@@ -1,0 +1,175 @@
+# Business Requirements Document (BRD): aigate
+
+**Versi:** 1.0
+**Tanggal:** 2026-09-03
+**Penulis:** Business Analyst (stand-in)
+**Sumber rujukan utama:** `documents/PRD.md` (PRD aigate), `pm/memory-bank.md`, `pm/status.md`
+
+---
+
+## 1. Ringkasan Eksekutif (Overview)
+
+**aigate** adalah aplikasi desktop berbasis Python (multiplatform: Windows, macOS, Linux) yang berfungsi sebagai **AI Proxy Gateway & Management Tool**. Produk ini menyatukan pengelolaan *AI Providers*, *Proxy Pools*, *Combos* (logika routing/load-balancing), dan penyediaan *custom OpenAI-compatible endpoints* dalam satu antarmuka. Selain itu, aigate menyertakan Terminal terintegrasi berbasis `xterm.js` (multi-tab) dengan kontrol mengambang (fullscreen & paste) serta dukungan scroll/swipe ala trackpad, dan integrasi instan untuk *CLI tools* (dikelompokkan per kategori) yang secara otomatis mengonfigurasi dan memilih model dari provider atau combos yang aktif.
+
+Tujuan bisnis utama aigate adalah **menurunkan friction** bagi pengembang dan praktisi ML dalam menjalankan agen AI berbasis CLI: tidak perlu lagi mengatur API key, base URL, rotasi proxy, dan failover secara manual di setiap tool. Semua dikelola sekali di aigate, lalu disuntikkan otomatis ke CLI tool pilihan.
+
+## 2. Tujuan Bisnis (Business Objectives)
+
+1. **Konsolidasi pengelolaan AI:** Satu titik kontrol untuk provider, proxy, routing, dan endpoint.
+2. **Akselerasi adopsi CLI agentic:** Pengguna dapat menjalankan `claude`, `opencode`, `codex`, `aider`, dan lainnya dalam hitungan detik tanpa setup manual.
+3. **Ketahanan (resilience):** Failover otomatis antar provider melalui Combo mengurangi downtime saat satu provider error atau rate-limited.
+4. **Efisiensi biaya & latensi:** Strategi routing *lowest latency / cost optimization* menekan biaya inferensi.
+5. **Pengalaman terminal natural:** Scroll/swipe velocity-based dan kontrol mengambang membuat aigate nyaman dipakai sebagai workspace utama.
+
+## 3. Stakeholders & User Personas
+
+| Persona | Peran | Kebutuhan utama | Nilai yang diharapkan |
+| :--- | :--- | :--- | :--- |
+| **Developer / CLI-Agent User** | Engineer yang menjalankan agen coding (`claude`, `opencode`, `aider`, dsb.) | Launcher instan + auto-config model/provider; terminal multi-tab nyaman | Hemat waktu setup; fokus ke coding, bukan konfigurasi |
+| **ML Ops / Platform Engineer** | Mengelola banyak provider, proxy, quota | Proxy pools, health check, routing cerdas, access control endpoint | Uptime tinggi, observabilitas, kontrol biaya |
+| **Researcher / Autonomous-Agent Builder** | Menjalankan agen otonom (`autogpt`, `crewai`, `openhands`) | Grouping tool, auto-inject env, multi-tab | Eksperimen cepat tanpa boilerplate |
+| **Casual Power User** | Pakai chat/shell assistant (`llm`, `sgpt`, `mods`) | Grup C rapi, paste/fullscreen mudah | Pengalaman CLI sehari-hari lebih mulus |
+| **Product Owner / BA (internal)** | Menentukan prioritas fitur | Dokumen kebutuhan jelas & teruji | Roadmap terukur |
+
+**Stakeholder eksternal:** Pengguna akhir aigate (individu/ tim kecil praktisi AI). Tidak ada pihak ketiga selain provider AI eksternal.
+
+## 4. Value Proposition & ROI Framing
+
+- **Penghematan waktu (Time-to-First-Token):** Tanpa aigate, setiap CLI tool memerlukan setup env manual (~5–15 menit/tool). Dengan launcher auto-config, turun ke <30 detik. Untuk tim 5 orang × 10 tool = ~12,5 jam/orang/bulan dihemat.
+- **Pengurangan kegagalan konfigurasi:** Auto-injection menekan error *wrong API base/key* mendekati nol.
+- **Resilience tanpa biaya ops:** Failover Combo mencegah interupsi kerja saat provider down; ROI berupa kontinuitas produktivitas.
+- **Native Python run (tanpa deployment & tanpa packaging):** Berjalan langsung sebagai aplikasi Python cross-platform sehingga beban onboarding & dukungan IT rendah.
+
+## 5. User Stories & Acceptance Criteria
+
+Prioritas: **Must-have** (M), **Should-have** (S), **Nice-to-have** (N).
+Setiap story merujuk nomor section PRD terkait.
+
+### 5.1 Providers Management (rujukan PRD §2.1)
+
+**US-2.1.1 — CRUD Provider** *(Must-have)*
+Sebagai Developer, saya ingin menambah/mengedit/melihat/menghapus AI Provider (OpenAI, Anthropic, OpenRouter, Ollama, LiteLLM, dsb.) agar semua kredensial terpusat.
+- *Acceptance:* (1) UI menyediakan form tambah/edit/hapus provider. (2) Daftar provider terlihat lengkap. (3) Hapus provider meminta konfirmasi dan menghapus data terkait.
+
+**US-2.1.2 — Credential Storage Aman** *(Must-have)*
+Sebagai ML Ops, saya ingin menyimpan API Key, Base URL, dan custom headers per provider secara aman agar tidak tersebar di env shell.
+- *Acceptance:* (1) Field API Key bertipe masked. (2) Data tersimpan terenkripsi/terlindungi di storage lokal (SQLite/JSON). (3) Custom headers dapat ditambah sebagai pasangan key-value.
+
+**US-2.1.3 — Model Auto-Discovery** *(Should-have)*
+Sebagai Developer, saya ingin aigate mengambil daftar model otomatis dari provider yang mendukung `/models`.
+- *Acceptance:* (1) Saat provider ditambah, aigate memanggil endpoint `/models` bila didukung. (2) Daftar model tampil dan bisa dipilih. (3) Bila tidak didukung, user dapat input model manual.
+
+### 5.2 Proxy Pools (rujukan PRD §2.2)
+
+**US-2.2.1 — Proxy Configuration Multi-Protokol** *(Must-have)*
+Sebagai ML Ops, saya ingin mendaftarkan proxy HTTP/HTTPS/SOCKS5 agar traffic ke provider dapat di-routing.
+- *Acceptance:* (1) UI menerima input host:port dan tipe protokol. (2) Validasi format address. (3) Proxy tersimpan dan dapat dipilih oleh routing.
+
+**US-2.2.2 — Rotation Strategy** *(Should-have)*
+Sebagai ML Ops, saya ingin memilih strategi rotasi (Round Robin / Random / Failover).
+- *Acceptance:* (1) Dropdown strategi tersedia. (2) Behavior rotasi sesuai pilihan saat request keluar.
+
+**US-2.2.3 — Health Check** *(Should-have)*
+Sebagai ML Ops, saya ingin proxy di-check latensi & uptime berkala agar proxy mati otomatis dilewati.
+- *Acceptance:* (1) Status proxy (healthy/dead) tampil. (2) Proxy dead tidak dipakai rotasi. (3) Check berjalan di background.
+
+### 5.3 Combos — Smart Routing & Fallback (rujukan PRD §2.3)
+
+**US-2.3.1 — Custom Pipeline** *(Must-have)*
+Sebagai ML Ops, saya ingin menggabungkan beberapa provider/model ke dalam satu Combo agar dipakai sebagai satu tujuan.
+- *Acceptance:* (1) UI membuat Combo dari ≥2 anggota provider/model. (2) Combo muncul di daftar & dapat dipilih endpoint/CLI.
+
+**US-2.3.2 — Fallback Strategy** *(Must-have)*
+Sebagai Developer, saya ingin request dialihkan ke provider B bila A error/rate-limited.
+- *Acceptance:* (1) Bila A gagal (5xx/429), request otomatis ke B. (2) User tidak perlu restart.
+
+**US-2.3.3 — Load Balancing & Cost/Latency Optimization** *(Should-have)*
+Sebagai ML Ops, saya ingin strategi load-balancing berbobot dan *lowest latency / cost optimization*.
+- *Acceptance:* (1) Bobot tiap anggota dapat diatur. (2) Strategi arahkan ke model tercepat/termurah berfungsi.
+
+### 5.4 Endpoints (rujukan PRD §2.4)
+
+**US-2.4.1 — OpenAI-Compatible Gateway** *(Must-have)*
+Sebagai Developer, saya ingin server lokal `http://localhost:8080/v1` kompatibel OpenAI (`/v1/chat/completions`, `/v1/models`).
+- *Acceptance:* (1) Server jalan otomatis saat aigate aktif. (2) Request format OpenAI dijawab benar. (3) `/v1/models` mengembalikan model terdaftar.
+
+**US-2.4.2 — Endpoint Binding** *(Must-have)*
+Sebagai ML Ops, saya ingin memetakan endpoint ke Provider/Combo tertentu.
+- *Acceptance:* (1) Setiap endpoint terikat ke satu sumber (provider/combo). (2) Perubahan binding langsung berlaku.
+
+**US-2.4.3 — Access Control** *(Should-have)*
+Sebagai ML Ops, saya ingin API key internal opsional mengamankan akses lokal.
+- *Acceptance:* (1) Bila diaktifkan, request tanpa key ditolak. (2) Key dapat digenerate & direset.
+
+### 5.5 Integrated Multi-Tab Terminal (rujukan PRD §2.5, §2.5.1)
+
+**US-2.5.1 — Web/UI Terminal Multi-Tab** *(Must-have)*
+Sebagai Developer, saya ingin terminal `xterm.js` multi-tab via WebSocket PTY di dalam aigate.
+- *Acceptance:* (1) Buka ≥1 tab independen. (2) Shell terdeteksi (Bash/Zsh/PowerShell/CMD). (3) Input/output real-time.
+
+**US-2.5.2 — Floating Control: Toggle Fullscreen** *(Must-have)*
+Sebagai Developer, saya ingin ikon mengambang untuk memperbesar terminal menutupi seluruh area kerja lalu kembali normal.
+- *Acceptance:* (1) Ikon mengambang tampil di area terminal. (2) Klik toggle → fullscreen; klik lagi → normal. (3) State tidak merusak tab lain.
+
+**US-2.5.3 — Floating Control: Paste + Auto Return Focus** *(Must-have)*
+Sebagai Developer, saya ingin tombol paste menyuntikkan clipboard ke PTY aktif, lalu fokus input otomatis kembali ke terminal aktif tanpa klik ulang.
+- *Acceptance:* (1) Klik paste → isi clipboard masuk ke PTY. (2) Setelah paste, kursor/fokus berada di terminal aktif. (3) Tidak bergantung shortcut OS.
+
+**US-2.5.4 — Scroll Mouse & Trackpad** *(Should-have)*
+Sebagai Developer, saya ingin scroll vertikal (dan horizontal bila ada) via roda mouse/trackpad.
+- *Acceptance:* (1) Roda mouse scroll buffer. (2) Gesture trackpad horizontal berfungsi bila didukung hardware.
+
+**US-2.5.5 — Swipe → Scroll (bukan navigasi TUI)** *(Must-have)*
+Sebagai Developer, saya ingin gesture swipe diubah menjadi scroll buffer (bukan memicu navigasi/escape TUI yang merusak tampilan).
+- *Acceptance:* (1) Swipe di area terminal = scroll. (2) Tidak memicu escape/navigasi TUI. (3) Aplikasi TUI yang butuh swipe khusus dapat dikecualikan per-aplikasi.
+
+**US-2.5.6 — Velocity-based Scroll & Damping** *(Should-have)*
+Sebagai Developer, saya ingin kecepatan swipe menentukan kecepatan scroll, dengan easing & damping agar natural.
+- *Acceptance:* (1) Swipe cepat → scroll cepat (bisa lompat layar). (2) Swipe lambat → halus baris-per-baris. (3) Easing/damping halus di ujung buffer.
+
+### 5.6 CLI Tools Auto-Launcher & Auto-Configuration (rujukan PRD §2.6, §2.6.1)
+
+**US-2.6.1 — CLI Tool Presets & Auto-Install** *(Must-have)*
+Sebagai Developer, saya ingin klik tool CLI (mis. `aider`, `llm`) lalu aigate cek `which/where`; bila belum ada, install otomatis di tab terminal.
+- *Acceptance:* (1) Klik tool → cek ketersediaan binary. (2) Bila tiada → jalankan `pip install`/`uv` di tab baru. (3) Bila ada → lanjut ke picker.
+
+**US-2.6.2 — Interactive Model & Provider Picker** *(Must-have)*
+Sebagai Developer, saya ingin modal berisi daftar Provider/Combo & Model aktif sebelum tool dijalankan.
+- *Acceptance:* (1) Modal tampil sebelum eksekusi. (2) Pilihan terbatas pada provider/combo/model aktif. (3) Pilihan disimpan untuk sesi.
+
+**US-2.6.3 — Auto-Injection Envs/Flags** *(Must-have)*
+Sebagai Developer, saya ingin aigate menyet `OPENAI_API_BASE`, `OPENAI_API_KEY` (atau flag) ke tab terminal lalu menjalankan CLI tool.
+- *Acceptance:* (1) Env disuntikkan sebelum command. (2) Tool berjalan terhadap gateway lokal aigate. (3) Key tidak tertulis plaintext di history shell yang mudah terbaca (best-effort).
+
+**US-2.6.4 — Grouping Tool CLI (Grup A/B/C)** *(Must-have)*
+Sebagai Developer, saya ingin tool CLI dikelompokkan: Grup A (Agentic Coding: `claude`, `opencode`, `codex`, `gemini`, `antigravity`, `phi`, `aider`, `goose`, `amp`, `qwen`, `cline`, `kilo`), Grup B (Autonomous Agents: `openhands`, `swe-agent`, `open-interpreter`, `autogpt`, `gpt-researcher`, `crewai`), Grup C (Chat/Shell: `llm`, `sgpt`, `mods`, `oterm`, `gptme`, `aichat`).
+- *Acceptance:* (1) UI membagi minimal 3 grup, masing-masing ≥5 preset. (2) Grup A (agentic) ditonjolkan/diutamakan. (3) Daftar dapat diperluas via YAML/JSON (rujukan Roadmap §6).
+
+## 6. Prioritas & Matrix Dampak
+
+| Fitur | Prioritas | Dampak bisnis | Alasan |
+| :--- | :--- | :--- | :--- |
+| 2.4 Gateway + 2.6 Launcher/Auto-config | Must | Tinggi | Inti value proposition (zero-setup agentic) |
+| 2.1 Providers, 2.3 Combos | Must | Tinggi | Fondasi routing & resilience |
+| 2.5 Terminal + floating control + swipe/scroll | Must | Sedang-Tinggi | Workspace utama & UX differentiation |
+| 2.2 Proxy Pools | Should | Sedang | Penting untuk region/anti-rate-limit |
+| 2.1.3 Auto-discovery, 2.4.3 Access Control | Should | Sedang | Keamanan & kenyamanan |
+| 2.5.4/2.5.6 velocity scroll/damping | Should | Sedang | Polesan UX |
+| Cost limits/telemetry (Roadmap §6) | Nice | Akan datang | Belum di-scope MVP |
+
+## 7. Asumsi & Ketergantungan
+
+- aigate dijalankan natively sebagai aplikasi Python (cross-platform, tanpa deployment & tanpa packaging) → lihat NFR PRD §5 / TSD ADR-009.
+- CLI tool mengonsumsi env `OPENAI_API_BASE`/`OPENAI_API_KEY` standar.
+- xterm.js + WebSocket PTY tersedia di stack (PRD §3).
+- YAML/JSON config untuk ekspansi grup tool (Roadmap §6).
+
+## 8. Definisi Selesai (Definition of Done)
+
+- BRD lengkap & konsisten; setiap fitur inti ≥1 user story ber-acceptance criteria.
+- Fitur terminal baru (floating control, scroll/swipe, grouping) tercakup eksplisit.
+- Dev/QA dapat menurunkan test case langsung dari acceptance criteria.
+
+---
+
+*Dokumen ini ditulis di bawah scope `docs/business/` sesuai aturan specialist Business Analyst.*
