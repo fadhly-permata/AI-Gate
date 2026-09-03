@@ -14,6 +14,7 @@ are stored in plaintext — no encryption, matching the ERD data dictionary.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import (
     Boolean,
@@ -41,12 +42,21 @@ class Provider(Base):
     # ADR-007: plaintext per design (local app) — NO encryption, NO hashing.
     api_key: Mapped[str] = mapped_column(String, nullable=False, default="")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # B5.2: 3-Tier Fallback tier classification. Allowed: 'subscription' |
+    # 'cheap' | 'free'. Defaults to 'subscription'; if unset/unknown, the
+    # routing layer classifies by provider ``type`` via ``provider_tier``.
+    tier: Mapped[str] = mapped_column(String, default="subscription")
     # JSON-encoded dict of extra HTTP headers (e.g. org/region headers).
     # Empty -> "{}". Stored as text; ADR-007 plaintext (no encryption).
     custom_headers: Mapped[str] = mapped_column(String, default="{}")
+    # Default model hint for this provider (nullable; free-form provider model id).
+    default_model: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     models: Mapped[list["ProviderModel"]] = relationship(back_populates="provider")
+    accounts: Mapped[list["ProviderAccount"]] = relationship(
+        back_populates="provider"
+    )
     combo_members: Mapped[list["ComboMember"]] = relationship(
         back_populates="provider"
     )
@@ -57,6 +67,34 @@ class Provider(Base):
         ),
         viewonly=True,
     )
+
+
+class ProviderAccount(Base):
+    """Per-provider credential account (B5.1 / ADR-007 / ADR-013).
+
+    A provider may have many accounts. Each account carries either a static
+    ``api_key`` (``auth_type='api_key'``) or an OAuth token set
+    (``auth_type='oauth'``): ``oauth_token``, ``refresh_token``,
+    ``expires_at``. Tokens are stored in **plaintext** (ADR-007) — no
+    encryption, no masking, returned as-is by the API.
+    """
+
+    __tablename__ = "provider_accounts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider_id: Mapped[int] = mapped_column(
+        ForeignKey("providers.id"), nullable=False
+    )
+    label: Mapped[str] = mapped_column(String, nullable=False, default="")
+    auth_type: Mapped[str] = mapped_column(String, nullable=False, default="api_key")
+    # ADR-007: plaintext per design (local app) — NO encryption, NO hashing.
+    api_key: Mapped[str] = mapped_column(String, default="")
+    oauth_token: Mapped[str] = mapped_column(String, default="")
+    refresh_token: Mapped[str] = mapped_column(String, default="")
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    provider: Mapped["Provider"] = relationship(back_populates="accounts")
 
 
 class ProviderModel(Base):
@@ -168,6 +206,11 @@ class Endpoint(Base):
     # proxy). FK to proxy_pools.id; null = no proxy for this endpoint.
     proxy_pool_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("proxy_pools.id"), nullable=True
+    )
+    # ADR-013 / B5.4: Token Saver hook mode applied as a pre-translate hook.
+    # Allowed: 'off' | 'rtk' | 'caveman' | 'ponytail'. Default 'off' (no hook).
+    token_saver: Mapped[str] = mapped_column(
+        String, nullable=False, default="off"
     )
 
     bindings: Mapped[list["EndpointBinding"]] = relationship(
@@ -294,6 +337,7 @@ class Setting(Base):
 
 __all__ = [
     "Provider",
+    "ProviderAccount",
     "ProviderModel",
     "ProxyPool",
     "ProxyNode",

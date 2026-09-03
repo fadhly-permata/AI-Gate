@@ -8,10 +8,14 @@ plaintext — no encryption, matching ERD.md.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+
+logger = logging.getLogger(__name__)
 
 
 class Base(DeclarativeBase):
@@ -49,13 +53,87 @@ SessionLocal: sessionmaker = sessionmaker(
 )
 
 
+def _ensure_provider_default_model_column(engine) -> None:
+    """Self-heal ``providers.default_model`` on pre-existing DBs.
+
+    ``create_all`` never alters existing tables, so a DB created before the
+    column existed (e.g. ``~/.aigate/aigate.db``) lacks it and every
+    ``/api/providers`` call 500s. Idempotent: a PRAGMA check guards the ALTER,
+    and only the specific ``OperationalError`` is swallowed (R12 — no bare
+    ``except``).
+    """
+    try:
+        with engine.connect() as conn:
+            existing = {
+                row[1] for row in conn.execute(text("PRAGMA table_info(providers)")).fetchall()
+            }
+            if "default_model" not in existing:
+                conn.execute(
+                    text("ALTER TABLE providers ADD COLUMN default_model TEXT")
+                )
+                conn.commit()
+    except OperationalError as exc:  # e.g. table missing on a bare/empty engine
+        logger.warning("skipping provider.default_model migration: %s", exc)
+
+
+def _ensure_endpoint_token_saver_column(engine) -> None:
+    """Self-heal ``endpoints.token_saver`` on pre-existing DBs (B5.4 / ADR-013).
+
+    ``create_all`` never alters existing tables, so a DB created before the
+    column existed lacks it. Idempotent: a PRAGMA check guards the ALTER, and
+    only the specific ``OperationalError`` is swallowed (R12 — no bare
+    ``except``).
+    """
+    try:
+        with engine.connect() as conn:
+            existing = {
+                row[1]
+                for row in conn.execute(text("PRAGMA table_info(endpoints)")).fetchall()
+            }
+            if "token_saver" not in existing:
+                conn.execute(
+                    text(
+                        "ALTER TABLE endpoints ADD COLUMN token_saver TEXT "
+                        "NOT NULL DEFAULT 'off'"
+                    )
+                )
+                conn.commit()
+    except OperationalError as exc:  # e.g. table missing on a bare/empty engine
+        logger.warning("skipping endpoint.token_saver migration: %s", exc)
+
+
+def _ensure_provider_tier_column(engine) -> None:
+    """Self-heal ``providers.tier`` on pre-existing DBs (B5.2).
+
+    ``create_all`` never alters existing tables, so a DB created before the
+    column existed lacks it. Idempotent: a PRAGMA check guards the ALTER, and
+    only the specific ``OperationalError`` is swallowed (R12 — no bare
+    ``except``).
+    """
+    try:
+        with engine.connect() as conn:
+            existing = {
+                row[1] for row in conn.execute(text("PRAGMA table_info(providers)")).fetchall()
+            }
+            if "tier" not in existing:
+                conn.execute(text("ALTER TABLE providers ADD COLUMN tier TEXT"))
+                conn.commit()
+    except OperationalError as exc:  # e.g. table missing on a bare/empty engine
+        logger.warning("skipping provider.tier migration: %s", exc)
+
+
 def init_db() -> None:
     """Create all tables declared on ``Base.metadata`` (idempotent).
 
     Importing ``backend.models`` registers every mapped entity onto
-    ``Base.metadata`` before ``create_all`` runs.
+    ``Base.metadata`` before ``create_all`` runs. After bootstrap, self-heal
+    any columns added to existing tables after their first creation.
     """
     from backend import models  # noqa: F401  (side-effect: register mappers)
     from backend.config.db import Base
 
-    Base.metadata.create_all(get_engine())
+    engine = get_engine()
+    Base.metadata.create_all(engine)
+    _ensure_provider_default_model_column(engine)
+    _ensure_provider_tier_column(engine)
+    _ensure_endpoint_token_saver_column(engine)

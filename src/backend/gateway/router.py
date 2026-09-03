@@ -36,7 +36,7 @@ from backend.combo_routing import execute_combo
 from backend.gateway import provider_adapter
 from backend.gateway.errors import GatewayError
 from backend.gateway.resolver import ResolvedTarget, TargetNotFound, resolve_target
-from backend.log import log_info, log_warning
+from backend.log import log_info, log_warning, log_warning_exc
 from backend.models import (
     Combo,
     Endpoint,
@@ -45,7 +45,9 @@ from backend.models import (
     ProviderModel,
     ProxyPool,
 )
+from backend.gateway import token_saver as _token_saver
 from backend import proxy_selector
+from backend.oauth import select_provider_credential
 
 
 class ChatCompletionRequest(BaseModel):
@@ -136,6 +138,10 @@ async def chat_completions(request: Request) -> dict:
     # driven by the Endpoint's EndpointBinding instead of the model reference.
     endpoint_name = request.headers.get("x-aigate-endpoint")
     if endpoint_name:
+        # ADR-013 / B5.4: apply the Endpoint's Token Saver hook to the payload
+        # BEFORE forwarding. Fail-open: never raises; original payload returned
+        # on any error / missing endpoint / mode 'off'.
+        payload = _apply_token_saver_for_endpoint(endpoint_name, payload)
         result = await _route_via_endpoint(endpoint_name, model, payload, request)
         log_info(
             f"chat completion success via endpoint '{endpoint_name}' "
@@ -207,6 +213,52 @@ async def list_models() -> dict:
 # --------------------------------------------------------------------------- #
 # Endpoint-level routing (ADR-008 / task B2.5)
 # --------------------------------------------------------------------------- #
+def _lookup_endpoint(session, ref: str) -> Optional[Endpoint]:
+    """Resolve an ``Endpoint`` by integer id (header value parsed) or by name.
+
+    The ``X-Aigate-Endpoint`` header may carry either the numeric endpoint id
+    or its name; try id first, then fall back to name lookup.
+    """
+    # Try integer id first (no risky parse exception; names are non-numeric).
+    if ref.isdigit():
+        endpoint = session.get(Endpoint, int(ref))
+        if endpoint is not None:
+            return endpoint
+    return session.query(Endpoint).filter_by(name=ref).first()
+
+
+def _apply_token_saver_for_endpoint(name: str, payload: dict) -> dict:
+    """Apply the Token Saver hook for the named/identified Endpoint (fail-open).
+
+    Looks up the ``Endpoint`` by id-or-name; if found and its ``token_saver``
+    mode is not ``off``/None, runs ``apply_token_saver`` on the payload. Any
+    failure (lookup error, missing endpoint, transform exception) results in the
+    original ``payload`` being returned unchanged (ADR-013 fail-open).
+    """
+    try:
+        with SessionLocal() as session:
+            endpoint = _lookup_endpoint(session, name)
+            if endpoint is None:
+                return payload  # header present but endpoint unknown -> no hook
+            mode = endpoint.token_saver
+            if not mode or mode == "off":
+                return payload
+            log_info(
+                f"applying token_saver mode '{mode}' for endpoint "
+                f"'{endpoint.name}'",
+                source="backend.gateway.router",
+                context={"endpoint": endpoint.name, "mode": mode},
+            )
+            return _token_saver.apply_token_saver(mode, payload)
+    except Exception as exc:  # noqa: BLE001 - fail-open mandated by ADR-013
+        log_warning_exc(
+            "token_saver endpoint lookup failed; passing through original payload",
+            source="backend.gateway.router",
+            exc=exc,
+        )
+        return payload
+
+
 def _strip_binding_prefix(model: str) -> str:
     """Strip a leading ``provider:``/``combo:`` reference prefix for an
     Endpoint-bound provider call so the REAL model id reaches the upstream.
@@ -324,7 +376,7 @@ async def _route_via_endpoint(
                 )
             target = ResolvedTarget(
                 base_url=provider.base_url,
-                api_key=provider.api_key,
+                api_key=select_provider_credential(provider, session),
                 model_ref=model,
                 upstream_model=_strip_binding_prefix(model),
                 combo_used=False,
