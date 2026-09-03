@@ -474,6 +474,22 @@
 - BACKLOG B5.6 `[x]`. **B5.7 aktif** (be-dev+fe-dev, sekuensial): Export/Import
   Setting lokal (JSON) — pengganti cloud sync (PRD §2.4.4). be-dev dulu.
 
+## Frontend automation 2026-09-03 — vitest + e2e (diperluas) — SELESAI
+- User "test otomasi front end" -> PM jalanin 2 lapis:
+  - **vitest (unit/jsdom)**: **173 passed (15 file)** — termasuk accounts(9),
+    usage(26), analytics(40), exportimport(13).
+  - **e2e smoke** (`e2e/android.mjs`, puppeteer-core + chromium headless): **PASS**
+    (title + sidebar + /api/health + /api/providers).
+- User "lanjut" -> perluas e2e ke view B5.x (fe-dev nulis, PM eksekusi):
+  - **fe-dev**: `src/frontend/e2e/b5_features.mjs` (puppeteer-core) + npm script
+    `test:e2e:b5`. `node --check` lolos.
+  - **PM eksekusi** (server sementara + chromium): **B5 E2E PASS** — seed provider+
+    account -> B5.1 Providers->Accounts -> B5.5 Usage&Quota -> B5.6 Analytics+
+    ExportCSV -> B5.7 Backup/Restore, semua OK. Commit `6f89c78`.
+  - Catatan: warning `anthropic/models 404` di log = expected (no network), ditangani
+    graceful (bukan kegagalan).
+- Semua sementara (tmp) dibersihkan (R8); tree bersih.
+
 ## Opsional pasca-backlog 2026-09-03 — CSV report export — SELESAI
 - User "boleh, tapi commit dulu" -> PM konfirmasi tree bersih (semua backlog udah
   ke-commit), lalu kerjakan opsional.
