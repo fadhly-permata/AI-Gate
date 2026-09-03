@@ -26,6 +26,7 @@
   "use strict";
 
   var ANALYTICS_API = "/api/analytics";
+  var ANALYTICS_EXPORT_API = "/api/analytics/export";
   var REQLOG_API = "/api/request-logs";
   var SETTINGS_API = "/api/settings";
   var REQLOG_LIMIT = 50;        // default rows in the request-log table
@@ -255,6 +256,38 @@
     });
   }
 
+  /* ---- CSV export (B5.6 add-on): download the CURRENT report ---- */
+  // GET /api/analytics/export?range=&group_by=&format=csv -> 200 text/csv with
+  // Content-Disposition: attachment (server sets the filename). The browser
+  // downloads it automatically; we just navigate an anchor at the URL that
+  // matches what's on screen (same range + group_by as the dashboard).
+  function buildExportUrl(range, groupBy) {
+    return ANALYTICS_EXPORT_API + "?range=" + encodeURIComponent(range || "month") +
+      "&group_by=" + encodeURIComponent(groupBy || "model") + "&format=csv";
+  }
+
+  // Args fall back to the current control values (mirrors loadAnalytics). Returns
+  // the URL it triggered so callers/tests can assert it.
+  function exportAnalyticsCsv(range, groupBy) {
+    var r = el("analyticsRange");
+    var g = el("analyticsGroup");
+    range = range || (r && r.value) || "month";
+    groupBy = groupBy || (g && g.value) || "model";
+    var url = buildExportUrl(range, groupBy);
+    // Same temp-anchor pattern the B5.7 settings export uses: the empty
+    // `download` attr lets the server's Content-Disposition name the file.
+    var a = document.createElement("a");
+    a.setAttribute("href", url);
+    a.setAttribute("download", "");
+    a.rel = "noopener";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setMsg("analyticsMsg", getStr("analytics.export.ok"), "ok");
+    return url;
+  }
+
   /* ---- Request Log viewer (debug mode) ---- */
   function buildReqLogUrl(limit, endpointId) {
     var url = REQLOG_API + "?limit=" + encodeURIComponent(limit || REQLOG_LIMIT);
@@ -385,6 +418,10 @@
     if (refreshBtn) {
       refreshBtn.addEventListener("click", function () { loadAnalytics(); });
     }
+    var exportBtn = el("analyticsExportBtn");
+    if (exportBtn) {
+      exportBtn.addEventListener("click", function () { exportAnalyticsCsv(); });
+    }
     var reqlogToggle = el("reqlogEnabled");
     if (reqlogToggle) {
       reqlogToggle.addEventListener("change", function () {
@@ -404,6 +441,7 @@
   window.aigate.renderTrendChart = renderTrendChart;
   window.aigate.renderByGroup = renderByGroup;
   window.aigate.loadAnalytics = loadAnalytics;
+  window.aigate.exportAnalyticsCsv = exportAnalyticsCsv;
   window.aigate.renderRequestLogs = renderRequestLogs;
   window.aigate.loadRequestLogs = loadRequestLogs;
   window.aigate.setRequestLogEnabled = setRequestLogEnabled;
@@ -416,6 +454,8 @@
     renderTrendChart: renderTrendChart,
     renderByGroup: renderByGroup,
     loadAnalytics: loadAnalytics,
+    exportAnalyticsCsv: exportAnalyticsCsv,
+    buildExportUrl: buildExportUrl,
     renderRequestLogs: renderRequestLogs,
     loadRequestLogs: loadRequestLogs,
     loadRequestLogSetting: loadRequestLogSetting,

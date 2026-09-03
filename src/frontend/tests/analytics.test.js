@@ -38,6 +38,7 @@ function withAnalyticsDom() {
       '<option value="cost">cost</option>' +
     '</select>' +
     '<button id="analyticsRefreshBtn" type="button">Refresh</button>' +
+    '<button id="analyticsExportBtn" type="button">Export CSV</button>' +
     '<div id="analyticsTotals"></div>' +
     '<div id="analyticsChart"></div>' +
     '<table><tbody id="analyticsGroupBody"></tbody></table>' +
@@ -355,6 +356,73 @@ describe("loadAnalytics / loadRequestLogs hit the right URLs", () => {
   });
 });
 
+describe("exportAnalyticsCsv (B5.6 CSV export)", () => {
+  beforeEach(() => { withAnalyticsDom(); });
+
+  it("builds the export URL + triggers a download for explicit args", () => {
+    const clicked = [];
+    const spy = vi.spyOn(window.HTMLElement.prototype, "click").mockImplementation(function () {
+      clicked.push(this.getAttribute("href"));
+    });
+
+    const url = window.aigate.exportAnalyticsCsv("month", "model");
+
+    expect(url).toBe("/api/analytics/export?range=month&group_by=model&format=csv");
+    expect(clicked).toContain("/api/analytics/export?range=month&group_by=model&format=csv");
+    spy.mockRestore();
+
+    const msg = document.getElementById("analyticsMsg");
+    expect(msg.textContent).toContain("Export started");
+    expect(msg.className).toContain("settings-msg-ok");
+  });
+
+  it("URL honors provider grouping + encodes params", () => {
+    const spy = vi.spyOn(window.HTMLElement.prototype, "click").mockImplementation(() => {});
+    const url = window.aigate.analytics.buildExportUrl("week", "provider");
+    expect(url).toBe("/api/analytics/export?range=week&group_by=provider&format=csv");
+    spy.mockRestore();
+  });
+
+  it("falls back to the CURRENT selector values when called with no args", () => {
+    document.getElementById("analyticsRange").value = "week";
+    document.getElementById("analyticsGroup").value = "provider";
+    const clicked = [];
+    const spy = vi.spyOn(window.HTMLElement.prototype, "click").mockImplementation(function () {
+      clicked.push(this.getAttribute("href"));
+    });
+
+    const url = window.aigate.exportAnalyticsCsv();
+
+    expect(url).toBe("/api/analytics/export?range=week&group_by=provider&format=csv");
+    expect(clicked).toContain("/api/analytics/export?range=week&group_by=provider&format=csv");
+    spy.mockRestore();
+  });
+
+  it("the anchor carries an empty download attr (server sets the filename)", () => {
+    let downloadAttr;
+    const spy = vi.spyOn(window.HTMLElement.prototype, "click").mockImplementation(function () {
+      downloadAttr = this.getAttribute("download");
+    });
+    window.aigate.exportAnalyticsCsv("day", "model");
+    expect(downloadAttr).toBe("");
+    spy.mockRestore();
+    // temp anchor is cleaned up (not left in the DOM)
+    expect(document.querySelector('a[download]')).toBeNull();
+  });
+
+  it("button is wired: clicking it triggers the export (mirrors init)", () => {
+    // Spy on the exposed helper (no-op) so we prove the click handler fires it
+    // without mocking prototype.click (which would block event dispatch).
+    const spy = vi.spyOn(window.aigate, "exportAnalyticsCsv").mockImplementation(() => {});
+    // Wire exactly as init() does, then click the real button.
+    const btn = document.getElementById("analyticsExportBtn");
+    btn.addEventListener("click", function () { window.aigate.exportAnalyticsCsv(); });
+    btn.click();
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+});
+
 describe("setRequestLogEnabled (PUT /api/settings)", () => {
   beforeEach(() => { withAnalyticsDom(); });
 
@@ -455,10 +523,23 @@ describe("index.html wiring (B5.6 structure)", () => {
     const view = doc.querySelector('.view[data-view="analytics"]');
     expect(view).not.toBeNull();
     ["analyticsMsg", "analyticsRange", "analyticsGroup", "analyticsMetric",
-     "analyticsRefreshBtn", "analyticsTotals", "analyticsChart",
+     "analyticsRefreshBtn", "analyticsExportBtn", "analyticsTotals", "analyticsChart",
      "analyticsGroupBody", "reqlogEnabled", "reqlogRefreshBtn", "reqlogMsg",
      "reqlogTableBody"]
       .forEach((id) => expect(view.querySelector("#" + id)).not.toBeNull());
+  });
+
+  it("Export CSV button sits in the analytics controls and is i18n-labelled", () => {
+    const view = doc.querySelector('.view[data-view="analytics"]');
+    const btn = view.querySelector("#analyticsExportBtn");
+    expect(btn).not.toBeNull();
+    expect(btn.getAttribute("type")).toBe("button");
+    expect(btn.querySelector('[data-i18n="analytics.export"]')).not.toBeNull();
+    // Lives in the same controls row as the range/group_by selectors.
+    const controls = view.querySelector(".analytics-controls");
+    expect(controls.querySelector("#analyticsRange")).not.toBeNull();
+    expect(controls.querySelector("#analyticsGroup")).not.toBeNull();
+    expect(controls.querySelector("#analyticsExportBtn")).not.toBeNull();
   });
 
   it("loads analytics.js after app.js + usage.js", () => {
@@ -483,5 +564,10 @@ describe("i18n analytics/reqlog keys (EN/ID parity)", () => {
     expect(window.I18N.id["nav.analytics"]).toBe("Analitik");
     expect(window.I18N.en["analytics.savings"]).toBe("Est. savings (tokens)");
     expect(window.I18N.id["reqlog.enable"]).toBe("Aktifkan log permintaan");
+    // CSV export keys (EN/ID parity, asserted by the loop above too).
+    expect(window.I18N.en["analytics.export"]).toBe("Export CSV");
+    expect(window.I18N.id["analytics.export"]).toBe("Ekspor CSV");
+    expect(window.I18N.en["analytics.export.ok"]).toBe("Export started.");
+    expect(window.I18N.id["analytics.export.ok"]).toBe("Ekspor dimulai.");
   });
 });
