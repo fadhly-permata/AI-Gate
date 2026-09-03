@@ -1,4 +1,13 @@
+import path from "path";
+import { fileURLToPath } from "url";
 import { defineConfig, devices } from "@playwright/test";
+
+// Resolusi absolut ke run.py di root project (config ini ada di
+// src/frontend/e2e, jadi naik 3 level). Pakai absolut biar webServer jalan
+// benar terlepas dari direktori eksekusi.
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(HERE, "..", "..", "..");
+const RUN_PY = path.join(ROOT, "run.py");
 
 // ===========================================================================
 // Cross-platform e2e config (Android/Termux + Linux + macOS + Windows)
@@ -46,7 +55,7 @@ export default defineConfig({
   // Jalankan server lewat run.py (tau PYTHONPATH ke src/backend). reuseExistingServer
   // true => kalau server sudah jalan (mis. `python run.py`), tidak di-spawn lagi.
   webServer: {
-    command: process.env.AIGATE_SERVER_CMD || `python ../../run.py --port ${PORT}`,
+    command: process.env.AIGATE_SERVER_CMD || `python ${RUN_PY} --port ${PORT}`,
     url: BASE,
     reuseExistingServer: true,
     timeout: 60000,

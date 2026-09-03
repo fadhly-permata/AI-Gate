@@ -27,7 +27,7 @@ from backend.proxies_router import router as proxies_router
 from backend.terminal.router import router as terminal_router
 
 STATIC_DIR: Path = (
-    Path(__file__).resolve().parent.parent.parent / "frontend" / "static"
+    Path(__file__).resolve().parent.parent / "frontend" / "static"
 )
 
 

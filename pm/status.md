@@ -200,6 +200,25 @@
   (shared storage Android) GAK dukung symlink → npm/esbuild/playwright gagal di situ.
   Playwright e2e BELUM bisa di sandbox ini (butuh download browser + symlink). REKOMENDASI:
   taruh project di home Termux (`~/projects/...`) bukan `~/storage/*` biar npm/playwright lancar.
+- 2026-09-03: **PROJECT DIPINDAH** ke `/data/data/com.termux/files/home/projects/aigate`
+  (`~/projects/aigate`) — keluar dari shared storage Android (`/storage/emulated/0/...`).
+  Sesudah pindah: `npm install` jalan normal (symlink `node_modules/.bin/vitest` OK) dan
+  `vitest run` **54 passed** native (tanpa trik temp). Backend pytest juga hijau di lokasi baru.
+  Commit `7cbfeb0` (Fase 0-4) sudah aman di repo. Sisa: Playwright e2e tinggal
+  `npx playwright install` (download browser) lalu `npm run test:e2e`.
+- 2026-09-03: **CROSS-PLATFORM E2E**: ditemukan `playwright-core` menolak platform
+  `android` (guard internal) → Playwright TIDAK bisa jalan on-device Android/Termux
+  walau pakai browser eksternal. Solusi:
+  - Desktop (Linux/macOS/Windows): `e2e/playwright.config.js` sudah dirombak — dukung
+    `PW_EXECUTABLE`/`PW_CHANNEL`/`PW_NO_SANDBOX`/`AIGATE_PORT`/`AIGATE_SERVER_CMD`,
+    server lewat `run.py`, `reuseExistingServer`. `npm run test:e2e`.
+  - Android on-device: `e2e/android.mjs` (puppeteer-core, tanpa platform guard) +
+    npm script `test:e2e:android`. Jalankan dgn `PW_EXECUTABLE=<path chromium> PW_NO_SANDBOX=1
+    npm run test:e2e:android` (server aigate sdh nyala). `puppeteer-core` sdh di-devDep
+    (gak download browser).
+  - Alternatif: jalankan server di Android, lalu Playwright (desktop) dari laptop se-link
+    network dgn `AIGATE_URL=http://<ip-android>:8080`.
+  Catatan: e2e TIDAK dijalankan di sandbox PM (gak ada binary browser di env ini).
 - 2026-09-03: **B4.3 SELESAI** (qa: pytest 101 passed/3 skipped, src coverage 79% (gate 60%);
   frontend vitest + playwright terblokir env sandbox — dilaporkan di
   `.opencode/reports/2026-09-03/qa/1350_b4_3_qa.md`. **SELURUH BACKLOG aigate SELESAI**
@@ -301,3 +320,32 @@
   sub-agent batas sandbox), R15 (jangan interupsi mid-run).
 - Dampak: handover sub-agent jadi pendek & konsisten -> implementasi lebih cepat,
   lest error, gak perlu Q&A. Run siap dilanjut (B0.4).
+
+## Verifikasi e2e LANGSUNG di Android/Termux — 2026-09-03 (PM eksekusi)
+- User minta beneran coba jalanin e2e + fix apa pun yg meledak (mirip kasus
+  Playwright dulu).
+- Environment ini (Termux) awalnya GAK ada browser. Langkah perbaikan:
+  1. `pkg install -y x11-repo` lalu `pkg install -y chromium` -> dapat
+     `/data/data/com.termux/files/usr/bin/chromium-browser` (butuh x11-repo
+     karena gtk3/libxkbcommon/libevdev gak ada di repo utama).
+  2. Server dinyalakan: `python3 run.py --port 8080` (background).
+- BUG DITEMUKAN #1: `GET /` balas 404. Root cause: `backend/server.py`
+  `STATIC_DIR` naik 3 parent (`parent.parent.parent`) + `frontend/static`
+  -> nyasar ke `<root>/frontend/static` yg gak ada. Static beneran di
+  `src/frontend/static` (2 parent). Mount dilewati karena `STATIC_DIR.exists()`
+  false. FIX: jadi `parent.parent / "frontend" / "static"`. Setelah fix `/`
+  -> HTTP 200, title "aigate", `aside.sidebar` ada.
+- BUG DITEMUKAN #2: `playwright.config.js` pakai `python ../../run.py` dari
+  `src/frontend/e2e` -> resolusi jadi `src/run.py` (gak ada; `run.py` di root).
+  FIX: pakai absolute path `RUN_PY = path.resolve(HERE,"..","..","..","run.py")`.
+  (Penting buat e2e desktop; di Android Playwright tetap gak bisa karena guard
+  platform "android" di playwright-core — itu limitation environment, BUKAN bug
+  kode. Solusinya runner puppeteer `e2e/android.mjs`.)
+- HASIL: `PW_EXECUTABLE=.../chromium-browser PW_NO_SANDBOX=1 node e2e/android.mjs`
+  -> **ANDROID E2E PASS** (title + sidebar + /api/health + /api/providers),
+  exit 0. Runner puppeteer terbukti jalan di device asli.
+- Catatan: Playwright desktop butuh `npx playwright install` (browser) — belum
+  dijalankan di sini (gak ada display/browser desktop). Path config sudah
+  dibenerin biar jalan di Linux/macOS/Windows.
+- Perubahan BELUM di-commit (user belum minta commit). File: `src/backend/server.py`,
+  `src/frontend/e2e/playwright.config.js`.
