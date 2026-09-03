@@ -149,6 +149,35 @@ def _ensure_provider_quota_columns(engine) -> None:
         logger.warning("skipping provider quota columns migration: %s", exc)
 
 
+def _ensure_usage_record_saved_tokens_column(engine) -> None:
+    """Self-heal ``usage_records.saved_tokens_est`` on pre-existing DBs (B5.6).
+
+    ``create_all`` never alters existing tables, so a DB created before the
+    column existed (B5.5 era) lacks it and every INSERT/SELECT on UsageRecord
+    500s. Idempotent: a PRAGMA check guards the ALTER, and only the specific
+    ``OperationalError`` is swallowed (R12 — no bare ``except``). The new
+    ``request_logs`` table needs no migration (create_all creates it).
+    """
+    try:
+        with engine.connect() as conn:
+            existing = {
+                row[1]
+                for row in conn.execute(
+                    text("PRAGMA table_info(usage_records)")
+                ).fetchall()
+            }
+            if "saved_tokens_est" not in existing:
+                conn.execute(
+                    text(
+                        "ALTER TABLE usage_records "
+                        "ADD COLUMN saved_tokens_est INTEGER"
+                    )
+                )
+                conn.commit()
+    except OperationalError as exc:  # e.g. table missing on a bare/empty engine
+        logger.warning("skipping usage_records.saved_tokens_est migration: %s", exc)
+
+
 def init_db() -> None:
     """Create all tables declared on ``Base.metadata`` (idempotent).
 
@@ -165,3 +194,4 @@ def init_db() -> None:
     _ensure_provider_tier_column(engine)
     _ensure_provider_quota_columns(engine)
     _ensure_endpoint_token_saver_column(engine)
+    _ensure_usage_record_saved_tokens_column(engine)

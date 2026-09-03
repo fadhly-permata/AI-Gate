@@ -277,6 +277,7 @@ async def execute_combo(
     payload: dict,
     proxy_url: Optional[str] = None,
     endpoint_id: Optional[int] = None,
+    saved_tokens_est: Optional[int] = None,
 ) -> dict:
     """Route a chat-completion request through a Combo's strategy.
 
@@ -288,6 +289,9 @@ async def execute_combo(
       provider adapter for each attempt.
     :param endpoint_id: optional originating Endpoint id (B5.5) — recorded on
       the UsageRow written after a successful member attempt.
+    :param saved_tokens_est: optional Token Saver savings figure (B5.6) —
+      threaded onto the UsageRecord written for the winning member
+      (NULL = no saver applied; see ``backend.usage.record_usage``).
     :raises TargetNotFound: if no matching combo exists.
     :raises UpstreamError: if every attempt fails (fallback) or the single
       selected attempt fails (load_balance / latency_cost), or there are no
@@ -362,6 +366,7 @@ async def execute_combo(
                         account_id=target.account_id,
                         model=target.upstream_model,
                         endpoint_id=endpoint_id,
+                        saved_tokens_est=saved_tokens_est,
                     )
                     log_info(
                         f"execute_combo: {strategy} success via member "
@@ -428,6 +433,7 @@ async def execute_combo(
         account_id=target.account_id,
         model=target.upstream_model,
         endpoint_id=endpoint_id,
+        saved_tokens_est=saved_tokens_est,
     )
     log_info(
         f"execute_combo: {strategy} success via member "

@@ -1,11 +1,11 @@
 """SQLAlchemy ORM models for all aigate config entities (from ERD.md).
 
-Fifteen entities are modeled with exact columns and foreign keys per
+Sixteen entities are modeled with exact columns and foreign keys per
 ``documents/analysis/ERD.md``:
 
     Provider, ProviderModel, ProxyPool, ProxyNode, Combo, ComboMember,
     Endpoint, EndpointBinding, CLIToolGroup, CLITool, TerminalSession,
-    TerminalTab, LogEntry, Setting, UsageRecord.
+    TerminalTab, LogEntry, Setting, UsageRecord, RequestLog.
 
 ADR-007: secret columns (``api_key``, ``internal_api_key``, ``password``)
 are stored in plaintext — no encryption, matching the ERD data dictionary.
@@ -227,6 +227,10 @@ class Endpoint(Base):
     )
     # B5.5: usage rows produced through this endpoint (ERD Endpoint||--o{UsageRecord).
     usages: Mapped[list["UsageRecord"]] = relationship(back_populates="endpoint")
+    # B5.6: request-level debug rows (ERD Endpoint||--o{RequestLog "produces").
+    request_logs: Mapped[list["RequestLog"]] = relationship(
+        back_populates="endpoint"
+    )
 
 
 class EndpointBinding(Base):
@@ -279,11 +283,53 @@ class UsageRecord(Base):
     tokens_out: Mapped[int] = mapped_column(Integer, default=0)
     # B5.5: estimated USD cost (best-effort; see backend.usage.estimate_cost).
     cost_est: Mapped[float] = mapped_column(Float, default=0.0)
+    # B5.6 / PRD §2.4.3: estimated tokens saved by the Endpoint's Token Saver
+    # hook for this request. NULL = no saver applied (not measured); 0 = saver
+    # applied but savings not input-measurable (caveman/ponytail are output-side
+    # — documented limitation); >0 = RTK compression (saved_bytes/4 heuristic).
+    # Nullable column on an existing table -> self-heal ALTER in config.db.
+    saved_tokens_est: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True
+    )
     ts: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     endpoint: Mapped[Optional["Endpoint"]] = relationship(back_populates="usages")
     provider: Mapped["Provider"] = relationship(back_populates="usages")
     account: Mapped[Optional["ProviderAccount"]] = relationship()
+
+
+class RequestLog(Base):
+    """Request-level debug log (ERD §RequestLog / PRD §2.4.3, B5.6).
+
+    Written by the gateway ONLY when request logging is enabled (``Setting``
+    key ``request_log_enabled`` == ``'true'``, default off — avoids unbounded
+    DB growth). ``request`` holds a JSON dump of the incoming headers + body
+    (secret headers redacted, truncated to a fixed cap); ``response`` holds a
+    short summary of the upstream answer (or the error envelope).
+
+    Distinct from the mandatory operational ``LogEntry`` (PRD §2.8 / ADR-011):
+    this table is per-request debug/analytics material, not app logging.
+
+    Nullability note vs the ERD: ``endpoint_id`` is nullable because
+    model-based gateway requests (no ``X-Aigate-Endpoint`` header) carry no
+    endpoint attribution — same rationale as ``UsageRecord.endpoint_id``.
+    """
+
+    __tablename__ = "request_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    endpoint_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("endpoints.id"), nullable=True
+    )
+    model: Mapped[str] = mapped_column(String, default="")
+    ts: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    duration_ms: Mapped[int] = mapped_column(Integer, default=0)
+    request: Mapped[str] = mapped_column(Text, default="")
+    response: Mapped[str] = mapped_column(Text, default="")
+
+    endpoint: Mapped[Optional["Endpoint"]] = relationship(
+        back_populates="request_logs"
+    )
 
 
 class CLIToolGroup(Base):
@@ -401,4 +447,5 @@ __all__ = [
     "LogEntry",
     "Setting",
     "UsageRecord",
+    "RequestLog",
 ]

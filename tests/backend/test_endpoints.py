@@ -439,7 +439,9 @@ def test_combo_bound_endpoint_forwards_proxy(monkeypatch) -> None:
 
     captured = {}
 
-    async def fake_execute_combo(combo_ref, payload, proxy_url=None, endpoint_id=None):
+    async def fake_execute_combo(
+        combo_ref, payload, proxy_url=None, endpoint_id=None, saved_tokens_est=None
+    ):
         captured["combo_ref"] = combo_ref
         captured["proxy_url"] = proxy_url
         captured["endpoint_id"] = endpoint_id

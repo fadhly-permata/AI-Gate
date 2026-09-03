@@ -26,7 +26,8 @@ from backend.models import (
     TerminalTab,
 )
 
-# All 15 table names declared on Base.metadata, per ERD.md.
+# All 16 table names declared on Base.metadata, per ERD.md (B5.6 adds
+# ``request_logs`` — the ERD RequestLog entity, now modeled).
 EXPECTED_TABLES = {
     "providers",
     "provider_accounts",
@@ -38,6 +39,7 @@ EXPECTED_TABLES = {
     "endpoints",
     "endpoint_bindings",
     "usage_records",
+    "request_logs",
     "cli_tool_groups",
     "cli_tools",
     "terminal_sessions",
@@ -62,7 +64,7 @@ def test_all_erd_tables_created() -> None:
 
 
 def test_init_db_creates_all_tables() -> None:
-    # init_db() must register every model and create all 15 tables.
+    # init_db() must register every model and create all 16 tables.
     init_db()  # uses on-disk engine; assert against metadata instead.
     declared = set(Base.metadata.tables.keys())
     assert EXPECTED_TABLES == declared, declared.symmetric_difference(

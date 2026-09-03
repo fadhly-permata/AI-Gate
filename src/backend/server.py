@@ -14,6 +14,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from backend.cli_tools_router import router as cli_tools_router
+from backend.analytics_router import router as analytics_router
 from backend.combos_router import router as combos_router
 from backend.config.db import SessionLocal
 from backend.config.logs_router import router as logs_router
@@ -93,6 +94,8 @@ app.include_router(selfheal_router)
 app.include_router(accounts_router)
 # Quota & usage tracking API (B5.5): GET /api/usage, /api/usage/summary, /api/quota.
 app.include_router(usage_router)
+# Request-log (debug) + usage analytics API (B5.6): GET /api/request-logs, /api/analytics.
+app.include_router(analytics_router)
 # Render gateway failures as the OpenAI error envelope from the contract.
 app.add_exception_handler(GatewayError, gateway_error_handler)
 

@@ -35,6 +35,10 @@ DEFAULT_SETTINGS: dict[str, str] = {
     "dev_mode": "false",
     "theme": "light",
     "locale": "en",
+    # B5.6 / PRD §2.4.3: request-level debug logging (RequestLog). 'true'
+    # enables per-request/response persistence on the gateway; default OFF
+    # to avoid DB bloat. Read by backend.gateway.router per request.
+    "request_log_enabled": "false",
 }
 
 

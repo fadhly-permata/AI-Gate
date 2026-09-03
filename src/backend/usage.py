@@ -40,6 +40,8 @@ break because telemetry failed).
 
 from __future__ import annotations
 
+import bisect
+import builtins
 import json
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
@@ -86,6 +88,16 @@ RANGE_WINDOWS: Dict[str, timedelta] = {
     "month": timedelta(days=30),
 }
 DEFAULT_RANGE = "day"
+
+# B5.6 / PRD §2.4.3 ``analytics``: range -> (bucket unit, bucket count).
+# day = 24 hourly buckets (last 24h), week = 7 daily, month = 30 daily.
+ANALYTICS_BUCKETS: Dict[str, Tuple[str, int]] = {
+    "day": ("hour", 24),
+    "week": ("day", 7),
+    "month": ("day", 30),
+}
+VALID_GROUP_BY = ("provider", "model")
+DEFAULT_GROUP_BY = "model"
 
 # ``quota_status`` calendar-aligned windows (PRD §2.4.2 hour/day/week).
 QUOTA_WINDOWS: Dict[str, timedelta] = {
@@ -198,13 +210,17 @@ def record_usage(
     tokens_in: int,
     tokens_out: int,
     session: Optional[Session] = None,
+    saved_tokens_est: Optional[int] = None,
 ) -> Optional[UsageRecord]:
     """Persist one ``UsageRecord`` with ``cost_est`` from :func:`estimate_cost`.
 
-    Fail-open: any error is logged (``log_error_exc``) and ``None`` returned —
-    the gateway client response must never break because telemetry failed.
-    Pass ``session`` to join an outer transaction (no commit here); otherwise
-    a short-lived ``SessionLocal`` owns and commits the row.
+    ``saved_tokens_est`` (B5.6 / PRD §2.4.3): estimated tokens saved by the
+    Endpoint's Token Saver hook — NULL when no saver was applied (not
+    measured), an int (possibly 0) when one was. Fail-open: any error is
+    logged (``log_error_exc``) and ``None`` returned — the gateway client
+    response must never break because telemetry failed. Pass ``session`` to
+    join an outer transaction (no commit here); otherwise a short-lived
+    ``SessionLocal`` owns and commits the row.
     """
     try:
         if not provider_id:
@@ -230,6 +246,9 @@ def record_usage(
                 tokens_in=int(tokens_in or 0),
                 tokens_out=int(tokens_out or 0),
                 cost_est=cost,
+                saved_tokens_est=(
+                    int(saved_tokens_est) if saved_tokens_est is not None else None
+                ),
                 ts=datetime.utcnow(),
             )
             s.add(row)
@@ -269,11 +288,14 @@ def record_usage_from_result(
     model: str,
     endpoint_id: Optional[int] = None,
     session: Optional[Session] = None,
+    saved_tokens_est: Optional[int] = None,
 ) -> Optional[UsageRecord]:
     """Extract ``usage`` from an OpenAI-shaped response dict and record it.
 
     Missing/unparseable ``usage`` degrades to 0/0 tokens (logged warning), not
-    an exception. Returns the persisted row (or None on any failure).
+    an exception. ``saved_tokens_est`` is threaded through to
+    :func:`record_usage` unchanged (B5.6; NULL = saver not applied). Returns
+    the persisted row (or None on any failure).
     """
     tokens_in, tokens_out = 0, 0
     try:
@@ -295,6 +317,7 @@ def record_usage_from_result(
         tokens_in=tokens_in,
         tokens_out=tokens_out,
         session=session,
+        saved_tokens_est=saved_tokens_est,
     )
 
 
@@ -401,6 +424,176 @@ def summarize(
 
 
 # --------------------------------------------------------------------------- #
+# Usage Analytics (B5.6 / PRD §2.4.3 / FSD §2.4.3 — token & usage TRENDS)
+# --------------------------------------------------------------------------- #
+def saved_tokens_from_bytes(saved_bytes: Optional[int]) -> int:
+    """Rough token heuristic: ``saved_bytes // 4`` (≈4 bytes/token), floored ≥0.
+
+    Used by the gateway to convert the RTK byte-savings estimate into the
+    ``saved_tokens_est`` figure aggregated by :func:`analytics`. Output-side
+    savers (caveman/ponytail) are not measurable pre-request and record 0.
+    """
+    try:
+        return max(0, int(saved_bytes or 0) // 4)
+    except (TypeError, ValueError) as exc:  # defensive: bad telemetry input
+        log_warning_exc(
+            "saved_tokens_from_bytes: invalid input; using 0",
+            source=LOG_SOURCE,
+            exc=exc,
+            context={"saved_bytes": saved_bytes},
+        )
+        return 0
+
+
+def _bucket_start(dt: datetime, unit: str) -> datetime:
+    """Calendar-aligned start of the bucket containing ``dt`` (naive UTC)."""
+    if unit == "hour":
+        return dt.replace(minute=0, second=0, microsecond=0)
+    return dt.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def _bucket_label(dt: datetime, unit: str) -> str:
+    """Bucket label: hourly ``YYYY-MM-DD HH:00``, daily ``YYYY-MM-DD``."""
+    if unit == "hour":
+        return dt.strftime("%Y-%m-%d %H:00")
+    return dt.strftime("%Y-%m-%d")
+
+
+def analytics(
+    session: Session,
+    range: str = DEFAULT_RANGE,
+    group_by: str = DEFAULT_GROUP_BY,
+) -> dict:
+    """Token/usage trends over time buckets + totals + per-group breakdown.
+
+    Shape (consumed by ``GET /api/analytics`` — the fe-dev contract)::
+
+        {
+          "object": "analytics",
+          "range": "month", "group_by": "model",
+          "buckets": [{"label": "2026-09-01", "requests": N, "tokens_in": X,
+                       "tokens_out": Y, "cost_est": Z, "saved_tokens_est": S}, ...],
+          "totals":  {"requests", "tokens_in", "tokens_out", "cost_est",
+                      "saved_tokens_est"},
+          "by_group": [{"key": "gpt-4o", "requests", "tokens_in", "tokens_out",
+                        "cost_est", "saved_tokens_est"}, ...]
+        }
+
+    Bucketing (documented decision): ``day`` -> 24 HOURLY buckets ending at the
+    current hour; ``week`` -> 7 DAILY buckets ending today; ``month`` -> 30
+    DAILY buckets ending today. Empty buckets are INCLUDED as zeros so the UI
+    can chart a continuous trend. Labels are naive-UTC strings (see
+    :func:`_bucket_label`), buckets chronological ascending.
+
+    ``group_by=provider`` keys on the provider NAME (a row whose provider is
+    missing falls back to ``"provider#<id>"``); ``group_by=model`` keys on
+    ``UsageRecord.model``. ``by_group`` is sorted by requests desc, key asc.
+    Rows with ``saved_tokens_est`` NULL (no saver applied) contribute 0.
+    """
+    rng = (range or DEFAULT_RANGE).lower()
+    if rng not in ANALYTICS_BUCKETS:
+        rng = DEFAULT_RANGE
+    gb = (group_by or DEFAULT_GROUP_BY).lower()
+    if gb not in VALID_GROUP_BY:
+        gb = DEFAULT_GROUP_BY
+
+    unit, count = ANALYTICS_BUCKETS[rng]
+    delta = timedelta(hours=1) if unit == "hour" else timedelta(days=1)
+    now = datetime.utcnow()
+    last_start = _bucket_start(now, unit)
+    # NOTE: the ``range`` parameter shadows the builtin (API parity with
+    # ``summarize``) — use ``builtins.range`` for the bucket offsets.
+    starts = [last_start - delta * i for i in builtins.range(count)]
+    starts.reverse()
+    since = starts[0]
+
+    rows = session.query(UsageRecord).filter(UsageRecord.ts >= since).all()
+
+    buckets = [
+        {
+            "label": _bucket_label(s, unit),
+            "requests": 0,
+            "tokens_in": 0,
+            "tokens_out": 0,
+            "cost_est": 0.0,
+            "saved_tokens_est": 0,
+        }
+        for s in starts
+    ]
+    totals = {
+        "requests": 0,
+        "tokens_in": 0,
+        "tokens_out": 0,
+        "cost_est": 0.0,
+        "saved_tokens_est": 0,
+    }
+    groups: Dict[str, Dict[str, Any]] = {}
+
+    names: Dict[int, str] = {}
+    if gb == "provider" and rows:
+        pids = {r.provider_id for r in rows if r.provider_id is not None}
+        if pids:
+            for p in session.query(Provider).filter(
+                Provider.id.in_(list(pids))
+            ).all():
+                names[p.id] = p.name
+
+    for r in rows:
+        ti = int(r.tokens_in or 0)
+        to = int(r.tokens_out or 0)
+        cost = float(r.cost_est or 0.0)
+        saved = int(r.saved_tokens_est or 0)
+        idx = min(max(bisect.bisect_right(starts, r.ts) - 1, 0), count - 1)
+        b = buckets[idx]
+        b["requests"] += 1
+        b["tokens_in"] += ti
+        b["tokens_out"] += to
+        b["cost_est"] += cost
+        b["saved_tokens_est"] += saved
+        totals["requests"] += 1
+        totals["tokens_in"] += ti
+        totals["tokens_out"] += to
+        totals["cost_est"] += cost
+        totals["saved_tokens_est"] += saved
+        if gb == "provider":
+            key = names.get(r.provider_id) or f"provider#{r.provider_id}"
+        else:
+            key = r.model or ""
+        g = groups.setdefault(
+            key,
+            {
+                "key": key,
+                "requests": 0,
+                "tokens_in": 0,
+                "tokens_out": 0,
+                "cost_est": 0.0,
+                "saved_tokens_est": 0,
+            },
+        )
+        g["requests"] += 1
+        g["tokens_in"] += ti
+        g["tokens_out"] += to
+        g["cost_est"] += cost
+        g["saved_tokens_est"] += saved
+
+    for b in buckets:
+        b["cost_est"] = round(b["cost_est"], 8)
+    totals["cost_est"] = round(totals["cost_est"], 8)
+    by_group = sorted(groups.values(), key=lambda g: (-g["requests"], g["key"]))
+    for g in by_group:
+        g["cost_est"] = round(g["cost_est"], 8)
+
+    return {
+        "object": "analytics",
+        "range": rng,
+        "group_by": gb,
+        "buckets": buckets,
+        "totals": totals,
+        "by_group": by_group,
+    }
+
+
+# --------------------------------------------------------------------------- #
 # Quota status (real-time remaining + reset countdown)
 # --------------------------------------------------------------------------- #
 def _window_start(now: datetime, window: str) -> datetime:
@@ -497,12 +690,17 @@ __all__ = [
     "PRICE_PER_1K",
     "RANGE_WINDOWS",
     "QUOTA_WINDOWS",
+    "ANALYTICS_BUCKETS",
+    "VALID_GROUP_BY",
     "DEFAULT_RANGE",
     "DEFAULT_QUOTA_WINDOW",
+    "DEFAULT_GROUP_BY",
     "estimate_cost",
     "record_usage",
     "record_usage_from_result",
+    "saved_tokens_from_bytes",
     "since_for_range",
     "summarize",
+    "analytics",
     "quota_status",
 ]

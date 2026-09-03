@@ -69,24 +69,46 @@ def apply_token_saver(mode: str, payload: dict) -> dict:
     Fail-open: on ANY exception the original ``payload`` is returned unchanged
     and the error is logged to ``LogEntry``. ``'off'`` / unknown modes also
     return the original payload untouched.
+
+    Thin wrapper over :func:`apply_token_saver_with_metrics` (B5.6) that drops
+    the savings figure — kept for backward compatibility with B5.4 callers.
+    """
+    new_payload, _saved_bytes = apply_token_saver_with_metrics(mode, payload)
+    return new_payload
+
+
+def apply_token_saver_with_metrics(mode: str, payload: dict) -> tuple[dict, int]:
+    """Apply ``mode`` and ALSO report the estimated input bytes saved.
+
+    Returns ``(payload, saved_bytes)`` where ``saved_bytes >= 0``:
+
+    * ``rtk``      -> measured input-side compression (content bytes before -
+      after, floored at 0);
+    * ``caveman`` / ``ponytail`` -> ``0``: their savings are OUTPUT-side
+      (shorter answers) and cannot be measured pre-request (documented B5.6
+      limitation — the router records ``saved_tokens_est = 0`` for them);
+    * ``off`` / unknown / fail-open -> ``(original payload, 0)``.
+
+    Fail-open semantics identical to :func:`apply_token_saver`: any exception
+    is logged to ``LogEntry`` and the ORIGINAL payload is returned.
     """
     if mode in (None, "", "off") or mode not in TOKEN_SAVER_MODES:
-        return payload
+        return payload, 0
     try:
         if mode == "rtk":
             return _apply_rtk(payload)
         if mode == "caveman":
-            return _apply_instruction(payload, CAVEMAN_INSTRUCTION)
+            return _apply_instruction(payload, CAVEMAN_INSTRUCTION), 0
         if mode == "ponytail":
-            return _apply_instruction(payload, PONYTAIL_INSTRUCTION)
-        return payload
+            return _apply_instruction(payload, PONYTAIL_INSTRUCTION), 0
+        return payload, 0
     except Exception as exc:  # noqa: BLE001 - fail-open mandated by ADR-013
         log_warning_exc(
             f"token_saver mode '{mode}' failed; passing through original payload",
             source="backend.gateway.token_saver",
             exc=exc,
         )
-        return payload
+        return payload, 0
 
 
 # --------------------------------------------------------------------------- #
@@ -183,10 +205,11 @@ def _content_bytes(payload: dict) -> int:
     return total
 
 
-def _apply_rtk(payload: dict) -> dict:
+def _apply_rtk(payload: dict) -> tuple[dict, int]:
+    """RTK compression; returns ``(new_payload, saved_bytes)`` (B5.6)."""
     messages = payload.get("messages") if isinstance(payload, dict) else None
     if not isinstance(messages, list):
-        return payload
+        return payload, 0
 
     before = _content_bytes(payload)
     new_messages = []
@@ -202,14 +225,14 @@ def _apply_rtk(payload: dict) -> dict:
     new_payload["messages"] = new_messages
 
     after = _content_bytes(new_payload)
-    saved = before - after
+    saved = max(0, before - after)
     if saved > 0:
         log_info(
             f"token_saver rtk: approx {saved} bytes saved",
             source="backend.gateway.token_saver",
             context={"saved_bytes": saved},
         )
-    return new_payload
+    return new_payload, saved
 
 
 # --------------------------------------------------------------------------- #
@@ -250,4 +273,4 @@ def _apply_instruction(payload: dict, instruction: str) -> dict:
     return new_payload
 
 
-__all__ = ["TOKEN_SAVER_MODES", "apply_token_saver"]
+__all__ = ["TOKEN_SAVER_MODES", "apply_token_saver", "apply_token_saver_with_metrics"]
