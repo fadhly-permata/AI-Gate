@@ -474,6 +474,20 @@
 - BACKLOG B5.6 `[x]`. **B5.7 aktif** (be-dev+fe-dev, sekuensial): Export/Import
   Setting lokal (JSON) — pengganti cloud sync (PRD §2.4.4). be-dev dulu.
 
+## Run-impl session 2026-09-03 (continue) — B5.7 SELESAI -> SELURUH BACKLOG SELESAI
+- **B5.7 be-dev**: `export.py` (export_settings/import_settings; replace+merge,
+  FK-safe, 1 transaksi, rollback+log); `export_router.py` GET /api/settings/export
+  (Content-Disposition download) + POST /api/settings/import (400/500). Verifikasi
+  PM: pytest **248 passed, 1 skipped**. Commit `c16c4e5`.
+- **B5.7 fe-dev**: card Backup & Restore di Settings (Export download + Import
+  file picker + confirm destruktif + mode replace/merge + per-table counts + reload);
+  i18n EN/ID. Verifikasi PM: vitest **167 passed (15 file)**. Commit `a7ddec7`.
+- BACKLOG B5.7 `[x]`. **SELURUH BACKLOG aigate SELESAI (B0.1 -> B5.7, Fase 0-5).**
+- R19 terbukti: force-close TERNYATA nyimpen kerjaan ke `git stash@{0}` -> berhasil
+  dipulihkan; tiap subtask ke-commit jadi gak ada yang padam lagi.
+- Sisa (opsional, bukan task backlog): Playwright e2e desktop (`npx playwright
+  install` lalu `npm run test:e2e`); PDF/CSV export laporan bulanan (di luar scope).
+
 ## Run-impl session 2026-09-03 (continue) — SELESAI / NO-OP
 - Arg = `continue`. Prosedur: cari task pertama belum `[x]` di BACKLOG.md.
   HASIL: SELURUH task (B0.1 → B4.3) SUDAH `[x]`. Tidak ada task pending yg bisa

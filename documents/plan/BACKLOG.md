@@ -81,7 +81,7 @@ ini untuk delegasikan ke sub-agent (be-dev / fe-dev / qa) secara rapi.
        adopsi 9router) — `be-dev` + `fe-dev` — Dep: B2.2
 - [x] **B5.6** Log Permintaan (debug) + Dashboard Usage Analytics (PRD §2.4.3,
        adopsi 9router) — `be-dev` + `fe-dev` — Dep: B1.2
-- [ ] **B5.7** Export/Import Setting lokal (file JSON) — pengganti cloud sync
+- [x] **B5.7** Export/Import Setting lokal (file JSON) — pengganti cloud sync
        (PRD §2.4.4, request user) — `be-dev` + `fe-dev` — Dep: B1.1
 
 ## Catatan
