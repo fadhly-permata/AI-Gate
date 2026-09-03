@@ -19,6 +19,7 @@ from backend.combos_router import router as combos_router
 from backend.config.db import SessionLocal
 from backend.config.logs_router import router as logs_router
 from backend.endpoints_router import router as endpoints_router
+from backend.export_router import router as export_router
 from backend.config.settings_router import router as settings_router
 from backend.gateway.errors import GatewayError, gateway_error_handler
 from backend.gateway.router import router
@@ -80,6 +81,11 @@ app.include_router(proxies_router)
 app.include_router(combos_router)
 # Endpoint CRUD + binding (B2.5 / ADR-008).
 app.include_router(endpoints_router)
+# Export / Import the whole config as one JSON file (B5.7 / PRD §2.4.4).
+# MUST be included BEFORE settings_router: settings_router exposes
+# GET /api/settings/{key}, and Starlette matches routes in registration order,
+# so /api/settings/export would otherwise be swallowed as key="export".
+app.include_router(export_router)
 # Settings UI API (B1.3): read/write config-in-DB Setting rows.
 app.include_router(settings_router)
 # CLI Tools presets + resolve (B3.4): group/tool list + launch resolver.
