@@ -14,6 +14,7 @@ dependencies = [
     "sqlalchemy",
     "ptyprocess",
     "httpx",
+    "anyio>=4.2,<4.4",  # pin: anyio>=4.4 breaks on Python 3.14 (Termux); keep bootable
     "pywinpty; sys_platform == 'win32'",  # ADR-003: Windows PTY backend
 ]
 
@@ -45,5 +46,5 @@ quote-style = "double"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-pythonpath = ["."]
+pythonpath = ["src", "."]
 filterwarnings = ["ignore::DeprecationWarning"]

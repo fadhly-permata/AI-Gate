@@ -8,6 +8,14 @@
   <link rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
         crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <!-- xterm.js 5.x via CDN (no build step, ADR-001) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css"
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <script defer src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/addon-fit.js"
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -42,47 +50,390 @@
     <!-- ===== Sidebar ===== -->
     <aside class="sidebar">
       <nav class="nav">
-        <a class="nav-item" href="#" data-i18n-href="#providers">
+        <a class="nav-item" href="#" data-view="providers">
           <i class="nav-icon fa fa-server"></i>
           <span class="nav-label" data-i18n="nav.providers">Providers</span>
         </a>
-        <a class="nav-item" href="#" data-i18n-href="#combos">
+        <a class="nav-item" href="#" data-view="combos">
           <i class="nav-icon fa fa-layer-group"></i>
           <span class="nav-label" data-i18n="nav.combos">Combos</span>
         </a>
-        <a class="nav-item" href="#" data-i18n-href="#proxies">
+        <a class="nav-item" href="#" data-view="proxies">
           <i class="nav-icon fa fa-network-wired"></i>
           <span class="nav-label" data-i18n="nav.proxies">Proxy Pools</span>
         </a>
-        <a class="nav-item" href="#" data-i18n-href="#endpoints">
+        <a class="nav-item" href="#" data-view="endpoints">
           <i class="nav-icon fa fa-plug"></i>
           <span class="nav-label" data-i18n="nav.endpoints">Endpoints</span>
         </a>
-        <a class="nav-item" href="#" data-i18n-href="#terminal">
+        <a class="nav-item" href="#" data-view="terminal">
           <i class="nav-icon fa fa-terminal"></i>
           <span class="nav-label" data-i18n="nav.terminal">Terminal</span>
         </a>
-        <a class="nav-item" href="#" data-i18n-href="#cli">
+        <a class="nav-item" href="#" data-view="cli">
           <i class="nav-icon fa fa-screwdriver-wrench"></i>
           <span class="nav-label" data-i18n="nav.cli">CLI Tools</span>
+        </a>
+        <a class="nav-item" href="#" data-view="settings">
+          <i class="nav-icon fa fa-gear"></i>
+          <span class="nav-label" data-i18n="nav.settings">Settings</span>
         </a>
       </nav>
     </aside>
 
-    <!-- ===== Workspace (terminal mounts later) ===== -->
+    <!-- ===== Workspace (views) ===== -->
     <main class="workspace">
-      <div class="card welcome-card">
-        <h1 class="welcome-title" data-i18n="ws.welcome">Welcome to aigate</h1>
-        <p class="welcome-text" data-i18n="ws.placeholder">
-          The management console and terminal will appear here.
-        </p>
+      <!-- Default / welcome view -->
+      <section class="view is-active" data-view="welcome">
+        <div class="card welcome-card">
+          <h1 class="welcome-title" data-i18n="ws.welcome">Welcome to aigate</h1>
+          <p class="welcome-text" data-i18n="ws.placeholder">
+            The management console and terminal will appear here.
+          </p>
+        </div>
+      </section>
+
+      <!-- Settings view (B1.3) -->
+      <section class="view" data-view="settings">
+        <div class="card settings-card">
+          <h2 class="settings-title" data-i18n="nav.settings">Settings</h2>
+          <form id="settingsForm" class="settings-form" autocomplete="off">
+            <div class="form-row">
+              <label class="form-label" for="setPort" data-i18n="settings.port">Port</label>
+              <input class="form-input" type="number" id="setPort" name="port"
+                     min="1" max="65535" />
+            </div>
+
+            <div class="form-row">
+              <label class="form-label" for="setDevMode" data-i18n="settings.dev_mode">Developer Mode</label>
+              <label class="switch" title="Developer Mode">
+                <input type="checkbox" id="setDevMode" name="dev_mode" />
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+
+            <div class="form-row">
+              <label class="form-label" for="setTheme" data-i18n="settings.theme">Theme</label>
+              <select class="form-input" id="setTheme" name="theme">
+                <option value="light" data-i18n="settings.theme_light">Light</option>
+                <option value="dark" data-i18n="settings.theme_dark">Dark</option>
+              </select>
+            </div>
+
+            <div class="form-row">
+              <label class="form-label" for="setLocale" data-i18n="settings.locale">Language</label>
+              <select class="form-input" id="setLocale" name="locale">
+                <option value="en" data-i18n="settings.lang_en">English</option>
+                <option value="id" data-i18n="settings.lang_id">Indonesian</option>
+              </select>
+            </div>
+
+            <!-- Device Simulation (B4.2): dev/visual aid only, client-side. -->
+            <div class="form-row">
+              <label class="form-label" for="setDevice" data-i18n="settings.device_sim">Device Simulation</label>
+              <select class="form-input" id="setDevice" name="device">
+                <option value="desktop" data-i18n="settings.device_desktop">Desktop</option>
+                <option value="tablet" data-i18n="settings.device_tablet">Tablet</option>
+                <option value="phone" data-i18n="settings.device_phone">Phone</option>
+              </select>
+            </div>
+            <p class="settings-dev-note" id="setDeviceNote" data-i18n="settings.device_note">
+              Visual aid for development only — does not change server behavior.
+            </p>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary" id="setSave"
+                      data-i18n="settings.save">Save</button>
+            </div>
+
+            <p class="settings-msg" id="settingsMsg" role="status" aria-live="polite"></p>
+          </form>
+        </div>
+      </section>
+
+      <!-- Providers view (B2.2) -->
+      <section class="view" data-view="providers">
+        <!-- List + add -->
+        <div class="card providers-card">
+          <div class="providers-head">
+            <h2 class="providers-title" data-i18n="nav.providers">Providers</h2>
+            <button class="btn btn-primary" id="provAddBtn" type="button">
+              <i class="fa fa-plus"></i> <span data-i18n="providers.add">Add Provider</span>
+            </button>
+          </div>
+
+          <p class="settings-msg" id="provMsg" role="status" aria-live="polite"></p>
+
+          <table class="data-table" id="provTable">
+            <thead>
+              <tr>
+                <th data-i18n="providers.name">Name</th>
+                <th data-i18n="providers.type">Type</th>
+                <th data-i18n="providers.base_url">Base URL</th>
+                <th data-i18n="providers.enabled">Enabled</th>
+                <th data-i18n="providers.models">Models</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="provTableBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Detail + models -->
+        <div class="card providers-detail" id="provDetail" hidden>
+          <div class="providers-head">
+            <h3 class="modal-title" id="provDetailTitle"></h3>
+            <div class="detail-actions">
+              <button class="btn btn-primary" id="provDiscoverBtn" type="button">
+                <i class="fa fa-magnifying-glass"></i>
+                <span data-i18n="providers.discover">Discover Models</span>
+              </button>
+              <button class="btn" id="provEditBtn" type="button" title="Edit">
+                <i class="fa fa-pen"></i>
+              </button>
+              <button class="btn btn-danger" id="provDeleteBtn" type="button" title="Delete">
+                <i class="fa fa-trash"></i>
+              </button>
+            </div>
+          </div>
+
+          <p class="settings-msg" id="provModelMsg" role="status" aria-live="polite"></p>
+
+          <table class="data-table" id="provModelsTable">
+            <thead>
+              <tr>
+                <th>model_id</th>
+                <th>model_name</th>
+              </tr>
+            </thead>
+            <tbody id="provModelsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Terminal view (B3.1): collapsible terminal pane + Log Window -->
+      <section class="view" data-view="terminal">
+        <div class="card terminal-card">
+
+          <!-- Collapsible terminal pane (placeholder; xterm wired in B3.3) -->
+          <div class="terminal-pane" id="terminalPane">
+            <div class="terminal-header" id="terminalHeader">
+              <span class="terminal-title">
+                <i class="fa fa-terminal"></i>
+                <span data-i18n="nav.terminal">Terminal</span>
+              </span>
+              <button class="icon-btn" id="termCollapseBtn" type="button"
+                      data-i18n-aria="term.collapse" title="Collapse">
+                <i class="fa fa-chevron-up"></i>
+              </button>
+            </div>
+            <div class="terminal-body" id="terminalBody">
+              <!-- Multi-tab terminal (B3.3) -->
+              <div class="term-toolbar">
+                <div class="term-tabs" id="termTabBar" role="tablist">
+                  <button class="icon-btn term-newtab" id="termNewTab" type="button"
+                          data-i18n-aria="term.new_tab" title="New Tab">
+                    <i class="fa fa-plus"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div class="term-stage" id="termStage">
+                <!-- One container per tab; xterm mounted here -->
+                <div class="term-containers" id="termContainers"></div>
+
+                <!-- Floating control overlay (FSD §2.5.0) -->
+                <div class="term-floating" id="termFloating">
+                  <button class="icon-btn term-ctl" id="termFullscreen" type="button"
+                          data-i18n-aria="term.fullscreen" title="Fullscreen">
+                    <i class="fa fa-expand"></i>
+                  </button>
+                  <button class="icon-btn term-ctl" id="termPaste" type="button"
+                          data-i18n-aria="term.paste" title="Paste">
+                    <i class="fa fa-paste"></i>
+                  </button>
+                  <button class="icon-btn term-ctl" id="termTui" type="button"
+                          data-i18n-aria="term.tui_mode" title="TUI Mode" aria-pressed="false">
+                    <i class="fa fa-hand-pointer"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Log Window (working part of B3.1) -->
+          <div class="logwindow" id="logWindow">
+            <div class="logwindow-head">
+              <h2 class="logwindow-title">
+                <i class="fa fa-list"></i>
+                <span data-i18n="term.log_window">Log Window</span>
+              </h2>
+              <div class="logwindow-controls">
+                <label class="form-label" for="logSeverity" data-i18n="term.severity">Severity</label>
+                <select class="form-input" id="logSeverity">
+                  <option value="all" data-i18n="term.sev_all">All</option>
+                  <option value="info" data-i18n="term.sev_info">Info</option>
+                  <option value="warning" data-i18n="term.sev_warning">Warning</option>
+                  <option value="error" data-i18n="term.sev_error">Error</option>
+                </select>
+                <button class="btn btn-primary" id="logRefreshBtn" type="button">
+                  <i class="fa fa-rotate"></i>
+                  <span data-i18n="term.refresh">Refresh</span>
+                </button>
+              </div>
+            </div>
+
+            <p class="settings-msg" id="logMsg" role="status" aria-live="polite"></p>
+
+            <table class="data-table" id="logTable">
+              <thead>
+                <tr>
+                  <th data-i18n="term.time">Time</th>
+                  <th data-i18n="term.severity">Severity</th>
+                  <th data-i18n="term.source">Source</th>
+                  <th data-i18n="term.message">Message</th>
+                </tr>
+              </thead>
+              <tbody id="logTableBody"></tbody>
+            </table>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- CLI Tools view (B3.4): preset groups A/B/C + launch modal -->
+      <section class="view" data-view="cli">
+        <div class="card cli-card">
+          <h2 class="cli-title" data-i18n="nav.cli">CLI Tools</h2>
+          <p class="settings-msg" id="cliLoadMsg" role="status" aria-live="polite"></p>
+          <div class="cli-groups" id="cliGroups"></div>
+        </div>
+
+        <!-- Self-Heal card (B4.1): checks agentic CLI, runs heal -->
+        <div class="card cli-card selfheal-card">
+          <h2 class="cli-title" data-i18n="selfheal.title">Self-Heal</h2>
+          <p class="settings-msg" id="selfHealCheckMsg" role="status" aria-live="polite"></p>
+          <div class="selfheal-actions">
+            <button class="btn" id="selfHealCheckBtn" type="button" data-i18n="selfheal.check">Check</button>
+            <button class="btn btn-primary" id="selfHealRunBtn" type="button"
+                    data-i18n="selfheal.run" disabled>Run Self-Heal</button>
+          </div>
+          <div class="selfheal-result" id="selfHealResult" role="status" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <!-- Provider add/edit modal (B2.2) -->
+      <div class="modal-overlay" id="provModal" hidden>
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="provModalTitle">
+          <h3 class="modal-title" id="provModalTitle" data-i18n="providers.add">Add Provider</h3>
+          <form id="provForm" class="settings-form" autocomplete="off">
+            <input type="hidden" id="provId" />
+            <div class="form-row">
+              <label class="form-label" for="provName" data-i18n="providers.name">Name</label>
+              <input class="form-input" type="text" id="provName" name="name" required />
+            </div>
+            <div class="form-row">
+              <label class="form-label" for="provType" data-i18n="providers.type">Type</label>
+              <select class="form-input" id="provType" name="type">
+                <option value="openai-compatible">openai-compatible</option>
+                <option value="anthropic">anthropic</option>
+                <option value="ollama">ollama</option>
+                <option value="openrouter">openrouter</option>
+                <option value="litellm">litellm</option>
+                <option value="other">other</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label class="form-label" for="provBaseUrl" data-i18n="providers.base_url">Base URL</label>
+              <input class="form-input" type="text" id="provBaseUrl" name="base_url" />
+            </div>
+            <div class="form-row">
+              <label class="form-label" for="provApiKey" data-i18n="providers.api_key">API Key</label>
+              <!-- ADR-007: plaintext, no masking -->
+              <input class="form-input" type="text" id="provApiKey" name="api_key" />
+            </div>
+            <div class="form-row">
+              <label class="form-label" for="provEnabled" data-i18n="providers.enabled">Enabled</label>
+              <label class="switch" title="Enabled">
+                <input type="checkbox" id="provEnabled" name="enabled" />
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+            <div class="form-row form-row-stack">
+              <label class="form-label" data-i18n="providers.custom_headers">Custom Headers</label>
+              <div class="headers-editor" id="provHeaders"></div>
+              <button type="button" class="btn hdr-add" id="provAddHeaderBtn">
+                <i class="fa fa-plus"></i> <span data-i18n="providers.add_header">Add Header</span>
+              </button>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary" id="provSaveBtn" data-i18n="providers.save">Save</button>
+              <button type="button" class="btn" id="provCancel" data-i18n="providers.cancel">Cancel</button>
+            </div>
+          </form>
+        </div>
       </div>
-    </main>
-  </div>
+
+      <!-- CLI Tools launch modal (B3.4): model picker + Launch/Cancel -->
+      <div class="modal-overlay" id="cliLaunchModal" hidden>
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cliLaunchTitle">
+          <h3 class="modal-title" id="cliLaunchTitle" data-i18n="cli.launch_title">Launch CLI Tool</h3>
+          <div class="form-row">
+            <label class="form-label" for="cliModel" data-i18n="cli.model">Model</label>
+            <select class="form-input" id="cliModel"></select>
+          </div>
+          <p class="cli-hint" id="cliHint" hidden></p>
+          <p class="settings-msg" id="cliMsg" role="status" aria-live="polite"></p>
+          <div class="form-actions">
+            <button class="btn btn-primary" id="cliLaunchBtn" type="button" data-i18n="cli.launch">Launch</button>
+            <button class="btn" id="cliCancelBtn" type="button" data-i18n="cli.cancel">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Self-Heal popup (B4.1): no agentic CLI installed, etc. -->
+      <div class="modal-overlay" id="selfHealModal" hidden>
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="selfHealModalTitle">
+          <h3 class="modal-title" id="selfHealModalTitle" data-i18n="selfheal.title">Self-Heal</h3>
+          <p class="settings-msg settings-msg-error" id="selfHealModalMsg"></p>
+          <div class="form-actions">
+            <button class="btn btn-primary" id="selfHealModalOk" type="button" data-i18n="selfheal.ok">OK</button>
+          </div>
+        </div>
+      </div>
+      </main>
+
+      <!-- Mobile bottom navigation (B4.2): shown only on phone device
+           simulation or real narrow viewports. Icons only, non-AdminLTE shell. -->
+      <nav class="bottom-nav" aria-label="Mobile navigation">
+        <a class="bn-item" href="#" data-view="providers"
+           data-i18n-aria="nav.providers"><i class="fa fa-server"></i></a>
+        <a class="bn-item" href="#" data-view="combos"
+           data-i18n-aria="nav.combos"><i class="fa fa-layer-group"></i></a>
+        <a class="bn-item" href="#" data-view="proxies"
+           data-i18n-aria="nav.proxies"><i class="fa fa-network-wired"></i></a>
+        <a class="bn-item" href="#" data-view="endpoints"
+           data-i18n-aria="nav.endpoints"><i class="fa fa-plug"></i></a>
+        <a class="bn-item" href="#" data-view="terminal"
+           data-i18n-aria="nav.terminal"><i class="fa fa-terminal"></i></a>
+        <a class="bn-item" href="#" data-view="cli"
+           data-i18n-aria="nav.cli"><i class="fa fa-screwdriver-wrench"></i></a>
+        <a class="bn-item" href="#" data-view="settings"
+           data-i18n-aria="nav.settings"><i class="fa fa-gear"></i></a>
+      </nav>
+    </div>
 
   <!-- Client-side i18n dictionary (must load before app.js) -->
   <script src="i18n.js" defer></script>
+  <!-- Device simulation helper (B4.2) — must load before app.js uses it -->
+  <script src="device.js" defer></script>
   <!-- App bootstrap (defer preserves order) -->
   <script src="app.js" defer></script>
+  <!-- CLI Tools launcher (B3.4) — needs app.js (window.aigate) + terminal.js -->
+  <script src="clitools.js" defer></script>
+  <!-- Self-Heal UI (B4.1) — needs i18n.js (window.I18N) + clitools.js -->
+  <script src="selfheal.js" defer></script>
+  <!-- Terminal manager (B3.3) — after xterm CDN + app.js -->
+  <script src="terminal.js" defer></script>
 </body>
 </html>

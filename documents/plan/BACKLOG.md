@@ -20,52 +20,52 @@ ini untuk delegasikan ke sub-agent (be-dev / fe-dev / qa) secara rapi.
   DB, ADR-011 logging wajib, ADR-012 pure-Python (Termux).
 
 ## Fase 0 — Fondasi
-- [ ] **B0.1** Inisialisasi project (FastAPI + server + `/api/health` + UI shell
-      AdminLTE-like, collapsible sidebar, dark/light, i18n EN/ID) — `be-dev` + `fe-dev`
-- [ ] **B0.2** DB engine SQLite (SQLAlchemy) + 12 entity dari `analysis/ERD.md`
-      (`models.py`, `config/db.py`) — `be-dev`
-- [ ] **B0.3** Penyimpanan secrets plaintext tanpa enkripsi (ADR-007) — `be-dev`
+- [x] **B0.1** Inisialisasi project (FastAPI + server + `/api/health` + UI shell
+       AdminLTE-like, collapsible sidebar, dark/light, i18n EN/ID) — `be-dev` + `fe-dev`
+- [x] **B0.2** DB engine SQLite (SQLAlchemy) + 12 entity dari `analysis/ERD.md`
+       (`models.py`, `config/db.py`) — `be-dev`
+- [x] **B0.3** Penyimpanan secrets plaintext tanpa enkripsi (ADR-007) — `be-dev`
 
 ## Fase 1 — Config & Logging
-- [ ] **B1.1** Config-in-DB: model `Setting` + repo `config/settings.py`
-      (get/set/ensure_seeded) (ADR-010/011, R11) — `be-dev` — Dep: B0.2
-- [ ] **B1.2** Logging infra: model `LogEntry` + helper logger (severity+stacktrace+
-      context) + enforce no-empty-catch di seluruh backend (ADR-011, R12) — `be-dev`
+- [x] **B1.1** Config-in-DB: model `Setting` + repo `config/settings.py`
+       (get/set/ensure_seeded) (ADR-010/011, R11) — `be-dev` — Dep: B0.2
+- [x] **B1.2** Logging infra: model `LogEntry` + helper logger (severity+stacktrace+
+       context) + enforce no-empty-catch di seluruh backend (ADR-011, R12) — `be-dev`
       — Dep: B0.2
-- [ ] **B1.3** Settings UI: panel port / dev-mode / theme baca-tulis `Setting`
-      (vanilla JS, R13) — `fe-dev` — Dep: B1.1
+- [x] **B1.3** Settings UI: panel port / dev-mode / theme baca-tulis `Setting`
+       (vanilla JS, R13) — `be-dev` + `fe-dev` — Dep: B1.1
 
 ## Fase 2 — Gateway & Routing
-- [ ] **B2.1** Endpoint OpenAI-compatible `/v1/chat/completions` + `/v1/models`
+- [x] **B2.1** Endpoint OpenAI-compatible `/v1/chat/completions` + `/v1/models`
       (ikuti `api/OPENAI_COMPATIBLE_CONTRACT.md`); tiap method wajib log (ADR-011);
       pakai Pydantic v1 (R10) — `be-dev` — Dep: B1.2, B0.2
-- [ ] **B2.2** Provider CRUD + model auto-discovery + key management
+- [x] **B2.2** Provider CRUD + model auto-discovery + key management
       (`analysis/FSD.md` §2.1–§2.2) — `be-dev` + `fe-dev` — Dep: B2.1, B1.1
-- [ ] **B2.3** Proxy Pools (HTTP/HTTPS/SOCKS5) + rotasi (RR/Random/Failover) +
+- [x] **B2.3** Proxy Pools (HTTP/HTTPS/SOCKS5) + rotasi (RR/Random/Failover) +
       health check (`FSD` §2.3) — `be-dev` — Dep: B0.2
-- [ ] **B2.4** Combos (fallback / load-balance / latency-cost) (`FSD` §2.4) —
+- [x] **B2.4** Combos (fallback / load-balance / latency-cost) (`FSD` §2.4) —
       `be-dev` — Dep: B2.1
-- [ ] **B2.5** Binding proxy di level Endpoint, Endpoint -> Combo (ADR-008) —
+- [x] **B2.5** Binding proxy di level Endpoint, Endpoint -> Combo (ADR-008) —
       `be-dev` — Dep: B2.3, B2.4
 
 ## Fase 3 — Terminal & Execution
-- [ ] **B3.1** Terminal UI (collapsible, log window) (vanilla JS, R13) —
+- [x] **B3.1** Terminal UI (collapsible, log window) (vanilla JS, R13) —
       `fe-dev` — Dep: B0.1
-- [ ] **B3.2** PTY backend: `ptyprocess` (POSIX/Termux) + `pywinpty` (Win) wiring
+- [x] **B3.2** PTY backend: `ptyprocess` (POSIX/Termux) + `pywinpty` (Win) wiring
       (ADR-003) — `be-dev` — Dep: B0.1
-- [ ] **B3.3** Multi-tab terminal + floating control (fullscreen/paste/focus) +
-      scroll & swipe (velocity, whitelist TUI) — `fe-dev` — Dep: B3.1, B3.2
-- [ ] **B3.4** CLI tool management + preset grup A/B/C (ikuti
-      `config/CLI_CONFIG_SCHEMA.md`) — `be-dev` + `fe-dev` — Dep: B2.1
+- [x] **B3.3** Multi-tab terminal + floating control (fullscreen/paste/focus) +
+       scroll & swipe (velocity, whitelist TUI) — `fe-dev` — Dep: B3.1, B3.2
+- [x] **B3.4** CLI tool management + preset grup A/B/C (ikuti
+       `config/CLI_CONFIG_SCHEMA.md`) — `be-dev` + `fe-dev` — Dep: B2.1
 
 ## Fase 4 — Self-Heal & Polish
-- [ ] **B4.1** Self-Heal (menu CLI-Tool): git branch `aigate/self-heal-*` + launch
-      agentic CLI terinstall + loop fix/test dari `LogEntry` warning/error; **delete**
-      row yg sudah ke-resolve; merge ke `main` + hapus branch (PRD §2.8 / FSD §2.8) —
-      `be-dev` + `fe-dev` — Dep: B1.2, B1.3
-- [ ] **B4.2** i18n EN/ID lengkap + dark/light + responsif & simulasi perangkat
-      (phone non-AdminLTE) (`FSD` §2.5, §2.7) — `fe-dev` — Dep: B0.1
-- [ ] **B4.3** QA: eksekusi `qa/TEST_PLAN.md` (pytest + vitest + playwright) —
+- [x] **B4.1** Self-Heal (menu CLI-Tool): git branch `aigate/self-heal-*` + launch
+       agentic CLI terinstall + loop fix/test dari `LogEntry` warning/error; **delete**
+       row yg sudah ke-resolve; merge ke `main` + hapus branch (PRD §2.8 / FSD §2.8) —
+       `be-dev` + `fe-dev` — Dep: B1.2, B1.3
+- [x] **B4.2** i18n EN/ID lengkap + dark/light + responsif & simulasi perangkat
+       (phone non-AdminLTE) (`FSD` §2.5, §2.7) — `fe-dev` — Dep: B0.1
+- [x] **B4.3** QA: eksekusi `qa/TEST_PLAN.md` (pytest + vitest + playwright) —
       `qa` — Dep: semua Fase 1–3
 
 ## Catatan

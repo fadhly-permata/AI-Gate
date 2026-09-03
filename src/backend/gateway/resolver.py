@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 
 from backend.config.db import SessionLocal
-from backend.models import Combo, ComboMember, Provider
+from backend.models import Combo, Provider, ProviderModel
 
 
 class TargetNotFound(Exception):
@@ -32,34 +32,94 @@ class TargetNotFound(Exception):
 
 @dataclass
 class ResolvedTarget:
-    """A concrete upstream to forward a request to."""
+    """A concrete upstream to forward a request to.
+
+    ``model_ref`` is the original request ``model`` string (kept for reference
+    and logging). ``upstream_model`` is the REAL model id that must be sent to
+    the upstream provider (the ``provider:``-prefixed string is never valid
+    upstream).
+
+    ``priority`` / ``weight`` are carried for Combo strategy routing
+    (``backend.combo_routing``): ``weight`` drives ``load_balance`` selection,
+    ``priority`` is the tie-break for ``latency_cost``.
+    """
 
     base_url: str
     api_key: str
     model_ref: str
+    upstream_model: str
     combo_used: bool = False
+    priority: int = 0
+    weight: float = 1.0
 
 
 def resolve_target(model: str) -> ResolvedTarget:
     """Resolve a ``provider:`` / ``combo:`` model reference to an upstream.
+
+    Accepted forms (canonical scheme, R9):
+
+    * ``provider:<name>`` (2 segments) — resolve Provider by ``name``;
+      upstream model = that provider's first ``ProviderModel.model_id``
+      (by id asc). ``TargetNotFound`` if the provider has no models.
+    * ``provider:<name>:<model_id>`` (3 segments) — resolve Provider by
+      ``name``; upstream model = ``<model_id>`` (validated to exist among the
+      provider's models).
+    * ``combo:<name>`` — first ``ComboMember`` by ``priority`` asc (current
+      placeholder; full strategy deferred to B1.3); upstream model =
+      that member's ``provider_model``.
 
     :param model: the request ``model`` string.
     :raises TargetNotFound: if nothing matches the reference.
     """
     with SessionLocal() as session:
         if model.startswith("provider:"):
-            name = model[len("provider:"):]
-            provider = session.scalars(
-                select(Provider).where(Provider.name == name)
-            ).first()
-            if provider is None:
-                raise TargetNotFound(f"provider '{name}' not found")
-            return ResolvedTarget(
-                base_url=provider.base_url,
-                api_key=provider.api_key,
-                model_ref=model,
-                combo_used=False,
-            )
+            rest = model[len("provider:"):]
+            if ":" in rest:
+                # 3 segments: provider:<name>:<model_id>
+                name, model_id = rest.split(":", 1)
+                provider = session.scalars(
+                    select(Provider).where(Provider.name == name)
+                ).first()
+                if provider is None:
+                    raise TargetNotFound(f"provider '{name}' not found")
+                exists = session.scalars(
+                    select(ProviderModel)
+                    .where(ProviderModel.provider_id == provider.id)
+                    .where(ProviderModel.model_id == model_id)
+                ).first()
+                if exists is None:
+                    raise TargetNotFound(
+                        f"model '{model_id}' not found for provider '{name}'"
+                    )
+                return ResolvedTarget(
+                    base_url=provider.base_url,
+                    api_key=provider.api_key,
+                    model_ref=model,
+                    upstream_model=model_id,
+                    combo_used=False,
+                )
+            else:
+                # 2 segments: provider:<name> -> first provider model by id asc
+                name = rest
+                provider = session.scalars(
+                    select(Provider).where(Provider.name == name)
+                ).first()
+                if provider is None:
+                    raise TargetNotFound(f"provider '{name}' not found")
+                first_model = session.scalars(
+                    select(ProviderModel)
+                    .where(ProviderModel.provider_id == provider.id)
+                    .order_by(ProviderModel.id.asc())
+                ).first()
+                if first_model is None:
+                    raise TargetNotFound(f"provider '{name}' has no models")
+                return ResolvedTarget(
+                    base_url=provider.base_url,
+                    api_key=provider.api_key,
+                    model_ref=model,
+                    upstream_model=first_model.model_id,
+                    combo_used=False,
+                )
 
         if model.startswith("combo:"):
             name = model[len("combo:"):]
@@ -69,24 +129,16 @@ def resolve_target(model: str) -> ResolvedTarget:
             if combo is None:
                 raise TargetNotFound(f"combo '{name}' not found")
 
-            # TODO B1.3: apply strategy (fallback / load_balance / latency_cost).
-            # For now: take the first member by priority asc as a placeholder.
-            member = session.scalars(
-                select(ComboMember)
-                .where(ComboMember.combo_id == combo.id)
-                .order_by(ComboMember.priority.asc())
-            ).first()
-            if member is None:
-                raise TargetNotFound(f"combo '{name}' has no members")
-
-            provider = member.provider
-            if provider is None:
-                raise TargetNotFound(f"combo '{name}' member has no provider")
-
+            # B2.4: full strategy routing is delegated to
+            # ``backend.combo_routing.execute_combo``. Return a combo marker with
+            # ``combo_used=True``; the concrete upstream(s) are resolved per the
+            # combo's strategy there. ``base_url``/``api_key`` are left empty
+            # because they are strategy-dependent.
             return ResolvedTarget(
-                base_url=provider.base_url,
-                api_key=provider.api_key,
+                base_url="",
+                api_key="",
                 model_ref=model,
+                upstream_model="",
                 combo_used=True,
             )
 

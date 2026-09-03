@@ -1,11 +1,11 @@
 """SQLAlchemy ORM models for all aigate config entities (from ERD.md).
 
-Twelve entities are modeled with exact columns and foreign keys per
+Fourteen entities are modeled with exact columns and foreign keys per
 ``documents/analysis/ERD.md``:
 
     Provider, ProviderModel, ProxyPool, ProxyNode, Combo, ComboMember,
     Endpoint, EndpointBinding, CLIToolGroup, CLITool, TerminalSession,
-    TerminalTab.
+    TerminalTab, LogEntry, Setting.
 
 ADR-007: secret columns (``api_key``, ``internal_api_key``, ``password``)
 are stored in plaintext — no encryption, matching the ERD data dictionary.
@@ -15,7 +15,15 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.config.db import Base
@@ -30,13 +38,24 @@ class Provider(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     type: Mapped[str] = mapped_column(String, nullable=False)
     base_url: Mapped[str] = mapped_column(String, nullable=False)
+    # ADR-007: plaintext per design (local app) — NO encryption, NO hashing.
     api_key: Mapped[str] = mapped_column(String, nullable=False, default="")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # JSON-encoded dict of extra HTTP headers (e.g. org/region headers).
+    # Empty -> "{}". Stored as text; ADR-007 plaintext (no encryption).
+    custom_headers: Mapped[str] = mapped_column(String, default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     models: Mapped[list["ProviderModel"]] = relationship(back_populates="provider")
     combo_members: Mapped[list["ComboMember"]] = relationship(
         back_populates="provider"
+    )
+    bindings: Mapped[list["EndpointBinding"]] = relationship(
+        primaryjoin=(
+            "and_(foreign(EndpointBinding.bind_id) == Provider.id, "
+            "EndpointBinding.bind_type == 'provider')"
+        ),
+        viewonly=True,
     )
 
 
@@ -65,6 +84,9 @@ class ProxyPool(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     rotation_strategy: Mapped[str] = mapped_column(String, default="round_robin")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Round-robin cursor state (B2.3). Index into the healthy-node list;
+    # wrapped with modulo at selection time.
+    last_used_index: Mapped[int] = mapped_column(Integer, default=0)
 
     nodes: Mapped[list["ProxyNode"]] = relationship(back_populates="pool")
 
@@ -81,6 +103,7 @@ class ProxyNode(Base):
     host: Mapped[str] = mapped_column(String, nullable=False)
     port: Mapped[int] = mapped_column(Integer, nullable=False)
     protocol: Mapped[str] = mapped_column(String, default="http")
+    # ADR-007: plaintext per design (local app) — NO encryption, NO hashing.
     username: Mapped[str] = mapped_column(String, default="")
     password: Mapped[str] = mapped_column(String, default="")
     status: Mapped[str] = mapped_column(String, default="unknown")
@@ -102,6 +125,13 @@ class Combo(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
     members: Mapped[list["ComboMember"]] = relationship(back_populates="combo")
+    bindings: Mapped[list["EndpointBinding"]] = relationship(
+        primaryjoin=(
+            "and_(foreign(EndpointBinding.bind_id) == Combo.id, "
+            "EndpointBinding.bind_type == 'combo')"
+        ),
+        viewonly=True,
+    )
 
 
 class ComboMember(Base):
@@ -132,7 +162,13 @@ class Endpoint(Base):
     listen_host: Mapped[str] = mapped_column(String, default="127.0.0.1")
     listen_port: Mapped[int] = mapped_column(Integer, default=8000)
     access_control_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    # ADR-007: plaintext per design (local app) — NO encryption, NO hashing.
     internal_api_key: Mapped[str] = mapped_column(String, default="")
+    # ADR-008: Endpoint -> ProxyPool binding (nullable; per-endpoint egress
+    # proxy). FK to proxy_pools.id; null = no proxy for this endpoint.
+    proxy_pool_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("proxy_pools.id"), nullable=True
+    )
 
     bindings: Mapped[list["EndpointBinding"]] = relationship(
         back_populates="endpoint"
@@ -219,6 +255,43 @@ class TerminalTab(Base):
     session: Mapped["TerminalSession"] = relationship(back_populates="tabs")
 
 
+class LogEntry(Base):
+    """Operational application log (PRD §2.8 / ADR-011).
+
+    Every backend method (and the frontend) must write to this table.
+    ``stacktrace`` is nullable and only populated for warning/error.
+    """
+
+    __tablename__ = "log_entries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, nullable=False
+    )
+    severity: Mapped[str] = mapped_column(String, nullable=False, default="info")
+    source: Mapped[str] = mapped_column(String, nullable=False, default="")
+    message: Mapped[str] = mapped_column(String, nullable=False, default="")
+    stacktrace: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class Setting(Base):
+    """Application configuration key-value store (PRD §2.8 / ADR-010).
+
+    Replaces separate config files; ``value`` is free-form serialization.
+    Secrets elsewhere (Provider/Endpoint/ProxyNode) remain plaintext
+    per ADR-007 — this table holds only config keys, not credentials.
+    """
+
+    __tablename__ = "settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    key: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    value: Mapped[str] = mapped_column(String, nullable=False, default="")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+
+
 __all__ = [
     "Provider",
     "ProviderModel",
@@ -232,4 +305,6 @@ __all__ = [
     "CLITool",
     "TerminalSession",
     "TerminalTab",
+    "LogEntry",
+    "Setting",
 ]

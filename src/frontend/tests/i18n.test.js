@@ -27,6 +27,7 @@ describe("i18n.applyLocale", () => {
     // nav.providers differs EN/ID — meaningful language switch assertion
     expect(providers.textContent).toBe("Penyedia");
     expect(document.documentElement.getAttribute("lang")).toBe("id");
+    expect(document.documentElement.getAttribute("data-locale")).toBe("id");
   });
 
   it("reverts to English on applyLocale('en')", async () => {

@@ -18,8 +18,13 @@ store is for singleton app-level secrets that must not live in the DB.
 from __future__ import annotations
 
 import json
+import logging
 import threading
 from pathlib import Path
+
+from backend.log import log_warning
+
+logger = logging.getLogger(__name__)
 
 # Path to the plaintext secrets file. Overridable (tests point it at tmp dir).
 SECRETS_PATH: Path = Path.home() / ".aigate" / "secrets.json"
@@ -36,6 +41,15 @@ def _read_raw() -> dict[str, str]:
             data = json.load(fh)
         return data if isinstance(data, dict) else {}
     except (json.JSONDecodeError, OSError):
+        logger.warning(
+            "failed to read secrets file at %s; returning empty store",
+            SECRETS_PATH,
+            exc_info=True,
+        )
+        log_warning(
+            f"failed to read secrets file at {SECRETS_PATH}; returning empty store",
+            source="backend.config.secrets",
+        )
         return {}
 
 
@@ -60,6 +74,8 @@ def get_secret(key: str) -> str | None:
 
 def set_secret(key: str, value: str) -> None:
     """Store ``key`` = ``value`` as plaintext (no encryption). Overwrites."""
+    # ADR-007: plaintext per design (local app) — NO encryption, NO hashing,
+    # NO masking at rest. This helper only performs a literal JSON write.
     with _lock:
         data = _read_raw()
         data[key] = value
