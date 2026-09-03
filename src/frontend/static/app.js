@@ -601,6 +601,11 @@
       provEl("provDetailTitle").textContent = p.name || id;
       renderModels(p.models);
       loadAccounts(id);
+      // B5.5: refresh the per-provider Usage subsection (day summary).
+      if (window.aigate && window.aigate.usage &&
+          typeof window.aigate.usage.loadProviderUsage === "function") {
+        window.aigate.usage.loadProviderUsage(id);
+      }
       setModelMsg("");
     }).catch(function (err) {
       setModelMsg(err.message, "error");
@@ -1029,6 +1034,13 @@
     // --- Nav / view switching (top sidebar + mobile bottom-nav share logic) ---
     function handleNav(item) {
       var view = item.getAttribute("data-view");
+      // B5.5: stop the usage auto-refresh whenever we navigate (the usage
+      // module restarts it via onShow when its view is entered). Guarded so
+      // the shell works even if usage.js is absent.
+      if (view !== "usage" && window.aigate && window.aigate.usage &&
+          typeof window.aigate.usage.onHide === "function") {
+        window.aigate.usage.onHide();
+      }
       showView(view);
       setActiveNav(item);
       if (view === "settings") loadSettings();
@@ -1039,6 +1051,9 @@
         if (window.aigate && window.aigate.proxies) window.aigate.proxies.onShow();
       } else if (view === "endpoints") {
         if (window.aigate && window.aigate.endpoints) window.aigate.endpoints.onShow();
+      } else if (view === "usage") {
+        // B5.5: load quota + summary + recent and start the auto-refresh.
+        if (window.aigate && window.aigate.usage) window.aigate.usage.onShow();
       } else if (view === "terminal") {
         initTerminalView();
         // B3.3: open/refit the multi-tab terminal when its view is shown.

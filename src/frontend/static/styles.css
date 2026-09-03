@@ -889,3 +889,77 @@ body.sidebar-collapsed .logwindow { left: var(--sidebar-w-collapsed); }
   background: rgba(255,193,7,0.12);
   color: #ffc107;
 }
+
+/* ===== Usage & Quota (B5.5) ===== */
+.usage-range-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.usage-range-controls .form-input { width: auto; }
+
+/* Totals stat cards */
+.usage-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 12px 0 18px;
+}
+.usage-stat {
+  flex: 1 1 140px;
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  text-align: center;
+}
+.usage-stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.usage-stat-label {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* Quota progress bar */
+.usage-progress {
+  display: inline-block;
+  vertical-align: middle;
+  width: 120px;
+  height: 10px;
+  border-radius: 6px;
+  background: var(--panel-border);
+  overflow: hidden;
+}
+.usage-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: 6px;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+.usage-progress-high { background: #dc3545; }
+[data-theme="dark"] .usage-progress-high { background: #ff6b6b; }
+.usage-progress-pct {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.usage-subtitle {
+  margin: 18px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.usage-section { margin-top: 18px; }
+.quota-used { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.quota-reset { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.usage-ts { white-space: nowrap; color: var(--muted); font-size: 13px; }

@@ -259,6 +259,31 @@
               <tbody id="accountsBody"></tbody>
             </table>
           </div>
+
+          <!-- Usage subsection (B5.5): this provider's day summary -->
+          <div class="accounts-section usage-section">
+            <div class="providers-head">
+              <h4 class="accounts-title" data-i18n="usage.summary">Usage summary</h4>
+            </div>
+
+            <p class="settings-msg" id="provUsageMsg" role="status" aria-live="polite"></p>
+
+            <div class="usage-stats" id="provUsageTotals"></div>
+
+            <h3 class="usage-subtitle" data-i18n="usage.top_models">Top models</h3>
+            <table class="data-table" id="provUsageModelTable">
+              <thead>
+                <tr>
+                  <th data-i18n="usage.model">Model</th>
+                  <th data-i18n="usage.requests">Requests</th>
+                  <th data-i18n="usage.tokens_in">Tokens in</th>
+                  <th data-i18n="usage.tokens_out">Tokens out</th>
+                  <th data-i18n="usage.cost">Cost (est.)</th>
+                </tr>
+              </thead>
+              <tbody id="provUsageModelBody"></tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -340,6 +365,97 @@
               </tr>
             </thead>
             <tbody id="endpointTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Usage & Quota view (B5.5): quota panel + summary + recent usage -->
+      <section class="view" data-view="usage">
+        <!-- Quota panel -->
+        <div class="card usage-quota-card">
+          <div class="providers-head">
+            <h2 class="providers-title" data-i18n="usage.quota">Quota</h2>
+            <button class="btn" id="usageRefreshBtn" type="button">
+              <i class="fa fa-rotate"></i> <span data-i18n="usage.refresh">Refresh</span>
+            </button>
+          </div>
+
+          <p class="settings-msg" id="usageMsg" role="status" aria-live="polite"></p>
+
+          <table class="data-table" id="quotaTable">
+            <thead>
+              <tr>
+                <th data-i18n="usage.provider">Provider</th>
+                <th data-i18n="usage.tier">Tier</th>
+                <th data-i18n="usage.used">Used</th>
+                <th data-i18n="usage.progress">Progress</th>
+                <th data-i18n="usage.reset">Resets in</th>
+                <th data-i18n="usage.cost">Cost (est.)</th>
+              </tr>
+            </thead>
+            <tbody id="quotaTableBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Usage summary panel -->
+        <div class="card usage-summary-card">
+          <div class="providers-head">
+            <h2 class="providers-title" data-i18n="usage.summary">Usage summary</h2>
+            <div class="usage-range-controls">
+              <label class="form-label" for="usageRange" data-i18n="usage.range">Range</label>
+              <select class="form-input" id="usageRange">
+                <option value="day" data-i18n="usage.range.day">Day</option>
+                <option value="week" data-i18n="usage.range.week">Week</option>
+                <option value="month" data-i18n="usage.range.month">Month</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="usage-stats" id="usageTotals"></div>
+
+          <h3 class="usage-subtitle" data-i18n="usage.by_provider">By provider</h3>
+          <table class="data-table" id="usageProviderTable">
+            <thead>
+              <tr>
+                <th data-i18n="usage.provider">Provider</th>
+                <th data-i18n="usage.requests">Requests</th>
+                <th data-i18n="usage.tokens_in">Tokens in</th>
+                <th data-i18n="usage.tokens_out">Tokens out</th>
+                <th data-i18n="usage.cost">Cost (est.)</th>
+              </tr>
+            </thead>
+            <tbody id="usageProviderBody"></tbody>
+          </table>
+
+          <h3 class="usage-subtitle" data-i18n="usage.by_model">By model</h3>
+          <table class="data-table" id="usageModelTable">
+            <thead>
+              <tr>
+                <th data-i18n="usage.model">Model</th>
+                <th data-i18n="usage.requests">Requests</th>
+                <th data-i18n="usage.tokens_in">Tokens in</th>
+                <th data-i18n="usage.tokens_out">Tokens out</th>
+                <th data-i18n="usage.cost">Cost (est.)</th>
+              </tr>
+            </thead>
+            <tbody id="usageModelBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Recent usage table -->
+        <div class="card usage-recent-card">
+          <h2 class="providers-title" data-i18n="usage.recent">Recent usage</h2>
+          <table class="data-table" id="recentUsageTable">
+            <thead>
+              <tr>
+                <th data-i18n="usage.model">Model</th>
+                <th data-i18n="usage.tokens_in">Tokens in</th>
+                <th data-i18n="usage.tokens_out">Tokens out</th>
+                <th data-i18n="usage.cost">Cost (est.)</th>
+                <th data-i18n="usage.time">Time</th>
+              </tr>
+            </thead>
+            <tbody id="recentUsageBody"></tbody>
           </table>
         </div>
       </section>
@@ -695,6 +811,8 @@
   <script src="combos.js" defer></script>
   <script src="proxies.js" defer></script>
   <script src="endpoints.js" defer></script>
+  <!-- Usage & Quota tracking (B5.5) — needs app.js (window.aigate helpers) -->
+  <script src="usage.js" defer></script>
   <!-- CLI Tools launcher (B3.4) — needs app.js (window.aigate) + terminal.js -->
   <script src="clitools.js" defer></script>
   <!-- Self-Heal UI (B4.1) — needs i18n.js (window.I18N) + clitools.js -->
