@@ -461,6 +461,19 @@
 - BACKLOG B5.5 `[x]`. **B5.6 aktif** (be-dev+fe-dev, sekuensial): Log Permintaan
   (RequestLog) + Dashboard Usage Analytics (PRD §2.4.3). be-dev dulu.
 
+## Run-impl session 2026-09-03 (continue) — B5.6 SELESAI + B5.7 START
+- **B5.6 be-dev**: `RequestLog` model + `UsageRecord.saved_tokens_est` + migrasi;
+  gate Setting `request_log_enabled` (default off); gateway catat RequestLog
+  (success+error, redaksi secret, trunc 8KB, duration) + saved_bytes→savings;
+  `/api/request-logs` + `/api/analytics` (buckets/totals/by_group). Verifikasi PM:
+  pytest **232 passed, 1 skipped**. Commit `e673e4c`.
+- **B5.6 fe-dev**: view Analytics (selectors range/group_by/metric, totals cards
+  + savings, CSS-bar trend chart, by-group table) + Request Log viewer (toggle
+  request_log_enabled, recent logs pretty-print, refresh); i18n EN/ID. Verifikasi
+  PM: vitest **154 passed (14 file)**. Commit `e4a5815`.
+- BACKLOG B5.6 `[x]`. **B5.7 aktif** (be-dev+fe-dev, sekuensial): Export/Import
+  Setting lokal (JSON) — pengganti cloud sync (PRD §2.4.4). be-dev dulu.
+
 ## Run-impl session 2026-09-03 (continue) — SELESAI / NO-OP
 - Arg = `continue`. Prosedur: cari task pertama belum `[x]` di BACKLOG.md.
   HASIL: SELURUH task (B0.1 → B4.3) SUDAH `[x]`. Tidak ada task pending yg bisa
