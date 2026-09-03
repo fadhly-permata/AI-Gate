@@ -474,6 +474,24 @@
 - BACKLOG B5.6 `[x]`. **B5.7 aktif** (be-dev+fe-dev, sekuensial): Export/Import
   Setting lokal (JSON) — pengganti cloud sync (PRD §2.4.4). be-dev dulu.
 
+## QA 2026-09-03 — combo member editor + negative test — SELESAI
+- User: "gimana setting combo kayak 9router (multi-model/multi-provider)? cek log, ada error".
+- **Log triage**: error `settings.get('port')` = HISTORIS (bug lama, udah ke-fix;
+  diverifikasi: picu baca settings + gateway -> TIDAK ada error baru). Warning
+  `token_saver transform exploded` = dari TEST fail-open (bukan runtime). Bukan bug aktif.
+- **Combo gap**: backend udah dukung member (provider+model+priority+weight, CRUD
+  lengkap) TAPI UI `combos.js` gak punya editor member. -> **fe-dev** bangun editor
+  member (list/add/edit/remove; provider->model dropdown; buffer utk combo baru,
+  endpoint CRUD utk combo existing) + opsi strategi `three_tier`. Commit `7451bf8`.
+  Verifikasi PM: vitest **189 passed**.
+- **Test suite**: backend 257 passed/1 skipped; frontend 189 passed.
+- **NEGATIVE TEST** (38 kasus input rusak/edge vs server DB-sementara): **38 ok,
+  0 crash/5xx, 0 unhandled exception** di log. Semua ditolak bener (400/404/405/422).
+- **SOFT FINDING** (bukan crash): `POST /api/combos` dengan member `provider_id`
+  gak-exist -> **201 diterima** (gap validasi referensial). Routing tetap aman
+  (build_candidates skip provider hilang + warning), jadi gak crash — tapi idealnya
+  ditolak 400. Opsional: be-dev tambah validasi member.provider_id exists.
+
 ## Frontend automation 2026-09-03 — vitest + e2e (diperluas) — SELESAI
 - User "test otomasi front end" -> PM jalanin 2 lapis:
   - **vitest (unit/jsdom)**: **173 passed (15 file)** — termasuk accounts(9),
