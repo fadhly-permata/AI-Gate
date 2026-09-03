@@ -170,3 +170,23 @@ gak keulang:
   kerjaan yang udah ke-commit gak akan padam lagi.
 (Pelajaran 2026-09-03: force-close revert models.py; kerjaan B5.1-B5.4 nyaris
 padam gara-gara belum di-commit.)
+
+## R20 — Verifikasi end-to-end di lingkungan NYATA; jangan ngandelin CDN/unit-test doang
+Pelajaran (2026-09-03, user marah "kacau kerjaan lu"): PM udah bilang "aplikasi
+jalan" + "test hijau", TAPI **terminal gak bisa dipakai**. Penyebab: (1) xterm +
+FitAddon dimuat dari **CDN** dengan URL salah (`addon-fit.js` harusnya
+`xterm-addon-fit.js` → 404) dan mati kalau offline; (2) dependensi runtime
+**`websockets` gak terdaftar** → uvicorn balas 404 di handshake WS → PTY gak nyambung;
+(3) verifikasi PM (vitest + e2e smoke) **gak pernah nyentuh terminal beneran**.
+Aturan wajib:
+1. Aset yang DIPAKAI FITUR (library JS/CSS) WAJIB **di-vendor lokal**, BUKAN CDN —
+   aigate jalan native/offline (ADR-009). CDN = titik gagal.
+2. Dependensi runtime yang dipakai kode (mis. `websockets` utk uvicorn WS) WAJIB
+   masuk `pyproject` + `run.py` REQUIRED, dan diverifikasi beneran ter-install.
+3. Sebelum klaim "fitur X jalan", PM WAJIB **meng-exercise fitur itu end-to-end di
+   lingkungan nyata** (Chromium + server + deps terpasang). Buktinya output NYATA
+   (mis. prompt shell muncul + round-trip `echo` balik), BUKAN cuma "halaman ke-load".
+4. e2e smoke WAJIB nyentuh **tiap fitur inti** (terminal, gateway, combo, self-heal),
+   bukan cuma shell UI. Fitur yang gak ke-cover e2e = gap — catat, JANGAN tandai selesai.
+5. "Test hijau" ≠ "aplikasi kepake". Unit test bisa lolos padahal asset/dep/integrasi
+   rusak. Selalu cek level integrasi juga.

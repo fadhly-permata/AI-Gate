@@ -474,6 +474,27 @@
 - BACKLOG B5.6 `[x]`. **B5.7 aktif** (be-dev+fe-dev, sekuensial): Export/Import
   Setting lokal (JSON) — pengganti cloud sync (PRD §2.4.4). be-dev dulu.
 
+## Insiden terminal gak kepake + R20 — 2026-09-03 (user marah)
+- User: "terminal ga bisa dipake" + "kacau kerjaan lu". PM ngaku salah: udah klaim
+  "aplikasi jalan" padahal terminal (fitur inti) mati.
+- 2 AKAR MASALAH:
+  1. xterm + FitAddon dari CDN jsdelivr; URL addon-fit SALAH (`lib/addon-fit.js`
+     harusnya `lib/xterm-addon-fit.js` → 404) + mati offline. FIX: vendor lokal ke
+     `static/vendor/xterm/` (xterm.js 283KB, xterm.css, xterm-addon-fit.js) +
+     index.html nunjuk lokal.
+  2. `websockets` gak ada di dependensi → uvicorn 404 di WS handshake → `/ws/terminal`
+     gak nyambung. FIX: tambah ke pyproject + run.py REQUIRED + `pip install websockets`.
+- VERIFIKASI NYATA (Chromium + WS client): xterm render, WS **101**, prompt shell
+  `~/projects/aigate $` muncul, round-trip `echo AIGATE_WS_RT_42` BALIK via PTY.
+  (Keystroke puppeteer gak kerekam = artefak headless focus, bukan bug — dibuktikan
+  via round-trip WS langsung.) 404 sisa cuma favicon.ico (cosmetic).
+- Combo editor: fungsional OK (add+save+persist); "ngaco" = sub-form tanpa label +
+  wrap jelek -> fe-dev rapiin grid 2x2 berlabel (vitest 193). Commit `07b45b4`.
+- **R20** dibuat (OPERATING_RULES.md): vendor lokal bukan CDN; dep runtime wajib
+  terdaftar+terpasang; exercise fitur end-to-end di lingkungan nyata sebelum klaim
+  selesai; e2e wajib nyentuh tiap fitur inti; "test hijau" != "aplikasi kepake".
+- Server di-restart (PID baru di aigate_run.pid) biar websockets + vendor kebawa.
+
 ## QA 2026-09-03 — combo member editor + negative test — SELESAI
 - User: "gimana setting combo kayak 9router (multi-model/multi-provider)? cek log, ada error".
 - **Log triage**: error `settings.get('port')` = HISTORIS (bug lama, udah ke-fix;
