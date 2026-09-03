@@ -9,6 +9,7 @@ plaintext — no encryption, matching ERD.md.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 from sqlalchemy import create_engine, text
@@ -22,7 +23,14 @@ class Base(DeclarativeBase):
     """Declarative base for all aigate ORM models (SQLAlchemy 2.x)."""
 
 
-DB_PATH: Path = Path.home() / ".aigate" / "aigate.db"
+# Resolved once at import time. ``AIGATE_DB_PATH`` lets the test suite (and any
+# other caller) point the engine at a throwaway file; when the env var is unset
+# the default is the production ``~/.aigate/aigate.db`` (ADR-004). Because the
+# module-level engine + ``SessionLocal`` below bind to this path at import, the
+# override MUST be set before ``backend.config.db`` is first imported.
+DB_PATH: Path = Path(
+    os.environ.get("AIGATE_DB_PATH") or (Path.home() / ".aigate" / "aigate.db")
+)
 
 _engine = None
 
