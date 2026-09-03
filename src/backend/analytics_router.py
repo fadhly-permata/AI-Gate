@@ -13,25 +13,33 @@ Endpoints (contract for fe-dev — shapes are EXACT):
      "totals":{...},"by_group":[...]}``
   day = 24 hourly buckets, week = 7 daily, month = 30 daily (see
   :func:`backend.usage.analytics` for the full contract).
+* ``GET /api/analytics/export?range=...&group_by=...&format=csv``
+  -> the SAME report as a downloadable CSV (``text/csv``,
+  ``Content-Disposition: attachment``). Default range=month, group_by=model,
+  format=csv. Serialization lives in :mod:`backend.analytics_export` (stdlib
+  ``csv``/``io`` only — no new dependency). Layout: see that module.
 
-Layering: aggregation lives in :mod:`backend.usage`; this module only
-validates params, opens a session and serializes. R12/ADR-011: every call is
-logged to ``LogEntry`` via ``backend.log``.
+Layering: aggregation lives in :mod:`backend.usage`; CSV rendering lives in
+:mod:`backend.analytics_export`; this module only validates params, opens a
+session and serializes. R12/ADR-011: every call is logged to ``LogEntry`` via
+``backend.log``.
 
 Pydantic **v1** only (rule R10): ``BaseModel`` + ``class Config``, no v2 syntax.
 """
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Optional
 
 from fastapi import APIRouter, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
+from backend import analytics_export
 from backend import usage as usage_service
 from backend.config.db import SessionLocal
-from backend.log import log_info, log_warning
+from backend.log import log_error_exc, log_info, log_warning
 from backend.models import RequestLog
 
 LOG_SOURCE = "backend.analytics.router"
@@ -191,6 +199,76 @@ def get_analytics(
         source=LOG_SOURCE,
     )
     return out
+
+
+@router.get("/api/analytics/export")
+def export_analytics(
+    range: Optional[str] = Query(None),
+    group_by: Optional[str] = Query(None),
+    format: Optional[str] = Query(None),
+) -> Any:
+    """Download the analytics report as a CSV file (PRD §2.4.3 monthly report).
+
+    Same params as ``GET /api/analytics`` plus ``format`` (only ``csv`` today),
+    but defaults differ: ``range=month``, ``group_by=model``, ``format=csv``.
+    The report is built by :func:`backend.usage.analytics` (no duplicated
+    aggregation) then rendered by :mod:`backend.analytics_export`. Returns
+    ``text/csv`` with a ``Content-Disposition: attachment`` filename
+    ``aigate-report-<range>-<YYYYMMDD>.csv`` (UTC date). Invalid params -> 400
+    OpenAI-style envelope; empty data -> valid CSV with zero rows (not 404).
+    """
+    rng, err = _validate_choice(range, VALID_RANGES, "range", "month")
+    if err is not None:
+        log_warning(
+            f"GET /api/analytics/export invalid range={range!r}", source=LOG_SOURCE
+        )
+        return err
+    gb, err = _validate_choice(
+        group_by, VALID_GROUP_BY, "group_by", usage_service.DEFAULT_GROUP_BY
+    )
+    if err is not None:
+        log_warning(
+            f"GET /api/analytics/export invalid group_by={group_by!r}",
+            source=LOG_SOURCE,
+        )
+        return err
+    fmt, err = _validate_choice(
+        format, analytics_export.VALID_FORMATS, "format", analytics_export.DEFAULT_FORMAT
+    )
+    if err is not None:
+        log_warning(
+            f"GET /api/analytics/export invalid format={format!r}", source=LOG_SOURCE
+        )
+        return err
+
+    # One instant drives BOTH the metadata timestamp and the filename date.
+    generated_at = datetime.utcnow()
+    try:
+        with SessionLocal() as session:
+            report = usage_service.analytics(session, range=rng, group_by=gb)
+        csv_text = analytics_export.build_report_csv(report, generated_at)
+    except Exception as exc:  # noqa: BLE001 - R12: log + 500 envelope, never swallow
+        log_error_exc(
+            "GET /api/analytics/export failed to build CSV report",
+            source=LOG_SOURCE,
+            exc=exc,
+            context={"range": rng, "group_by": gb, "format": fmt},
+        )
+        return _error(
+            500, "failed to generate CSV report", "export_failed", etype="server_error"
+        )
+
+    filename = f"aigate-report-{rng}-{generated_at.strftime('%Y%m%d')}.csv"
+    log_info(
+        f"GET /api/analytics/export range={rng} group_by={gb} format={fmt} "
+        f"-> {report['totals']['requests']} request(s)",
+        source=LOG_SOURCE,
+    )
+    return Response(
+        content=csv_text,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 __all__ = [
