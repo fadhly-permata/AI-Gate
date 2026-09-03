@@ -570,6 +570,20 @@ body[data-device="phone"] .modal { width: 100%; }
 .header-row .hdr-key,
 .header-row .hdr-val { width: 100%; flex: 1; max-width: none; }
 
+/* Combo members editor (B5.x) — inline add/edit/remove, mirrors .header-row. */
+.combo-member-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.combo-member-form .form-input { width: auto; max-width: none; flex: 1 1 120px; }
+.combo-member-form #comboMemberPriority,
+.combo-member-form #comboMemberWeight { flex: 0 0 90px; width: 90px; }
+.combo-members-row { display: block; }
+.combo-members-row .form-label { display: block; margin-bottom: 8px; }
+
 .hdr-add { align-self: flex-start; }
 
 /* Modal */

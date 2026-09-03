@@ -772,6 +772,7 @@
                 <option value="fallback">fallback</option>
                 <option value="load_balance">load_balance</option>
                 <option value="latency_cost">latency_cost</option>
+                <option value="three_tier" data-i18n="combos.strategy.three_tier">three_tier</option>
               </select>
             </div>
             <div class="form-row">
@@ -780,6 +781,36 @@
                 <input type="checkbox" id="comboEnabled" name="enabled" />
                 <span class="switch-slider"></span>
               </label>
+            </div>
+            <!-- Members editor (multi-provider routes, 9router-style) -->
+            <div class="form-row combo-members-row">
+              <label class="form-label" data-i18n="combos.members">Members</label>
+              <p class="settings-msg" id="comboMemberMsg" role="status" aria-live="polite"></p>
+              <table class="data-table" id="comboMembersTable">
+                <thead>
+                  <tr>
+                    <th data-i18n="combos.member.provider">Provider</th>
+                    <th data-i18n="combos.member.model">Model</th>
+                    <th data-i18n="combos.member.priority">Priority</th>
+                    <th data-i18n="combos.member.weight">Weight</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="comboMembersBody"></tbody>
+              </table>
+              <div class="combo-member-form">
+                <select class="form-input" id="comboMemberProvider"
+                        aria-label="Provider"></select>
+                <input class="form-input" type="text" id="comboMemberModel"
+                       name="comboMemberModel" list="comboMemberModelList" autocomplete="off" />
+                <datalist id="comboMemberModelList"></datalist>
+                <input class="form-input" type="number" id="comboMemberPriority" value="0" step="1" />
+                <input class="form-input" type="number" id="comboMemberWeight" value="1" step="0.1" />
+                <button type="button" class="btn btn-primary" id="comboMemberAddBtn"
+                        data-i18n="combos.member.add">Add member</button>
+                <button type="button" class="btn" id="comboMemberCancelEdit" hidden
+                        data-i18n="combos.member.cancel_edit">Cancel edit</button>
+              </div>
             </div>
             <div class="form-actions">
               <button type="submit" class="btn btn-primary" id="comboSaveBtn" data-i18n="combos.save">Save</button>
