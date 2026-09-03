@@ -474,6 +474,21 @@
 - BACKLOG B5.6 `[x]`. **B5.7 aktif** (be-dev+fe-dev, sekuensial): Export/Import
   Setting lokal (JSON) — pengganti cloud sync (PRD §2.4.4). be-dev dulu.
 
+## Opsional pasca-backlog 2026-09-03 — CSV report export — SELESAI
+- User "boleh, tapi commit dulu" -> PM konfirmasi tree bersih (semua backlog udah
+  ke-commit), lalu kerjakan opsional.
+- Cleanup: `git stash@{0}` (sisa force-close, isi 4 file udah di HEAD) DIHAPUS (R8).
+- **be-dev**: `GET /api/analytics/export?range&group_by&format=csv` -> text/csv
+  download (Content-Disposition `aigate-report-<range>-<date>.csv`); reuse
+  `usage.analytics()`; stdlib csv/io (no dep baru); 400 invalid_*, 500 export_failed.
+  Verifikasi PM: pytest **257 passed, 1 skipped**. Commit `c76ed61`.
+- **fe-dev**: tombol "Export CSV" di row kontrol Analytics (pakai range/group_by
+  aktif, pola temp-anchor download); i18n EN/ID. Verifikasi PM: vitest **173 passed
+  (15 file)**. Commit `13f0381`.
+- PDF export TIDAK dibuat (dep berat/rapuh di Termux; CSV cukup buat laporan).
+- Playwright e2e desktop masih butuh `npx playwright install` (unduh browser) —
+  gak bisa di sandbox ini.
+
 ## Run-impl session 2026-09-03 (continue) — B5.7 SELESAI -> SELURUH BACKLOG SELESAI
 - **B5.7 be-dev**: `export.py` (export_settings/import_settings; replace+merge,
   FK-safe, 1 transaksi, rollback+log); `export_router.py` GET /api/settings/export
