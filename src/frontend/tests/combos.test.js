@@ -21,6 +21,8 @@ function withDom() {
 
 // Build the combo modal DOM (mirrors index.html #comboModal) incl. the
 // members editor section, so the members helpers can be driven in tests.
+// Structure mirrors the labeled add-member grid: each field wrapped in a
+// .combo-member-field with a visible <label for=...>. Element ids unchanged.
 function withComboModalDom() {
   withDom();
   document.body.innerHTML +=
@@ -38,13 +40,31 @@ function withComboModalDom() {
         '<input type="checkbox" id="comboEnabled" />' +
         '<p id="comboMemberMsg"></p>' +
         '<table id="comboMembersTable"><tbody id="comboMembersBody"></tbody></table>' +
-        '<select id="comboMemberProvider"></select>' +
-        '<input id="comboMemberModel" list="comboMemberModelList" />' +
-        '<datalist id="comboMemberModelList"></datalist>' +
-        '<input type="number" id="comboMemberPriority" value="0" />' +
-        '<input type="number" id="comboMemberWeight" value="1" step="0.1" />' +
-        '<button type="button" id="comboMemberAddBtn">Add member</button>' +
-        '<button type="button" id="comboMemberCancelEdit" hidden>Cancel edit</button>' +
+        '<div class="combo-member-form">' +
+          '<div class="combo-member-fields">' +
+            '<div class="combo-member-field">' +
+              '<label class="form-label" for="comboMemberProvider" data-i18n="combos.member.provider">Provider</label>' +
+              '<select id="comboMemberProvider"></select>' +
+            '</div>' +
+            '<div class="combo-member-field">' +
+              '<label class="form-label" for="comboMemberModel" data-i18n="combos.member.model">Model</label>' +
+              '<input id="comboMemberModel" list="comboMemberModelList" />' +
+              '<datalist id="comboMemberModelList"></datalist>' +
+            '</div>' +
+            '<div class="combo-member-field">' +
+              '<label class="form-label" for="comboMemberPriority" data-i18n="combos.member.priority">Priority</label>' +
+              '<input type="number" id="comboMemberPriority" value="0" />' +
+            '</div>' +
+            '<div class="combo-member-field">' +
+              '<label class="form-label" for="comboMemberWeight" data-i18n="combos.member.weight">Weight</label>' +
+              '<input type="number" id="comboMemberWeight" value="1" step="0.1" />' +
+            '</div>' +
+          '</div>' +
+          '<div class="combo-member-actions">' +
+            '<button type="button" id="comboMemberAddBtn">Add member</button>' +
+            '<button type="button" id="comboMemberCancelEdit" hidden>Cancel edit</button>' +
+          '</div>' +
+        '</div>' +
       '</form>' +
     '</div>';
 }
@@ -418,6 +438,68 @@ describe("combos strategy select — three_tier (B5.2)", () => {
     ].forEach((k) => {
       expect(window.I18N.en[k]).toBeDefined();
       expect(window.I18N.id[k]).toBeDefined();
+    });
+  });
+});
+
+describe("combos members — add-member sub-form layout + labels (visual fix)", () => {
+  // Read the SHIPPED markup (source of truth for the visual fix), not the
+  // simplified test DOM, so the layout/label structure is verified for real.
+  const doc = new JSDOM(
+    readFileSync(join(__dirname, "..", "static", "index.html"), "utf8")
+  ).window.document;
+
+  const FIELDS = [
+    { id: "comboMemberProvider", key: "combos.member.provider" },
+    { id: "comboMemberModel", key: "combos.member.model" },
+    { id: "comboMemberPriority", key: "combos.member.priority" },
+    { id: "comboMemberWeight", key: "combos.member.weight" }
+  ];
+
+  it("every sub-form field has a VISIBLE associated <label for=...> (a11y)", () => {
+    FIELDS.forEach(({ id, key }) => {
+      const label = doc.querySelector('label[for="' + id + '"]');
+      expect(label).not.toBeNull();               // associated, not just aria-label
+      expect(label.classList.contains("form-label")).toBe(true);
+      expect(label.getAttribute("data-i18n")).toBe(key); // i18n-wired
+      expect((label.textContent || "").trim().length).toBeGreaterThan(0); // visible copy
+    });
+  });
+
+  it("no field relies solely on aria-label (visible label replaces it)", () => {
+    // The provider select previously had only aria-label; it must now be gone
+    // in favour of the real <label for=...>.
+    const sel = doc.getElementById("comboMemberProvider");
+    expect(sel).not.toBeNull();
+    expect(sel.getAttribute("aria-label")).toBeNull();
+  });
+
+  it("fields sit in a labeled grid; buttons on their own aligned row", () => {
+    const form = doc.querySelector(".combo-member-form");
+    expect(form).not.toBeNull();
+    const grid = form.querySelector(".combo-member-fields");
+    expect(grid).not.toBeNull();
+    // All four fields are inside the grid, each wrapped in .combo-member-field.
+    FIELDS.forEach(({ id }) => {
+      const field = grid.querySelector('.combo-member-field #' + id);
+      expect(field).not.toBeNull();
+    });
+    expect(grid.querySelectorAll(".combo-member-field").length).toBe(4);
+    // Add/Cancel live in a separate actions row (never orphaned with a field).
+    const actions = form.querySelector(".combo-member-actions");
+    expect(actions).not.toBeNull();
+    expect(actions.querySelector("#comboMemberAddBtn")).not.toBeNull();
+    expect(actions.querySelector("#comboMemberCancelEdit")).not.toBeNull();
+  });
+
+  it("keeps every member-editor element id unchanged (logic/tests depend on them)", () => {
+    [
+      "comboMemberProvider", "comboMemberModel", "comboMemberModelList",
+      "comboMemberPriority", "comboMemberWeight", "comboMemberAddBtn",
+      "comboMemberCancelEdit", "comboMembersBody", "comboMembersTable",
+      "comboMemberMsg"
+    ].forEach((id) => {
+      expect(doc.getElementById(id)).not.toBeNull();
     });
   });
 });

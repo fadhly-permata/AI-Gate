@@ -570,19 +570,50 @@ body[data-device="phone"] .modal { width: 100%; }
 .header-row .hdr-key,
 .header-row .hdr-val { width: 100%; flex: 1; max-width: none; }
 
-/* Combo members editor (B5.x) — inline add/edit/remove, mirrors .header-row. */
+/* Combo members editor (B5.x) — inline add/edit/remove. The sub-form is a
+   responsive labeled grid: 4 fields in 2 columns (Provider|Model over
+   Priority|Weight) so no field is orphaned by mid-row wrapping, with the
+   Add/Cancel buttons on their own aligned row. Stacks to a single column on
+   narrow screens. Reuses .form-label/.form-input; theme-safe (custom props). */
+.combo-members-row { display: block; }
+.combo-members-row > .form-label { display: block; margin-bottom: 8px; }
+
 .combo-member-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+.combo-member-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.combo-member-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.combo-member-field .form-label {
+  display: block;
+  margin: 0;
+  font-size: 13px;
+}
+.combo-member-field .form-input {
+  width: 100%;
+  max-width: none;
+}
+.combo-member-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 8px;
 }
-.combo-member-form .form-input { width: auto; max-width: none; flex: 1 1 120px; }
-.combo-member-form #comboMemberPriority,
-.combo-member-form #comboMemberWeight { flex: 0 0 90px; width: 90px; }
-.combo-members-row { display: block; }
-.combo-members-row .form-label { display: block; margin-bottom: 8px; }
+/* Narrow viewports / phone shell: stack the labeled fields in order. */
+@media (max-width: 480px) {
+  .combo-member-fields { grid-template-columns: 1fr; }
+}
+body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
 
 .hdr-add { align-self: flex-start; }
 

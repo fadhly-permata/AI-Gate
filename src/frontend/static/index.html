@@ -8,13 +8,11 @@
   <link rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
         crossorigin="anonymous" referrerpolicy="no-referrer" />
-  <!-- xterm.js 5.x via CDN (no build step, ADR-001) -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css"
-        crossorigin="anonymous" referrerpolicy="no-referrer" />
-  <script defer src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"
-          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/addon-fit.js"
-          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <!-- xterm.js 5.x + FitAddon vendored LOCALLY (offline-safe; ADR-001 no build,
+       ADR-009 native run). No CDN dependency — terminal works with no internet. -->
+  <link rel="stylesheet" href="vendor/xterm/xterm.css" />
+  <script defer src="vendor/xterm/xterm.js"></script>
+  <script defer src="vendor/xterm/xterm-addon-fit.js"></script>
 
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -798,18 +796,42 @@
                 </thead>
                 <tbody id="comboMembersBody"></tbody>
               </table>
+              <!-- Add/edit member sub-form: responsive labeled grid. Each field
+                   has a visible <label for=...> (a11y + i18n); fields sit in a
+                   2-col grid (Provider|Model / Priority|Weight) so nothing is
+                   orphaned by mid-row wrap; buttons on their own aligned row.
+                   Element ids unchanged — combos.js + tests depend on them. -->
               <div class="combo-member-form">
-                <select class="form-input" id="comboMemberProvider"
-                        aria-label="Provider"></select>
-                <input class="form-input" type="text" id="comboMemberModel"
-                       name="comboMemberModel" list="comboMemberModelList" autocomplete="off" />
-                <datalist id="comboMemberModelList"></datalist>
-                <input class="form-input" type="number" id="comboMemberPriority" value="0" step="1" />
-                <input class="form-input" type="number" id="comboMemberWeight" value="1" step="0.1" />
-                <button type="button" class="btn btn-primary" id="comboMemberAddBtn"
-                        data-i18n="combos.member.add">Add member</button>
-                <button type="button" class="btn" id="comboMemberCancelEdit" hidden
-                        data-i18n="combos.member.cancel_edit">Cancel edit</button>
+                <div class="combo-member-fields">
+                  <div class="combo-member-field">
+                    <label class="form-label" for="comboMemberProvider"
+                           data-i18n="combos.member.provider">Provider</label>
+                    <select class="form-input" id="comboMemberProvider"></select>
+                  </div>
+                  <div class="combo-member-field">
+                    <label class="form-label" for="comboMemberModel"
+                           data-i18n="combos.member.model">Model</label>
+                    <input class="form-input" type="text" id="comboMemberModel"
+                           name="comboMemberModel" list="comboMemberModelList" autocomplete="off" />
+                    <datalist id="comboMemberModelList"></datalist>
+                  </div>
+                  <div class="combo-member-field">
+                    <label class="form-label" for="comboMemberPriority"
+                           data-i18n="combos.member.priority">Priority</label>
+                    <input class="form-input" type="number" id="comboMemberPriority" value="0" step="1" />
+                  </div>
+                  <div class="combo-member-field">
+                    <label class="form-label" for="comboMemberWeight"
+                           data-i18n="combos.member.weight">Weight</label>
+                    <input class="form-input" type="number" id="comboMemberWeight" value="1" step="0.1" />
+                  </div>
+                </div>
+                <div class="combo-member-actions">
+                  <button type="button" class="btn btn-primary" id="comboMemberAddBtn"
+                          data-i18n="combos.member.add">Add member</button>
+                  <button type="button" class="btn" id="comboMemberCancelEdit" hidden
+                          data-i18n="combos.member.cancel_edit">Cancel edit</button>
+                </div>
               </div>
             </div>
             <div class="form-actions">

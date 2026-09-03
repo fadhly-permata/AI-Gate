@@ -23,6 +23,7 @@ REQUIRED = {
     "fastapi": "fastapi>=0.95,<0.100",
     "pydantic": "pydantic>=1.10,<2",
     "uvicorn": "uvicorn",
+    "websockets": "websockets",  # WS support for the terminal PTY bridge
     "sqlalchemy": "sqlalchemy",
     "ptyprocess": "ptyprocess",
     "httpx": "httpx",
