@@ -1054,6 +1054,12 @@
       } else if (view === "usage") {
         // B5.5: load quota + summary + recent and start the auto-refresh.
         if (window.aigate && window.aigate.usage) window.aigate.usage.onShow();
+      } else if (view === "analytics") {
+        // B5.6: load the analytics dashboard + request-log viewer (manual refresh
+        // only — no auto-poll timers to stop on onHide).
+        if (window.aigate && window.aigate.analytics) {
+          window.aigate.analytics.onShow();
+        }
       } else if (view === "terminal") {
         initTerminalView();
         // B3.3: open/refit the multi-tab terminal when its view is shown.

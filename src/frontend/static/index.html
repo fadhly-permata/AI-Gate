@@ -70,6 +70,10 @@
           <i class="nav-icon fa fa-chart-line"></i>
           <span class="nav-label" data-i18n="nav.usage">Usage &amp; Quota</span>
         </a>
+        <a class="nav-item" href="#" data-view="analytics">
+          <i class="nav-icon fa fa-chart-column"></i>
+          <span class="nav-label" data-i18n="nav.analytics">Analytics</span>
+        </a>
         <a class="nav-item" href="#" data-view="terminal">
           <i class="nav-icon fa fa-terminal"></i>
           <span class="nav-label" data-i18n="nav.terminal">Terminal</span>
@@ -460,6 +464,95 @@
         </div>
       </section>
 
+      <!-- Analytics view (B5.6, PRD §2.4.3): usage analytics dashboard +
+           request log viewer (debug). Vanilla CSS bar chart — no chart lib. -->
+      <section class="view" data-view="analytics">
+        <!-- Usage Analytics dashboard -->
+        <div class="card analytics-card">
+          <div class="providers-head">
+            <h2 class="providers-title" data-i18n="analytics.title">Usage Analytics</h2>
+            <div class="analytics-controls usage-range-controls">
+              <label class="form-label" for="analyticsRange" data-i18n="analytics.range">Range</label>
+              <select class="form-input" id="analyticsRange">
+                <option value="day" data-i18n="usage.range.day">Day</option>
+                <option value="week" data-i18n="usage.range.week">Week</option>
+                <option value="month" selected data-i18n="usage.range.month">Month</option>
+              </select>
+              <label class="form-label" for="analyticsGroup" data-i18n="analytics.group_by">Group by</label>
+              <select class="form-input" id="analyticsGroup">
+                <option value="model" data-i18n="analytics.model">Model</option>
+                <option value="provider" data-i18n="analytics.provider">Provider</option>
+              </select>
+              <label class="form-label" for="analyticsMetric" data-i18n="analytics.metric">Metric</label>
+              <select class="form-input" id="analyticsMetric">
+                <option value="tokens" data-i18n="analytics.metric.tokens">Tokens</option>
+                <option value="requests" data-i18n="analytics.metric.requests">Requests</option>
+                <option value="cost" data-i18n="analytics.metric.cost">Cost</option>
+              </select>
+              <button class="btn" id="analyticsRefreshBtn" type="button">
+                <i class="fa fa-rotate"></i> <span data-i18n="analytics.refresh">Refresh</span>
+              </button>
+            </div>
+          </div>
+
+          <p class="settings-msg" id="analyticsMsg" role="status" aria-live="polite"></p>
+
+          <h3 class="usage-subtitle" data-i18n="analytics.totals">Totals</h3>
+          <div class="usage-stats" id="analyticsTotals"></div>
+
+          <h3 class="usage-subtitle" data-i18n="analytics.trend">Trend</h3>
+          <div class="trend-chart" id="analyticsChart" role="img"
+               aria-label="Usage trend chart"></div>
+
+          <h3 class="usage-subtitle" data-i18n="analytics.by_group">By group</h3>
+          <table class="data-table" id="analyticsGroupTable">
+            <thead>
+              <tr>
+                <th data-i18n="analytics.group">Group</th>
+                <th data-i18n="analytics.requests">Requests</th>
+                <th data-i18n="analytics.tokens_in">Tokens in</th>
+                <th data-i18n="analytics.tokens_out">Tokens out</th>
+                <th data-i18n="analytics.cost">Cost (est.)</th>
+                <th data-i18n="analytics.savings">Est. savings (tokens)</th>
+              </tr>
+            </thead>
+            <tbody id="analyticsGroupBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Request Log viewer (debug): enable toggle + recent logged requests -->
+        <div class="card reqlog-card">
+          <div class="providers-head">
+            <h2 class="providers-title" data-i18n="reqlog.title">Request Log (debug)</h2>
+            <div class="analytics-controls">
+              <label class="form-label" for="reqlogEnabled" data-i18n="reqlog.enable">Enable request logging</label>
+              <label class="switch" title="Request logging">
+                <input type="checkbox" id="reqlogEnabled" />
+                <span class="switch-slider"></span>
+              </label>
+              <button class="btn" id="reqlogRefreshBtn" type="button">
+                <i class="fa fa-rotate"></i> <span data-i18n="reqlog.refresh">Refresh</span>
+              </button>
+            </div>
+          </div>
+
+          <p class="settings-msg" id="reqlogMsg" role="status" aria-live="polite"></p>
+
+          <table class="data-table" id="reqlogTable">
+            <thead>
+              <tr>
+                <th data-i18n="reqlog.ts">Time</th>
+                <th data-i18n="reqlog.model">Model</th>
+                <th data-i18n="reqlog.endpoint">Endpoint</th>
+                <th data-i18n="reqlog.duration">Duration</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="reqlogTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
       <!-- Terminal view (B3.1): collapsible terminal pane + Log Window -->
       <section class="view" data-view="terminal">
         <div class="card terminal-card">
@@ -813,6 +906,8 @@
   <script src="endpoints.js" defer></script>
   <!-- Usage & Quota tracking (B5.5) — needs app.js (window.aigate helpers) -->
   <script src="usage.js" defer></script>
+  <!-- Usage Analytics + Request Log viewer (B5.6) — needs app.js + usage.js formatters -->
+  <script src="analytics.js" defer></script>
   <!-- CLI Tools launcher (B3.4) — needs app.js (window.aigate) + terminal.js -->
   <script src="clitools.js" defer></script>
   <!-- Self-Heal UI (B4.1) — needs i18n.js (window.I18N) + clitools.js -->

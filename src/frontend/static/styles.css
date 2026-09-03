@@ -963,3 +963,97 @@ body.sidebar-collapsed .logwindow { left: var(--sidebar-w-collapsed); }
 .quota-used { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .quota-reset { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .usage-ts { white-space: nowrap; color: var(--muted); font-size: 13px; }
+
+/* ===== Usage Analytics + Request Log (B5.6) ===== */
+.analytics-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.analytics-controls .form-input { width: auto; }
+
+/* Trend chart: plain CSS vertical bars (R13 — no chart library). */
+.trend-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 190px;
+  padding: 8px 4px 0;
+  margin: 6px 0 14px;
+  border-bottom: 1px solid var(--panel-border);
+  overflow-x: auto;
+}
+.trend-col {
+  flex: 1 1 0;
+  min-width: 16px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+}
+.trend-bar {
+  width: 70%;
+  max-width: 30px;
+  min-width: 6px;
+  background: var(--accent);
+  border-radius: 3px 3px 0 0;
+  opacity: 0.85;
+  transition: height 0.3s ease;
+}
+.trend-bar:hover { opacity: 1; }
+/* Zero buckets: a flat baseline tick so the continuous axis stays honest. */
+.trend-bar-zero { height: 2px; background: var(--panel-border); }
+.trend-label {
+  height: 16px;
+  margin-top: 4px;
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+/* Request Log viewer (debug) */
+.reqlog-card { margin-top: 16px; }
+.reqlog-duration { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.reqlog-details { max-width: 460px; }
+.reqlog-details summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 12px;
+  user-select: none;
+}
+.reqlog-block-title {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.reqlog-details pre {
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 12px;
+  max-height: 260px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.reqlog-truncated {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #b8860b;
+}
+[data-theme="dark"] .reqlog-truncated { color: #ffc107; }
+
+/* Phone: keep the chart scrollable and the payload blocks compact. */
+body[data-device="phone"] .trend-chart { height: 150px; }
+body[data-device="phone"] .reqlog-details { max-width: 240px; }
