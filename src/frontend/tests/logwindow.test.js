@@ -1,5 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 
+// i18n dict so window.I18N (and getStr resolution) is available — the collapse
+// tests exercise applyLogCollapse/toggleLogCollapse which read i18n labels.
+import "../static/i18n.js";
 // app.js is an IIFE that attaches pure helpers onto window.aigate and runs
 // init() against the (jsdom) document. Importing for side effects exposes the
 // helpers we assert below.
@@ -88,3 +91,51 @@ describe("buildLogsQuery (B3.1)", () => {
     expect(window.aigate.buildLogsQuery("error", "abc")).toBe("?severity=error");
   });
 });
+
+describe("Log Window is global + collapsible (B3.1)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.body.innerHTML =
+      '<div class="logwindow" id="logWindow">' +
+        '<div class="logwindow-head">' +
+          '<button id="logCollapseBtn"><i class="fa fa-chevron-up"></i></button>' +
+        '</div>' +
+        '<div class="logwindow-body">' +
+          '<p id="logMsg"></p>' +
+          '<table id="logTable"><tbody id="logTableBody"></tbody></table>' +
+        '</div>' +
+      '</div>';
+  });
+
+  it("is expanded by default and exposes toggle/state helpers", () => {
+    expect(window.aigate.isLogCollapsed()).toBe(false);
+    expect(typeof window.aigate.toggleLogCollapse).toBe("function");
+    expect(typeof window.aigate.applyLogCollapse).toBe("function");
+  });
+
+  it("toggleLogCollapse flips state, toggles the class, and persists to localStorage", () => {
+    window.aigate.toggleLogCollapse();
+    expect(window.aigate.isLogCollapsed()).toBe(true);
+    expect(document.getElementById("logWindow").classList.contains("logwindow-collapsed")).toBe(true);
+    expect(localStorage.getItem("aigate.logCollapsed")).toBe("collapsed");
+
+    window.aigate.toggleLogCollapse();
+    expect(window.aigate.isLogCollapsed()).toBe(false);
+    expect(localStorage.getItem("aigate.logCollapsed")).toBe("expanded");
+  });
+
+  it("applyLogCollapse(true) collapses and (false) expands via class", () => {
+    window.aigate.applyLogCollapse(true);
+    expect(document.getElementById("logWindow").classList.contains("logwindow-collapsed")).toBe(true);
+    window.aigate.applyLogCollapse(false);
+    expect(document.getElementById("logWindow").classList.contains("logwindow-collapsed")).toBe(false);
+  });
+
+  it("exposes auto-refresh controls that are safe to call repeatedly", () => {
+    expect(typeof window.aigate.startLogAutoRefresh).toBe("function");
+    expect(typeof window.aigate.stopLogAutoRefresh).toBe("function");
+    // No timer running -> stop is a no-op and must not throw.
+    expect(() => window.aigate.stopLogAutoRefresh()).not.toThrow();
+  });
+});
+

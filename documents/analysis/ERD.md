@@ -143,6 +143,45 @@ erDiagram
     Endpoint ||--o| EndpointBinding : "has"
     CLIToolGroup ||--o{ CLITool : "contains"
     TerminalSession ||--o{ TerminalTab : "owns"
+    Provider ||--o{ ProviderAccount : "has"
+    ProviderAccount ||--o{ ComboMember : "used by"
+    Endpoint ||--o{ UsageRecord : "produces"
+    Endpoint ||--o{ RequestLog : "produces"
+```
+
+    ProviderAccount {
+        int id PK
+        int provider_id FK
+        string label
+        string auth_type
+        string api_key
+        string oauth_token
+        string refresh_token
+        datetime expires_at
+        bool enabled
+    }
+
+    UsageRecord {
+        int id PK
+        int endpoint_id FK
+        int provider_id FK
+        int account_id FK
+        string model
+        int tokens_in
+        int tokens_out
+        float cost_est
+        datetime ts
+    }
+
+    RequestLog {
+        int id PK
+        int endpoint_id FK
+        string model
+        datetime ts
+        int duration_ms
+        text request
+        text response
+    }
 ```
 
 ---
@@ -160,6 +199,10 @@ erDiagram
 | Endpoint → EndpointBinding | 1:1 (alternating) | Tiap endpoint terikat tepat satu sumber (provider atau combo). |
 | CLIToolGroup → CLITool | 1:N | Satu grup berisi banyak tool CLI. |
 | TerminalSession → TerminalTab | 1:N | Satu sesi terminal memiliki banyak tab. |
+| Provider → ProviderAccount | 1:N | Satu provider punya banyak akun (multi-akun). |
+| ProviderAccount → ComboMember | 1:N | Satu akun dapat dipakai sebagai anggota Combo (cadangan). |
+| Endpoint → UsageRecord | 1:N | Tiap endpoint menghasilkan catatan pemakaian. |
+| Endpoint → RequestLog | 1:N | Tiap endpoint menghasilkan log permintaan (debug). |
 
 > Catatan: `EndpointBinding.bind_type` membedakan apakah `bind_id` menunjuk ke `Provider.id` atau `Combo.id` (polymorphic binding).
 
@@ -286,6 +329,38 @@ config terpisah; key-value store di SQLite.
 - `value` (string): nilai setting (serialisasi bebas).
 - `updated_at` (datetime)
 
+### ProviderAccount
+Akun tambahan per provider (multi-akun) + kredensial OAuth.
+- `id` (int, PK)
+- `provider_id` (int, FK → Provider)
+- `label` (string): nama akun (mis. `acc-1`).
+- `auth_type` (string): `api_key` | `oauth`.
+- `api_key` (string, opsional): kunci bila auth_type=api_key (plaintext per ADR-007).
+- `oauth_token`, `refresh_token` (string, opsional): token OAuth.
+- `expires_at` (datetime, opsional): kedaluwarsa token; dipakai untuk auto-refresh.
+- `enabled` (bool)
+
+### UsageRecord
+Catatan pemakaian token & biaya per request (telemetri/kuota).
+- `id` (int, PK)
+- `endpoint_id` (int, FK → Endpoint)
+- `provider_id` (int, FK → Provider)
+- `account_id` (int, FK → ProviderAccount, opsional)
+- `model` (string)
+- `tokens_in`, `tokens_out` (int)
+- `cost_est` (float): estimasi biaya.
+- `ts` (datetime)
+
+### RequestLog
+Log permintaan (debug) level request/response.
+- `id` (int, PK)
+- `endpoint_id` (int, FK → Endpoint)
+- `model` (string)
+- `ts` (datetime)
+- `duration_ms` (int)
+- `request` (text): header/isi (opsional, mode debug).
+- `response` (text): ringkasan jawaban.
+
 ---
 
 ## 4. Catatan Konsistensi dengan PRD/BRD
@@ -297,6 +372,10 @@ config terpisah; key-value store di SQLite.
 - `TerminalSession`/`TerminalTab` merefleksikan multi-tab + floating fullscreen (PRD §2.5).
 - `LogEntry` merefleksikan mandatory logging (PRD §2.8 / ADR-011): seluruh method log ke sini, warning/error + stacktrace.
 - `Setting` merefleksikan konfigurasi di DB (PRD §2.8 / ADR-010): tidak ada file config terpisah; secret tetap plaintext di kolom Provider/Endpoint/ProxyNode (ADR-007).
+- `ProviderAccount` merefleksikan multi-akun + OAuth (PRD §2.1 / adopsi 9router): satu provider → banyak akun; token OAuth diperbarui otomatis.
+- `UsageRecord` merefleksikan Pelacak Kuota & Pemakaian (PRD §2.4.2) + Usage Analytics (PRD §2.4.3).
+- `RequestLog` merefleksikan Log Permintaan debug (PRD §2.4.3).
+- Export/Import Setting (PRD §2.4.4) adalah serialisasi seluruh `Setting` + entitas di atas ke JSON (tanpa entitas baru).
 
 ---
 

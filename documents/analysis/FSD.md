@@ -43,7 +43,7 @@ Entitas penyimpanan (data model) dijelaskan terpisah di `ERD.md`.
 ### 2.1 Providers Management
 
 **Deskripsi fungsional**
-Fitur pengelolaan AI Provider: menambah, mengedit, melihat daftar, dan menghapus provider AI (OpenAI, Anthropic, OpenRouter, Ollama, LiteLLM, dsb.). Kredensial disimpan plaintext di DB tanpa enkripsi dan tanpa masking UI (ADR-007). Daftar model diambil otomatis via endpoint `/models` bila provider mendukung.
+Fitur pengelolaan AI Provider: menambah, mengedit, melihat daftar, dan menghapus provider AI (OpenAI, Anthropic, OpenRouter, Ollama, LiteLLM, dsb.). Kredensial disimpan plaintext di DB tanpa enkripsi dan tanpa masking UI (ADR-007). Daftar model diambil otomatis via endpoint `/models` bila provider mendukung. Satu provider dapat punya beberapa akun (multi-akun) dengan kredensial sendiri; penyedia resmi mendukung login OAuth dengan token diperbarui otomatis (lihat `ProviderAccount` di ERD).
 
 **Input**
 - `name` (string) — nama provider.
@@ -66,11 +66,15 @@ Fitur pengelolaan AI Provider: menambah, mengedit, melihat daftar, dan menghapus
 4. Sistem panggil `GET {base_url}/models` (bila provider mendukung discovery).
 5. Hasil discovery disimpan ke `ProviderModel` / ditampilkan; bila gagal, user input manual.
 6. Edit/Hapus: konfirmasi hapus → cascade hapus relasi (ComboMember, EndpointBinding).
+7. **Multi-Akun:** user dapat menambah `ProviderAccount` (label, auth_type, api_key atau oauth token) ke provider yang sama; routing memilih akun (round-robin) atau pakai sebagai cadangan.
+8. **OAuth:** bila `auth_type=oauth`, klik Connect memicu flow OAuth; token + `refresh_token` + `expires_at` disimpan. Sebelum request, sistem otomatis refresh bila hampir kedaluwarsa (tanpa login ulang).
 
 **Traceability**
 - US-2.1.1 (CRUD Provider) — M
 - US-2.1.2 (Credential Storage Aman) — M
 - US-2.1.3 (Model Auto-Discovery) — S
+- US-2.1.4 (Multi-Akun per Provider) — M
+- US-2.1.5 (OAuth + Token Refresh) — M
 
 ---
 
@@ -105,10 +109,10 @@ Mengelola kumpulan proxy (HTTP/HTTPS/SOCKS5) untuk merutekan traffic ke provider
 ### 2.3 Combos (Smart Routing & Fallback)
 
 **Deskripsi fungsional**
-Menggabungkan beberapa provider/model menjadi satu tujuan logis ("Combo") dengan strategi routing: Fallback (alihkan bila A error/429), Load Balancing (berbobot), atau Lowest Latency / Cost Optimization.
+Menggabungkan beberapa provider/model menjadi satu tujuan logis ("Combo") dengan strategi routing: **3-Tier Fallback** (langganan → murah → gratis, otomatis pindah bila kuota habis/error), **Cadangan Antar-Akun** (akun lain di provider sama bila satu kena limit), **Load Balancing** (berbobot), atau **Lowest Latency / Cost Optimization** — dengan **routing sadar kuota** (mempertimbangkan sisa kuota tiap provider).
 
 **Input**
-- `Combo`: `name`, `strategy` (enum: fallback | load_balance | latency_cost), `enabled`.
+- `Combo`: `name`, `strategy` (enum: three_tier | fallback | load_balance | latency_cost), `enabled`.
 - `ComboMember`: `combo_id` (FK), `provider_id` (FK) atau `provider_model` (string), `priority` (int), `weight` (float, untuk load_balance).
 
 **Output**
@@ -118,22 +122,27 @@ Menggabungkan beberapa provider/model menjadi satu tujuan logis ("Combo") dengan
 **Process flow (routing)**
 1. Request masuk ke endpoint terikat Combo.
 2. Engine pilih anggota berdasar strategi:
-   - *Fallback*: coba prioritas 1 → bila 5xx/429, lanjut prioritas 2, dst.
-   - *Load Balance*: pilih anggota berbobot (weight-normalized random).
-   - *Latency/Cost*: pilih anggota dengan latensi/estimasi biaya terendah (data dari health check / metadata model).
-3. Bila semua anggota gagal → kembalikan error gateway ke client.
+    - *3-Tier*: urut langganan → murah → gratis; bila tier atas habis/error → lanjut tier bawah otomatis (coding tak berhenti).
+    - *Fallback*: coba prioritas 1 → bila 5xx/429, lanjut prioritas 2, dst.
+    - *Load Balance*: pilih anggota berbobot (weight-normalized random).
+    - *Latency/Cost*: pilih anggota dengan latensi/estimasi biaya terendah.
+    - *Cadangan Antar-Akun*: bila anggota punya beberapa `ProviderAccount`, dan akun aktif kena limit → pakai akun lain di provider sama.
+3. **Sadar Kuota:** sebelum pilih anggota, engine cek sisa kuota (`UsageRecord`/quota tracker); preferensi ke langganan yang masih punya kuota.
+4. Bila semua anggota & akun gagal → kembalikan error gateway ke client.
 
 **Traceability**
 - US-2.3.1 (Custom Pipeline) — M
 - US-2.3.2 (Fallback Strategy) — M
 - US-2.3.3 (Load Balancing & Cost/Latency Optimization) — S
+- US-2.3.4 (3-Tier Fallback) — M
+- US-2.3.5 (Multi-Akun + Sadar Kuota) — M
 
 ---
 
 ### 2.4 Endpoints (OpenAI-Compatible Gateway)
 
 **Deskripsi fungsional**
-Menyediakan server HTTP lokal (`http://localhost:8080/v1`) kompatibel OpenAI (`/v1/chat/completions`, `/v1/models`). Setiap endpoint di-bind ke satu Provider atau satu Combo. Akses dapat diamankan dengan API key internal opsional.
+Menyediakan server HTTP lokal (`http://localhost:8080/v1`) kompatibel OpenAI (`/v1/chat/completions`, `/v1/models`). Setiap endpoint di-bind ke satu Provider atau satu Combo. Akses dapat diamankan dengan API key internal opsional. Endpoint juga menjalankan **penerjemah format** otomatis (OpenAI↔Claude↔Gemini↔Cursor↔Kiro↔Vertex↔Antigravity↔Ollama) sehingga alat CLI apa pun bisa dipakai dengan provider mana pun (transparan).
 
 **Input**
 - `Endpoint`: `name`, `listen_host`, `listen_port`, `bind_type` (provider | combo), `bind_id` (FK), `access_control_enabled` (bool), `internal_api_key?` (secret).
@@ -156,6 +165,28 @@ Menyediakan server HTTP lokal (`http://localhost:8080/v1`) kompatibel OpenAI (`/
 - US-2.4.1 (OpenAI-Compatible Gateway) — M
 - US-2.4.2 (Endpoint Binding) — M
 - US-2.4.3 (Access Control) — S
+- US-2.4.4 (Format Translation) — M
+
+#### 2.4.1 Penghemat Token (Token Savers) *(adopsi 9router)*
+**Deskripsi:** hook pra-terjemah/pra-kirim yang mengurangi token. RTK memadatkan hasil alat (`git diff`, `grep`, `ls`, `tree`) sebelum ke LLM (hemat 20–40% input); mode Caveman menyuntikkan gaya jawaban singkat (hemat hingga 65% output); Ponytail menyuntikkan instruksi "tulis kode minimal". Semua toggle per-endpoint, fail-open (bila gagal → teks asli).
+**Input:** `Endpoint.token_saver` (enum: off | rtk | caveman | ponytail).
+**Output:** request/response lebih kecil; metrik penghematan di Usage Analytics.
+**Traceability:** US-2.4.5.
+
+#### 2.4.2 Pelacak Kuota & Pemakaian *(adopsi 9router)*
+**Deskripsi:** pelacakan kuota real-time per provider berlangganan (sisa token + hitung mundur reset), estimasi biaya, dan optimasi pemakaian langganan sebelum reset. Dipakai Combo untuk routing sadar kuota.
+**Input/Output:** `UsageRecord` (provider_id, account_id?, tokens_in, tokens_out, cost_est, ts); `GET /api/usage`, `GET /api/quota`.
+**Traceability:** US-2.4.6.
+
+#### 2.4.3 Log Permintaan (Debug) + Usage Analytics *(adopsi 9router)*
+**Deskripsi:** mode debug mencatat tiap permintaan & jawaban (header/isi, opsional); laporan pemakaian token & tren per provider/model. Terpisah dari wajib-logging DB (§2.8 / ADR-011).
+**Input/Output:** `RequestLog` (ts, endpoint, model, durasi, tokens); dashboard analitik.
+**Traceability:** US-2.4.7.
+
+#### 2.4.4 Export / Import Setting Lokal *(request user — pengganti cloud sync)*
+**Deskripsi:** export seluruh setting (provider, akun, combo, proxy, endpoint, preferensi) ke satu file JSON; import di device lain memulihkan setting. Lokal sepenuhnya, tanpa cloud.
+**Input/Output:** `GET /api/settings/export` → JSON; `POST /api/settings/import` (body JSON).
+**Traceability:** US-2.4.8.
 
 ---
 
@@ -359,6 +390,8 @@ Secret tetap plaintext di DB (ADR-007).
 
 Routing keluar: `Endpoint → (Combo → ComboMember → Provider) | Provider` → lewat `ProxyPool` (bila terikat) → provider eksternal.
 
+Entitas tambahan (adopsi 9router): `ProviderAccount` (banyak akun per Provider; OAuth + refresh token), `UsageRecord` (token in/out + estimasi biaya per request), `RequestLog` (debug log permintaan). Alur: `Provider --< has >-- ProviderAccount`; `ProviderAccount --< dipakai oleh >-- ComboMember`; `Endpoint --< menghasilkan >-- UsageRecord/RequestLog`.
+
 ---
 
 ## 4. Non-Functional Alignment (dari PRD §5)
@@ -375,7 +408,7 @@ Routing keluar: `Endpoint → (Combo → ComboMember → Provider) | Provider` �
 | 2.1 Providers | US-2.1.1, US-2.1.2, US-2.1.3 | M,M,S |
 | 2.2 Proxy Pools | US-2.2.1, US-2.2.2, US-2.2.3 | M,S,S |
 | 2.3 Combos | US-2.3.1, US-2.3.2, US-2.3.3 | M,M,S |
-| 2.4 Endpoints | US-2.4.1, US-2.4.2, US-2.4.3 | M,M,S |
+| 2.4 Endpoints | US-2.4.1, US-2.4.2, US-2.4.3, US-2.4.4, US-2.4.5, US-2.4.6, US-2.4.7, US-2.4.8 | M,M,S,M,S,S,S,S |
 | 2.5 Terminal | US-2.5.1 s/d US-2.5.6 | M×4, S×2 |
 | 2.6 Launcher | US-2.6.1, US-2.6.2, US-2.6.3, US-2.6.4 | M×4 |
 | 2.7 Admin Console UI | US-2.7.1, US-2.7.2, US-2.7.3 | M×3 |

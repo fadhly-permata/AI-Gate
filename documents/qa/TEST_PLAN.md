@@ -29,6 +29,15 @@ Peta acceptance criteria dari BRD ke test case. Merujuk BRD
 | US-2.8.4 | Mandatory logging | seluruh method log; warn/err + stacktrace di DB; no empty catch | static/integration | green |
 | US-2.8.5 | Self-Heal | klik → branch + agentic CLI (atau popup bila none); loop fix/test; log terkait dihapus; bila pass → merge ke main + hapus branch | e2e | green |
 | US-2.8.6 | Config di DB | setting baca/tulis via DB; tak ada file config sbg sumber | integration | green |
+| US-2.1.4 | Multi-akun | provider punya ≥1 akun; routing pakai akun lain bila limit | integration | green |
+| US-2.1.5 | OAuth + refresh | login OAuth; token diperbarui otomatis & request jalan | integration | green |
+| US-2.3.4 | 3-tier fallback | habis kuota/error → pindah tier bawah otomatis | integration | green |
+| US-2.3.5 | multi-akun + kuota | akun limit → akun lain; routing sadar kuota | integration | green |
+| US-2.4.4 | Format translation | client OpenAI jalan ke provider non-OpenAI via terjemahan | integration | green |
+| US-2.4.5 | Token saver | RTK kurangi token; toggle mati → normal (fail-open) | unit+integration | green |
+| US-2.4.6 | Kuota tracking | dashboard kuota & reset countdown tepat | integration | green |
+| US-2.4.7 | Log + Analytics | debug log & laporan pemakaian tersedia | integration | green |
+| US-2.4.8 | Export/Import | export → import pulih setting | e2e | green |
 
 ## Quality gate (CI)
 - Semua unit test hijau.

@@ -323,3 +323,153 @@ def test_delete_missing_returns_404(monkeypatch) -> None:
     resp = client.delete("/api/providers/999999")
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "provider_not_found"
+
+
+# --- 7. POST /api/providers/test connectivity check -------------------------
+
+
+@respx.mock
+def test_provider_test_ok(monkeypatch) -> None:
+    client = _client(monkeypatch)
+    respx.get("https://acme.test/v1/models").mock(
+        return_value=httpx.Response(200, json={"object": "list", "data": []})
+    )
+    resp = client.post(
+        "/api/providers/test",
+        json={
+            "type": "openai-compatible",
+            "base_url": "https://acme.test/v1/",
+            "api_key": "sk-x",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body == {"ok": True}
+    # trailing slash normalization must have been applied
+    assert respx.calls.last.request.url == "https://acme.test/v1/models"
+
+
+@respx.mock
+def test_provider_test_unauthorized(monkeypatch) -> None:
+    client = _client(monkeypatch)
+    respx.get("https://acme.test/v1/models").mock(
+        return_value=httpx.Response(401, json={"error": "unauthorized"})
+    )
+    resp = client.post(
+        "/api/providers/test",
+        json={
+            "type": "openai-compatible",
+            "base_url": "https://acme.test/v1",
+            "api_key": "sk-bad",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is False
+    assert body["error"] == "HTTP 401"
+
+
+@respx.mock
+def test_provider_test_network_error(monkeypatch) -> None:
+    client = _client(monkeypatch)
+    respx.get("https://acme.test/v1/models").mock(
+        side_effect=httpx.ConnectError("connection refused")
+    )
+    resp = client.post(
+        "/api/providers/test",
+        json={
+            "type": "openai-compatible",
+            "base_url": "https://acme.test/v1",
+            "api_key": "sk-x",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is False
+    assert body["error"] == "Connection refused"
+
+
+@respx.mock
+def test_provider_test_invalid_base_url(monkeypatch) -> None:
+    client = _client(monkeypatch)
+    resp = client.post(
+        "/api/providers/test",
+        json={"type": "openai-compatible", "base_url": "acme.test/v1", "api_key": ""},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is False
+    assert body["error"] == "invalid base_url"
+
+
+@respx.mock
+def test_provider_test_anthropic(monkeypatch) -> None:
+    client = _client(monkeypatch)
+    respx.post("https://claude.test/v1/messages").mock(
+        return_value=httpx.Response(200, json={"id": "msg_1", "type": "message"})
+    )
+    resp = client.post(
+        "/api/providers/test",
+        json={
+            "type": "anthropic",
+            "base_url": "https://claude.test",
+            "api_key": "sk-ant",
+            "model": "claude-3-5-sonnet-20241022",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body == {"ok": True}
+
+
+@respx.mock
+def test_provider_test_ollama(monkeypatch) -> None:
+    client = _client(monkeypatch)
+    respx.get("https://ollama.test:11434/api/tags").mock(
+        return_value=httpx.Response(200, json={"models": []})
+    )
+    resp = client.post(
+        "/api/providers/test",
+        json={
+            "type": "ollama",
+            "base_url": "https://ollama.test:11434",
+            "api_key": "",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {"ok": True}
+
+
+# --- 8. default_model persistence -------------------------------------------
+
+
+def test_provider_default_model_persist(monkeypatch) -> None:
+    client = _client(monkeypatch)
+    created = client.post(
+        "/api/providers",
+        json={
+            "name": "acme",
+            "type": "openai-compatible",
+            "base_url": "https://acme.test/v1",
+            "api_key": "sk-x",
+            "default_model": "gpt-4o",
+        },
+    )
+    assert created.status_code == 201
+    body = created.json()
+    assert body["default_model"] == "gpt-4o"
+
+    by_id = client.get(f"/api/providers/{body['id']}")
+    assert by_id.status_code == 200
+    assert by_id.json()["default_model"] == "gpt-4o"
+
+    # update clears it via explicit None -> stays set? None sent means no change.
+    updated = client.put(
+        f"/api/providers/{body['id']}", json={"default_model": "gpt-4o-mini"}
+    )
+    assert updated.status_code == 200
+    assert updated.json()["default_model"] == "gpt-4o-mini"
+
+    listing = client.get("/api/providers")
+    match = next(p for p in listing.json()["data"] if p["id"] == body["id"])
+    assert match["default_model"] == "gpt-4o-mini"

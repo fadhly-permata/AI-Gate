@@ -108,3 +108,65 @@ policy, bukan berhenti nanya tiap ambiguitas.)
 - Selama `/run-impl` berjalan, tahan perubahan spec (revise-docs) sampai run selesai
   atau batch di awal. Kirim pesan lain di tengah run membuat task ke-cancel & scope
   berantakan (sudah terjadi di B1.1). Ini aturan proses, bukan keputusan.
+
+## R16 — Tanya mode paralel/sekuensial SEBELUM multi-agent kompleks
+Sebelum PM menjalankan proses kompleks/panjang yang butuh >1 sub-agent, PM WAJIB
+tanya user: jalankan PARALEL atau SEKUENSIAL. Ini PENGECOALIAN dari R9 (yang
+melarang konfirmasi) — keputusan mode eksekusi multi-agent HARUS dari user, bukan
+default PM.
+- Pemicu: task butuh spawn 2+ sub-agent (mis. be-dev + fe-dev), atau estimasi
+  panjang / multi-modul. (Lihat juga `parallel-sequential.md`.)
+- Pilihan user BERLAKU untuk SESI YANG SAMA: setelah dipilih, PAKAI LAGI untuk
+  semua task multi-agent berikutnya di sesi ini (jangan tanya ulang).
+- SESI BARU: PM WAJIB tanya lagi — jangan bawa pilihan sesi lalu. Implementasi:
+  simpan di `pm/state.md` key `multiagent_mode`; anggap "belum dipilih" kalau state
+  belum mencatatnya untuk sesi berjalan.
+- Paralel hanya aman bila file-scope tiap agent TIDAK overlap (lihat
+  `agent-boundaries.md`). Kalau overlap / dependen -> PM PAKSA sekuensial walau
+  user pilih paralel, dan jelaskan ke user.
+  - Catat pilihan di `pm/status.md` + `pm/state.md`, lalu jalan.
+
+## R17 — Referensi eksternal untuk fitur yang diadopsi HARUS nyata
+Bila user minta PRD/doc mengadopsi fitur dari repo/sumber eksternal tertentu
+(mis. "referensi ke 9router buat semua fitur yang diadopsi"), PM WAJIB:
+1. FETCH langsung isi sumber itu (baca README / CLAUDE.md / docs resminya)
+   SEBELUM nulis apa pun.
+2. CITE sumber (nama + URL) di dokumen pada bagian fitur yang diadopsi.
+3. ALIGN isi fitur ke konten ASLI sumber — JANGAN tulis dari asumsi umum
+   "AI gateway" / "proxy" yang malah bikin fitur diverge.
+4. Sebelum klaim selesai, VERIFY (grep) referensi tsb benar-benar ada di doc.
+(Pelajaran 2026-09-03: PRD ditulis tanpa SATU PUN sebutan 9router; fitur
+adopsi diverge jauh dari 9router asli — token saver RTK/Caveman/Ponytail,
+3-tier fallback + quota tracking, multi-account, auto token refresh, cloud sync
+semua TIDAK ada di PRD; sebaliknya PRD punya terminal xterm + self-heal yang
+9router tidak punya. User kecewa isinya beda.)
+
+## R18 — Pertahankan rujukan inline di doc (provenance lintas sesi)
+Bila fitur diadopsi dari sumber eksternal, JANGAN cabut tag/sitasi inline
+(mis. "(adopsi dari 9router)") demi kebersihan dokumen. Tag itu berfungsi
+sebagai provenance: PM di sesi BARU butuh tahu asal fitur agar gak mengulang
+kesalahan (nulis dari asumsi sendiri). Catat asal di doc, bukan cuma di pm/.
+(Pelajaran 2026-09-03: user pilih mempertahankan tag karena tanpa itu, sesi
+baru gak akan tahu konsep tersebut dimaksudkan adopsi 9router.)
+
+## R19 — Checkpoint git tiap task + commit tiap subtask selesai (anti force-close)
+Termux pernah **force-close** di tengah `/run-impl` dan bikin file *tracked*
+(`models.py`) ke-revert ke HEAD — kerjaan sub-agent yang belum di-commit HILANG
+(ProviderAccount + tier + default_model padam, 11 collection error). Aturan biar
+gak keulang:
+- **Awal tiap task** di `/run-impl`: PM bikin checkpoint git DULU —
+  `git add -A && git commit -m "checkpoint: <task> start"` — supaya state tree
+  tersimpan SEBELUM sub-agent mengubah apa pun. Boleh non-green; ini snapshot.
+- **Tiap subtask selesai** (receipt sub-agent + PM verifikasi sendiri hijau):
+  PM LANGSUNG `git add -A && git commit -m "<type>(<task>): <subtask>"`.
+  JANGAN numpuk banyak subtask baru sekali commit.
+- Konvensi pesan: Conventional Commits. Prefix `checkpoint:` utk snapshot awal
+  task, `wip:` utk state merah yang mau diselamatin, `feat/fix/test:` utk subtask
+  beres.
+- JANGAN commit secret/DB: hormati `.gitignore` (`.env`, `node_modules`,
+  `__pycache__`); DB ada di `~/.aigate` (luar repo). SELALU cek `git status`
+  sebelum commit; jangan `git add` file di luar scope task.
+- Kalo sesi putus lagi: `/run-impl continue` lanjut dari commit terakhir —
+  kerjaan yang udah ke-commit gak akan padam lagi.
+(Pelajaran 2026-09-03: force-close revert models.py; kerjaan B5.1-B5.4 nyaris
+padam gara-gara belum di-commit.)

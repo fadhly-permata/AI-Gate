@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.cli_tools_router import router as cli_tools_router
 from backend.combos_router import router as combos_router
+from backend.config.db import SessionLocal
 from backend.config.logs_router import router as logs_router
 from backend.endpoints_router import router as endpoints_router
 from backend.config.settings_router import router as settings_router
@@ -24,6 +25,7 @@ from backend.log import SEVERITY_ERROR, log_exception
 from backend.providers_router import router as providers_router
 from backend.selfheal_router import router as selfheal_router
 from backend.proxies_router import router as proxies_router
+from backend.accounts_router import router as accounts_router
 from backend.terminal.router import router as terminal_router
 
 STATIC_DIR: Path = (
@@ -86,6 +88,8 @@ app.include_router(logs_router)
 app.include_router(terminal_router)
 # Self-Heal (B4.1): agentic CLI detection + self-heal run endpoint.
 app.include_router(selfheal_router)
+# Multi-account + OAuth management (B5.1).
+app.include_router(accounts_router)
 # Render gateway failures as the OpenAI error envelope from the contract.
 app.add_exception_handler(GatewayError, gateway_error_handler)
 

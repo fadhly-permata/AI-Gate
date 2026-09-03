@@ -29,6 +29,7 @@ from backend.models import (
 # All 14 table names declared on Base.metadata, per ERD.md.
 EXPECTED_TABLES = {
     "providers",
+    "provider_accounts",
     "provider_models",
     "proxy_pools",
     "proxy_nodes",

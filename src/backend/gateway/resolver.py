@@ -19,7 +19,9 @@ from dataclasses import dataclass
 from sqlalchemy import select
 
 from backend.config.db import SessionLocal
+from backend.gateway.translator import format_for_provider_type
 from backend.models import Combo, Provider, ProviderModel
+from backend.oauth import select_provider_credential
 
 
 class TargetNotFound(Exception):
@@ -51,6 +53,12 @@ class ResolvedTarget:
     combo_used: bool = False
     priority: int = 0
     weight: float = 1.0
+    # B5.2: the originating Provider id, carried so combo routing can perform
+    # account-level retry (cadangan antar-akun). Optional; defaults to 0.
+    provider_id: int = 0
+    # B5.3 (ADR-012): canonical upstream format (openai/anthropic/gemini). Drives
+    # the Format Translation Engine. Defaults to "openai" (pass-through).
+    format: str = "openai"
 
 
 def resolve_target(model: str) -> ResolvedTarget:
@@ -93,10 +101,11 @@ def resolve_target(model: str) -> ResolvedTarget:
                     )
                 return ResolvedTarget(
                     base_url=provider.base_url,
-                    api_key=provider.api_key,
+                    api_key=select_provider_credential(provider, session),
                     model_ref=model,
                     upstream_model=model_id,
                     combo_used=False,
+                    format=format_for_provider_type(provider.type),
                 )
             else:
                 # 2 segments: provider:<name> -> first provider model by id asc
@@ -115,10 +124,11 @@ def resolve_target(model: str) -> ResolvedTarget:
                     raise TargetNotFound(f"provider '{name}' has no models")
                 return ResolvedTarget(
                     base_url=provider.base_url,
-                    api_key=provider.api_key,
+                    api_key=select_provider_credential(provider, session),
                     model_ref=model,
                     upstream_model=first_model.model_id,
                     combo_used=False,
+                    format=format_for_provider_type(provider.type),
                 )
 
         if model.startswith("combo:"):

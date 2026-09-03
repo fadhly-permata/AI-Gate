@@ -20,6 +20,11 @@
   (documents/qa/), #5 Dev Setup (documents/dev/), #6 Terminal UX (documents/ux/),
   #7 CLI Config Schema (documents/config/). ADR-007 & ADR-008 resolved.
 
+- 2026-09-03: PRD diselaraskan ke 9router (R17 capture). Fitur adopsi baru (token
+  saver, pelacak kuota, penerjemah format, multi-akun, OAuth refresh, export/import
+  lokal) SUDAH di PRD tapi BELUM di BACKLOG & BELUM diimplementasi. Perlu backlog
+  baru + /run-impl.
+
 ## Decisions
 - 2026-09-03: Terminal UX — swipe diubah jadi scroll (bukan navigasi TUI) karena
   TUI sering salah tangani swipe. Scroll velocity-based + damping agar natural.

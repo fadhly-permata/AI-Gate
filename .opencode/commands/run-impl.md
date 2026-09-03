@@ -21,16 +21,27 @@ Procedure (PM executes):
    - `fresh`: set penanda task aktif = B0.1 di pm/status.md.
    - `continue` (default): cari task pertama yang belum `[x]` = task aktif.
    - `status`: cetak tabel progres, stop.
-3. Eksekusi task aktif sesuai R9 (TANPA konfirmasi; ambiguitas -> default + log
+3. **CHECKPOINT GIT (R19)** — sebelum eksekusi task aktif: `git status` (cek
+   bersih/ada sisa), lalu `git add -A && git commit -m "checkpoint: <task> start"`
+   supaya state tree tersimpan SEBELUM sub-agent mengubah apa pun. Skip commit
+   kalau working tree sudah bersih. Jangan commit `.env`/DB (hormati .gitignore).
+4. Eksekusi task aktif sesuai R9 (TANPA konfirmasi; ambiguitas -> default + log
    di pm/status.md + memory-bank). Pakai sub-agent sesuai owner
     (be-dev / fe-dev / qa); bila belum terdaftar di sesi, pakai 'general'
    stand-in, atau subagent asli bila opencode sudah di-restart.
-4. Setelah task selesai: tandai `[x]` di BACKLOG.md, update pm/status.md
-   (task aktif = berikutnya), lalu lanjut task berikutnya sampai habis.
-5. Bila sesi terputus (batre habis / force-close): di sesi baru cukup jalankan
-   `/run-impl continue` -> lanjut OTOMATIS dari task belum selesai. Tidak perlu
-   ulang dari nol.
+5. **COMMIT TIAP SUBTASK (R19)** — begitu satu subtask selesai (receipt sub-agent
+   + PM verifikasi sendiri: pytest/vitest hijau), LANGSUNG
+   `git add -A && git commit -m "<type>(<task>): <subtask>"`. Jangan numpuk.
+   Kalau subtask selesai tapi tes masih merah -> commit `wip:` (selamatin kerja),
+   JANGAN tandai [x].
+6. Setelah task selesai: tandai `[x]` di BACKLOG.md, update pm/status.md
+   (task aktif = berikutnya), commit `docs(<task>): mark done`, lalu lanjut task
+   berikutnya sampai habis.
+7. Bila sesi terputus (batre habis / force-close): di sesi baru cukup jalankan
+   `/run-impl continue` -> lanjut OTOMATIS dari task belum selesai. Kerjaan yang
+   sudah ke-commit (R19) tidak padam; tidak perlu ulang dari nol.
 
 Definition of done:
 - Implementasi jalan berurutan dari Backlog; progres tersimpan di BACKLOG.md +
-  pm/status.md sehingga bisa dilanjutkan tanpa mengulang.
+  pm/status.md DAN di git (checkpoint awal task + commit tiap subtask, R19)
+  sehingga bisa dilanjutkan tanpa mengulang walau sesi terputus.

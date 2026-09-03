@@ -67,6 +67,7 @@ Arsitektur dibagi menjadi 7 modul berlapis. Komunikasi antar modul mengikuti kon
 | 3 | **Proxy & Routing Engine** | Gateway Server | Provider Adapter, Proxy Pool | `route(req, binding) → provider_call`; `select_proxy(pool) → node` |
 | 4 | **Combo Engine** | Proxy & Routing Engine | Provider Adapter | `select_member(strategy, combo) → member` (fallback/load_balance/latency_cost) |
 | 5 | **Provider Adapter** | Proxy & Routing Engine, Combo Engine | External Provider (HTTP via httpx) | `chat_completion(req) → resp` (OpenAI-format); `list_models() → models` |
+| 5b | **Format Translator** | Gateway Server, Provider Adapter | Provider Adapter / upstream | `translate(req, from, to) → req`; `translate_resp(resp, from, to) → resp` (OpenAI↔Claude↔Gemini↔Cursor↔Kiro↔Vertex↔Antigravity↔Ollama) |
 | 6 | **CLI Tool Manager & Auto-Injector** | UI | Gateway Server, Terminal/PTY Service, Config Engine | `launch(tool, picker) → spawn_tab`; `inject_env(tab, endpoint)` |
 | 7 | **Terminal/PTY Service** | UI (WS), CLI Tool Manager | OS PTY (ptyprocess/pywinpty) | `open_tab(shell) → tab_id`; `write(tab, data)`; `resize(tab, rows, cols)` |
 
@@ -118,6 +119,20 @@ Arsitektur dibagi menjadi 7 modul berlapis. Komunikasi antar modul mengikuti kon
 - **Konteks:** User meminta aigate dapat berjalan **native tanpa perlu deployment**, menggunakan Python yang sudah terbukti cross-platform. Untuk frontend, user memberi kebebasan (baseline: Web UI lokal per ADR-001).
 - **Keputusan:** aigate dijalankan langsung sebagai aplikasi Python (`python -m aigate` / `uvicorn aigate.server:app`) di Windows/macOS/Linux — tidak memerlukan container/Docker/deployment step, dan tanpa packaging single-binary. Frontend: implementasi bebas di tangan dev; ADR-001 (Web UI lokal FastAPI + xterm.js, **vanilla JS SPA tanpa framework/build**) tetap baseline kecuali diubah kelak.
 - **Trade-off:** tiap user perlu Python + `pip install -e .` (install sekali). Keuntungan: dev & sinkronisasi lintas-OS jauh lebih sederhana, tidak ada beban container maupun packaging.
+
+### ADR-012 — Format Translation Engine
+- **Status:** Accepted (adopsi dari 9router, 2026-09-03).
+- **Konteks:** Alat CLI (Claude Code, Codex, Cursor, dll) mengirim format OpenAI; provider tujuan pakai format berbeda (Claude, Gemini, Kiro, Vertex, …).
+- **Keputusan:** Gateway menyisipkan modul **Format Translator** yang menerjemahkan request & response antar format (OpenAI ↔ Claude ↔ Gemini ↔ Cursor ↔ Kiro ↔ Vertex ↔ Antigravity ↔ Ollama) secara otomatis & transparan; client tetap kirim/terima format OpenAI.
+- **Trade-off:** butuh pemetaan schema per pasangan format; pasangan rawan (thinking blocks, tool ids, non-base64 images) pakai *direct route* bila ada, bukan double-hop lossy.
+
+### ADR-013 — Token Saver Hooks & OAuth Auto-Refresh
+- **Status:** Accepted (adopsi dari 9router, 2026-09-03).
+- **Konteks:** token mahal; beberapa provider resmi butuh OAuth (bukan API key statis).
+- **Keputusan:**
+  - **Token Saver:** hook pra-kirim di endpoint (`Endpoint.token_saver`: off | rtk | caveman | ponytail). RTK memadatkan `tool_result` sebelum ke LLM (fail-open: bila gagal → teks asli). Caveman/Ponytail menyuntikkan instruksi gaya ke prompt. Semua fail-open.
+  - **OAuth Auto-Refresh:** `ProviderAccount.auth_type=oauth` menyimpan `oauth_token`+`refresh_token`+`expires_at`; sebelum request, sistem refresh otomatis bila hampir kedaluwarsa (tanpa login ulang).
+- **Trade-off:** token saver bisa mengubah isi request (tapi fail-open aman); OAuth butuh flow callback (lihat API contract `/api/oauth/*`).
 
 ---
 
@@ -243,15 +258,21 @@ Client (CLI Tool / UI / external)
    │  POST /v1/chat/completions  (Authorization / x-api-key opsional)
    ▼
 [Gateway Server — FastAPI]
-   1. Access Control: bila endpoint.access_control_enabled →
-      validasi token vs Endpoint.internal_api_key (401 bila gagal)
-   2. Resolve EndpointBinding → bind_type (provider | combo), bind_id
-   3. Bila provider → panggil Provider Adapter langsung
-      Bila combo   → panggil Combo Engine (strategi routing)
-   4. Combo Engine pilih anggota (fallback / load_balance / latency_cost)
-   5. Provider Adapter: ambil ProxyPool terikat (jika ada) →
-      pilih node per rotation_strategy → httpx upstream call ke base_url
-   6. Teruskan respons (streaming SSE bila request stream=true) ke client
+    1. Access Control: bila endpoint.access_control_enabled →
+       validasi token vs Endpoint.internal_api_key (401 bila gagal)
+    1.5 Token Saver: bila `endpoint.token_saver != off` → terapkan hook
+        (RTK padatkan tool_result / Caveman / Ponytail) secara fail-open (ADR-013).
+    2. Resolve EndpointBinding → bind_type (provider | combo), bind_id
+    3. Bila provider → panggil Provider Adapter langsung
+       Bila combo   → panggil Combo Engine (strategi routing, lihat §4.3)
+    4. Combo Engine pilih anggota (three_tier / fallback / load_balance / latency_cost),
+       dengan cadangan antar-akun & sadar kuota (§4.3, ADR-013)
+    4.5 Format Translation: aigate menerjemahkan format antar-alat
+        (OpenAI↔Claude↔Gemini↔Cursor↔Kiro↔Vertex↔Antigravity↔Ollama)
+        secara otomatis & transparan (ADR-012).
+    5. Provider Adapter: ambil ProxyPool terikat (jika ada) →
+       pilih node per rotation_strategy → httpx upstream call ke base_url
+    6. Teruskan respons (streaming SSE bila request stream=true) ke client
 ```
 
 ### 4.2 OpenAI-Compatible Contract
@@ -261,9 +282,12 @@ Client (CLI Tool / UI / external)
 - **Access Control:** `internal_api_key` di-generate acak saat endpoint dibuat (atau direset). Dikirim lewat header `Authorization: Bearer <key>` atau `x-api-key`. Validasi dilakukan *sebelum* resolve binding. CLI Tool Manager menyuntikkan key ini ke env `OPENAI_API_KEY` (lihat §6).
 
 ### 4.3 Combo Engine — Strategi Routing
+- **3-Tier Fallback:** urut langganan → murah → gratis; bila tier atas habis/error → lanjut tier bawah otomatis (coding tak berhenti).
 - **Fallback:** urut `priority` asc; bila anggota returns 5xx/429/timeout → lanjut anggota berikutnya; bila habis → error gateway.
 - **Load Balance:** pemilihan *weighted random* (`weight` dinormalisasi).
-- **Latency/Cost:** pilih anggota dengan `last_latency_ms` (dari ProxyNode health check) atau estimasi biaya terendah (metadata `ProviderModel.capabilities`/`cost`). Data historis disiapkan untuk telemetry roadmap.
+- **Latency/Cost:** pilih anggota dengan `last_latency_ms` (dari ProxyNode health check) atau estimasi biaya terendah.
+- **Cadangan Antar-Akun:** bila anggota punya beberapa `ProviderAccount`, dan akun aktif kena limit → pakai akun lain di provider sama.
+- **Sadar Kuota:** sebelum pilih anggota, engine cek sisa kuota (`UsageRecord`/quota tracker); preferensi ke langganan yang masih punya kuota.
 - Semua strategi memanggil **Provider Adapter** yang sama → konsisten kontrak upstream.
 
 ### 4.4 Proxy & Routing Binding (Resolusi)
@@ -271,6 +295,25 @@ Client (CLI Tool / UI / external)
 - TSD mengusulkan **binding ProxyPool opsional pada Endpoint** (FK `proxy_pool_id` di `Endpoint`, atau asosiasi `EndpointProxyBinding`). Saat request keluar, engine memakai pool terikat endpoint; bila tidak ada, fallback ke pool default global (jika dikonfigurasi) atau koneksi langsung.
 - Alternatif (kompatibel): binding per-Combo via `Combo.proxy_pool_id`. Rekomendasi: binding di **Endpoint** (cakupan traffic keluar per gateway) + opsi override di Combo. Ini menjaga `EndpointBinding` tetap polymorphic murni ke Provider/Combo (sesuai ERD).
 - **Rotation strategy** (round_robin/random/failover) diterapkan oleh `ProxyPool.select_node()`; node `status=dead` dilewati (health check background).
+
+### 4.5 Format Translation Engine (ADR-012)
+Modul **Format Translator** menerjemahkan request & response antar format
+(OpenAI ↔ Claude ↔ Gemini ↔ Cursor ↔ Kiro ↔ Vertex ↔ Antigravity ↔ Ollama)
+secara otomatis & transparan. Translasi terjadi di belakang layar; client tetap
+kirim/terima format OpenAI. Pasangan rawan (thinking blocks, tool ids,
+non-base64 images) pakai *direct route* bila tersedia, bukan double-hop lossy.
+Terjemahan tidak merusak streaming (diterapkan per-chunk).
+
+### 4.6 Token Saver & OAuth Auto-Refresh (ADR-013)
+- **Token Saver:** hook pra-kirim di endpoint (`Endpoint.token_saver`:
+  `off | rtk | caveman | ponytail`). RTK memadatkan `tool_result` (git diff, grep,
+  ls, tree) sebelum ke LLM (hemat 20–40% input); Caveman menyuntikkan gaya
+  jawaban singkat; Ponytail menyuntikkan instruksi "tulis kode minimal". Semua
+  **fail-open**: bila hook gagal → request jalan dengan teks asli.
+- **OAuth Auto-Refresh:** `ProviderAccount.auth_type=oauth` menyimpan
+  `oauth_token`+`refresh_token`+`expires_at`; sebelum request, sistem refresh
+  otomatis bila hampir kedaluwarsa (tanpa login ulang). Flow OAuth via
+  `/api/oauth/<provider>/start` + `/callback` (lihat API contract).
 
 ---
 
@@ -311,7 +354,7 @@ Lihat §4.4. Binding dilakukan lewat `Endpoint.proxy_pool_id` (FK opsional). Sel
 
 Desain dibuat *contract-first* agar item roadmap (PRD §6) menempel tanpa refactor besar:
 
-- **Telemetry & Usage Analytics:** `Provider Adapter` & `Combo Engine` sudah menghasilkan event (token in/out, latency, status). Tambah modul `TelemetrySink` yang mengonsumsi event ini → simpan ke tabel baru `UsageRecord`. UI cukup tambah panel; gateway tidak berubah.
+- **Telemetry & Usage Analytics (SEKARANG CORE — adopsi 9router):** `Provider Adapter` & `Combo Engine` menghasilkan event (token in/out, latency, status) → disimpan ke tabel `UsageRecord` (sudah ada di ERD) + `RequestLog` (debug). Dashboard kuota & analitik membaca tabel ini. Tidak perlu modul tambahan; gateway tidak berubah.
 - **Cost Limits & Rate Limiting:** Terapkan sebagai *middleware* di Gateway Server (sebelum resolve binding) membaca kuota dari `Endpoint`/`Key` config baru (`RateLimitPolicy`). Tidak mengubah kontrak upstream.
 - **Plugin YAML untuk CLI Tools:** `CLI Tool Manager` memuat `plugins/cli_tools/*.yaml` yang memetakan ke `CLITool`/`CLIToolGroup` saat startup → insert/merge ke Config Engine. Mekanisme `SwipeException` juga dapat diisi via YAML (`swipe_policies.yaml`).
 - **Evolusi skema:** Penambahan `SwipeException`, `proxy_pool_id` (Endpoint), `UsageRecord`, `RateLimitPolicy` dilakukan via Alembic migration (SQLAlchemy) → backward compatible.
@@ -333,6 +376,8 @@ Desain dibuat *contract-first* agar item roadmap (PRD §6) menempel tanpa refact
 | ADR-008 | ProxyPool binding = FK `proxy_pool_id` di Endpoint (+ override Combo) | Accepted (2026-09-03) |
 | ADR-010 | Config storage = SQLite (`Setting` table), tanpa file config terpisah | Accepted (2026-09-03) |
 | ADR-011 | Mandatory logging ke DB (severity + stacktrace pd warn/err), no empty catch | Accepted (2026-09-03) |
+| ADR-012 | Format Translation Engine (OpenAI↔Claude↔Gemini↔…, transparan) | Accepted (2026-09-03, adopsi 9router) |
+| ADR-013 | Token Saver hooks (RTK/Caveman/Ponytail, fail-open) + OAuth auto-refresh | Accepted (2026-09-03, adopsi 9router) |
 
 ---
 

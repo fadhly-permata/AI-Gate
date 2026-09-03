@@ -25,11 +25,12 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from backend.config.db import SessionLocal
-from backend.log import log_error_exc, log_info, log_warning
+from backend.log import logger, log_error, log_error_exc, log_info, log_warning
 from backend.models import (
     ComboMember,
     EndpointBinding,
     Provider,
+    ProviderAccount,
     ProviderModel,
 )
 
@@ -48,6 +49,7 @@ class ProviderCreate(BaseModel):
     api_key: str
     enabled: Optional[bool] = True
     custom_headers: Optional[Dict[str, Any]] = None
+    default_model: Optional[str] = None
 
     class Config:
         pass
@@ -60,6 +62,7 @@ class ProviderUpdate(BaseModel):
     api_key: Optional[str] = None
     enabled: Optional[bool] = None
     custom_headers: Optional[Dict[str, Any]] = None
+    default_model: Optional[str] = None
 
     class Config:
         pass
@@ -83,6 +86,7 @@ class ProviderDTO(BaseModel):
     api_key: str
     enabled: bool
     custom_headers: Dict[str, Any]
+    default_model: Optional[str] = None
     models: List[ModelDTO]
 
     class Config:
@@ -125,6 +129,7 @@ def _provider_to_dto(session: Session, provider: Provider) -> ProviderDTO:
         api_key=provider.api_key,  # ADR-007: plaintext in/out
         enabled=bool(provider.enabled),
         custom_headers=_decode_headers(provider.custom_headers),
+        default_model=provider.default_model,
         models=[
             ModelDTO(
                 id=m.id,
@@ -230,6 +235,126 @@ async def _discover_and_persist(
 # --------------------------------------------------------------------------- #
 # Routes
 # --------------------------------------------------------------------------- #
+class ProviderTestRequest(BaseModel):
+    type: str
+    base_url: str
+    api_key: str
+    model: Optional[str] = None
+
+    class Config:
+        pass
+
+
+def _normalize_base_url(base_url: str) -> Optional[str]:
+    """Strip trailing slash; return the normalized URL or ``None`` if it lacks
+    a scheme (treated as invalid per the contract)."""
+    if not base_url:
+        return None
+    stripped = base_url.rstrip("/")
+    # urlparse: scheme present only if '://' appears. A bare host ('example.com')
+    # has no scheme and is invalid.
+    parsed = httpx.URL(stripped)
+    if not parsed.scheme:
+        return None
+    return stripped
+
+
+async def _run_provider_test(req: ProviderTestRequest) -> dict:
+    """Lightweight connectivity check. Always returns a dict with ``ok`` and,
+    on failure, an ``error`` string. Never raises."""
+    base_url = _normalize_base_url(req.base_url)
+    if base_url is None:
+        return {"ok": False, "error": "invalid base_url"}
+
+    ptype = (req.type or "other").lower()
+    log_info(
+        "provider test",
+        source=LOG_SOURCE,
+        context={"type": ptype, "base_url": base_url, "has_key": bool(req.api_key)},
+    )
+
+    timeout = httpx.Timeout(10)
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            if ptype == "ollama":
+                resp = await client.get(f"{base_url}/api/tags")
+            elif ptype == "anthropic":
+                model = req.model or "claude-3-5-sonnet-20241022"
+                resp = await client.post(
+                    f"{base_url}/v1/messages",
+                    json={"model": model, "max_tokens": 1, "messages": []},
+                    headers={
+                        "x-api-key": req.api_key,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json",
+                    },
+                )
+            else:  # openai-compatible, openrouter, litellm, other (default)
+                headers = {"Accept": "application/json"}
+                if req.api_key:
+                    headers["Authorization"] = f"Bearer {req.api_key}"
+                resp = await client.get(f"{base_url}/models", headers=headers)
+            # Reachability proven when the upstream answers at all. For
+            # anthropic, even a 400 still proves reachability (best-effort);
+            # other types treat any >= 400 as a not-ok with a short reason.
+            status = resp.status_code
+            if status >= 400:
+                if ptype == "anthropic" and status == 400:
+                    return {"ok": True}
+                return {"ok": False, "error": f"HTTP {status}"}
+            return {"ok": True}
+    except httpx.TimeoutException as exc:
+        logger.error("provider test failed: timeout", exc_info=True)
+        log_error_exc(
+            "provider test failed: timeout",
+            source=LOG_SOURCE,
+            exc=exc,
+            context={"type": ptype, "base_url": base_url},
+        )
+        return {"ok": False, "error": "Timeout"}
+    except httpx.HTTPError as exc:  # connection refused, DNS, etc.
+        logger.error("provider test failed: transport error", exc_info=True)
+        log_error_exc(
+            "provider test failed: transport error",
+            source=LOG_SOURCE,
+            exc=exc,
+            context={"type": ptype, "base_url": base_url},
+        )
+        return {"ok": False, "error": _short_transport_error(exc)}
+    except Exception as exc:  # noqa: BLE001 - never 500; surface as not-ok
+        logger.error("provider test failed: unexpected error", exc_info=True)
+        log_error_exc(
+            "provider test failed: unexpected error",
+            source=LOG_SOURCE,
+            exc=exc,
+            context={"type": ptype, "base_url": base_url},
+        )
+        return {"ok": False, "error": "unexpected error"}
+
+
+def _short_transport_error(exc: Exception) -> str:
+    """Map a transport exception to a short human reason for the UI."""
+    name = type(exc).__name__
+    if name in ("ConnectError", "ConnectTimeout"):
+        return "Connection refused"
+    if name == "TimeoutException":
+        return "Timeout"
+    # Fall back to the exception class name without leaking details.
+    return name or "Connection error"
+
+
+@router.post("/api/providers/test")
+async def test_provider(req: ProviderTestRequest) -> dict:
+    """Verify a provider config BEFORE saving.
+
+    Always returns HTTP 200 with ``{"ok": true}`` on success or
+    ``{"ok": false, "error": "<reason>"}`` on failure. Network/DNS/timeout
+    failures are the only things that count as not-ok; HTTP status codes from
+    the upstream (incl. 401/503) still prove reachability.
+    """
+    return await _run_provider_test(req)
+
+
 @router.get("/api/providers")
 def list_providers() -> dict:
     """List all providers with their (possibly empty) discovered models."""
@@ -250,6 +375,7 @@ async def create_provider(req: ProviderCreate) -> dict:
         api_key=req.api_key,  # ADR-007: plaintext
         enabled=bool(req.enabled),
         custom_headers=_encode_headers(req.custom_headers),
+        default_model=req.default_model,
     )
     with SessionLocal() as session:
         session.add(provider)
@@ -311,6 +437,9 @@ def update_provider(provider_id: int, req: ProviderUpdate) -> Any:
         if req.custom_headers is not None:
             provider.custom_headers = _encode_headers(req.custom_headers)
             changed.append("custom_headers")
+        if req.default_model is not None:
+            provider.default_model = req.default_model
+            changed.append("default_model")
 
         session.commit()
         session.refresh(provider)
@@ -342,6 +471,8 @@ def delete_provider(provider_id: int) -> Any:
         session.query(EndpointBinding).filter_by(
             bind_type="provider", bind_id=provider_id
         ).delete()
+        # 3b. ProviderAccount rows (multi-account, B5.1)
+        session.query(ProviderAccount).filter_by(provider_id=provider_id).delete()
         # 4. The provider itself
         session.delete(provider)
         session.commit()

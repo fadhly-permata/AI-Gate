@@ -21,7 +21,7 @@ from typing import Any, Iterable, Mapping, Sequence
 
 from sqlalchemy import select
 
-from backend.config.db import SessionLocal
+from backend.config import db as _db
 from backend.log import log_error_exc, log_info
 from backend.models import Setting
 
@@ -45,7 +45,7 @@ def get(key: str, default: str | None = None, session: Any | None = None) -> str
     short-lived ``SessionLocal`` is created, committed and closed.
     """
     own_session = session is None
-    s = session if session is not None else SessionLocal()
+    s = session if session is not None else _db.SessionLocal()
     try:
         row = _get_by_key(s, key)
         return row.value if row is not None else default
@@ -68,7 +68,7 @@ def set(key: str, value: str, session: Any | None = None) -> Setting:
     persisted ``Setting``. Commits when owning the session.
     """
     own_session = session is None
-    s = session if session is not None else SessionLocal()
+    s = session if session is not None else _db.SessionLocal()
     try:
         row = _get_by_key(s, key)
         if row is None:
@@ -102,7 +102,7 @@ def ensure_seeded(session: Any | None = None) -> None:
     every startup. Commits when owning the session.
     """
     own_session = session is None
-    s = session if session is not None else SessionLocal()
+    s = session if session is not None else _db.SessionLocal()
     try:
         existing = {k for k in _existing_keys(s)}
         to_insert = [
@@ -141,7 +141,7 @@ def ensure_seeded(session: Any | None = None) -> None:
 def list_all(session: Any | None = None) -> dict[str, str]:
     """Return a dict of every ``Setting`` key -> value."""
     own_session = session is None
-    s = session if session is not None else SessionLocal()
+    s = session if session is not None else _db.SessionLocal()
     try:
         rows: Sequence[Setting] = s.execute(select(Setting)).scalars().all()
         return {row.key: row.value for row in rows}

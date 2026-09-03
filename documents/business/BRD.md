@@ -59,6 +59,14 @@ Sebagai ML Ops, saya ingin menyimpan API Key, Base URL, dan custom headers per p
 Sebagai Developer, saya ingin aigate mengambil daftar model otomatis dari provider yang mendukung `/models`.
 - *Acceptance:* (1) Saat provider ditambah, aigate memanggil endpoint `/models` bila didukung. (2) Daftar model tampil dan bisa dipilih. (3) Bila tidak didukung, user dapat input model manual.
 
+**US-2.1.4 — Multi-Akun per Provider** *(Must-have)*
+Sebagai ML Ops, saya ingin menambah beberapa akun per provider agar beban/limit dibagi atau jadi cadangan otomatis.
+- *Acceptance:* (1) Satu provider bisa punya ≥1 akun. (2) Routing bisa pilih akun (round-robin) atau pakai sebagai cadangan. (3) Tiap akun punya kredensial sendiri.
+
+**US-2.1.5 — Login OAuth + Token Diperbarui Otomatis** *(Must-have)*
+Sebagai Developer, saya ingin login provider resmi (Claude Code, Codex, Cursor, Antigravity, GitHub Copilot, dll) via OAuth tanpa modal token manual, dan token diperbarui otomatis.
+- *Acceptance:* (1) Tombol "Connect" memicu OAuth. (2) Token disimpan & diperbarui otomatis sebelum kedaluwarsa (tanpa login ulang). (3) Bila refresh gagal, user diberi tahu.
+
 ### 5.2 Proxy Pools (rujukan PRD §2.2)
 
 **US-2.2.1 — Proxy Configuration Multi-Protokol** *(Must-have)*
@@ -87,6 +95,14 @@ Sebagai Developer, saya ingin request dialihkan ke provider B bila A error/rate-
 Sebagai ML Ops, saya ingin strategi load-balancing berbobot dan *lowest latency / cost optimization*.
 - *Acceptance:* (1) Bobot tiap anggota dapat diatur. (2) Strategi arahkan ke model tercepat/termurah berfungsi.
 
+**US-2.3.4 — Fallback 3 Tingkat (Langganan→Murah→Gratis)** *(Must-have)*
+Sebagai Developer, saya ingin Combo otomatis pindah: langganan → murah → gratis bila kuota habis/error, agar coding tak berhenti.
+- *Acceptance:* (1) Tier diurutkan. (2) Bila tier atas habis/error → lanjut tier bawah otomatis. (3) Tidak perlu restart.
+
+**US-2.3.5 — Cadangan Antar-Akun + Sadar Kuota** *(Must-have)*
+Sebagai ML Ops, saya ingin Combo memakai akun lain di provider sama bila satu akun kena limit, dan mempertimbangkan sisa kuota saat routing.
+- *Acceptance:* (1) Satu anggota Combo bisa punya beberapa akun; bila satu limit → pakai akun lain. (2) Routing preferensi ke langganan yang masih punya kuota.
+
 ### 5.4 Endpoints (rujukan PRD §2.4)
 
 **US-2.4.1 — OpenAI-Compatible Gateway** *(Must-have)*
@@ -100,6 +116,26 @@ Sebagai ML Ops, saya ingin memetakan endpoint ke Provider/Combo tertentu.
 **US-2.4.3 — Access Control** *(Should-have)*
 Sebagai ML Ops, saya ingin API key internal opsional mengamankan akses lokal.
 - *Acceptance:* (1) Bila diaktifkan, request tanpa key ditolak. (2) Key dapat digenerate & direset.
+
+**US-2.4.4 — Penerjemah Format Antar-Alat** *(Must-have)*
+Sebagai Developer, saya ingin aigate menerjemahkan permintaan & jawaban antar format (OpenAI↔Claude↔Gemini↔Cursor↔Kiro↔Vertex↔Antigravity↔Ollama) secara otomatis.
+- *Acceptance:* (1) Alat CLI berformat OpenAI bisa dipakai dengan provider mana pun. (2) Terjemahan transparan (client tak perlu tahu). (3) Tidak merusak streaming.
+
+**US-2.4.5 — Penghemat Token (RTK / Caveman / Ponytail)** *(Should-have)*
+Sebagai Developer, saya ingin opsi penghemat token: RTK memadatkan hasil alat, mode Caveman menjawab singkat, Ponytail menyuruh AI tulis kode minimal — tiap endpoint bisa nyala/mati.
+- *Acceptance:* (1) Toggle per endpoint. (2) RTK kurangi token input 20–40%. (3) Bila gagal, request tetap jalan normal (fail-open).
+
+**US-2.4.6 — Pelacak Kuota & Pemakaian Real-Time** *(Should-have)*
+Sebagai ML Ops, saya ingin melihat sisa kuota & hitung mundur reset per provider berlangganan, plus estimasi biaya.
+- *Acceptance:* (1) Dashboard tampilkan sisa token & reset countdown. (2) Estimasi biaya tier berbayar. (3) Dipakai routing sadar kuota.
+
+**US-2.4.7 — Log Permintaan (Debug) + Usage Analytics** *(Should-have)*
+Sebagai ML Ops, saya ingin mode debug mencatat tiap permintaan/jawaban, plus laporan pemakaian token & tren.
+- *Acceptance:* (1) Debug log mencatat header/isi (opsional). (2) Laporan pemakaian per provider/model. (3) Terpisah dari wajib-logging DB (§2.8).
+
+**US-2.4.8 — Export/Import Setting Lokal** *(Should-have, request user)*
+Sebagai User, saya ingin export semua setting ke satu file lalu import di device lain, tanpa cloud.
+- *Acceptance:* (1) Menu export → file JSON. (2) Import di device lain → setting pulih. (3) Lokal sepenuhnya.
 
 ### 5.5 Integrated Multi-Tab Terminal (rujukan PRD §2.5, §2.5.1)
 
@@ -199,6 +235,10 @@ Sebagai Developer, saya ingin seluruh konfigurasi aplikasi tersimpan di SQLite, 
 | 2.2 Proxy Pools | Should | Sedang | Penting untuk region/anti-rate-limit |
 | 2.1.3 Auto-discovery, 2.4.3 Access Control | Should | Sedang | Keamanan & kenyamanan |
 | 2.5.4/2.5.6 velocity scroll/damping | Should | Sedang | Polesan UX |
+| 2.1.4 Multi-akun, 2.1.5 OAuth+refresh | Must | Tinggi | Resilience & kemudahan kredensial |
+| 2.3.4 / 2.3.5 3-tier + akun + kuota | Must | Tinggi | Zero-downtime coding |
+| 2.4.4 Format translation | Must | Tinggi | Kompatibilitas alat beragam |
+| 2.4.5/2.4.6/2.4.7/2.4.8 token saver, kuota, analitik, export | Should | Sedang | Efisiensi & portabilitas |
 | Cost limits/telemetry (Roadmap §6) | Nice | Akan datang | Belum di-scope MVP |
 
 ## 7. Asumsi & Ketergantungan

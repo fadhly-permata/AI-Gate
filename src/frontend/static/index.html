@@ -66,6 +66,10 @@
           <i class="nav-icon fa fa-plug"></i>
           <span class="nav-label" data-i18n="nav.endpoints">Endpoints</span>
         </a>
+        <a class="nav-item" href="#" data-view="usage">
+          <i class="nav-icon fa fa-chart-line"></i>
+          <span class="nav-label" data-i18n="nav.usage">Usage &amp; Quota</span>
+        </a>
         <a class="nav-item" href="#" data-view="terminal">
           <i class="nav-icon fa fa-terminal"></i>
           <span class="nav-label" data-i18n="nav.terminal">Terminal</span>
@@ -208,6 +212,135 @@
             </thead>
             <tbody id="provModelsBody"></tbody>
           </table>
+
+          <!-- Accounts subsection (B5.1): multi-account per provider + OAuth -->
+          <div class="accounts-section">
+            <div class="providers-head">
+              <h4 class="accounts-title" data-i18n="accounts.title">Accounts</h4>
+              <button class="btn" id="provConnectOAuthBtn" type="button">
+                <i class="fa fa-link"></i>
+                <span data-i18n="accounts.connect_oauth">Connect OAuth</span>
+              </button>
+            </div>
+
+            <p class="settings-msg" id="accountsMsg" role="status" aria-live="polite"></p>
+
+            <div class="accounts-add">
+              <div class="form-row-inline">
+                <label class="form-label" for="accLabel" data-i18n="accounts.label">Label</label>
+                <input class="form-input" type="text" id="accLabel" />
+              </div>
+              <div class="form-row-inline">
+                <label class="form-label" for="accAuthType" data-i18n="accounts.auth_type">Auth Type</label>
+                <select class="form-input" id="accAuthType">
+                  <option value="api_key" data-i18n="accounts.auth_api_key">API Key</option>
+                  <option value="oauth" data-i18n="accounts.auth_oauth">OAuth</option>
+                </select>
+              </div>
+              <div class="form-row-inline" id="accApiKeyRow">
+                <label class="form-label" for="accApiKey" data-i18n="accounts.api_key">API Key</label>
+                <input class="form-input" type="text" id="accApiKey" />
+              </div>
+              <button class="btn btn-primary" id="accAddBtn" type="button">
+                <i class="fa fa-plus"></i>
+                <span data-i18n="accounts.add">Add Account</span>
+              </button>
+            </div>
+
+            <table class="data-table" id="accountsTable">
+              <thead>
+                <tr>
+                  <th data-i18n="accounts.label">Label</th>
+                  <th data-i18n="accounts.auth_type">Auth Type</th>
+                  <th data-i18n="accounts.credential">Credential</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="accountsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Combos view (B2.4) -->
+      <section class="view" data-view="combos">
+        <div class="card combos-card">
+          <div class="providers-head">
+            <h2 class="providers-title" data-i18n="combos.title">Combos</h2>
+            <button class="btn btn-primary" id="comboAddBtn" type="button">
+              <i class="fa fa-plus"></i> <span data-i18n="combos.add">Add Combo</span>
+            </button>
+          </div>
+
+          <p class="settings-msg" id="comboMsg" role="status" aria-live="polite"></p>
+
+          <table class="data-table" id="comboTable">
+            <thead>
+              <tr>
+                <th data-i18n="combos.name">Name</th>
+                <th data-i18n="combos.strategy">Strategy</th>
+                <th data-i18n="combos.enabled">Enabled</th>
+                <th data-i18n="combos.members">Members</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="comboTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Proxy Pools view (B2.3) -->
+      <section class="view" data-view="proxies">
+        <div class="card proxies-pool-card">
+          <div class="providers-head">
+            <h2 class="providers-title" data-i18n="proxies.title">Proxy Pools</h2>
+            <button class="btn btn-primary" id="poolAddBtn" type="button">
+              <i class="fa fa-plus"></i> <span data-i18n="proxies.add">Add Proxy Pool</span>
+            </button>
+          </div>
+
+          <p class="settings-msg" id="poolMsg" role="status" aria-live="polite"></p>
+
+          <table class="data-table" id="poolTable">
+            <thead>
+              <tr>
+                <th data-i18n="proxies.name">Name</th>
+                <th data-i18n="proxies.strategy">Rotation</th>
+                <th data-i18n="proxies.enabled">Enabled</th>
+                <th data-i18n="proxies.nodes">Nodes</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="poolTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Endpoints view (B2.5) -->
+      <section class="view" data-view="endpoints">
+        <div class="card endpoints-card">
+          <div class="providers-head">
+            <h2 class="providers-title" data-i18n="endpoints.title">Endpoints</h2>
+            <button class="btn btn-primary" id="endpointAddBtn" type="button">
+              <i class="fa fa-plus"></i> <span data-i18n="endpoints.add">Add Endpoint</span>
+            </button>
+          </div>
+
+          <p class="settings-msg" id="endpointMsg" role="status" aria-live="polite"></p>
+
+          <table class="data-table" id="endpointTable">
+            <thead>
+              <tr>
+                <th data-i18n="endpoints.name">Name</th>
+                <th data-i18n="endpoints.listen">Listen</th>
+                <th data-i18n="endpoints.access_control">Access Control</th>
+                <th data-i18n="endpoints.proxy_pool">Proxy Pool</th>
+                <th data-i18n="endpoints.binding">Binding</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="endpointTableBody"></tbody>
+          </table>
         </div>
       </section>
 
@@ -259,43 +392,6 @@
                 </div>
               </div>
             </div>
-          </div>
-
-          <!-- Log Window (working part of B3.1) -->
-          <div class="logwindow" id="logWindow">
-            <div class="logwindow-head">
-              <h2 class="logwindow-title">
-                <i class="fa fa-list"></i>
-                <span data-i18n="term.log_window">Log Window</span>
-              </h2>
-              <div class="logwindow-controls">
-                <label class="form-label" for="logSeverity" data-i18n="term.severity">Severity</label>
-                <select class="form-input" id="logSeverity">
-                  <option value="all" data-i18n="term.sev_all">All</option>
-                  <option value="info" data-i18n="term.sev_info">Info</option>
-                  <option value="warning" data-i18n="term.sev_warning">Warning</option>
-                  <option value="error" data-i18n="term.sev_error">Error</option>
-                </select>
-                <button class="btn btn-primary" id="logRefreshBtn" type="button">
-                  <i class="fa fa-rotate"></i>
-                  <span data-i18n="term.refresh">Refresh</span>
-                </button>
-              </div>
-            </div>
-
-            <p class="settings-msg" id="logMsg" role="status" aria-live="polite"></p>
-
-            <table class="data-table" id="logTable">
-              <thead>
-                <tr>
-                  <th data-i18n="term.time">Time</th>
-                  <th data-i18n="term.severity">Severity</th>
-                  <th data-i18n="term.source">Source</th>
-                  <th data-i18n="term.message">Message</th>
-                </tr>
-              </thead>
-              <tbody id="logTableBody"></tbody>
-            </table>
           </div>
 
         </div>
@@ -353,6 +449,11 @@
               <input class="form-input" type="text" id="provApiKey" name="api_key" />
             </div>
             <div class="form-row">
+              <label class="form-label" for="provModel" data-i18n="providers.model">Model</label>
+              <input list="provModelList" id="provModel" name="default_model" class="form-input" />
+              <datalist id="provModelList"></datalist>
+            </div>
+            <div class="form-row">
               <label class="form-label" for="provEnabled" data-i18n="providers.enabled">Enabled</label>
               <label class="switch" title="Enabled">
                 <input type="checkbox" id="provEnabled" name="enabled" />
@@ -366,7 +467,9 @@
                 <i class="fa fa-plus"></i> <span data-i18n="providers.add_header">Add Header</span>
               </button>
             </div>
+            <p class="settings-msg" id="provModalMsg" role="status" aria-live="polite"></p>
             <div class="form-actions">
+              <button type="button" class="btn" id="provTestBtn" data-i18n="providers.test">Test Connection</button>
               <button type="submit" class="btn btn-primary" id="provSaveBtn" data-i18n="providers.save">Save</button>
               <button type="button" class="btn" id="provCancel" data-i18n="providers.cancel">Cancel</button>
             </div>
@@ -401,7 +504,166 @@
           </div>
         </div>
       </div>
+
+      <!-- Combo add/edit modal (B2.4) -->
+      <div class="modal-overlay" id="comboModal" hidden>
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="comboModalTitle">
+          <h3 class="modal-title" id="comboModalTitle" data-i18n="combos.add">Add Combo</h3>
+          <form id="comboForm" class="settings-form" autocomplete="off">
+            <input type="hidden" id="comboId" />
+            <div class="form-row">
+              <label class="form-label" for="comboName" data-i18n="combos.name">Name</label>
+              <input class="form-input" type="text" id="comboName" name="name" required />
+            </div>
+            <div class="form-row">
+              <label class="form-label" for="comboStrategy" data-i18n="combos.strategy">Strategy</label>
+              <select class="form-input" id="comboStrategy" name="strategy">
+                <option value="fallback">fallback</option>
+                <option value="load_balance">load_balance</option>
+                <option value="latency_cost">latency_cost</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label class="form-label" for="comboEnabled" data-i18n="combos.enabled">Enabled</label>
+              <label class="switch" title="Enabled">
+                <input type="checkbox" id="comboEnabled" name="enabled" />
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary" id="comboSaveBtn" data-i18n="combos.save">Save</button>
+              <button type="button" class="btn" id="comboCancel" data-i18n="combos.cancel">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Proxy Pool add/edit modal (B2.3) -->
+      <div class="modal-overlay" id="poolModal" hidden>
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="poolModalTitle">
+          <h3 class="modal-title" id="poolModalTitle" data-i18n="proxies.add">Add Proxy Pool</h3>
+          <form id="poolForm" class="settings-form" autocomplete="off">
+            <input type="hidden" id="poolId" />
+            <div class="form-row">
+              <label class="form-label" for="poolName" data-i18n="proxies.name">Name</label>
+              <input class="form-input" type="text" id="poolName" name="name" required />
+            </div>
+            <div class="form-row">
+              <label class="form-label" for="poolStrategy" data-i18n="proxies.strategy">Rotation</label>
+              <select class="form-input" id="poolStrategy" name="rotation_strategy">
+                <option value="round_robin">round_robin</option>
+                <option value="random">random</option>
+                <option value="latency_cost">latency_cost</option>
+                <option value="least_latency">least_latency</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label class="form-label" for="poolEnabled" data-i18n="proxies.enabled">Enabled</label>
+              <label class="switch" title="Enabled">
+                <input type="checkbox" id="poolEnabled" name="enabled" />
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary" id="poolSaveBtn" data-i18n="proxies.save">Save</button>
+              <button type="button" class="btn" id="poolCancel" data-i18n="proxies.cancel">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Endpoint add/edit modal (B2.5) -->
+      <div class="modal-overlay" id="endpointModal" hidden>
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="endpointModalTitle">
+          <h3 class="modal-title" id="endpointModalTitle" data-i18n="endpoints.add">Add Endpoint</h3>
+          <form id="endpointForm" class="settings-form" autocomplete="off">
+            <input type="hidden" id="endpointId" />
+            <div class="form-row">
+              <label class="form-label" for="endpointName" data-i18n="endpoints.name">Name</label>
+              <input class="form-input" type="text" id="endpointName" name="name" required />
+            </div>
+            <div class="form-row">
+              <label class="form-label" for="endpointHost" data-i18n="endpoints.host">Host</label>
+              <input class="form-input" type="text" id="endpointHost" name="listen_host" placeholder="127.0.0.1" />
+            </div>
+            <div class="form-row">
+              <label class="form-label" for="endpointPort" data-i18n="endpoints.port">Port</label>
+              <input class="form-input" type="number" id="endpointPort" name="listen_port" min="1" max="65535" placeholder="8000" />
+            </div>
+            <div class="form-row">
+              <label class="form-label" for="endpointAccessControl" data-i18n="endpoints.access_control">Access Control</label>
+              <label class="switch" title="Access Control">
+                <input type="checkbox" id="endpointAccessControl" name="access_control_enabled" />
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+            <div class="form-row">
+              <label class="form-label" for="endpointProxyPool" data-i18n="endpoints.proxy_pool">Proxy Pool</label>
+              <input class="form-input" type="number" id="endpointProxyPool" name="proxy_pool_id" min="1" placeholder="—" />
+            </div>
+            <div class="form-row">
+              <label class="form-label" for="endpointBindType" data-i18n="endpoints.bind_type">Bind To</label>
+              <select class="form-input" id="endpointBindType" name="bind_type">
+                <option value="none" data-i18n="endpoints.none">None</option>
+                <option value="provider">provider</option>
+                <option value="combo">combo</option>
+              </select>
+            </div>
+            <div class="form-row" id="endpointBindIdRow">
+              <label class="form-label" for="endpointBindId" data-i18n="endpoints.bind_id">Bind ID</label>
+              <input class="form-input" type="number" id="endpointBindId" name="bind_id" min="1" />
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary" id="endpointSaveBtn" data-i18n="endpoints.save">Save</button>
+              <button type="button" class="btn" id="endpointCancel" data-i18n="endpoints.cancel">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
       </main>
+
+      <!-- Global Log Window (B3.1): visible on every view, collapsible -->
+      <div class="logwindow" id="logWindow">
+        <div class="logwindow-head">
+          <h2 class="logwindow-title">
+            <i class="fa fa-list"></i>
+            <span data-i18n="term.log_window">Log Window</span>
+          </h2>
+          <div class="logwindow-controls">
+            <button class="icon-btn" id="logCollapseBtn" type="button"
+                    data-i18n-aria="log.collapse" title="Collapse">
+              <i class="fa fa-chevron-up"></i>
+            </button>
+            <label class="form-label" for="logSeverity" data-i18n="term.severity">Severity</label>
+            <select class="form-input" id="logSeverity">
+              <option value="all" data-i18n="term.sev_all">All</option>
+              <option value="info" data-i18n="term.sev_info">Info</option>
+              <option value="warning" data-i18n="term.sev_warning">Warning</option>
+              <option value="error" data-i18n="term.sev_error">Error</option>
+            </select>
+            <button class="btn btn-primary" id="logRefreshBtn" type="button">
+              <i class="fa fa-rotate"></i>
+              <span data-i18n="term.refresh">Refresh</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="logwindow-body">
+          <p class="settings-msg" id="logMsg" role="status" aria-live="polite"></p>
+
+          <table class="data-table" id="logTable">
+            <thead>
+              <tr>
+                <th data-i18n="term.time">Time</th>
+                <th data-i18n="term.severity">Severity</th>
+                <th data-i18n="term.source">Source</th>
+                <th data-i18n="term.message">Message</th>
+              </tr>
+            </thead>
+            <tbody id="logTableBody"></tbody>
+          </table>
+        </div>
+      </div>
 
       <!-- Mobile bottom navigation (B4.2): shown only on phone device
            simulation or real narrow viewports. Icons only, non-AdminLTE shell. -->
@@ -429,6 +691,10 @@
   <script src="device.js" defer></script>
   <!-- App bootstrap (defer preserves order) -->
   <script src="app.js" defer></script>
+  <!-- Combos / Proxy Pools / Endpoints management (B2.4 / B2.3 / B2.5) -->
+  <script src="combos.js" defer></script>
+  <script src="proxies.js" defer></script>
+  <script src="endpoints.js" defer></script>
   <!-- CLI Tools launcher (B3.4) — needs app.js (window.aigate) + terminal.js -->
   <script src="clitools.js" defer></script>
   <!-- Self-Heal UI (B4.1) — needs i18n.js (window.I18N) + clitools.js -->

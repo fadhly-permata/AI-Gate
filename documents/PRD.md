@@ -7,27 +7,52 @@
 
 ## 2. Core Features & Functional Requirements
 
-### 2.1 Providers Management
-- **CRUD Provider:** Menambah, mengedit, menghapus, dan melihat daftar AI Provider (seperti OpenAI, Anthropic, OpenRouter, Ollama, LiteLLM, dsb.).
-- **Credential Storage:** Menyimpan API Key, Base URL, serta custom headers secara aman.
-- **Model Auto-Discovery:** Mengambil daftar model yang tersedia secara otomatis dari provider (jika provider mendukung endpoint `/models`).
+### 2.1 Providers Management *(adopsi dari 9router)*
+- **CRUD Provider:** kelola 40+ penyedia AI (OpenAI, Anthropic, Gemini, OpenRouter, Ollama, LiteLLM, dsb) dalam satu daftar.
+- **Penyimpanan Kredensial:** simpan API Key, Base URL, dan custom headers. Untuk penyedia resmi (Claude Code, Codex, Cursor, Antigravity, GitHub Copilot, dll) mendukung login OAuth + **token diperbarui otomatis** (tanpa login ulang manual).
+- **Multi-Akun:** bisa menambah beberapa akun per penyedia; dibagi beban (round-robin) atau jadi cadangan otomatis.
+- **Model Auto-Discovery:** ambil daftar model otomatis dari penyedia yang mendukung endpoint `/models`.
 
-### 2.2 Proxy Pools
+### 2.2 Proxy Pools *(fitur tambahan aigate — tidak diadopsi dari 9router — opsional)*
+- **Opsional:** Fitur ini tidak wajib. Tanpa proxy yang diisi, aigate tetap menghubungi penyedia AI secara langsung (berjalan normal).
 - **Proxy Configuration:** Mendukung protokol HTTP, HTTPS, dan SOCKS5.
 - **Rotation Strategy:** Opsi rotasi proxy (Round Robin, Random, Failover).
 - **Health Check:** Pengecekan status latensi dan uptime proxy secara berkala.
 
-### 2.3 Combos (Smart Routing & Fallback)
-- **Custom Pipeline:** Menggabungkan beberapa provider/model ke dalam satu grup "Combo".
-- **Strategy Selection:**
-  - *Fallback:* Mengalihkan request ke provider B jika provider A error/rate limited.
-  - *Load Balancing:* Membagi beban request antar provider/model berdasarkan bobot.
-  - *Lowest Latency / Cost Optimization:* Mengarahkan ke model tercepat/termurah.
+### 2.3 Combos (Smart Routing & Fallback) *(adopsi dari 9router)*
+- **Custom Pipeline:** gabungkan beberapa provider/model ke dalam satu grup "Combo" (bisa campur langganan, murah, dan gratis).
+- **Fallback 3 Tingkat:** otomatis pindah berurutan — (1) langganan → (2) murah → (3) gratis — kalau kuota habis atau error, supaya coding gak berhenti.
+- **Cadangan Antar-Akun:** kalau satu akun kena limit, pindah ke akun lain di penyedia yang sama (multi-akun, lihat 2.1).
+- **Sadar Kuota:** routing mempertimbangkan sisa kuota/limit tiap provider (lihat bagian Pelacak Kuota) supaya langganan dipakai optimal dulu.
+- **Load Balancing & Tercepat/Termurah:** bagi beban antar provider berdasar bobot, atau arahkan ke model tercepat/termurah (tetap dipertahankan sebagai opsi).
 
-### 2.4 Endpoints
-- **OpenAI-Compatible Gateway:** Menyediakan server HTTP lokal (misal: `http://localhost:8080/v1`) yang kompatibel dengan format API OpenAI (`/v1/chat/completions`, `/v1/models`).
-- **Endpoint Binding:** Memetakan endpoint ke Provider tertentu atau Combo tertentu.
+### 2.4 Endpoints *(adopsi dari 9router)*
+- **OpenAI-Compatible Gateway:** server HTTP lokal (misal `http://localhost:8080/v1`) yang kompatibel format API OpenAI (`/v1/chat/completions`, `/v1/models`).
+- **Penerjemah Format Antar-Alat:** aigate otomatis menerjemahkan permintaan & jawaban antar format berbeda — OpenAI ↔ Claude ↔ Gemini ↔ Cursor ↔ Kiro ↔ Vertex ↔ Antigravity ↔ Ollama. Jadi alat CLI apa pun yang cuma paham format OpenAI bisa dipakai dengan penyedia mana pun.
+- **Endpoint Binding:** memetakan endpoint ke Provider atau Combo tertentu.
 - **Access Control:** API Key internal opsional untuk mengamankan akses lokal.
+
+### 2.4.1 Penghemat Token (Token Savers) *(adopsi dari 9router)*
+- **RTK Token Saver:** otomatis memadatkan hasil alat (seperti `git diff`, `grep`, `ls`, `tree`) sebelum dikirim ke AI — hemat 20–40% token input per request. Kalau gagal, pakai teks asli (aman, gak bikin request rusak).
+- **Mode Caveman:** menyuntikkan gaya jawaban singkat & padat ke AI → hemat hingga 65% token output (isi teknis tetap utuh).
+- **Ponytail (Senior Malas):** menyuntikkan instruksi "tulis kode minimal, utamakan yang sudah ada" → output lebih pendek & lebih sedikit refactoring.
+- Semua bisa diatur nyala/mati per endpoint di konsol.
+
+### 2.4.2 Pelacak Kuota & Pemakaian *(adopsi dari 9router)*
+- **Kuota Real-Time:** tampilkan sisa token & hitung mundur reset (per jam / harian / mingguan) tiap provider berlangganan.
+- **Estimasi Biaya:** perkiraan biaya untuk tier berbayar.
+- **Optimasi Langganan:** bantu pakai seluruh kuota langganan sebelum reset supaya gak terbuang.
+- **Sadar Kuota di Routing:** dipakai Combo (lihat 2.3) untuk menentukan kapan pindah ke tier murah/gratis.
+
+### 2.4.3 Log Permintaan & Laporan Pemakaian *(adopsi dari 9router)*
+- **Request Logging:** mode debug mencatat seluruh permintaan & jawaban (header, isi) untuk bantu cari masalah.
+- **Usage Analytics:** lacak token & tren pemakaian per provider/model; laporan bulanan + perkiraan penghematan dari fitur token saver.
+- **Catatan:** ini beda dengan wajib-logging ke database di 2.8 (punya aigate) — 2.4.3 fokus ke analitik & debug level permintaan.
+
+### 2.4.4 Export & Import Setting (Lokal) *(pengganti cloud sync — request user)*
+- **Export:** menu di konsol untuk menyimpan SELURUH setting (provider, combo, akun, proxy, endpoint, preferensi) ke satu file (misal `aigate-settings.json`).
+- **Import:** buka file tersebut di device lain → semua setting langsung pulih, gak perlu setup ulang.
+- **Lokal sepenuhnya:** gak ada kirim-ke-cloud; file ada di tangan lu. (Alternatif dari sinkron cloud 9router.)
 
 ### 2.5 Integrated Multi-Tab Terminal (xterm)
 - **Web-based / UI Terminal:** Menggunakan `xterm.js` yang terhubung via WebSocket ke backend PTY (Pseudo-Terminal) Python.
@@ -43,15 +68,11 @@
 - **Respons Natural & Berbasis Kecepatan (Velocity-based):** Kecepatan swipe menentukan kecepatan scroll — swipe cepat menghasilkan scroll layar cepat (bisa melompat beberapa layar), swipe lambat menghasilkan scroll halus baris-per-baris. Diberikan efek easing agar terasa natural, tidak *abrupt*.
 - **Damping & Batas:** Scroll diberi peredaman (*damping*) agar berhenti halus di ujung buffer. Aplikasi TUI yang memang membutuhkan input swipe khusus dapat dikecualikan per-aplikasi bila diperlukan.
 
-### 2.6 CLI Tools Auto-Launcher & Auto-Configuration
-- **Supported CLI Tools Presets:** Pengelolaan tool CLI populer (seperti `aider`, `interpreter`, `llm`, `sgpt`, `mods`, dll.).
-- **Auto-Install Check:**
-  - Saat tool diklik, backend mengeksekusi pengecekan perintah (misal: `which aider` atau `where aider`).
-  - Jika belum terinstal, jalankan proses instalasi otomatis (misal: `pip install aider-chat` atau via `uv`) langsung di tab terminal aktif.
-- **Interactive Model & Provider Picker:**
-  - Sebelum menjalankan CLI tool, tampilkan pilihan modal/popup berisi daftar *Provider* atau *Combos* beserta *Model* yang aktif di **aigate**.
-- **Auto-Injection Envs/Flags:**
-  - Secara otomatis mengeset environment variable (misal: `OPENAI_API_BASE`, `OPENAI_API_KEY`) atau menambahkan argumen flag saat menjalankan command di terminal.
+### 2.6 CLI Tools Auto-Launcher & Auto-Configuration *(inti adopsi dari 9router, diperkaya aigate)*
+- **Sambungkan Alat ke Pintu API:** intinya, alat CLI (Claude Code, Codex, Cursor, Cline, OpenCode, dsb) cukup diarahkan ke endpoint aigate (`http://localhost:8080/v1`) + API key aigate, lalu jalan lewat provider/combo pilihan. Ini cara kerja yang diadopsi dari 9router.
+- **Auto-Install Check (tambahan aigate):** saat tool diklik, backend cek dulu apakah terpasang (`which aider`/`where aider`); kalau belum, pasang otomatis (`pip install`/`uv`) di tab terminal aktif.
+- **Interactive Model & Provider Picker:** sebelum jalan, tampilkan popup berisi daftar Provider/Combo + Model aktif di aigate.
+- **Auto-Injection Envs/Flags (tambahan aigate):** otomatis set environment (`OPENAI_API_BASE`, `OPENAI_API_KEY`) atau tambah flag saat menjalankan command di terminal.
 
 ### 2.6.1 Pengelompokan Tool CLI (Grouping)
 Daftar tool CLI dikelompokkan agar mudah ditemukan. Setiap grup minimal berisi 5 preset. Prioritas utama: *agentic CLI* (agen coding & otomatisasi).

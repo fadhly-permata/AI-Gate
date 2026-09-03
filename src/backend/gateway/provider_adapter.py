@@ -20,35 +20,69 @@ logger = logging.getLogger(__name__)
 
 from backend.gateway.errors import UpstreamError
 from backend.gateway.resolver import ResolvedTarget
+from backend.gateway.translator import (
+    translate_error,
+    translate_request,
+    translate_response,
+)
 from backend.log import log_error_exc, log_warning_exc
 
 # Outbound timeout (seconds). Streaming SSE will revisit this in a later task.
+# TODO streaming: per-chunk translation for format-translated providers (ADR-012).
 _DEFAULT_TIMEOUT = 60.0
 
 
 async def chat_completion(
     target: ResolvedTarget, payload: dict, proxy_url: str | None = None
 ) -> dict:
-    """POST ``{base_url}/chat/completions`` and return the upstream JSON.
+    """POST to the upstream and return an OpenAI-shaped JSON response.
 
-    :param target: a resolved upstream (base_url + api_key).
-    :param payload: the raw OpenAI-style request body (forwarded as-is).
-    :param proxy_url: optional egress proxy URL (ADR-008). When set, httpx
-      routes the upstream call through it. Never logged (ADR-011 secret-safe).
+    When ``target.format != 'openai'`` the request/response are transparently
+    translated by the Format Translation Engine (ADR-012). The OpenAI path is
+    kept 100% unchanged so existing behaviour is preserved.
+
+    :param target: a resolved upstream (base_url + api_key + format).
+    :param payload: the raw OpenAI-style request body.
+    :param proxy_url: optional egress proxy URL (ADR-008).
     :raises UpstreamError: on any network or upstream HTTP failure.
     """
-    url = target.base_url.rstrip("/") + "/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {target.api_key}",
-        "Content-Type": "application/json",
-    }
-
-    # ADR-007: api_key sent plaintext as Bearer (no encryption / masking).
+    # ADR-007: api_key sent plaintext (no encryption / masking).
     # Rewrite the request `model` to the REAL upstream model id; the
     # `provider:`-prefixed reference must never reach the upstream provider.
-    # All other fields (messages, temperature, n, ...) pass through verbatim.
     out = dict(payload)
     out["model"] = target.upstream_model
+
+    fmt = (target.format or "openai").lower()
+
+    if fmt == "openai":
+        # --- unchanged OpenAI pass-through path -----------------------------
+        url = target.base_url.rstrip("/") + "/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {target.api_key}",
+            "Content-Type": "application/json",
+        }
+        body = out
+    else:
+        # --- ADR-012 format translation -------------------------------------
+        req = translate_request(fmt, out)
+        url = target.base_url.rstrip("/") + req["url_path"]
+        if fmt == "anthropic":
+            # Anthropic authenticates with x-api-key (NOT Authorization Bearer)
+            # and requires the anthropic-version header.
+            headers = {
+                "x-api-key": target.api_key,
+                "anthropic-version": req["headers_extra"].get(
+                    "anthropic-version", "2023-06-01"
+                ),
+                "Content-Type": "application/json",
+            }
+        else:
+            headers = {
+                "Authorization": f"Bearer {target.api_key}",
+                "Content-Type": "application/json",
+            }
+            headers.update(req["headers_extra"])
+        body = req["body"]
 
     try:
         client_kwargs: dict = {"timeout": _DEFAULT_TIMEOUT}
@@ -58,7 +92,7 @@ async def chat_completion(
         if proxy_url:
             client_kwargs["proxies"] = proxy_url
         async with httpx.AsyncClient(**client_kwargs) as client:
-            resp = await client.post(url, headers=headers, json=out)
+            resp = await client.post(url, headers=headers, json=body)
     except httpx.ConnectError as exc:
         logger.error("upstream unreachable: %s", exc, exc_info=True)
         log_error_exc(
@@ -88,42 +122,66 @@ async def chat_completion(
         )
 
     # Map upstream HTTP statuses to OpenAI envelopes.
-    if resp.status_code == 401:
-        raise UpstreamError(
-            502,
-            _error("upstream authentication failed", "upstream_error", "upstream_401"),
-        )
-    if 500 <= resp.status_code < 600:
-        raise UpstreamError(
-            502,
-            _error(
-                f"upstream error (HTTP {resp.status_code})",
-                "upstream_error",
-                "upstream_5xx",
-            ),
-        )
-    if 400 <= resp.status_code < 500:
-        try:
-            body = resp.json()
-            message = str(body.get("error", body))
-        except Exception:  # noqa: BLE001 - fall back to raw text
-            logger.warning(
-                "could not parse upstream error body (HTTP %s)",
+    if fmt == "openai":
+        if resp.status_code == 401:
+            raise UpstreamError(
+                502,
+                _error("upstream authentication failed", "upstream_error", "upstream_401"),
+            )
+        if 500 <= resp.status_code < 600:
+            raise UpstreamError(
+                502,
+                _error(
+                    f"upstream error (HTTP {resp.status_code})",
+                    "upstream_error",
+                    "upstream_5xx",
+                ),
+            )
+        if 400 <= resp.status_code < 500:
+            try:
+                body = resp.json()
+                message = str(body.get("error", body))
+            except Exception:  # noqa: BLE001 - fall back to raw text
+                logger.warning(
+                    "could not parse upstream error body (HTTP %s)",
+                    resp.status_code,
+                    exc_info=True,
+                )
+                log_warning_exc(
+                    f"could not parse upstream error body (HTTP {resp.status_code})",
+                    source="backend.gateway.provider_adapter",
+                )
+                message = resp.text or f"upstream error (HTTP {resp.status_code})"
+            raise UpstreamError(
                 resp.status_code,
-                exc_info=True,
+                _error(message, "upstream_error", f"upstream_{resp.status_code}"),
             )
-            log_warning_exc(
-                f"could not parse upstream error body (HTTP {resp.status_code})",
-                source="backend.gateway.provider_adapter",
+    else:
+        # Translated formats: surface the native error through translate_error so
+        # the client still receives an OpenAI-shaped envelope (ADR-012).
+        if not 200 <= resp.status_code < 300:
+            try:
+                err_body = resp.json()
+            except Exception:  # noqa: BLE001 - fall back to raw text
+                logger.warning(
+                    "could not parse %s upstream error body (HTTP %s)",
+                    fmt,
+                    resp.status_code,
+                    exc_info=True,
+                )
+                log_warning_exc(
+                    f"could not parse {fmt} upstream error body "
+                    f"(HTTP {resp.status_code})",
+                    source="backend.gateway.provider_adapter",
+                )
+                err_body = resp.text or None
+            raise UpstreamError(
+                resp.status_code,
+                translate_error(fmt, resp.status_code, err_body),
             )
-            message = resp.text or f"upstream error (HTTP {resp.status_code})"
-        raise UpstreamError(
-            resp.status_code,
-            _error(message, "upstream_error", f"upstream_{resp.status_code}"),
-        )
 
     try:
-        return resp.json()
+        data = resp.json()
     except Exception as exc:  # noqa: BLE001 - bad upstream payload
         logger.error("invalid upstream JSON response: %s", exc, exc_info=True)
         log_error_exc(
@@ -135,6 +193,11 @@ async def chat_completion(
             502,
             _error(f"invalid upstream JSON: {exc}", "upstream_error", "upstream_bad_response"),
         )
+
+    # Translate non-OpenAI responses back into the OpenAI contract shape.
+    if fmt != "openai":
+        data = translate_response(fmt, data)
+    return data
 
 
 def _error(message: str, error_type: str, code: str) -> dict:

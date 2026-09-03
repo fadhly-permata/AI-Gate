@@ -76,3 +76,33 @@ Mengambil log operasional dari tabel `LogEntry` (mode developer / observabilitas
 ## Streaming
 `stream: true` -> Server-Sent Events `data: {json}\n\n` selesai dengan
 `data: [DONE]`.
+
+## Management Endpoints (adopsi 9router)
+
+> Penerjemah format (PRD §2.4) bersifat **internal/transparan** — tidak ada
+> endpoint baru; client tetap kirim/terima format OpenAI, aigate menerjemahkan
+> ke provider target di belakang layar.
+
+### Multi-Account & OAuth (PRD §2.1)
+- `GET /api/accounts?provider_id=` — daftar akun per provider.
+- `POST /api/accounts` — tambah akun (api_key / oauth token). Body:
+  `{"provider_id": 1, "label": "acc-1", "auth_type": "api_key|oauth", "api_key": "..."}`.
+- `POST /api/oauth/<provider>/start` — mulai flow OAuth; kembalikan URL authorize.
+- `GET /api/oauth/<provider>/callback` — tukar code → simpan token + `expires_at`;
+  refresh otomatis sebelum kedaluwarsa (lihat TSD ADR-013).
+- `DELETE /api/accounts/<id>` — hapus akun.
+
+### Quota & Usage (PRD §2.4.2 / §2.4.3)
+- `GET /api/usage?provider_id=&range=day` — ringkasan token in/out, estimasi
+  biaya, tren. `GET /api/quota` — sisa kuota & reset countdown per provider
+  berlangganan.
+
+### Export / Import Setting (PRD §2.4.4 — lokal, tanpa cloud)
+- `GET /api/settings/export` — kembalikan seluruh setting (provider, combo,
+  akun, proxy, endpoint, preferensi) sebagai JSON.
+- `POST /api/settings/import` — body = JSON dari export; pulihkan setting.
+  Rute ini lokal; tidak ada pengiriman ke pihak ketiga.
+
+### Token Saver toggle (PRD §2.4.1)
+- Field `token_saver` (enum: `off | rtk | caveman | ponytail`) di config
+  Endpoint — diterapkan sebagai pre-translate hook (lihat TSD ADR-013).

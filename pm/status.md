@@ -349,3 +349,259 @@
   dibenerin biar jalan di Linux/macOS/Windows.
 - Perubahan BELUM di-commit (user belum minta commit). File: `src/backend/server.py`,
   `src/frontend/e2e/playwright.config.js`.
+
+## Run-impl session 2026-09-03 (continue) — B5.1 START (sekuensial)
+- Mode `continue` arg. Active task pertama belum `[x]` = **B5.1** (Multi-akun per
+  provider + OAuth login + token auto-refresh). Owner `be-dev`+`fe-dev`.
+- Pilihan mode multi-agent (R16): user pilih **SEKUENSIAL** ("sekuen").
+  `multiagent_mode: sequential` di `pm/state.md`. PM jalankan be-dev dulu, lalu
+  fe-dev setelahnya.
+- B5.1 be-dev scope: model `ProviderAccount` (ERD) + router `/api/accounts` +
+  `/api/oauth/<provider>/{start,callback}` + auto-refresh `get_valid_token` +
+  wiring ke gateway resolver/combo_routing supaya request pakai kredensial akun
+  (round-robin antar akun enabled; fallback ke `provider.api_key` bila kosong).
+  Wajib: Pydantic v1 (R10), plaintext ADR-007, no-empty-catch R12, log ke LogEntry.
+- Handover be-dev tertulis di spawn prompt. Setelah be-dev return receipt → PM
+  verifikasi (pytest) → spawn fe-dev (UI multi-akun + tombol Connect OAuth).
+- **VERIFIKASI PM**: `pytest tests/backend` = **133 passed, 1 skipped**;
+  `import backend.server` ok (55 routes). be-dev B5.1 BACKEND SELESAI & verified.
+- **fe-dev SPAWN #1 ke-cancel** (interupsi eksternal, bukan hasil kerja). PM
+  re-spawn fe-dev (UI B5.1) untuk lanjut — scope sama: Accounts subsection di
+  `#provDetail` + Add/Delete/Connect OAuth + i18n + tests/accounts.test.js.
+- Catatan R9: ambiguitas OAuth (endpoint per provider-type) → be-dev pakai registry
+  built-in + fallback 400 bila tak dikenal; log ke pm/status.md.
+
+## Run-impl session 2026-09-03 (continue) — B5.1 SELESAI
+- **B5.1 be-dev**: model `ProviderAccount` + `accounts_router.py` (CRUD + OAuth
+  start/callback) + `oauth.py` (registry + `get_valid_token` auto-refresh) +
+  wiring resolver/combo_routing/endpoint path pakai `select_provider_credential`
+  (round-robin akun enabled; fallback `provider.api_key`). Verifikasi PM: pytest
+  **133 passed, 1 skipped**; `import backend.server` ok (55 routes).
+- **B5.1 fe-dev**: Accounts subsection di `#provDetail` (list/add/delete +
+  Connect OAuth dgn polling 2s×15), i18n EN/ID, `tests/accounts.test.js` (9).
+  Verifikasi PM: vitest **94 passed (12 file)**. ADR-007 plaintext di UI.
+- `documents/plan/BACKLOG.md` B5.1 ditandai `[x]`. Active task sekarang = **B5.2**.
+- Mode sekuensial (user 'sekuen') tetap berlaku se-sesi utk task multi-agent
+  berikutnya (B5.5/5.6/5.7). B5.2 owner `be-dev` (single) — lanjut otomatis tanpa
+  tanya.
+
+## Run-impl session 2026-09-03 (continue) — B5.2 SELESAI + B5.3 START
+- **B5.2 be-dev**: `Provider.tier` + idempoten migration; `three_tier` strategy (reuse
+  fallback ordering subscription→cheap→free); cadangan antar-akun (retry akun lain
+  on 429/quota/401, bounded); `quota_aware_order` scaffold (no-op, TODO B5.5).
+  Verifikasi PM: pytest **141 passed, 1 skipped**. B5.2 SELESAI.
+- **B5.3 aktif** (be-dev, single): Format Translation Engine (ADR-012) — modul
+  `gateway/translator.py` terjemah request/response OpenAI↔Claude↔Gemini↔Cursor↔
+  Kiro↔Vertex↔Antigravity↔Ollama; wiring di `provider_adapter` + `ResolvedTarget.format`.
+  Transparan (client tetap OpenAI). Non-streaming dulu; streaming TODO.
+
+## Run-impl session 2026-09-03 (continue) — B5.3 SELESAI + B5.4 START
+- **B5.3 be-dev**: `gateway/translator.py` (translate_request/response/error OpenAI↔
+  Anthropic↔Gemini; pass-through utk openai-compatible/cursor/kiro/vertex/antigravity/
+  ollama). Wiring di `provider_adapter` + `ResolvedTarget.format` (resolver &
+  combo_routing). Verifikasi PM: pytest **158 passed, 1 skipped**. B5.3 SELESAI.
+- **B5.4 aktif** (be-dev, single): Token Saver hooks (ADR-013) — `Endpoint.token_saver`
+  (off|rtk|caveman|ponytail) + modul `gateway/token_saver.py` pre-translate hook
+  (fail-open) + wiring di `gateway/router.py` via header `X-Aigate-Endpoint` +
+  DTO `endpoints_router`.
+
+## Rule created 2026-09-03 (user request) — R19 git checkpoint/commit
+- Pemicu: Termux **force-close** di tengah run -> `models.py` ke-revert ke HEAD,
+  ProviderAccount+tier+default_model padam, 11 collection error, kerjaan B5.1-B5.4
+  nyaris ilang (belum di-commit).
+- User minta rule: "setiap task baru jalan langsung buat checkpoint di git;
+  setiap subtask selesai langsung commit."
+- Diabadikan: **R19** di `pm/OPERATING_RULES.md` (checkpoint awal task + commit
+  tiap subtask beres; prefix `checkpoint:`/`wip:`; hormati .gitignore; cek
+  `git status` sebelum commit). Ditanam juga ke prosedur
+  `.opencode/commands/run-impl.md` (langkah 3 checkpoint, langkah 5 commit/subtask,
+  langkah 6 commit docs saat tandai [x]).
+- Berlaku mulai sekarang. PM langsung terapin: commit checkpoint kerjaan
+  B5.1-B5.4 yang masih uncommitted biar aman, lalu restore models.py -> hijau.
+
+## Run-impl session 2026-09-03 (continue) — PAUSED + REPO BROKEN (honest log)
+- User: "stop dulu". PM berhenti spawn. Saat simpan progres, PM cek pytest ->
+  **11 collection error**: `cannot import name 'ProviderAccount' from backend.models`.
+- ROOT CAUSE: `src/backend/models.py` ke-revert ke HEAD (commit Fase 0-4). Buktinya
+  `git diff --stat src/backend/models.py` KOSONG (= sama dgn HEAD). Kehilangan:
+  `ProviderAccount` (B5.1), `Provider.tier` (B5.2), `Provider.accounts` rel, entri
+  `__all__`. File lain (oauth.py, accounts_router.py, combo_routing.py,
+  providers_router.py, server.py) MASIH import symbol tsb -> suite pecah.
+- KOREKSI KENYATAAN: B5.5 backend TIDAK PERNAH ada (tidak ada file usage/quota/
+  UsageRecord; `ls` kosong). Angka "pytest 188 passed" yang PM tulis di handover
+  fe-dev B5.5 = SALAH (halusinasi PM; be-dev B5.5 belum pernah di-spawn). PM akui.
+  B5.5 tetap `[ ]`.
+- Yang SEHAT (kode ada, tinggal models.py): B5.1 (oauth.py+accounts_router.py),
+  B5.2 (combo_routing tier+account-retry), B5.3 (translator.py), B5.4
+  (token_saver.py). fe-dev B5.5 UI: app.js/index.html/i18n.js ke-modify +
+  usage.js + views/usage tests dibuat oleh spawn yg ke-cancel -> BELUM diverifikasi,
+  kemungkinan parsial.
+- RESUME PLAN (urut): (1) RESTORE models.py -> pytest B5.1-B5.4 hijau lagi;
+  (2) audit perubahan fe-dev B5.5 (usage.js/app.js) -> jalankan vitest, perbaiki;
+  (3) kerjakan B5.5 backend BENERAN (be-dev: UsageRecord + quota + usage_router +
+  tests) SEBELUM fe-dev; (4) B5.6, B5.7.
+- Catatan utk diri sendiri (PM): JANGAN klaim hasil sub-agent tanpa receipt/verifikasi
+  nyata. Selalu `pytest`/`vitest` sendiri sebelum tandai [x] atau tulis angka.
+
+## Run-impl session 2026-09-03 (continue) — SELESAI / NO-OP
+- Arg = `continue`. Prosedur: cari task pertama belum `[x]` di BACKLOG.md.
+  HASIL: SELURUH task (B0.1 → B4.3) SUDAH `[x]`. Tidak ada task pending yg bisa
+  dieksekusi -> tidak ada pekerjaan baru. Run dinyatakan selesai.
+- VERIFIKASI: `git status` bersih (perubahan e2e bug #1/#2 SUDAH ter-commit di
+  `e876a6f` "fix: serve UI static + correct Playwright server path"); pytest
+  smoke `test_health.py` PASS (1 passed). State repo konsisten dgn laporan status
+  sebelumnya.
+- `pm/state.md` diupdate: mode `paused` -> `completed`, checkpoint = semua backlog
+  selesai.
+- Rekomendasi user (opsional, tdk otomatis): jalankan e2e nyata
+  (`PW_EXECUTABLE=... PW_NO_SANDBOX=1 npm run test:e2e:android` atau Playwright
+  desktop setelah `npx playwright install`) utk konfirmasi end-to-end di env masing.
+  Backend pytest + frontend vitest sudah hijau per B4.3.
+
+## Automation test run 2026-09-03 (user request) — SELESAI
+- Request: "coba lakukan automation test".
+- HASIL (semua hijau):
+  - Backend pytest: **100 passed, 2 skipped** (`tests/backend`).
+  - Frontend vitest: **54 passed** (7 file) via `node node_modules/vitest/dist/cli.js run`
+    (npm/vitest shebang gagal di Termux: `/usr/bin/env` tidak ada).
+  - E2E Android (puppeteer-core + chromium): **PASS** (title + sidebar + /api/health
+    + /api/providers). Server dijalankan sbg subprocess (PYTHONPATH=src) lalu di-terminate.
+- Laporan: `.opencode/reports/2026-09-03/qa/1448_automation_test.md`.
+- Catatan: shell-tool `&` backgrounding wedge sesi (pipe gak EOF) — selanjutnya pakai
+  runner Python foreground utk jalanin server+e2e.
+
+## Frontend fixes 2026-09-03 (user eval feedback) — SELESAI (fe-dev)
+- User eval: (1) banyak halaman kosong, (2) Log Window cuma di Terminal, maunya
+  global + collapsible.
+- Penyebab: nav `combos`/`proxies`/`endpoints` gak punya `<section class="view">`
+  & JS (backend API ada, frontend belum). Log Window nested di terminal view +
+  auto-refresh distop saat pindah view.
+- fe-dev (subagent) eksekusi:
+  - Tambah 3 view + modal (combos/proxies/endpoints) di index.html + JS module
+    baru (combos.js/proxies.js/endpoints.js) mirip pola Providers; API path
+    dikonfirmasi dari backend routers (gak ubah backend).
+  - Pindah Log Window jadi panel global fixed bottom-dock (luar `.workspace`);
+    collapsible via `aigate.logCollapsed` (localStorage), auto-refresh global
+    (gak distop saat ganti view), filter severity + refresh tetap jalan.
+- Verifikasi PM: git status = hanya file frontend berubah; vitest **80 passed**
+  (11 file), naik dari 54, tanpa regresi. Server tetap jalan; user cukup
+  hard-refresh browser (http://localhost:8080/).
+- File baru: src/frontend/static/{combos,proxies,endpoints}.js +
+  tests/{combos,proxies,endpoints,views}.test.js.
+
+## Bugs logged 2026-09-03 (user eval) — /log-bug
+- BUG-260903-1 (medium, open): Provider — tak ada pilihan model & tombol test
+  koneksi. User gak tau settingnya benar/belum.
+- BUG-260903-2 (medium, open): CLI Tools view kosong — perlu diisi.
+- BUG-260903-3 (medium, open): User temukan error di log — perlu investigasi
+  (PM akan cek /api/logs; naikkan ke high bila terbukti blocker).
+- Semua severity auto=medium (tak ada indikasi crash/data-loss). pm/bugs.md dibuat
+  (baru) dgn header + 3 entry.
+
+## Backend fixes 2026-09-03 (dari log triage) — SELESAI (be-dev)
+- Log triage (/api/logs) nemukan 2 error startup:
+  (1) `server.py:55` NameError `SessionLocal` -> CLI Tools gak ke-seed (BUG-260903-2);
+  (2) `settings.py:164` AttributeError `.execute` -> settings.get gagal (BUG-260903-3).
+- be-dev fix: import `SessionLocal` di server.py; settings.py pakai `_db.SessionLocal()`
+  dinamis. Full backend **107 passed, 1 skipped** (was 100, +7 test baru).
+- Status: BUG-260903-2 & -3 = fixed di kode, pending verifikasi setelah restart server.
+  BUG-260903-1 (provider model select + test btn) MASIH OPEN (fitur baru, belum dikerjakan).
+- Aksi PM: restart server (setsid) biar fix kebawa + cek /api/cli-tools sekarang isi.
+
+## Rule created 2026-09-03 (user request) — R16 + parallel-sequential.md
+- User: sebelum proses kompleks/multi-agent, PM WAJIB tanya paralel/sekuensial;
+  pilihan berlaku se-sesi; sesi baru tanya lagi (gak semua skenario mendukung paralel).
+- Diabadikan: R16 di `pm/OPERATING_RULES.md` (pengecualian R9), update
+  `.opencode/rules/parallel-sequential.md` (trigger multi-agent + session persistence
+  + forced-sequential), dan `multiagent_mode: ask` di `pm/state.md`.
+- Berlaku mulai sekarang: untuk BUG-260903-1 (provider model + test) yang butuh
+  be-dev+fe-dev, PM akan tanya dulu mode-nya.
+
+## BUG-260903-1 fix 2026-09-03 (sekuensial, R16) — SELESAI (be-dev -> fe-dev)
+- Mode: SEKUENSIAL (user pilih). `multiagent_mode: sequential` di pm/state.md.
+- be-dev dulu: +kolom `default_model` di Provider + endpoint `POST /api/providers/test`
+  (body {type,base_url,api_key,model?} -> 200 {ok,error?}). Backend **114 passed, 1 skipped**.
+- fe-dev: form provider + field Model (datalist dari hasil discover) + tombol
+  "Test Connection" yg panggil endpoint tsb. Frontend **85 passed** (was 80, +5).
+- Restart server (kill by PID, hindari pkill -f self-match): endpoint terverifikasi
+  balas {ok:false,error:"Connection refused"} / "invalid base_url". BUG-260903-1 =
+  fixed (verified). Sisa: ketiga bug dari eval user SUDAH FIXED.
+- Catatan fe-dev: Test button baru ada di modal (belum di detail view) — minor.
+
+## UX fix 2026-09-03 (user eval) — SELESAI (fe-dev)
+- User: pesan "connected"/"fail" dari tombol Test muncul di halaman provider (belakang
+  modal), harusnya di dalam modal Add Provider.
+- Root: `testProviderConnection` nulis ke `#provMsg` (di page) vs `#provModalMsg` (dlm
+  modal). fe-dev tambah `#provModalMsg` di `#provModal` + helper `setProvModalMsg`,
+  dan pindahkan 4 call tsb. `#provMsg` tetap utk error list/save di page.
+- Frontend **85 passed** (unchanged). Frontend-only -> cukup hard-refresh browser
+  (static dilayani dari disk, gak perlu restart server).
+
+## Provider 500 fix 2026-09-03 (user eval) — SELESAI (PM + be-dev)
+- User: gak bisa save provider baru + HTTP 500 di halaman provider.
+- Root: `default_model` kolom gak ke-migrasi ke tabel `providers` existing (create_all
+  gak tambah kolom) -> `no such column` -> 500. (500 = bug, bukan fitur.)
+- PM: langsung `ALTER TABLE providers ADD COLUMN default_model TEXT` ke DB lama ->
+  server langsung bisa save (GET 200 / POST 201). Test row dibersihkan.
+- be-dev: migrasi idempoten di `init_db()` (`_ensure_provider_default_model_column`)
+  jalan tiap startup -> self-heal. Backend **117 passed, 1 skipped** (was 114).
+- Status: BUG-260903-4 = fixed (verified). Server jalan tetap (gak perlu restart; DB
+  sudah dimigrasi, kode migrasi siap utk restart mendatang).
+- VERIFIKASI: health=200; /api/cli-tools kembali data (grup agentic_coding dkk);
+  /api/settings balas port/theme/locale normal -> settings.get bener. Error di log
+  tinggal entry lama (id=12, pra-fix), gak ada error baru. BUG-260903-2 & -3 =
+  fixed (verified). BUG-260903-1 (provider model select + test btn) MASIH OPEN.
+- 2026-09-03 (user): hapus `tests/backend/test_gateway_pattern.py` (placeholder usang
+  "B1.1 not implemented yet"; tes gateway beneran ada di `test_gateway.py`). Hasil:
+  backend **100 passed, 1 skipped** (sisa 1 skip = test_terminal.py:55, sengaja
+  skip bila ptyprocess terpasang).
+
+## R17 capture 2026-09-03 (user scold: PRD beda dari 9router)
+- Insiden: user suruh referensi 9router pas bikin PRD (fitur yang diadopsi),
+  tapi PRD ditulis tanpa sebutan 9router sama sekali (grep = 0 match di repo).
+  Fitur adopsi diverge jauh dari 9router asli.
+- Aturan baru R17 di `pm/OPERATING_RULES.md`: bila user minta adopsi dari sumber
+  eksternal, PM wajib fetch + cite + align + verify (grep) sebelum klaim selesai.
+- Tindakan lanjut (belum dijalankan): selaraskan bagian fitur adopsi di PRD ke
+  fitur asli 9router; pertahankan fitur khas aigate (terminal xterm, self-heal)
+  sebagai tambahan.
+
+## PRD alignment ke 9router — SELESAI 2026-09-03 (retroaktif, user: cek dulu sblm generate)
+- Penyebab: PRD awal dibuat tanpa rujuk 9router (R17). Diperbaiki dgn cek sumber
+  resmi (CLAUDE.md + README + docs/ 9router) lalu selaraskan.
+- Perubahan (konfirmasi satu per satu, user setuju): #1 2.1 Providers (multi-akun
+  + OAuth + refresh), #2 2.2 Proxy Pools (tetap, khas aigate, opsional), #3 2.3
+  Combos (3-tier + cadangan akun + sadar kuota), #4 2.4 Endpoints (+penerjemah
+  format), #5 2.6 CLI Tools (inti adopsi + gaya aigate), #6 2.4.1 Token Savers
+  (RTK/caveman/ponytail), #7 2.4.2 Pelacak Kuota, #8 2.4.3 Log+Analitik, #9 2.4.4
+  Export/Import lokal (ganti cloud sync, request user).
+- #10 sitasi ekstra: user skip (gak usah tag tambahan).
+- Deviasi dari 9router: cloud sync → export/import lokal; proxy pools murni aigate;
+  terminal xterm + self-heal + auto-install CLI = tambahan aigate.
+- Verify: grep '9router' di PRD.md = 10 match (rujukan ada).
+
+## Command baru: update-backlog 2026-09-03
+- User hindari restart + instruksi panjang. Gua bikin command reusable
+  `.opencode/commands/update-backlog.md` (sync backlog dari PRD; temukan fitur
+  PRD yg belum ada task, tambah sbg Fase baru). Lalu gua jalanin sekarang.
+- Hasil: Fase 5 (B5.1-B5.7) ditambah ke BACKLOG.md utk fitur adopsi 9router yg
+  belum diimplementasi (multi-akun+OAuth, combos 3-tier, format translation,
+  token savers, kuota, log+analitik, export/import lokal).
+- Cara pakai lain hari: `/update-backlog` (atau `/update-backlog <doc> <backlog>`).
+- Setelah restart opencode: `/run-impl continue` -> mulai B5.1 (PM tanya
+  paralel/sekuensial dulu, R16).
+
+## revise-docs 2026-09-03 (selaras PRD ter-align 9router)
+- Diperlukan karena PRD diubah banyak (fitur adopsi 9router baru) tapi doc
+  turunan masih scope lama -> tidak konsisten.
+- UPDATE: BRD, FSD, ERD, TSD, api/OPENAI_COMPATIBLE_CONTRACT, qa/TEST_PLAN.
+- SKIP: PRD (sumber), CLI_CONFIG_SCHEMA, dev/SETUP, ux/TERMINAL_UX, plan/BACKLOG
+  (sudah di-update via update-backlog).
+- Penambahan inti: multi-akun + OAuth refresh (ProviderAccount), 3-tier combo +
+  sadar kuota + cadangan akun, format translation engine (ADR-012), token saver
+  hooks (RTK/Caveman/Ponytail, fail-open) + OAuth auto-refresh (ADR-013),
+  kuota/usage tracking (UsageRecord), request log (RequestLog), export/import
+  setting lokal.
+- Traceability PRD->BRD->FSD/ERD->TSD dijaga (US-2.1.4 s.d US-2.4.8).
+- Laporan: .opencode/reports/20260903/revise/2127_revise_docs_9router.md
+- Catatan: sebagian referensi path di doc masih `docs/` (sisa cleanup R5).

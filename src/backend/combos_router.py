@@ -24,8 +24,12 @@ from backend.models import Combo, ComboMember
 
 LOG_SOURCE = "backend.combos.router"
 
-# Allowed combo strategies (FSD.md 2.3).
-ALLOWED_STRATEGIES = frozenset({"fallback", "load_balance", "latency_cost"})
+# Allowed combo strategies (FSD.md 2.3). ``three_tier`` adds the 3-tier
+# fallback ordering (subscription -> cheap -> free) on top of sequential
+# fallback semantics (B5.2).
+ALLOWED_STRATEGIES = frozenset(
+    {"fallback", "load_balance", "latency_cost", "three_tier"}
+)
 
 router = APIRouter()
 

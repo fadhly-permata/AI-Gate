@@ -66,7 +66,23 @@ ini untuk delegasikan ke sub-agent (be-dev / fe-dev / qa) secara rapi.
 - [x] **B4.2** i18n EN/ID lengkap + dark/light + responsif & simulasi perangkat
        (phone non-AdminLTE) (`FSD` §2.5, §2.7) — `fe-dev` — Dep: B0.1
 - [x] **B4.3** QA: eksekusi `qa/TEST_PLAN.md` (pytest + vitest + playwright) —
-      `qa` — Dep: semua Fase 1–3
+       `qa` — Dep: semua Fase 1–3
+
+## Fase 5 — Adopsi 9router (fitur baru dari PRD ter-align)
+- [x] **B5.1** Multi-akun per provider + login OAuth + token diperbarui otomatis
+       (PRD §2.1, adopsi 9router) — `be-dev` + `fe-dev` — Dep: B2.2
+- [x] **B5.2** Combos fallback 3 tingkat (langganan→murah→gratis) + cadangan antar-akun
+       + routing sadar kuota (PRD §2.3, adopsi 9router) — `be-dev` — Dep: B2.4, B5.1, B5.5
+- [x] **B5.3** Engine penerjemah format (OpenAI↔Claude↔Gemini↔Cursor↔Kiro↔Vertex↔
+       Antigravity↔Ollama) (PRD §2.4, adopsi 9router) — `be-dev` — Dep: B2.1
+- [ ] **B5.4** Penghemat Token: RTK (padatkan tool_result), mode Caveman, Ponytail —
+       toggle per endpoint (PRD §2.4.1, adopsi 9router) — `be-dev` — Dep: B2.1
+- [ ] **B5.5** Pelacak Kuota & Pemakaian real-time + estimasi biaya (PRD §2.4.2,
+       adopsi 9router) — `be-dev` + `fe-dev` — Dep: B2.2
+- [ ] **B5.6** Log Permintaan (debug) + Dashboard Usage Analytics (PRD §2.4.3,
+       adopsi 9router) — `be-dev` + `fe-dev` — Dep: B1.2
+- [ ] **B5.7** Export/Import Setting lokal (file JSON) — pengganti cloud sync
+       (PRD §2.4.4, request user) — `be-dev` + `fe-dev` — Dep: B1.1
 
 ## Catatan
 - Urutan mempertimbangkan dependensi; jangan mulai Fase 2 sebelum B0.2 siap.

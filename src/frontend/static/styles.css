@@ -744,8 +744,42 @@ body[data-device="phone"] .modal { width: 100%; }
   height: calc(100vh - 43px);
 }
 
-/* ===== Log Window (B3.1) ===== */
-.logwindow { padding: 18px 22px; }
+/* ===== Log Window (B3.1) — GLOBAL, fixed bottom-docked, collapsible ===== */
+.logwindow {
+  position: fixed;
+  left: var(--sidebar-w);
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  padding: 10px 22px 14px;
+  background: var(--panel);
+  border-top: 1px solid var(--panel-border);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.08);
+  margin: 0;
+}
+
+/* Collapsed sidebar shifts the docked panel in. */
+body.sidebar-collapsed .logwindow { left: var(--sidebar-w-collapsed); }
+
+/* Phone simulation / real narrow viewport: sit above the bottom nav (56px). */
+@media (max-width: 600px) {
+  body .logwindow,
+  body[data-device="phone"] .logwindow {
+    left: 0;
+    bottom: 56px;
+  }
+}
+
+/* Collapsed: hide the body, keep the header. */
+.logwindow-collapsed .logwindow-body { display: none; }
+
+.logwindow-body {
+  max-height: 240px;
+  overflow: auto;
+  margin-top: 10px;
+}
+
+.muted { color: var(--muted); }
 
 .logwindow-head {
   display: flex;
