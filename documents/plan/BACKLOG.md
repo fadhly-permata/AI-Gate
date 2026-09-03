@@ -77,7 +77,7 @@ ini untuk delegasikan ke sub-agent (be-dev / fe-dev / qa) secara rapi.
        Antigravity↔Ollama) (PRD §2.4, adopsi 9router) — `be-dev` — Dep: B2.1
 - [ ] **B5.4** Penghemat Token: RTK (padatkan tool_result), mode Caveman, Ponytail —
        toggle per endpoint (PRD §2.4.1, adopsi 9router) — `be-dev` — Dep: B2.1
-- [ ] **B5.5** Pelacak Kuota & Pemakaian real-time + estimasi biaya (PRD §2.4.2,
+- [x] **B5.5** Pelacak Kuota & Pemakaian real-time + estimasi biaya (PRD §2.4.2,
        adopsi 9router) — `be-dev` + `fe-dev` — Dep: B2.2
 - [ ] **B5.6** Log Permintaan (debug) + Dashboard Usage Analytics (PRD §2.4.3,
        adopsi 9router) — `be-dev` + `fe-dev` — Dep: B1.2

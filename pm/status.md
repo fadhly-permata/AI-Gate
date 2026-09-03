@@ -443,6 +443,24 @@
 - Catatan utk diri sendiri (PM): JANGAN klaim hasil sub-agent tanpa receipt/verifikasi
   nyata. Selalu `pytest`/`vitest` sendiri sebelum tandai [x] atau tulis angka.
 
+## Run-impl session 2026-09-03 (continue) — RECOVERY + B5.5 SELESAI + B5.6 START
+- **RECOVERY (R19 pertama dipakai)**: force-close ternyata nyimpen kerjaan ke
+  `git stash@{0}`. be-dev restore 4 file ke-revert (models.py, config/db.py,
+  gateway/router.py, endpoints_router.py) via `git checkout stash@{0} -- ...` +
+  benerin 2 bug (body `_strip_binding_prefix`, `except: pass` di `_lookup_endpoint`).
+  Commit `4c15adf`. Suite hijau lagi.
+- **B5.5 be-dev**: `UsageRecord` + `Provider.quota_limit/quota_window` + migrasi;
+  `usage.py` (record/summarize/quota_status/estimate_cost); `/api/usage` +
+  `/api/usage/summary` + `/api/quota`; gateway catat usage per request (fail-open);
+  `quota_aware_order` DIIMPLEMENTASI (nutup TODO B5.2). Verifikasi PM: pytest
+  **198 passed, 1 skipped**. Commit `3698e9a`.
+- **B5.5 fe-dev**: view Usage & Quota (nav+section), tabel kuota (progress bar +
+  countdown live), summary (totals/by_provider/by_model) + recent usage, subsection
+  usage di provDetail; i18n EN/ID; leftover spawn ke-cancel diselaraskan ke shape
+  asli. Verifikasi PM: vitest **120 passed (13 file)**. Commit `a606513`.
+- BACKLOG B5.5 `[x]`. **B5.6 aktif** (be-dev+fe-dev, sekuensial): Log Permintaan
+  (RequestLog) + Dashboard Usage Analytics (PRD §2.4.3). be-dev dulu.
+
 ## Run-impl session 2026-09-03 (continue) — SELESAI / NO-OP
 - Arg = `continue`. Prosedur: cari task pertama belum `[x]` di BACKLOG.md.
   HASIL: SELURUH task (B0.1 → B4.3) SUDAH `[x]`. Tidak ada task pending yg bisa
