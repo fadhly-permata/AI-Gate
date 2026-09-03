@@ -383,6 +383,19 @@ body.sidebar-collapsed .nav-item {
   color: var(--muted);
 }
 
+/* ===== Backup & Restore (B5.7) ===== */
+.backup-card { margin-top: 18px; }
+.backup-card .form-row { flex-wrap: wrap; }
+/* File inputs ignore the fixed .form-input width; let them size naturally. */
+input.form-input[type="file"] {
+  width: auto;
+  max-width: 100%;
+  padding: 6px;
+  border: 1px dashed var(--panel-border);
+  background: var(--bg);
+}
+a.btn { text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+
 /* Tablet: keep the AdminLTE-like layout, just tighten spacing/widths. */
 @media (max-width: 960px) {
   :root { --sidebar-w: 200px; }

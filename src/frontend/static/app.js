@@ -210,6 +210,145 @@
   window.aigate = window.aigate || {};
   window.aigate.buildSettingsBody = buildSettingsBody;
 
+  /* ===== Backup & Restore (B5.7, PRD §2.4.4) ===== */
+  /* Export/import the whole local config as one JSON file (no cloud). The export
+     file carries secrets in plaintext by design (R11 / ADR-007). Errors are
+     surfaced in the status line + console (ADR-011). */
+  var EXPORT_URL = "/api/settings/export";
+  var IMPORT_API = "/api/settings/import";
+
+  function backupMsgEl() { return document.getElementById("backupMsg"); }
+
+  function setBackupMsg(text, kind) {
+    var m = backupMsgEl();
+    if (!m) return;
+    m.textContent = text || "";
+    m.className = "settings-msg" + (kind ? " settings-msg-" + kind : "");
+    if (kind === "error") {
+      try { console.error("[backup] " + (text || "")); } catch (e) { /* no console */ }
+    }
+  }
+
+  // Read the mode selector; anything but an explicit "merge" is "replace".
+  function currentImportMode() {
+    var sel = document.getElementById("importMode");
+    var v = sel ? String(sel.value || "").toLowerCase() : "";
+    return v === "merge" ? "merge" : "replace";
+  }
+
+  // Trigger the file download. The server sets the filename via
+  // Content-Disposition, so the download attribute is left empty.
+  function exportSettings() {
+    var a = document.createElement("a");
+    a.setAttribute("href", EXPORT_URL);
+    a.setAttribute("download", "");
+    a.rel = "noopener";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setBackupMsg(getStr("settings.export.ok"), "ok");
+    return EXPORT_URL;
+  }
+
+  // FileReader -> text, as a promise.
+  function readFileText(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(reader.result); };
+      reader.onerror = function () {
+        reject(reader.error || new Error("read_error"));
+      };
+      reader.readAsText(file);
+    });
+  }
+
+  // Pure-ish: format the per-table imported counts into a status string.
+  function renderImportResult(result) {
+    if (!result || result.ok !== true || !result.imported) {
+      return getStr("settings.import.error");
+    }
+    var imported = result.imported;
+    var parts = [];
+    Object.keys(imported).forEach(function (k) {
+      var n = imported[k];
+      if (n == null) return;
+      parts.push(k + ": " + n);
+    });
+    var base = getStr("settings.import.done");
+    return parts.length ? (base + " " + parts.join(", ")) : base;
+  }
+
+  // After a successful import, refresh the views so the restored config shows.
+  function reloadAfterImport() {
+    try { loadSettings(); } catch (e) { /* ignore */ }
+    try { loadProviders(); } catch (e) { /* ignore */ }
+    ["combos", "proxies", "endpoints", "usage", "analytics"].forEach(function (m) {
+      try {
+        if (window.aigate && window.aigate[m] &&
+            typeof window.aigate[m].onShow === "function") {
+          window.aigate[m].onShow();
+        }
+      } catch (e) { /* module not loaded — ignore */ }
+    });
+  }
+
+  // Read + parse + confirm + POST. Returns a promise resolving to the outcome.
+  // The confirm + fetch live here so tests can drive them directly.
+  function importSettingsFromFile(fileObj) {
+    var mode = currentImportMode();
+    return readFileText(fileObj).then(function (text) {
+      var doc;
+      try {
+        doc = JSON.parse(text);
+      } catch (e) {
+        setBackupMsg(getStr("settings.import.invalid"), "error");
+        return { ok: false, error: "invalid_json" };
+      }
+      var confirmKey = mode === "merge"
+        ? "settings.import.confirm.merge" : "settings.import.confirm";
+      if (!window.confirm(getStr(confirmKey))) {
+        setBackupMsg(getStr("settings.import.cancelled"), "");
+        return { ok: false, cancelled: true };
+      }
+      var url = IMPORT_API + "?mode=" + encodeURIComponent(mode);
+      return fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify(doc)
+      }).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (res) {
+          res = res || {};
+          if (r.ok && res.ok === true) {
+            setBackupMsg(renderImportResult(res), "ok");
+            reloadAfterImport();
+            return res;
+          }
+          if (r.status === 400) {
+            setBackupMsg(getStr("settings.import.invalid"), "error");
+            return { ok: false, error: res.error || "invalid_format" };
+          }
+          var reason = res.error ? String(res.error) : ("HTTP " + r.status);
+          setBackupMsg(getStr("settings.import.error") + " " + reason, "error");
+          return { ok: false, error: reason, status: r.status };
+        });
+      }).catch(function (err) {
+        setBackupMsg(getStr("settings.import.error") + " " + err.message, "error");
+        return { ok: false, error: err.message };
+      });
+    }, function (err) {
+      var reason = (err && err.message) ? err.message : "read_error";
+      setBackupMsg(getStr("settings.import.error") + " " + reason, "error");
+      return { ok: false, error: reason };
+    });
+  }
+
+  window.aigate.exportSettings = exportSettings;
+  window.aigate.importSettingsFromFile = importSettingsFromFile;
+  window.aigate.renderImportResult = renderImportResult;
+  window.aigate.setBackupMsg = setBackupMsg;
+  window.aigate.currentImportMode = currentImportMode;
+
   /* ===== Providers management (B2.2) ===== */
   var PROV_API = "/api/providers";
   var selectedProviderId = null;
@@ -1088,6 +1227,30 @@
     // --- Settings form ---
     var form = document.getElementById("settingsForm");
     if (form) form.addEventListener("submit", saveSettings);
+
+    // --- Backup & Restore (B5.7) ---
+    // Export: intercept the anchor so we surface the "Export started" status and
+    // drive the download through exportSettings() (single, controlled trigger).
+    var exportBtn = document.getElementById("exportBtn");
+    if (exportBtn) {
+      exportBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        exportSettings();
+      });
+    }
+    // Import: read the chosen file, then run the confirm + POST flow.
+    var importBtn = document.getElementById("importBtn");
+    if (importBtn) {
+      importBtn.addEventListener("click", function () {
+        var input = document.getElementById("importFile");
+        var file = input && input.files && input.files[0];
+        if (!file) {
+          setBackupMsg(getStr("settings.import.no_file"), "error");
+          return;
+        }
+        importSettingsFromFile(file);
+      });
+    }
 
     // --- Providers (B2.2) ---
     var provAdd = document.getElementById("provAddBtn");

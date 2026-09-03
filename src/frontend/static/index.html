@@ -157,6 +157,45 @@
             <p class="settings-msg" id="settingsMsg" role="status" aria-live="polite"></p>
           </form>
         </div>
+
+        <!-- Backup & Restore (B5.7, PRD §2.4.4): export/import all settings as a
+             local JSON file. Export = plain download link (server sets the
+             filename via Content-Disposition). Import = pick a file, confirm the
+             destructive replace, then POST. Plaintext secrets are intended (R11). -->
+        <div class="card settings-card backup-card">
+          <h2 class="settings-title" data-i18n="settings.backup.title">Backup &amp; Restore (local)</h2>
+          <p class="settings-dev-note" data-i18n="settings.backup.note">
+            Export all settings to one JSON file, or restore from a file. Stored locally — no cloud.
+          </p>
+
+          <div class="form-row">
+            <span class="form-label" data-i18n="settings.export">Export settings</span>
+            <a class="btn btn-primary" id="exportBtn" href="/api/settings/export"
+               role="button"><i class="fa fa-download"></i>
+              <span data-i18n="settings.export">Export settings</span></a>
+          </div>
+
+          <div class="form-row">
+            <label class="form-label" for="importMode" data-i18n="settings.import.mode">Mode</label>
+            <select class="form-input" id="importMode">
+              <option value="replace" data-i18n="settings.import.mode.replace">Replace (overwrite all)</option>
+              <option value="merge" data-i18n="settings.import.mode.merge">Merge</option>
+            </select>
+          </div>
+
+          <div class="form-row">
+            <label class="form-label" for="importFile" data-i18n="settings.import.choose">Choose file</label>
+            <input class="form-input" type="file" id="importFile" accept="application/json" />
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn btn-primary" id="importBtn">
+              <i class="fa fa-upload"></i> <span data-i18n="settings.import">Import settings</span>
+            </button>
+          </div>
+
+          <p class="settings-msg" id="backupMsg" role="status" aria-live="polite"></p>
+        </div>
       </section>
 
       <!-- Providers view (B2.2) -->

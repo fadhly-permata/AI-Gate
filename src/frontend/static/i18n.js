@@ -246,7 +246,23 @@ window.I18N = {
     "reqlog.refresh": "Refresh",
     "reqlog.truncated": "payload truncated",
     "reqlog.enabled_ok": "Request logging enabled.",
-    "reqlog.disabled_ok": "Request logging disabled."
+    "reqlog.disabled_ok": "Request logging disabled.",
+    "settings.backup.title": "Backup & Restore (local)",
+    "settings.backup.note": "Export all settings to one JSON file, or restore from a file. Stored locally — no cloud.",
+    "settings.export": "Export settings",
+    "settings.export.ok": "Export started.",
+    "settings.import": "Import settings",
+    "settings.import.choose": "Choose file",
+    "settings.import.mode": "Mode",
+    "settings.import.mode.replace": "Replace (overwrite all)",
+    "settings.import.mode.merge": "Merge",
+    "settings.import.confirm": "Importing in Replace mode erases ALL current settings before restoring. Continue?",
+    "settings.import.confirm.merge": "Import will merge the file into your current settings (existing items kept). Continue?",
+    "settings.import.done": "Import complete:",
+    "settings.import.invalid": "Invalid file: not a valid aigate settings JSON.",
+    "settings.import.error": "Import failed:",
+    "settings.import.cancelled": "Import cancelled.",
+    "settings.import.no_file": "Choose a settings file first."
   },
   id: {
     "app.title": "aigate",
@@ -492,7 +508,23 @@ window.I18N = {
     "reqlog.refresh": "Segarkan",
     "reqlog.truncated": "muatan terpotong",
     "reqlog.enabled_ok": "Log permintaan diaktifkan.",
-    "reqlog.disabled_ok": "Log permintaan dinonaktifkan."
+    "reqlog.disabled_ok": "Log permintaan dinonaktifkan.",
+    "settings.backup.title": "Cadangkan & Pulihkan (lokal)",
+    "settings.backup.note": "Ekspor semua pengaturan ke satu file JSON, atau pulihkan dari file. Disimpan lokal — tanpa cloud.",
+    "settings.export": "Ekspor pengaturan",
+    "settings.export.ok": "Ekspor dimulai.",
+    "settings.import": "Impor pengaturan",
+    "settings.import.choose": "Pilih file",
+    "settings.import.mode": "Mode",
+    "settings.import.mode.replace": "Ganti (timpa semua)",
+    "settings.import.mode.merge": "Gabung",
+    "settings.import.confirm": "Impor mode Ganti akan menghapus SEMUA pengaturan saat ini sebelum memulihkan. Lanjutkan?",
+    "settings.import.confirm.merge": "Impor akan menggabungkan file ke pengaturan saat ini (item yang ada dipertahankan). Lanjutkan?",
+    "settings.import.done": "Impor selesai:",
+    "settings.import.invalid": "File tidak valid: bukan JSON pengaturan aigate yang benar.",
+    "settings.import.error": "Impor gagal:",
+    "settings.import.cancelled": "Impor dibatalkan.",
+    "settings.import.no_file": "Pilih file pengaturan terlebih dahulu."
   }
 };
 
