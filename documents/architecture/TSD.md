@@ -100,6 +100,10 @@ Arsitektur dibagi menjadi 7 modul berlapis. Komunikasi antar modul mengikuti kon
 ### ADR-002 — Gateway Stack
 - **Status:** Accepted.
 - FastAPI + Uvicorn (ASGI) + httpx async client. Streaming respons (`StreamingResponse`/SSE) untuk `/v1/chat/completions`. Lihat §4.
+- **Catatan portabilitas (2026-09-03):** FastAPI di-pin `<0.100` + Pydantic `<2`
+  (Pydantic v1, **pure Python, tanpa pydantic-core/Rust**) agar aigate jalan di
+  Termux & platform yang tak punya wheel Rust. Semua dep inti (uvicorn, starlette,
+  sqlalchemy, httpx, ptyprocess) juga pure Python → nol dependensi compile.
 
 ### ADR-003 — PTY Bridge Stack
 - **Status:** Accepted.
@@ -198,6 +202,38 @@ Arsitektur dibagi menjadi 7 modul berlapis. Komunikasi antar modul mengikuti kon
 
 ---
 
+### 3.4 Web Admin Console UI Shell (Frontend, tanpa framework/build)
+
+Konsol manajemen + Terminal disajikan sebagai **SPA vanilla** (ADR-001): HTML/CSS/JS tanpa framework JS dan tanpa build step (Node). Tata letak meniru **AdminLTE** (sidebar kiri + area kerja kanan) menggunakan **vanilla CSS** (tidak memakai Bootstrap/AdminLTE bundle agar tetap no-build).
+
+- **Layout:** Grid dua kolom — `aside.sidebar` (navigasi) + `main.workspace` (konten + Terminal pane). Header memuat pengalih tema & bahasa.
+- **Collapsible Sidebar (ikon-only saat collapse):** Root `<html>`/`body` membawa class `sidebar-collapsed`. CSS: saat collapsed, `.nav-label` `display:none`, `.nav-icon` tetap tampil (lebar sidebar menyusut ke ukuran ikon). Toggle via JS → simpan state di `localStorage['aigate.sidebar']`.
+- **Theme (dark/light):** Tema diimplementasikan dengan **CSS custom properties** di `<html data-theme="dark|light">` (`--bg`, `--fg`, `--panel`, `--accent`, dst). Toggle men-set atribut + simpan `localStorage['aigate.theme']`. Berlaku global termasuk Terminal pane (xterm theme disesuaikan via `term.setOption('theme', …)` saat tema berubah).
+- **i18n (EN/ID):** Kamus terjemahan sisi klien `i18n = { en: {...}, id: {...} }` (ekstensible). Node dengan atribut `data-i18n="key"` diganti teksnya oleh `applyLocale(locale)`. Pengalih bahasa set `localStorage['aigate.locale']` + panggil `applyLocale`. Bahasa awal: `en`, `id`.
+- **Ikon:** Font Awesome via CDN (`<link>` tanpa build) atau SVG inline; collapsed sidebar menampilkan ikon saja (tanpa teks).
+- **Persistensi:** Semua preferensi UI (sidebar, theme, locale) di `localStorage` — **tidak ada entitas DB baru** (ERD tidak berubah). Tidak ada round-trip ke backend untuk ganti tema/bahasa.
+
+> **Catatan desain:** AdminLTE *ditiru secara visual* dengan vanilla CSS (bukan mengimpor paket Bootstrap/AdminLTE) agar tetap memenuhi ADR-001 (no framework/build). Jika kelak butuh komponen kaya, dapat dipertimbangkan webview native tanpa mengubah kontrak (lihat §7).
+
+### 3.5 Logging, Run Modes, Self-Heal & Config-in-DB
+
+**Run / Launch:** native (`uvicorn backend.server:app`). Port via arg `--port` (default dari `Setting` DB atau 8080); mode developer via env `AIGATE_DEV=1`. Lihat SETUP.md.
+
+**Mandatory Logging (ADR-011):** SELURUH method (frontend & backend) wajib log level info/warning/error. Level warning & error **wajib menyertakan stacktrace / inner exception**. Logger backend menulis ke tabel `LogEntry` (SQLAlchemy handler). Frontend: log client di-forward ke backend (`POST /api/logs`) lalu disimpan. **Dilarang try/catch kosong** — semua exception ditangani & di-log. Aturan ini = code-review gate (CI/git hook dapat menolak `except: pass`).
+
+**Log Window (dev mode):** Panel di UI mode developer membaca `GET /api/logs` (filter `?severity=warning,error`), auto-refresh.
+
+**Responsif + Simulasi Perangkat:** UI responsif (CSS media/container queries). Di mode developer, tombol simulasi phone/tablet/desktop men-set class `.device-phone/.device-tablet/.device-desktop` pada root. **Di breakpoint phone, layout menyimpang dari AdminLTE** (nav bawah / hamburger) demi mobile.
+
+**Self-Heal (menu CLI-Tool):** lihat FSD §2.8. Backend helper `selfheal.run()`: (1) cek agentic CLI terinstall (`which` di Grup A); bila nihil → signal popup "Self-Heal tidak bisa jalan: tidak ada agentic CLI terinstall"; (2) `git init` bila belum ada repo, buat branch `aigate/self-heal-<ts>`; (3) query `LogEntry` severity warning|error; (4) buka tab terminal & jalankan agentic CLI dengan prompt fix berbasis log; (5) loop fix→test sampai tak ada warning/error (atau max iterasi).    LogWindow memantau progress. Setelah suatu issue selesai dikerjakan, baris
+   `LogEntry` terkait **dihapus** agar tidak di-fix ulang. Setelah seluruh issue
+   terbukti pass, helper melakukan `git merge` branch self-heal ke `main`,
+   `git checkout main`, dan hapus branch fixing — run berikutnya pakai versi latest.
+
+**Config-in-DB (ADR-010):** SELURUH konfigurasi aplikasi (port default, mode, toggle fitur, preset CLI) di tabel `Setting` (key-value) di SQLite — **bukan file terpisah**. ADR-007 (secret) tetap: secret plaintext di DB (kolom `api_key` dkk), tanpa enkripsi. File `secrets.json` dari B0.3 bersifat legacy/opsional; sumber kebenaran utama = DB.
+
+---
+
 ## 4. Desain Gateway (OpenAI-Compatible)
 
 ### 4.1 Request Flow — `/v1/chat/completions`
@@ -240,16 +276,13 @@ Client (CLI Tool / UI / external)
 
 ## 5. Security
 
-### 5.1 Penyimpanan `api_key` & `internal_api_key` (Resolusi Open Question)
-**Open question (FSD/BRD US-2.1.2, US-2.4.3):** bagaimana key disimpan aman (encryption at rest, keystore)?
+### 5.1 Penyimpanan `api_key` & `internal_api_key` (Resolusi: ADR-007)
+**Keputusan (ADR-007, RESOLVED 2026-09-03):** aigate adalah aplikasi **lokal**; secret disimpan di **file biasa** (`.env` / config JSON / kolom SQLite) **TANPA enkripsi**, dan **UI tidak me-redaksi/masking** nilainya. Ini menggantikan usulan Fernet di draft sebelumnya.
 
-- **Encryption at rest:** Field `api_key_encrypted` (Provider), `internal_api_key_encrypted` (Endpoint), `password_encrypted` (ProxyNode) dienkripsi dengan **Fernet (AES-128-CBC + HMAC)** sebelum ditulis ke SQLite.
-- **Master key (keystore):**
-  - Prioritas 1: ambil dari **OS credential store** via `keyring` (macOS Keychain / Windows Credential Manager / Linux Secret Service).
-  - Prioritas 2 (fallback): *master key* diturunkan dari *device secret* — file `master.key` dibuat sekali dengan permission `0600` di *user data dir* (`appdirs.user_data_dir("aigate")`), atau diturunkan via PBKDF2 dari passphrase pengguna (opsi "password vault" di roadmap).
-  - Kunci tidak pernah disimpan plaintext di memori lebih lama dari perlu; dekripsi lazim (lazy) saat provider dipakai.
+- **Penyimpanan:** `api_key` (Provider), `internal_api_key` (Endpoint), `password` proxy (ProxyNode) ditulis apa adanya ke storage lokal (SQLite / `.env`). Tidak ada field `*_encrypted` yang dienkripsi.
 - **Internal API key:** di-generate `secrets.token_urlsafe(32)` saat endpoint dibuat; tidak pernah ditulis ke shell history (di-inject via env PTY, lihat §3.2 & §6).
 - **Clipboard paste** tidak mengekspos key ke disk.
+- *Catatan:* Enkripsi at-rest ditunda ke roadmap bila ada kebutuhan multi-user/remote; untuk aplikasi lokal saat ini tidak diperlukan (selaras PRD §5 NFR & BACKLOG B0.3).
 
 ### 5.2 ProxyPool ↔ Provider Routing Binding
 Lihat §4.4. Binding dilakukan lewat `Endpoint.proxy_pool_id` (FK opsional). Selected node diteruskan ke httpx via `proxies=` (http/https/socks5). Tidak ada key proxy yang mengalir ke provider; kredensial proxy hanya dipakai pada hop keluar.
@@ -296,8 +329,10 @@ Desain dibuat *contract-first* agar item roadmap (PRD §6) menempel tanpa refact
 | ADR-004 | Config = SQLAlchemy + SQLite | Accepted |
 | ADR-009 | Native Python execution, no deployment & no packaging required | Accepted (2026-09-03) |
 | ADR-006 | Swipe per-app exception = `SwipeException` registry + `tui_mode` per tab | Proposed→Accepted (TSD) |
-| ADR-007 | Secret at rest = Fernet + master key via OS keyring / device keyfile | Proposed |
-| ADR-008 | ProxyPool binding = FK `proxy_pool_id` di Endpoint (+ override Combo) | Proposed |
+| ADR-007 | Secret at rest = plaintext di SQLite DB (tanpa enkripsi), UI tanpa redaksi | Accepted (2026-09-03) |
+| ADR-008 | ProxyPool binding = FK `proxy_pool_id` di Endpoint (+ override Combo) | Accepted (2026-09-03) |
+| ADR-010 | Config storage = SQLite (`Setting` table), tanpa file config terpisah | Accepted (2026-09-03) |
+| ADR-011 | Mandatory logging ke DB (severity + stacktrace pd warn/err), no empty catch | Accepted (2026-09-03) |
 
 ---
 

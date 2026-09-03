@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>aigate</title>
+  <!-- Font Awesome via CDN (no build step, ADR-001) -->
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="layout">
+    <!-- ===== Header bar ===== -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button id="sidebarToggle" class="icon-btn" type="button"
+                aria-label="Toggle sidebar" data-i18n-aria="btn.menu" title="Menu">
+          <i class="fa fa-bars"></i>
+        </button>
+        <span class="app-title" data-i18n="app.title">aigate</span>
+        <span class="app-subtitle" data-i18n="app.subtitle">AI Proxy Gateway</span>
+      </div>
+
+      <div class="topbar-right">
+        <!-- Theme toggle -->
+        <button id="themeToggle" class="icon-btn" type="button"
+                aria-label="Toggle theme" title="Theme">
+          <i class="fa fa-moon"></i>
+        </button>
+
+        <!-- Language switcher -->
+        <div class="lang-switch" role="group" aria-label="Language">
+          <button class="lang-btn" type="button" data-lang="en">EN</button>
+          <span class="lang-sep">|</span>
+          <button class="lang-btn" type="button" data-lang="id">ID</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- ===== Sidebar ===== -->
+    <aside class="sidebar">
+      <nav class="nav">
+        <a class="nav-item" href="#" data-i18n-href="#providers">
+          <i class="nav-icon fa fa-server"></i>
+          <span class="nav-label" data-i18n="nav.providers">Providers</span>
+        </a>
+        <a class="nav-item" href="#" data-i18n-href="#combos">
+          <i class="nav-icon fa fa-layer-group"></i>
+          <span class="nav-label" data-i18n="nav.combos">Combos</span>
+        </a>
+        <a class="nav-item" href="#" data-i18n-href="#proxies">
+          <i class="nav-icon fa fa-network-wired"></i>
+          <span class="nav-label" data-i18n="nav.proxies">Proxy Pools</span>
+        </a>
+        <a class="nav-item" href="#" data-i18n-href="#endpoints">
+          <i class="nav-icon fa fa-plug"></i>
+          <span class="nav-label" data-i18n="nav.endpoints">Endpoints</span>
+        </a>
+        <a class="nav-item" href="#" data-i18n-href="#terminal">
+          <i class="nav-icon fa fa-terminal"></i>
+          <span class="nav-label" data-i18n="nav.terminal">Terminal</span>
+        </a>
+        <a class="nav-item" href="#" data-i18n-href="#cli">
+          <i class="nav-icon fa fa-screwdriver-wrench"></i>
+          <span class="nav-label" data-i18n="nav.cli">CLI Tools</span>
+        </a>
+      </nav>
+    </aside>
+
+    <!-- ===== Workspace (terminal mounts later) ===== -->
+    <main class="workspace">
+      <div class="card welcome-card">
+        <h1 class="welcome-title" data-i18n="ws.welcome">Welcome to aigate</h1>
+        <p class="welcome-text" data-i18n="ws.placeholder">
+          The management console and terminal will appear here.
+        </p>
+      </div>
+    </main>
+  </div>
+
+  <!-- Client-side i18n dictionary (must load before app.js) -->
+  <script src="i18n.js" defer></script>
+  <!-- App bootstrap (defer preserves order) -->
+  <script src="app.js" defer></script>
+</body>
+</html>

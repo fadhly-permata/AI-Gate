@@ -1,7 +1,9 @@
 # CLI Tool Presets & Plugin — Config Schema
 
-Skema config untuk grouping tool CLI (PRD §2.6.1, FSD §2.6.1, UX §3). Disimpan
-sebagai YAML atau JSON, bisa diperluas via plugin (Roadmap §6).
+Skema config untuk grouping tool CLI (PRD §2.6.1, FSD §2.6.1, UX §3). Runtime
+config (grup & tool preset) disimpan di **DB** (tabel `CLIToolGroup` / `CLITool` per
+ERD) — lihat ADR-010 (config di DB, bukan file). File YAML/JSON di bawah hanya
+berlaku sebagai **format seed/import** (Roadmap §6), bukan sumber kebenaran.
 
 ## Schema (YAML)
 ```yaml
@@ -69,5 +71,5 @@ groups:
 - Minimal 5 tool per grup.
 
 ## Plugin
-File tambahan bisa di-drop di folder `config/cli-plugins/` dan di-merge saat
-startup (nama grup bebas asal `id` unik).
+File tambahan (YAML/JSON) bisa di-drop di folder `config/cli-plugins/` dan di-merge
+ke tabel DB (`CLIToolGroup`/`CLITool`) saat startup (nama grup bebas asal `id` unik).

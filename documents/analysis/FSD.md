@@ -43,26 +43,26 @@ Entitas penyimpanan (data model) dijelaskan terpisah di `ERD.md`.
 ### 2.1 Providers Management
 
 **Deskripsi fungsional**
-Fitur pengelolaan AI Provider: menambah, mengedit, melihat daftar, dan menghapus provider AI (OpenAI, Anthropic, OpenRouter, Ollama, LiteLLM, dsb.). Kredensial disimpan aman (masked + terenkripsi di storage). Daftar model diambil otomatis via endpoint `/models` bila provider mendukung.
+Fitur pengelolaan AI Provider: menambah, mengedit, melihat daftar, dan menghapus provider AI (OpenAI, Anthropic, OpenRouter, Ollama, LiteLLM, dsb.). Kredensial disimpan plaintext di DB tanpa enkripsi dan tanpa masking UI (ADR-007). Daftar model diambil otomatis via endpoint `/models` bila provider mendukung.
 
 **Input**
 - `name` (string) — nama provider.
 - `type` (enum) — kategori provider (openai-compatible, anthropic, ollama, dll.).
 - `base_url` (string) — URL dasar API.
-- `api_key` (secret string, masked) — kunci autentikasi.
+- `api_key` (secret string, plaintext per ADR-007) — kunci autentikasi.
 - `custom_headers[]` (key-value pairs) — header tambahan.
 - `enabled` (boolean) — status aktif.
 
 **Output**
 - Daftar provider (tabel/read-only view).
-- Detail provider (kredensial masked).
+- Detail provider (kredensial plaintext per ADR-007, tidak di-redaksi UI).
 - Daftar model ter-discover (`model_id`, `model_name`).
 - Konfirmasi CRUD (sukses/gagal + error).
 
 **Process flow**
 1. User buka panel Providers → klik "Tambah".
 2. Isi form (name, type, base_url, api_key, headers) → Simpan.
-3. Sistem validasi field → simpan ke tabel `Provider` (api_key terenkripsi).
+3. Sistem validasi field → simpan ke tabel `Provider` (api_key plaintext per ADR-007, tanpa enkripsi).
 4. Sistem panggil `GET {base_url}/models` (bila provider mendukung discovery).
 5. Hasil discovery disimpan ke `ProviderModel` / ditampilkan; bila gagal, user input manual.
 6. Edit/Hapus: konfirmasi hapus → cascade hapus relasi (ComboMember, EndpointBinding).
@@ -250,6 +250,101 @@ Tool CLI dikelompokkan minimal 3 grup (A/B/C), masing-masing ≥5 preset; Grup A
 
 ---
 
+### 2.7 Antarmuka Web / Admin Console UI
+
+**Deskripsi fungsional**
+Konsol manajemen (Providers, Combos, Proxy Pools, Endpoints, CLI Tools) dan Terminal disajikan dalam UI web lokal bergaya AdminLTE: sidebar kiri dapat di-collapse (saat collapse hanya menampilkan ikon), tombol pengalih tema gelap/terang, dan pengalih bahasa (EN/ID). Semua preferensi UI (collapse, tema, bahasa) disimpan di sisi klien (localStorage) — tidak mengubah data model (lihat ERD; tidak ada entitas baru).
+
+**Input**
+- Aksi toggle sidebar (expand/collapse).
+- Aksi pilih tema (`dark` / `light`).
+- Aksi pilih bahasa (`en` / `id`).
+
+**Output**
+- Layout sidebar berubah (label tersembunyi saat collapsed, ikon tetap tampil).
+- Seluruh UI (termasuk Terminal pane) mengikuti tema via CSS variables.
+- Seluruh string UI (menu, label, tombol) berganti ke bahasa terpilih via kamus i18n klien.
+- Preferensi tersimpan di localStorage dan dipulihkan saat reload.
+
+**Process flow (UI shell)**
+1. Saat load: baca `localStorage` (theme, locale, sidebar state) → terapkan ke `<html>` (atribut `data-theme`, `data-locale`, class `sidebar-collapsed`).
+2. Klik toggle sidebar → JS tambah/hapus class `sidebar-collapsed` → CSS sembunyikan teks, tampilkan ikon → simpan state ke localStorage.
+3. Klik pengalih tema → set `data-theme` + simpan localStorage.
+4. Klik pengalih bahasa → muat kamus `i18n[locale]` → ganti node ber-`data-i18n` → simpan localStorage.
+5. Tema & i18n bersifat global (mencakup Terminal pane); tidak ada round-trip ke backend.
+
+**Catatan implementasi (TSD §3.4):** Tanpa framework/build (ADR-001) — layout & gaya ditulis vanilla CSS meniru AdminLTE; ikon via Font Awesome CDN (atau SVG inline); tema via CSS custom properties.
+
+**Traceability**
+- US-2.7.1 (Collapsible Sidebar) — M
+- US-2.7.2 (Dark/Light Theme Switcher) — M
+- US-2.7.3 (Multi-Bahasa EN/ID) — M
+
+---
+
+### 2.8 Mode Developer, Logging & Self-Heal
+
+**Deskripsi fungsional**
+Mode developer (flag run / env `AIGATE_DEV=1`) menambah: (a) run di custom port;
+(b) UI responsif + simulasi perangkat (phone/tablet/desktop; phone TIDAK pakai
+AdminLTE); (c) Log Window membaca `LogEntry` dari DB; (d) aturan logging wajib
+(semua method log severity; warning/error + stacktrace; simpan ke DB; no empty
+catch); (e) Self-Heal dari menu CLI-Tool (git branch + agentic CLI + fix/test loop);
+(f) seluruh konfigurasi di DB (`Setting` table), bukan file.
+
+**Input**
+- Arg/env `--port`, env `AIGATE_DEV=1`.
+- Aksi UI: toggle simulasi perangkat, buka Log Window, klik Self-Heal.
+- Log dihasilkan otomatis tiap method (info/warning/error + stacktrace).
+
+**Output**
+- Server listen di port pilihan; mode developer mengaktifkan panel UI ekstra.
+- Log Window menampilkan `LogEntry` (filter severity) dari DB, auto-refresh.
+- Self-Heal: branch git baru, agentic CLI jalan di tab terminal, loop sampai log
+  warning/error habis (atau batas iterasi); bila tak ada agentic CLI → popup.
+
+**Process flow — Logging (wajib)**
+1. Tiap method panggil logger dengan level (info/warning/error).
+2. warning/error: sertakan `stacktrace` (traceback / inner exception).
+3. Handler logger tulis baris ke tabel `LogEntry` (timestamp, severity, source,
+   message, stacktrace). Frontend: log client di-forward ke backend lalu disimpan DB.
+4. Tidak ada try/catch kosong; semua exception ditangani & di-log.
+
+**Process flow — Self-Heal**
+1. Klik Self-Heal di menu CLI-Tool → cek agentic CLI terinstall (Grup A, `which`).
+2. Bila tidak ada → popup "Self-Heal tidak bisa jalan: tidak ada agentic CLI
+   terinstall"; STOP.
+3. Bila ada → pastikan git repo (`git init` bila belum), buat branch
+   `aigate/self-heal-<ts>`.
+4. Ambil `LogEntry` severity warning & error (ORDER BY timestamp).
+5. Buka tab terminal, jalankan agentic CLI dengan prompt perbaiki issue berdasar
+   log. Agent menjalankan fix & test.
+6. Loop: setelah test, cek ulang log warning/error; bila masih ada → ulangi (5);
+   bila kosong → "sembuh" (optional commit). Batas iterasi (mis. 10) cegah hang.
+6b. Setelah satu issue spesifik (warning/error tertentu) berhasil di-fix & test
+    hijau, **hapus baris `LogEntry` terkait** agar tidak di-fix ulang.
+7. Setelah **seluruh issue terbukti pass** (test hijau), helper `selfheal` lakukan
+   `git merge` branch `aigate/self-heal-*` ke `main`, `git checkout main`, lalu
+   **hapus branch fixing**. Run berikutnya memakai versi aigate terbaru (latest).
+
+**Process flow — Config di DB**
+1. Semua setting (port default, mode, toggle fitur, preset CLI) di tabel `Setting`
+   (key-value). Tidak ada file config terpisah sebagai sumber kebenaran.
+2. Baca/tulis via repository; seed bila tabel kosong.
+
+**Catatan (TSD §3.5):** Aturan logging + no-empty-catch = code-review gate (ADR-011).
+Secret tetap plaintext di DB (ADR-007).
+
+**Traceability**
+- US-2.8.1 (Custom Port & Dev Mode) — M
+- US-2.8.2 (Responsif + Simulasi Perangkat) — M
+- US-2.8.3 (Log Window) — M
+- US-2.8.4 (Mandatory Logging) — M
+- US-2.8.5 (Self-Heal) — M
+- US-2.8.6 (Konfigurasi di DB) — M
+
+---
+
 ## 3. Cross-Feature Data Flows
 
 ```
@@ -283,6 +378,8 @@ Routing keluar: `Endpoint → (Combo → ComboMember → Provider) | Provider` �
 | 2.4 Endpoints | US-2.4.1, US-2.4.2, US-2.4.3 | M,M,S |
 | 2.5 Terminal | US-2.5.1 s/d US-2.5.6 | M×4, S×2 |
 | 2.6 Launcher | US-2.6.1, US-2.6.2, US-2.6.3, US-2.6.4 | M×4 |
+| 2.7 Admin Console UI | US-2.7.1, US-2.7.2, US-2.7.3 | M×3 |
+| 2.8 Dev Mode, Logging & Self-Heal | US-2.8.1 s/d US-2.8.6 | M×6 |
 
 ---
 

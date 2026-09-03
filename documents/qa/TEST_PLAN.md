@@ -20,6 +20,15 @@ Peta acceptance criteria dari BRD ke test case. Merujuk BRD
 | US-2.5.3 | Paste + focus | teks masuk & fokus balik | e2e | green |
 | US-2.5.5 | Swipe->scroll | swipe cepat = scroll cepat, lambat = halus | e2e | green |
 | US-2.6.4 | Grouping A/B/C | tool terkelompok & ter-filter | e2e | green |
+| US-2.7.1 | Collapsible sidebar (ikon saat collapse) | toggle sidebar → label hilang, ikon tetap; state persist | e2e | green |
+| US-2.7.2 | Theme dark/light | toggle tema → seluruh UI + terminal ikut; persist | e2e | green |
+| US-2.7.3 | i18n EN/ID | ganti bahasa → semua string UI berubah; persist | e2e | green |
+| US-2.8.1 | Custom port & dev mode | server jalan di port arg; AIGATE_DEV=1 aktifkan fitur dev | integration | green |
+| US-2.8.2 | Responsif + simulasi perangkat | toggle device → viewport berubah; phone bukan AdminLTE | e2e | green |
+| US-2.8.3 | Log Window | panel tampil di dev mode; baca LogEntry + filter severity | e2e | green |
+| US-2.8.4 | Mandatory logging | seluruh method log; warn/err + stacktrace di DB; no empty catch | static/integration | green |
+| US-2.8.5 | Self-Heal | klik → branch + agentic CLI (atau popup bila none); loop fix/test; log terkait dihapus; bila pass → merge ke main + hapus branch | e2e | green |
+| US-2.8.6 | Config di DB | setting baca/tulis via DB; tak ada file config sbg sumber | integration | green |
 
 ## Quality gate (CI)
 - Semua unit test hijau.

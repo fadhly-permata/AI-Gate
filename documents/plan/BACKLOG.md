@@ -1,41 +1,74 @@
 # Implementation Backlog — aigate
 
 ## Tujuan
-Pecah fitur dari PRD / FSD / ERD / TSD menjadi task implementasi berurutan
-lengkap dengan penanggung jawab, dependensi, dan status. PM pakai ini untuk
-mendelegasikan ke sub-agent (be-dev / fe-dev / qa) secara rapi.
+Pecah fitur dari `@documents/` (PRD, FSD, ERD, TSD, API contract) menjadi task
+implementasi berurutan lengkap dengan owner, dependensi, dan status. PM pakai
+ini untuk delegasikan ke sub-agent (be-dev / fe-dev / qa) secara rapi.
 
 ## Konvensi
 - Status: `todo` | `in_progress` | `done`
   - Owner: `be-dev` | `fe-dev` | `qa` | `PM`
 - `Dep`: task yang harus selesai duluan.
-- Semua keputusan merujuk ADR di TSD: ADR-007 (secrets = file biasa, tanpa
-  enkripsi, tanpa redaksi UI) dan ADR-008 (proxy binding di level Endpoint,
-  Endpoint -> Combo).
+- **Aturan wajib (lihat `pm/OPERATING_RULES.md`):**
+  - R10 Stack: FastAPI `<0.100` + Pydantic **v1** (pure Python, no Rust).
+  - R11 Secret + config = **plaintext di DB** (tanpa enkripsi, tanpa masking UI).
+  - R12 Logging **wajib ke `LogEntry`** (severity+stacktrace); dilarang `except: pass`.
+  - R13 Frontend = **vanilla JS no-build** (AdminLTE-like); React/Vue/Expo dilarang.
+  - R9 Implementasi jalan tanpa konfirmasi; ambigu -> PM ambil default + catat.
+- Referensi ADR (TSD): ADR-001 vanilla JS, ADR-002 stack, ADR-003 PTY,
+  ADR-007 secret plaintext, ADR-008 proxy binding di Endpoint, ADR-010 config di
+  DB, ADR-011 logging wajib, ADR-012 pure-Python (Termux).
 
 ## Fase 0 — Fondasi
-- [ ] **B0.1** Inisialisasi project (FastAPI + UI: web UI lokal) — `be-dev` + `fe-dev` — Dep: -
-- [ ] **B0.2** Config engine SQLite (SQLAlchemy) + buat skema dari `documents/analysis/ERD.md` — `be-dev` — Dep: B0.1
-- [ ] **B0.3** Penyimpanan secrets di file biasa tanpa enkripsi (ADR-007) — `be-dev` — Dep: B0.2
+- [ ] **B0.1** Inisialisasi project (FastAPI + server + `/api/health` + UI shell
+      AdminLTE-like, collapsible sidebar, dark/light, i18n EN/ID) — `be-dev` + `fe-dev`
+- [ ] **B0.2** DB engine SQLite (SQLAlchemy) + 12 entity dari `analysis/ERD.md`
+      (`models.py`, `config/db.py`) — `be-dev`
+- [ ] **B0.3** Penyimpanan secrets plaintext tanpa enkripsi (ADR-007) — `be-dev`
 
-## Fase 1 — Gateway & Routing
-- [ ] **B1.1** Endpoint OpenAI-compatible `/v1/chat/completions` + `/v1/models` (lihat `documents/api/OPENAI_COMPATIBLE_CONTRACT.md`) — `be-dev` — Dep: B0.2
-- [ ] **B1.2** Proxy Pools (HTTP/HTTPS/SOCKS5) + rotasi (RR/Random/Failover) + health check — `be-dev` — Dep: B0.2
-- [ ] **B1.3** Combos (fallback / load-balance / latency-cost) — `be-dev` — Dep: B1.1
-- [ ] **B1.4** Binding proxy di level Endpoint, Endpoint -> Combo (ADR-008) — `be-dev` — Dep: B1.2, B1.3
+## Fase 1 — Config & Logging
+- [ ] **B1.1** Config-in-DB: model `Setting` + repo `config/settings.py`
+      (get/set/ensure_seeded) (ADR-010/011, R11) — `be-dev` — Dep: B0.2
+- [ ] **B1.2** Logging infra: model `LogEntry` + helper logger (severity+stacktrace+
+      context) + enforce no-empty-catch di seluruh backend (ADR-011, R12) — `be-dev`
+      — Dep: B0.2
+- [ ] **B1.3** Settings UI: panel port / dev-mode / theme baca-tulis `Setting`
+      (vanilla JS, R13) — `fe-dev` — Dep: B1.1
 
-## Fase 2 — Terminal
-- [ ] **B2.1** PTY bridge (`ptyprocess`/`pywinpty`) + `xterm.js` via WebSocket — `be-dev` — Dep: B0.1
-- [ ] **B2.2** Multi-tab terminal UI — `fe-dev` — Dep: B2.1
-- [ ] **B2.3** Floating control (toggle fullscreen + paste + auto-return focus) — `fe-dev` — Dep: B2.2
-- [ ] **B2.4** Scroll & swipe (velocity-based, swipe->scroll, damping, whitelist TUI) — `fe-dev` — Dep: B2.2
-- [ ] **B2.5** CLI auto-launcher + grouping A/B/C (lihat `documents/config/CLI_CONFIG_SCHEMA.md`) — `be-dev` + `fe-dev` — Dep: B1.1
+## Fase 2 — Gateway & Routing
+- [ ] **B2.1** Endpoint OpenAI-compatible `/v1/chat/completions` + `/v1/models`
+      (ikuti `api/OPENAI_COMPATIBLE_CONTRACT.md`); tiap method wajib log (ADR-011);
+      pakai Pydantic v1 (R10) — `be-dev` — Dep: B1.2, B0.2
+- [ ] **B2.2** Provider CRUD + model auto-discovery + key management
+      (`analysis/FSD.md` §2.1–§2.2) — `be-dev` + `fe-dev` — Dep: B2.1, B1.1
+- [ ] **B2.3** Proxy Pools (HTTP/HTTPS/SOCKS5) + rotasi (RR/Random/Failover) +
+      health check (`FSD` §2.3) — `be-dev` — Dep: B0.2
+- [ ] **B2.4** Combos (fallback / load-balance / latency-cost) (`FSD` §2.4) —
+      `be-dev` — Dep: B2.1
+- [ ] **B2.5** Binding proxy di level Endpoint, Endpoint -> Combo (ADR-008) —
+      `be-dev` — Dep: B2.3, B2.4
 
-## Fase 3 — QA & Polish
-- [ ] **B3.1** Eksekusi rencana test (lihat `documents/qa/TEST_PLAN.md`) — `qa` — Dep: semua Fase 1–2
+## Fase 3 — Terminal & Execution
+- [ ] **B3.1** Terminal UI (collapsible, log window) (vanilla JS, R13) —
+      `fe-dev` — Dep: B0.1
+- [ ] **B3.2** PTY backend: `ptyprocess` (POSIX/Termux) + `pywinpty` (Win) wiring
+      (ADR-003) — `be-dev` — Dep: B0.1
+- [ ] **B3.3** Multi-tab terminal + floating control (fullscreen/paste/focus) +
+      scroll & swipe (velocity, whitelist TUI) — `fe-dev` — Dep: B3.1, B3.2
+- [ ] **B3.4** CLI tool management + preset grup A/B/C (ikuti
+      `config/CLI_CONFIG_SCHEMA.md`) — `be-dev` + `fe-dev` — Dep: B2.1
 
+## Fase 4 — Self-Heal & Polish
+- [ ] **B4.1** Self-Heal (menu CLI-Tool): git branch `aigate/self-heal-*` + launch
+      agentic CLI terinstall + loop fix/test dari `LogEntry` warning/error; **delete**
+      row yg sudah ke-resolve; merge ke `main` + hapus branch (PRD §2.8 / FSD §2.8) —
+      `be-dev` + `fe-dev` — Dep: B1.2, B1.3
+- [ ] **B4.2** i18n EN/ID lengkap + dark/light + responsif & simulasi perangkat
+      (phone non-AdminLTE) (`FSD` §2.5, §2.7) — `fe-dev` — Dep: B0.1
+- [ ] **B4.3** QA: eksekusi `qa/TEST_PLAN.md` (pytest + vitest + playwright) —
+      `qa` — Dep: semua Fase 1–3
 
 ## Catatan
-- Urutan di atas sudah mempertimbangkan dependensi; jangan mulai Fase 2 sebelum
-  B0.2 (skema DB) siap.
-- Tiap task selesai wajib di-update statusnya di file ini + di `pm/status.md`.
+- Urutan mempertimbangkan dependensi; jangan mulai Fase 2 sebelum B0.2 siap.
+- Tiap task selesai: update status di file ini + log ke `pm/status.md`.
+- Implementasi berjalan tanpa konfirmasi (R9); PM catat default yg dipakai.

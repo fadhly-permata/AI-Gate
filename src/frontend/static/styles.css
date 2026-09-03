@@ -1,0 +1,240 @@
+/* ===== aigate UI shell — vanilla CSS (AdminLTE-like, no framework) ===== */
+
+:root {
+  /* Light theme (default) */
+  --bg: #f4f6f9;
+  --fg: #343a40;
+  --panel: #ffffff;
+  --panel-border: #e3e6ea;
+  --sidebar-bg: #343a40;
+  --sidebar-fg: #c2c7d0;
+  --sidebar-fg-hover: #ffffff;
+  --sidebar-active: #007bff;
+  --accent: #007bff;
+  --accent-contrast: #ffffff;
+  --muted: #6c757d;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+
+  --header-h: 56px;
+  --sidebar-w: 230px;
+  --sidebar-w-collapsed: 56px;
+  --radius: 8px;
+  --transition: 0.22s ease;
+}
+
+[data-theme="dark"] {
+  --bg: #1a1d21;
+  --fg: #e4e6eb;
+  --panel: #252a30;
+  --panel-border: #343a40;
+  --sidebar-bg: #1f2329;
+  --sidebar-fg: #aeb6c2;
+  --sidebar-fg-hover: #ffffff;
+  --sidebar-active: #375a7f;
+  --accent: #4a9eff;
+  --accent-contrast: #ffffff;
+  --muted: #8b929c;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+/* ===== Layout grid ===== */
+.layout {
+  display: grid;
+  grid-template-rows: var(--header-h) 1fr;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  height: 100vh;
+  transition: grid-template-columns var(--transition);
+}
+
+body.sidebar-collapsed .layout {
+  grid-template-columns: var(--sidebar-w-collapsed) 1fr;
+}
+
+/* ===== Top bar ===== */
+.topbar {
+  grid-row: 1;
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--panel-border);
+  box-shadow: var(--shadow);
+  z-index: 10;
+}
+
+.topbar-left,
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-title {
+  font-weight: 700;
+  font-size: 17px;
+  color: var(--accent);
+  letter-spacing: 0.3px;
+}
+
+.app-subtitle {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  font-size: 16px;
+  transition: background var(--transition), color var(--transition);
+}
+
+.icon-btn:hover {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lang-btn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: color var(--transition), background var(--transition);
+}
+
+.lang-btn:hover { color: var(--fg); }
+
+.lang-btn.active {
+  color: var(--accent-contrast);
+  background: var(--accent);
+}
+
+.lang-sep { color: var(--muted); }
+
+/* ===== Sidebar ===== */
+.sidebar {
+  grid-row: 2;
+  grid-column: 1;
+  background: var(--sidebar-bg);
+  color: var(--sidebar-fg);
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-top: 10px;
+  transition: width var(--transition);
+}
+
+.nav { display: flex; flex-direction: column; }
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  color: var(--sidebar-fg);
+  text-decoration: none;
+  white-space: nowrap;
+  border-left: 3px solid transparent;
+  transition: background var(--transition), color var(--transition),
+              border-color var(--transition);
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--sidebar-fg-hover);
+}
+
+.nav-item.active {
+  background: rgba(255, 255, 255, 0.05);
+  border-left-color: var(--sidebar-active);
+  color: var(--sidebar-fg-hover);
+}
+
+.nav-icon {
+  flex: 0 0 auto;
+  width: 22px;
+  text-align: center;
+  font-size: 16px;
+}
+
+.nav-label {
+  transition: opacity var(--transition);
+}
+
+/* Collapsed: icons only */
+body.sidebar-collapsed .nav-label {
+  display: none;
+}
+
+body.sidebar-collapsed .nav-item {
+  justify-content: center;
+  padding: 12px 0;
+}
+
+/* ===== Workspace ===== */
+.workspace {
+  grid-row: 2;
+  grid-column: 2;
+  padding: 18px;
+  overflow-y: auto;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 22px;
+}
+
+.welcome-card {
+  max-width: 640px;
+  margin: 8vh auto 0;
+  text-align: center;
+}
+
+.welcome-title {
+  margin: 0 0 10px;
+  color: var(--accent);
+  font-size: 24px;
+}
+
+.welcome-text {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* Small screens: force collapse-friendly base */
+@media (max-width: 600px) {
+  .app-subtitle { display: none; }
+}

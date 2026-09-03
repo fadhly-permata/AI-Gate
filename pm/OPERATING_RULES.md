@@ -74,3 +74,37 @@ Selama implementasi BERJALAN:
 
 (Pelajaran 2026-09-03: user mau implementasi tanpa konfirmasi -> butuh default
 policy, bukan berhenti nanya tiap ambiguitas.)
+
+## R10 — Stack portabilitas (Pydantic v1 / no Rust)
+- FastAPI `>=0.95,<0.100` + Pydantic `>=1.10,<2` (v1, pure Python). JANGAN pakai
+  fitur pydantic v2 / `pydantic-core`. Semua dependency HARUS pure-Python agar
+  jalan di Termux / Windows / Linux / macOS. Tidak ada dependensi Rust.
+- Sub-agent WAJIB pakai syntax Pydantic v1 (`class X(BaseModel)` v1) di semua
+  model request/response.
+
+## R11 — Secret & config storage (ADR-007 / ADR-010)
+- Secret disimpan **plaintext** di DB (kolom `api_key` / `internal_api_key` /
+  `password`), **TANPA enkripsi**, dan **UI TIDAK me-redaksi/masking** nilainya.
+- SELURUH config aplikasi di tabel `Setting` (key-value) di SQLite — BUKAN file.
+  File `secrets.json` dari B0.3 bersifat legacy; DB = sumber kebenaran utama.
+
+## R12 — Logging wajib ke DB (ADR-011)
+- Semua error/warning dicatat ke tabel `LogEntry` (field: severity + stacktrace +
+  context). **TIDAK ada `except: pass` / catch kosong.** Catch minimal harus log
+  ke DB. Ini kontrak wajib, bukan opsional.
+
+## R13 — Frontend: vanilla JS no-build (ADR-001)
+- UI = HTML/CSS/JS vanilla (AdminLTE-like, collapsible sidebar, dark/light via CSS
+  var, i18n EN/ID via `window.AIGATE_I18N`). **DILARANG** pakai React / Vue / Expo
+  / bundler/framework build. State di `app.js` global. Tidak ada step compile.
+
+## R14 — Verifikasi sub-agent (batas sandbox)
+- Sub-agent WAJIB `python -m py_compile` semua file `.py` yang ditulis (cek syntax).
+- Full `pytest` / `npm test` dijalankan di **env USER** (sandbox ini tidak bisa
+  install dep). JANGAN klaim "terverifikasi runtime" kalau cuma py_compile — catat
+  batas tersebut di receipt.
+
+## R15 — Jangan interupsi mid-run
+- Selama `/run-impl` berjalan, tahan perubahan spec (revise-docs) sampai run selesai
+  atau batch di awal. Kirim pesan lain di tengah run membuat task ke-cancel & scope
+  berantakan (sudah terjadi di B1.1). Ini aturan proses, bukan keputusan.

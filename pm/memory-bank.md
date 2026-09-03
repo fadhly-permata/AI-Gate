@@ -40,3 +40,8 @@
   subagent_type asli (selama ini pakai 'general' stand-in).
 - ADR-007 & ADR-008 SUDAH RESOLVED (2026-09-03) — lihat Decisions. Tidak ada
   lagi ADR Proposed yang blokir implementasi.
+- **Termux runtime risk:** RESOLVED (2026-09-03) — user pilih opsi (C): pin
+  `fastapi>=0.95,<0.100` + `pydantic>=1.10,<2` (Pydantic v1 pure Python, tanpa
+  pydantic-core/Rust). Semua dep inti pure Python → aigate jalan di Termux & semua
+  platform tanpa compile Rust. Expo/React Native ditolak (bukan pengganti backend
+  Python; tak kasih PTY utk CLI). Lihat TSD ADR-002.

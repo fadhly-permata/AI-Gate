@@ -19,7 +19,7 @@ erDiagram
         string name
         string type
         string base_url
-        string api_key_encrypted
+        string api_key
         bool enabled
         datetime created_at
     }
@@ -46,7 +46,7 @@ erDiagram
         int port
         string protocol
         string username
-        string password_encrypted
+        string password
         string status
         float last_latency_ms
         float uptime_pct
@@ -75,7 +75,7 @@ erDiagram
         string listen_host
         int listen_port
         bool access_control_enabled
-        string internal_api_key_encrypted
+        string internal_api_key
     }
 
     EndpointBinding {
@@ -118,6 +118,22 @@ erDiagram
         datetime created_at
     }
 
+    LogEntry {
+        int id PK
+        datetime timestamp
+        string severity
+        string source
+        string message
+        text stacktrace
+    }
+
+    Setting {
+        int id PK
+        string key
+        string value
+        datetime updated_at
+    }
+
     Provider ||--o{ ProviderModel : "has"
     ProxyPool ||--o{ ProxyNode : "contains"
     Provider ||--o{ ComboMember : "belongs to"
@@ -157,7 +173,7 @@ Entitas penyimpan konfigurasi & kredensial AI provider.
 - `name` (string): nama provider (OpenAI, Anthropic, dst).
 - `type` (string): kategori/format API provider.
 - `base_url` (string): URL dasar API.
-- `api_key_encrypted` (string): API key terenkripsi (masked di UI).
+- `api_key` (string): API key (disimpan apa adanya, tanpa enkripsi — ADR-007; UI tidak me-redaksi).
 - `enabled` (bool): status aktif.
 - `created_at` (datetime): waktu pencatatan.
 
@@ -182,7 +198,7 @@ Satu node proxy dalam sebuah pool.
 - `pool_id` (int, FK → ProxyPool)
 - `host` (string), `port` (int): alamat.
 - `protocol` (string): `http` | `https` | `socks5`.
-- `username`, `password_encrypted` (string, opsional).
+- `username`, `password` (string, opsional).
 - `status` (string): `healthy` | `dead` | `unknown`.
 - `last_latency_ms` (float): hasil health check terakhir.
 - `uptime_pct` (float): persentase uptime.
@@ -210,7 +226,7 @@ Server gateway lokal OpenAI-compatible.
 - `name` (string)
 - `listen_host` (string), `listen_port` (int): alamat listen.
 - `access_control_enabled` (bool)
-- `internal_api_key_encrypted` (string, opsional).
+- `internal_api_key` (string, opsional).
 
 ### EndpointBinding
 Pemetaan endpoint → satu sumber (provider atau combo).
@@ -252,6 +268,24 @@ Satu tab terminal dalam sesi.
 - `is_fullscreen` (bool): state floating control.
 - `created_at` (datetime)
 
+### LogEntry
+Log operasional aplikasi (PRD §2.8 / ADR-011). Semua method (frontend & backend)
+wajib menulis log ke sini.
+- `id` (int, PK)
+- `timestamp` (datetime): waktu kejadian.
+- `severity` (string): `info` | `warning` | `error`.
+- `source` (string): asal log (modul/function, atau `frontend:<komponen>`).
+- `message` (string): isi log.
+- `stacktrace` (text, nullable): stacktrace / inner exception untuk warning & error.
+
+### Setting
+Penyimpanan seluruh konfigurasi aplikasi (PRD §2.8 / ADR-010). Menggantikan file
+config terpisah; key-value store di SQLite.
+- `id` (int, PK)
+- `key` (string, unik): nama setting (mis. `default_port`, `dev_mode`, fitur toggle).
+- `value` (string): nilai setting (serialisasi bebas).
+- `updated_at` (datetime)
+
 ---
 
 ## 4. Catatan Konsistensi dengan PRD/BRD
@@ -261,6 +295,8 @@ Satu tab terminal dalam sesi.
 - `ProxyNode.status` + health check mengakomodasi US-2.2.3.
 - `CLIToolGroup` (A/B/C) + `CLITool` mengakomodasi US-2.6.4 dan §2.6.1.
 - `TerminalSession`/`TerminalTab` merefleksikan multi-tab + floating fullscreen (PRD §2.5).
+- `LogEntry` merefleksikan mandatory logging (PRD §2.8 / ADR-011): seluruh method log ke sini, warning/error + stacktrace.
+- `Setting` merefleksikan konfigurasi di DB (PRD §2.8 / ADR-010): tidak ada file config terpisah; secret tetap plaintext di kolom Provider/Endpoint/ProxyNode (ADR-007).
 
 ---
 

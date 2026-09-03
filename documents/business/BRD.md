@@ -53,7 +53,7 @@ Sebagai Developer, saya ingin menambah/mengedit/melihat/menghapus AI Provider (O
 
 **US-2.1.2 — Credential Storage Aman** *(Must-have)*
 Sebagai ML Ops, saya ingin menyimpan API Key, Base URL, dan custom headers per provider secara aman agar tidak tersebar di env shell.
-- *Acceptance:* (1) Field API Key bertipe masked. (2) Data tersimpan terenkripsi/terlindungi di storage lokal (SQLite/JSON). (3) Custom headers dapat ditambah sebagai pasangan key-value.
+- *Acceptance:* (1) Field API Key tampil apa adanya (tanpa masking per ADR-007). (2) Data tersimpan plaintext di DB lokal (SQLite) sesuai ADR-007/ADR-010, tanpa enkripsi. (3) Custom headers dapat ditambah sebagai pasangan key-value.
 
 **US-2.1.3 — Model Auto-Discovery** *(Should-have)*
 Sebagai Developer, saya ingin aigate mengambil daftar model otomatis dari provider yang mendukung `/models`.
@@ -145,6 +145,48 @@ Sebagai Developer, saya ingin aigate menyet `OPENAI_API_BASE`, `OPENAI_API_KEY` 
 Sebagai Developer, saya ingin tool CLI dikelompokkan: Grup A (Agentic Coding: `claude`, `opencode`, `codex`, `gemini`, `antigravity`, `phi`, `aider`, `goose`, `amp`, `qwen`, `cline`, `kilo`), Grup B (Autonomous Agents: `openhands`, `swe-agent`, `open-interpreter`, `autogpt`, `gpt-researcher`, `crewai`), Grup C (Chat/Shell: `llm`, `sgpt`, `mods`, `oterm`, `gptme`, `aichat`).
 - *Acceptance:* (1) UI membagi minimal 3 grup, masing-masing ≥5 preset. (2) Grup A (agentic) ditonjolkan/diutamakan. (3) Daftar dapat diperluas via YAML/JSON (rujukan Roadmap §6).
 
+### 5.7 Antarmuka Web / Admin Console (rujukan PRD §2.7)
+
+**US-2.7.1 — Collapsible Sidebar (ikon saat collapse)** *(Must-have)*
+Sebagai Developer, saya ingin sidebar konsol dapat di-collapse/expand; saat collapse tetap menampilkan ikon tanpa teks judul agar navigasi cepat.
+- *Acceptance:* (1) Ada tombol toggle collapse/expand. (2) Saat collapse, menu hanya menampilkan ikon (judul tersembunyi). (3) State collapse tersimpan di sisi klien (localStorage) antar sesi.
+
+**US-2.7.2 — Dark / Light Theme Switcher** *(Must-have)*
+Sebagai Developer, saya ingin tombol pengalih tema gelap/terang pada UI.
+- *Acceptance:* (1) Tersedia pengalih tema di header. (2) Beralih mengubah seluruh tampilan (sidebar + area kerja + terminal). (3) Pilihan tema tersimpan di sisi klien (localStorage).
+
+**US-2.7.3 — Multi-Bahasa (EN/ID)** *(Must-have)*
+Sebagai Pengguna, saya ingin UI dapat ditampilkan dalam Bahasa Inggris atau Indonesia.
+- *Acceptance:* (1) Pengalih bahasa di header dengan opsi EN & ID (minimal). (2) Mengganti bahasa memperbarui seluruh string UI (menu, label, tombol). (3) Pilihan bahasa tersimpan di sisi klien (localStorage).
+
+### 5.8 Mode Developer, Logging & Self-Heal (rujukan PRD §2.8)
+
+**US-2.8.1 — Custom Port & Developer Mode** *(Must-have)*
+Sebagai Developer, saya ingin menjalankan aigate di port pilihan dan mengaktifkan mode developer.
+- *Acceptance:* (1) Arg/env `--port` mengubah port listen. (2) Env `AIGATE_DEV=1` mengaktifkan fitur developer di UI.
+
+**US-2.8.2 — UI Responsif + Simulasi Perangkat** *(Must-have)*
+Sebagai Developer, saya ingin UI responsif (phone/tablet/desktop) dan di mode developer bisa mensimulasikan perangkat; di layar phone layout bukan AdminLTE.
+- *Acceptance:* (1) Layout menyesuaikan breakpoint phone/tablet/desktop. (2) Tombol simulasi phone/tablet/desktop mengubah lebar viewport. (3) Di phone, nav menyederhana (bukan AdminLTE).
+
+**US-2.8.3 — Log Window (dev mode)** *(Must-have)*
+Sebagai Developer, saya ingin panel log info/warning/error di UI mode developer.
+- *Acceptance:* (1) Panel log tampil di mode developer. (2) Menampilkan log dari database (auto-refresh). (3) Dapat filter severity.
+
+**US-2.8.4 — Mandatory Logging (severity + stacktrace + DB)** *(Must-have)*
+Sebagai Developer, saya ingin SETIAP method (frontend & backend) menulis log severity; warning/error menyertakan stacktrace; log di DB; tidak ada try/catch kosong.
+- *Acceptance:* (1) Semua method log minimal info. (2) Warning/error menyertakan stacktrace/inner exception. (3) Log tersimpan di DB (`LogEntry`). (4) Tidak ada blok try/catch tanpa penanganan.
+
+**US-2.8.5 — Self-Heal (menu CLI-Tool)** *(Must-have)*
+Sebagai Developer, saya ingin fitur Self-Heal di menu CLI-Tool yang membuat branch, menjalankan agentic CLI terinstall, lalu fix/test loop dari log warning/error.
+- *Acceptance:* (1) Klik Self-Heal → `git init` bila belum ada repo, buat branch `aigate/self-heal-*`. (2) Bila tidak ada agentic CLI terinstall → popup "Self-Heal tidak bisa jalan: tidak ada agentic CLI terinstall". (3) Ambil log warning+error, jalankan agentic CLI di tab terminal, loop fix→test sampai sehat atau batas iterasi. (4) Setelah issue selesai dikerjakan, baris `LogEntry` terkait dihapus agar tidak di-fix ulang. (5) Setelah seluruh issue terbukti pass, lakukan merge branch
+  self-heal ke `main`, pindah ke `main`, dan hapus branch fixing — run berikutnya
+  pakai versi latest.
+
+**US-2.8.6 — Konfigurasi di Database** *(Must-have)*
+Sebagai Developer, saya ingin seluruh konfigurasi aplikasi tersimpan di SQLite, bukan file terpisah.
+- *Acceptance:* (1) Setting (port, mode, toggle, preset CLI) dibaca/ditulis via DB. (2) Tidak ada file config terpisah yang jadi sumber kebenaran.
+
 ## 6. Prioritas & Matrix Dampak
 
 | Fitur | Prioritas | Dampak bisnis | Alasan |
@@ -152,6 +194,8 @@ Sebagai Developer, saya ingin tool CLI dikelompokkan: Grup A (Agentic Coding: `c
 | 2.4 Gateway + 2.6 Launcher/Auto-config | Must | Tinggi | Inti value proposition (zero-setup agentic) |
 | 2.1 Providers, 2.3 Combos | Must | Tinggi | Fondasi routing & resilience |
 | 2.5 Terminal + floating control + swipe/scroll | Must | Sedang-Tinggi | Workspace utama & UX differentiation |
+| 2.7 Admin Console UI (sidebar collapse, tema, i18n) | Must | Sedang | Konsol nyaman & akses cepat |
+| 2.8 Dev Mode, Logging & Self-Heal | Must | Sedang-Tinggi | Operabilitas & observabilitas |
 | 2.2 Proxy Pools | Should | Sedang | Penting untuk region/anti-rate-limit |
 | 2.1.3 Auto-discovery, 2.4.3 Access Control | Should | Sedang | Keamanan & kenyamanan |
 | 2.5.4/2.5.6 velocity scroll/damping | Should | Sedang | Polesan UX |

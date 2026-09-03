@@ -58,6 +58,21 @@ Daftar diambil dari Provider yang mendukung auto-discovery (`/models`) + Combo.
 ```
 HTTP status: 400 (bad request), 401 (auth), 502/503 (upstream/proxy).
 
+## GET /api/logs
+Mengambil log operasional dari tabel `LogEntry` (mode developer / observabilitas).
+- Query: `?severity=info,warning,error` (filter, default semua), `?limit=100`, `?since=<iso8601>`.
+- Response:
+```json
+{ "object": "list", "data": [
+  {"id": 1, "timestamp": "2026-09-03T06:00:00", "severity": "error",
+   "source": "backend.gateway", "message": "upstream 502", "stacktrace": "..."}
+] }
+```
+- `POST /api/logs` (frontend → backend): body
+  `{"severity":"error","source":"frontend:app","message":"...","stacktrace":"..."}`
+  → simpan ke `LogEntry`.
+- Akses log diutamakan saat `AIGATE_DEV=1`; di luar dev mode dapat dibatasi.
+
 ## Streaming
 `stream: true` -> Server-Sent Events `data: {json}\n\n` selesai dengan
 `data: [DONE]`.

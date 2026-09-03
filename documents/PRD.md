@@ -65,6 +65,51 @@ Daftar tool CLI dikelompokkan agar mudah ditemukan. Setiap grup minimal berisi 5
 
 > Catatan: Daftar di atas dapat diperluas via config YAML/JSON (lihat Roadmap 6).
 
+### 2.7 Antarmuka Web (Admin Console)
+Konsol manajemen (Providers, Combos, Proxy Pools, Endpoints, CLI Tools) serta
+Terminal terintegrasi disajikan dalam **antarmuka web lokal** bergaya
+**AdminLTE** (sidebar kiri + area kerja kanan), tanpa framework/build JavaScript
+(lihat TSD ADR-001 & §3.4):
+- **Collapsible Sidebar:** Sidebar dapat di-expand/collapse. Saat collapse, tetap
+  menampilkan menu **minimal berupa ikon** (tanpa teks judul) agar navigasi tetap
+  cepat.
+- **Dark / Light Theme Switcher:** Tersedia tombol pengalih tema gelap/terang;
+  preferensi disimpan di sisi klien (localStorage).
+- **Multi-Bahasa (i18n):** UI mendukung minimal **Bahasa Inggris & Indonesia**;
+  pemilihan bahasa via pengalih di header; string UI dikelola dalam kamus
+  terjemahan sisi klien (extensible ke bahasa lain via config).
+
+### 2.8 Mode Developer, Logging & Self-Heal
+aigate memiliki mode operasional ekstra (diaktifkan via flag run / env `AIGATE_DEV=1`):
+- **Custom Port & Developer Mode:** Server dijalankan di port arbitrer (arg
+  `--port` / env) dan mode developer menyalakan fitur operasional di bawah.
+- **UI Responsif + Simulasi Perangkat:** UI menyesuaikan layout untuk phone /
+  tablet / desktop; di mode developer tersedia tombol simulasi perangkat
+  (phone/tablet/desktop). **Untuk layar phone, layout TIDAK menggunakan gaya
+  AdminLTE** (nav disederhanakan, mis. bottom-nav) demi kenyamanan mobile.
+- **Log Window:** Panel log (info/warning/error) di UI (mode developer) terhubung
+  ke log yang tersimpan di database.
+- **Mandatory Logging:** SETIAP method (frontend & backend) WAJIB menulis log
+  dengan severity (info / warning / error). Untuk **warning & error wajib
+  menyertakan stacktrace / inner exception**. Log disimpan ke database (ERD
+  `LogEntry`). SETIAP method WAJIB membungkus logic rentan dalam try/catch —
+  **dilarang try/catch kosong** (no empty catch). Aturan wajib (code-review gate).
+- **Self-Heal (menu CLI-Tool):** (1) pastikan repo git ada (`git init` bila
+  belum), (2) buat branch baru `aigate/self-heal-*`, (3) tentukan agentic CLI
+  yang **sudah terinstall** (Grup A); bila tidak ada → popup "Self-Heal tidak
+  bisa jalan: tidak ada agentic CLI terinstall", (4) ambil log severity warning
+  & error, (5) jalankan agentic CLI di tab terminal untuk memperbaiki berdasar
+  log, (6) loop fix→test→fix→test sampai benar-benar "sembuh" (tidak ada lagi
+  log warning/error) atau batas iterasi. (7) Setelah suatu issue/bug/warning
+  selesai dikerjakan, **hapus baris `LogEntry` terkait** agar isu yang sama tidak
+  di-fix ulang. (8) Setelah **seluruh issue terbukti pass** (test hijau / build
+  hijau), lakukan `git merge` branch `aigate/self-heal-*` ke `main`, `git checkout
+  main`, lalu **hapus branch fixing** tersebut — sehingga run berikutnya memakai
+  versi aigate terbaru (latest).
+- **Konfigurasi di Database:** SELURUH konfigurasi aplikasi (port default, mode,
+  toggle fitur, preset CLI, dst.) disimpan di **SQLite (DB)**, bukan file
+  terpisah. (Secret tetap plaintext di DB sesuai ADR-007 — tanpa enkripsi.)
+
 ---
 
 ## 3. Technology Stack Recommendations

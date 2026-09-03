@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aigate"
+version = "0.0.1"
+description = "aigate — AI Proxy Gateway & Management Tool (native Python, FastAPI)."
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.95,<0.100",   # pin <0.100 → Pydantic v1 (pure Python, no pydantic-core/Rust) → runs on Termux
+    "pydantic>=1.10,<2",
+    "uvicorn",
+    "sqlalchemy",
+    "ptyprocess",
+    "httpx",
+    "pywinpty; sys_platform == 'win32'",  # ADR-003: Windows PTY backend
+]
+
+[project.scripts]
+aigate = "backend.launcher:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "respx>=0.21",
+    "pytest-cov>=5",
+    "factory-boy>=3.3",
+]
+
+[tool.setuptools.packages.find]
+where = ["src/backend"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+filterwarnings = ["ignore::DeprecationWarning"]
