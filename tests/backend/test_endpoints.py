@@ -433,15 +433,16 @@ def test_combo_bound_endpoint_forwards_proxy(monkeypatch) -> None:
     cid = _seed_combo(sf)
     pool_id = _seed_pool_with_healthy_node(sf)
     expected_proxy = _expected_proxy_for_pool(sf, pool_id)
-    _seed_endpoint_binding(
+    ep_id = _seed_endpoint_binding(
         sf, name="ep-combo", proxy_pool_id=pool_id, bind_type="combo", bind_id=cid
     )
 
     captured = {}
 
-    async def fake_execute_combo(combo_ref, payload, proxy_url=None):
+    async def fake_execute_combo(combo_ref, payload, proxy_url=None, endpoint_id=None):
         captured["combo_ref"] = combo_ref
         captured["proxy_url"] = proxy_url
+        captured["endpoint_id"] = endpoint_id
         return {"ok": True}
 
     monkeypatch.setattr(
@@ -456,3 +457,5 @@ def test_combo_bound_endpoint_forwards_proxy(monkeypatch) -> None:
     assert resp.status_code == 200
     assert captured["combo_ref"] == cid  # bound by id
     assert captured["proxy_url"] == expected_proxy
+    # B5.5: the endpoint id is threaded through for UsageRecord attribution.
+    assert captured["endpoint_id"] == ep_id

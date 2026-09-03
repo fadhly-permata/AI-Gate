@@ -27,9 +27,10 @@ from backend.gateway import provider_adapter
 from backend.gateway.errors import UpstreamError
 from backend.gateway.resolver import ResolvedTarget, TargetNotFound
 from backend.gateway.translator import format_for_provider_type
+from backend import usage as usage_service
 from backend.log import log_error_exc, log_info, log_warning
 from backend.models import Combo, ComboMember, Provider, ProviderAccount, ProviderModel
-from backend.oauth import get_valid_token, select_provider_credential
+from backend.oauth import get_valid_token, select_provider_credential_with_account
 
 LOG_SOURCE = "backend.combo.routing"
 
@@ -71,21 +72,59 @@ def _is_account_switchable(exc: UpstreamError) -> bool:
 
 
 def quota_aware_order(candidates, session) -> List[ResolvedTarget]:
-    """B5.2 (scaffold): prefer members with remaining quota when data exists.
+    """B5.5: prefer members whose provider still has remaining quota.
 
-    # TODO B5.5: once quota tracking (UsageRecord) lands, reorder ``candidates``
-    # to prefer members with remaining quota. For now this is a NO-OP
-    # pass-through so routing is never blocked when no quota data is present.
+    Completes the B5.2↔B5.5 dependency (PRD §2.4.2 "Sadar Kuota di Routing").
+    Reordering policy (documented decision):
+
+    * a provider with ``quota_limit`` set and ``remaining <= 0`` is treated as
+      EXHAUSTED and moved to the END of the list (stable — relative order kept);
+    * providers with no ``quota_limit`` (or no quota data at all) count as
+      "has quota" and keep their place at the FRONT;
+    * exhausted members are DEPRIORITIZED, never dropped: filtering them out
+      would turn an all-exhausted combo into a hard 502 instead of a last-
+      resort attempt (safer fallback semantics).
+
+    Fail-open: any quota-lookup error logs (R12) and returns ``candidates``
+    unchanged — routing is never blocked by quota telemetry.
     """
-    # TODO B5.5: implement real quota-aware reordering here.
-    if candidates:
-        log_info(
-            "quota tracking not yet available (B5.5) — skipping quota-aware "
-            "ordering",
+    if not candidates:
+        return candidates
+    try:
+        statuses = {s["provider_id"]: s for s in usage_service.quota_status(session)}
+    except Exception as exc:  # noqa: BLE001 - fail-open mandated (B5.5)
+        log_error_exc(
+            "quota_aware_order: quota lookup failed; keeping candidate order",
             source=LOG_SOURCE,
+            exc=exc,
             context={"candidates": len(candidates)},
         )
-    return candidates
+        return candidates
+
+    def _exhausted(c: ResolvedTarget) -> bool:
+        if not c.provider_id:
+            return False
+        st = statuses.get(c.provider_id)
+        if st is None:
+            return False
+        remaining = st.get("remaining")
+        return remaining is not None and remaining <= 0
+
+    keep = [c for c in candidates if not _exhausted(c)]
+    drained = [c for c in candidates if _exhausted(c)]
+    if drained:
+        log_info(
+            f"quota_aware_order: deprioritized {len(drained)} exhausted-quota "
+            f"member(s) (last-resort fallback kept)",
+            source=LOG_SOURCE,
+            context={
+                "candidates": len(candidates),
+                "exhausted_provider_ids": sorted(
+                    {c.provider_id for c in drained}
+                ),
+            },
+        )
+    return keep + drained
 
 
 def build_candidates(combo: Combo, session: Session) -> List[ResolvedTarget]:
@@ -150,22 +189,28 @@ def build_candidates(combo: Combo, session: Session) -> List[ResolvedTarget]:
             )
             continue
 
+        api_key, account_id = select_provider_credential_with_account(
+            provider, session
+        )
         candidates.append(
             ResolvedTarget(
                 base_url=provider.base_url,
-                api_key=select_provider_credential(provider, session),
+                api_key=api_key,
                 model_ref=f"combo:{combo.name}",
                 upstream_model=upstream_model,
                 combo_used=True,
                 priority=member.priority,
                 weight=member.weight,
                 provider_id=provider.id,
+                # B5.5: chosen account (None = legacy provider.api_key) so the
+                # UsageRecord can be attributed per subscription account.
+                account_id=account_id,
                 format=format_for_provider_type(provider.type),
             )
         )
 
-    # B5.2 (scaffold): quota-aware ordering is a no-op until B5.5 lands, but we
-    # still call it for fallback / three_tier so it can later reorder in place.
+    # B5.5: quota-aware ordering — deprioritize members whose provider has
+    # exhausted its quota window (fail-open; no quota data = unchanged).
     if strategy in ("fallback", "three_tier"):
         candidates = quota_aware_order(candidates, session)
 
@@ -228,7 +273,10 @@ def select_member(
 
 
 async def execute_combo(
-    combo_ref: str | int, payload: dict, proxy_url: Optional[str] = None
+    combo_ref: str | int,
+    payload: dict,
+    proxy_url: Optional[str] = None,
+    endpoint_id: Optional[int] = None,
 ) -> dict:
     """Route a chat-completion request through a Combo's strategy.
 
@@ -238,6 +286,8 @@ async def execute_combo(
     :param payload: the raw OpenAI-style request body (forwarded verbatim).
     :param proxy_url: optional egress proxy URL (ADR-008) threaded to the
       provider adapter for each attempt.
+    :param endpoint_id: optional originating Endpoint id (B5.5) — recorded on
+      the UsageRow written after a successful member attempt.
     :raises TargetNotFound: if no matching combo exists.
     :raises UpstreamError: if every attempt fails (fallback) or the single
       selected attempt fails (load_balance / latency_cost), or there are no
@@ -304,6 +354,15 @@ async def execute_combo(
                     result = await provider_adapter.chat_completion(
                         target, payload, proxy_url
                     )
+                    # B5.5: record usage for the member that actually succeeded
+                    # (fail-open inside backend.usage — never breaks the client).
+                    usage_service.record_usage_from_result(
+                        result,
+                        provider_id=target.provider_id,
+                        account_id=target.account_id,
+                        model=target.upstream_model,
+                        endpoint_id=endpoint_id,
+                    )
                     log_info(
                         f"execute_combo: {strategy} success via member "
                         f"(model={target.upstream_model})",
@@ -362,6 +421,14 @@ async def execute_combo(
     # load_balance / latency_cost: select one member, single attempt.
     target = select_member(strategy, candidates, None)
     result = await provider_adapter.chat_completion(target, payload, proxy_url)
+    # B5.5: record usage for the selected member (fail-open inside usage).
+    usage_service.record_usage_from_result(
+        result,
+        provider_id=target.provider_id,
+        account_id=target.account_id,
+        model=target.upstream_model,
+        endpoint_id=endpoint_id,
+    )
     log_info(
         f"execute_combo: {strategy} success via member "
         f"(model={target.upstream_model})",
@@ -371,4 +438,10 @@ async def execute_combo(
     return result
 
 
-__all__ = ["build_candidates", "select_member", "execute_combo"]
+__all__ = [
+    "build_candidates",
+    "quota_aware_order",
+    "select_member",
+    "execute_combo",
+    "provider_tier",
+]

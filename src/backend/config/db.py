@@ -122,6 +122,33 @@ def _ensure_provider_tier_column(engine) -> None:
         logger.warning("skipping provider.tier migration: %s", exc)
 
 
+def _ensure_provider_quota_columns(engine) -> None:
+    """Self-heal ``providers.quota_limit``/``quota_window`` on old DBs (B5.5).
+
+    ``create_all`` never alters existing tables, so a DB created before the
+    quota columns existed lacks them and every ``/api/quota`` call 500s.
+    Idempotent: a PRAGMA check guards each ALTER, and only the specific
+    ``OperationalError`` is swallowed (R12 — no bare ``except``).
+    """
+    try:
+        with engine.connect() as conn:
+            existing = {
+                row[1] for row in conn.execute(text("PRAGMA table_info(providers)")).fetchall()
+            }
+            if "quota_limit" not in existing:
+                conn.execute(
+                    text("ALTER TABLE providers ADD COLUMN quota_limit INTEGER")
+                )
+                conn.commit()
+            if "quota_window" not in existing:
+                conn.execute(
+                    text("ALTER TABLE providers ADD COLUMN quota_window TEXT")
+                )
+                conn.commit()
+    except OperationalError as exc:  # e.g. table missing on a bare/empty engine
+        logger.warning("skipping provider quota columns migration: %s", exc)
+
+
 def init_db() -> None:
     """Create all tables declared on ``Base.metadata`` (idempotent).
 
@@ -136,4 +163,5 @@ def init_db() -> None:
     Base.metadata.create_all(engine)
     _ensure_provider_default_model_column(engine)
     _ensure_provider_tier_column(engine)
+    _ensure_provider_quota_columns(engine)
     _ensure_endpoint_token_saver_column(engine)

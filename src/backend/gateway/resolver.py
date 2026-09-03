@@ -15,13 +15,14 @@ router or adapter.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 
 from sqlalchemy import select
 
 from backend.config.db import SessionLocal
 from backend.gateway.translator import format_for_provider_type
 from backend.models import Combo, Provider, ProviderModel
-from backend.oauth import select_provider_credential
+from backend.oauth import select_provider_credential_with_account
 
 
 class TargetNotFound(Exception):
@@ -56,6 +57,9 @@ class ResolvedTarget:
     # B5.2: the originating Provider id, carried so combo routing can perform
     # account-level retry (cadangan antar-akun). Optional; defaults to 0.
     provider_id: int = 0
+    # B5.5: the selected ProviderAccount id (None = legacy provider.api_key
+    # path). Carried so the gateway can attribute a UsageRecord per account.
+    account_id: Optional[int] = None
     # B5.3 (ADR-012): canonical upstream format (openai/anthropic/gemini). Drives
     # the Format Translation Engine. Defaults to "openai" (pass-through).
     format: str = "openai"
@@ -99,12 +103,17 @@ def resolve_target(model: str) -> ResolvedTarget:
                     raise TargetNotFound(
                         f"model '{model_id}' not found for provider '{name}'"
                     )
+                api_key, account_id = select_provider_credential_with_account(
+                    provider, session
+                )
                 return ResolvedTarget(
                     base_url=provider.base_url,
-                    api_key=select_provider_credential(provider, session),
+                    api_key=api_key,
                     model_ref=model,
                     upstream_model=model_id,
                     combo_used=False,
+                    provider_id=provider.id,
+                    account_id=account_id,
                     format=format_for_provider_type(provider.type),
                 )
             else:
@@ -122,12 +131,17 @@ def resolve_target(model: str) -> ResolvedTarget:
                 ).first()
                 if first_model is None:
                     raise TargetNotFound(f"provider '{name}' has no models")
+                api_key, account_id = select_provider_credential_with_account(
+                    provider, session
+                )
                 return ResolvedTarget(
                     base_url=provider.base_url,
-                    api_key=select_provider_credential(provider, session),
+                    api_key=api_key,
                     model_ref=model,
                     upstream_model=first_model.model_id,
                     combo_used=False,
+                    provider_id=provider.id,
+                    account_id=account_id,
                     format=format_for_provider_type(provider.type),
                 )
 

@@ -27,6 +27,7 @@ from backend.selfheal_router import router as selfheal_router
 from backend.proxies_router import router as proxies_router
 from backend.accounts_router import router as accounts_router
 from backend.terminal.router import router as terminal_router
+from backend.usage_router import router as usage_router
 
 STATIC_DIR: Path = (
     Path(__file__).resolve().parent.parent / "frontend" / "static"
@@ -90,6 +91,8 @@ app.include_router(terminal_router)
 app.include_router(selfheal_router)
 # Multi-account + OAuth management (B5.1).
 app.include_router(accounts_router)
+# Quota & usage tracking API (B5.5): GET /api/usage, /api/usage/summary, /api/quota.
+app.include_router(usage_router)
 # Render gateway failures as the OpenAI error envelope from the contract.
 app.add_exception_handler(GatewayError, gateway_error_handler)
 

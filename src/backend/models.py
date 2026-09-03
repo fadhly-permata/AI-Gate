@@ -1,11 +1,11 @@
 """SQLAlchemy ORM models for all aigate config entities (from ERD.md).
 
-Fourteen entities are modeled with exact columns and foreign keys per
+Fifteen entities are modeled with exact columns and foreign keys per
 ``documents/analysis/ERD.md``:
 
     Provider, ProviderModel, ProxyPool, ProxyNode, Combo, ComboMember,
     Endpoint, EndpointBinding, CLIToolGroup, CLITool, TerminalSession,
-    TerminalTab, LogEntry, Setting.
+    TerminalTab, LogEntry, Setting, UsageRecord.
 
 ADR-007: secret columns (``api_key``, ``internal_api_key``, ``password``)
 are stored in plaintext — no encryption, matching the ERD data dictionary.
@@ -46,6 +46,13 @@ class Provider(Base):
     # 'cheap' | 'free'. Defaults to 'subscription'; if unset/unknown, the
     # routing layer classifies by provider ``type`` via ``provider_tier``.
     tier: Mapped[str] = mapped_column(String, default="subscription")
+    # B5.5 / PRD §2.4.2: quota tracking. ``quota_limit`` = total tokens
+    # (in+out) allowed per ``quota_window``; None = no quota tracked
+    # (treated as "has quota" by routing, unlimited in /api/quota).
+    # ``quota_window`` in {'hour', 'day', 'week'}; None defaults to 'day'
+    # when a limit is set.
+    quota_limit: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    quota_window: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     # JSON-encoded dict of extra HTTP headers (e.g. org/region headers).
     # Empty -> "{}". Stored as text; ADR-007 plaintext (no encryption).
     custom_headers: Mapped[str] = mapped_column(String, default="{}")
@@ -60,6 +67,8 @@ class Provider(Base):
     combo_members: Mapped[list["ComboMember"]] = relationship(
         back_populates="provider"
     )
+    # B5.5: usage telemetry rows produced against this provider.
+    usages: Mapped[list["UsageRecord"]] = relationship(back_populates="provider")
     bindings: Mapped[list["EndpointBinding"]] = relationship(
         primaryjoin=(
             "and_(foreign(EndpointBinding.bind_id) == Provider.id, "
@@ -216,6 +225,8 @@ class Endpoint(Base):
     bindings: Mapped[list["EndpointBinding"]] = relationship(
         back_populates="endpoint"
     )
+    # B5.5: usage rows produced through this endpoint (ERD Endpoint||--o{UsageRecord).
+    usages: Mapped[list["UsageRecord"]] = relationship(back_populates="endpoint")
 
 
 class EndpointBinding(Base):
@@ -235,6 +246,44 @@ class EndpointBinding(Base):
     bind_id: Mapped[int] = mapped_column(Integer, nullable=False)
 
     endpoint: Mapped["Endpoint"] = relationship(back_populates="bindings")
+
+
+class UsageRecord(Base):
+    """Token & cost telemetry per request (ERD §UsageRecord / PRD §2.4.2, B5.5).
+
+    Written by the gateway after a SUCCESSFUL chat completion (fail-open —
+    recording errors never break the client response) and read by
+    ``backend.usage`` / ``backend.usage_router`` for ``/api/usage`` +
+    ``/api/quota``.
+
+    Nullability note vs the ERD: ``endpoint_id`` is nullable because
+    model-based gateway requests (no ``X-Aigate-Endpoint`` header) have no
+    endpoint attribution; ``account_id`` is nullable for the legacy
+    ``provider.api_key`` path (ERD marks it optional).
+    """
+
+    __tablename__ = "usage_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    endpoint_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("endpoints.id"), nullable=True
+    )
+    provider_id: Mapped[int] = mapped_column(
+        ForeignKey("providers.id"), nullable=False
+    )
+    account_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("provider_accounts.id"), nullable=True
+    )
+    model: Mapped[str] = mapped_column(String, default="")
+    tokens_in: Mapped[int] = mapped_column(Integer, default=0)
+    tokens_out: Mapped[int] = mapped_column(Integer, default=0)
+    # B5.5: estimated USD cost (best-effort; see backend.usage.estimate_cost).
+    cost_est: Mapped[float] = mapped_column(Float, default=0.0)
+    ts: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    endpoint: Mapped[Optional["Endpoint"]] = relationship(back_populates="usages")
+    provider: Mapped["Provider"] = relationship(back_populates="usages")
+    account: Mapped[Optional["ProviderAccount"]] = relationship()
 
 
 class CLIToolGroup(Base):
@@ -351,4 +400,5 @@ __all__ = [
     "TerminalTab",
     "LogEntry",
     "Setting",
+    "UsageRecord",
 ]

@@ -36,7 +36,7 @@ from backend.combo_routing import execute_combo
 from backend.gateway import provider_adapter
 from backend.gateway.errors import GatewayError
 from backend.gateway.resolver import ResolvedTarget, TargetNotFound, resolve_target
-from backend.log import log_info, log_warning, log_warning_exc
+from backend.log import log_error_exc, log_info, log_warning, log_warning_exc
 from backend.models import (
     Combo,
     Endpoint,
@@ -47,7 +47,8 @@ from backend.models import (
 )
 from backend.gateway import token_saver as _token_saver
 from backend import proxy_selector
-from backend.oauth import select_provider_credential
+from backend import usage as _usage
+from backend.oauth import select_provider_credential_with_account
 
 
 class ChatCompletionRequest(BaseModel):
@@ -167,9 +168,13 @@ async def chat_completions(request: Request) -> dict:
     # provider adapter). A plain provider reference goes straight to the adapter.
     if target.combo_used:
         combo_name = model[len("combo:"):]
+        # B5.5: ``execute_combo`` records the UsageRecord itself (it knows which
+        # member/account actually succeeded). No endpoint on this path.
         result = await execute_combo(combo_name, payload)
     else:
         result = await provider_adapter.chat_completion(target, payload)
+        # B5.5: persist usage telemetry (fail-open — never breaks the client).
+        _record_usage_safe(result, target, endpoint_id=None)
 
     # ADR-011 / R12: success path must still land in LogEntry.
     log_info(
@@ -208,6 +213,33 @@ async def list_models() -> dict:
             )
 
     return {"object": "list", "data": data}
+
+
+# --------------------------------------------------------------------------- #
+# Usage recording (B5.5 / PRD §2.4.2)
+# --------------------------------------------------------------------------- #
+def _record_usage_safe(result: dict, target: ResolvedTarget, endpoint_id=None) -> None:
+    """Persist a UsageRecord for a successful completion (fail-open).
+
+    ``backend.usage.record_usage_from_result`` already swallows+logs its own
+    errors; this outer guard additionally protects the extraction call itself
+    so a telemetry failure can NEVER alter or break the client response.
+    """
+    try:
+        _usage.record_usage_from_result(
+            result,
+            provider_id=target.provider_id,
+            account_id=target.account_id,
+            model=target.upstream_model,
+            endpoint_id=endpoint_id,
+        )
+    except Exception as exc:  # noqa: BLE001 - fail-open mandated (B5.5)
+        log_error_exc(
+            "usage recording failed (fail-open; client response unaffected)",
+            source="backend.gateway.router",
+            exc=exc,
+            context={"model_ref": target.model_ref},
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -374,20 +406,32 @@ async def _route_via_endpoint(
                     "invalid_request_error",
                     "provider_not_found",
                 )
+            api_key, account_id = select_provider_credential_with_account(
+                provider, session
+            )
             target = ResolvedTarget(
                 base_url=provider.base_url,
-                api_key=select_provider_credential(provider, session),
+                api_key=api_key,
                 model_ref=model,
                 upstream_model=_strip_binding_prefix(model),
                 combo_used=False,
+                # B5.5: provider + account so the UsageRecord can be attributed.
+                provider_id=provider.id,
+                account_id=account_id,
             )
             result = await provider_adapter.chat_completion(
                 target, payload, proxy_url
             )
+            # B5.5: record usage telemetry for the endpoint-bound provider call.
+            _record_usage_safe(result, target, endpoint_id=endpoint.id)
             return result
 
         if binding.bind_type == "combo":
-            result = await execute_combo(binding.bind_id, payload, proxy_url)
+            # B5.5: execute_combo records the UsageRecord (it knows the winning
+            # member/account); the endpoint id is threaded through here.
+            result = await execute_combo(
+                binding.bind_id, payload, proxy_url, endpoint_id=endpoint.id
+            )
             return result
 
         log_warning(

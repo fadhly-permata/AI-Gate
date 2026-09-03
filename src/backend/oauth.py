@@ -212,17 +212,31 @@ def get_valid_token(account: ProviderAccount, session: Session) -> str:
 def select_provider_credential(provider: Provider, session: Session) -> str:
     """Pick a credential for a provider across its enabled accounts (B5.1).
 
-    Round-robin across the provider's enabled ``ProviderAccount`` rows (ordered
-    by id asc). Each pick returns ``get_valid_token(...)`` (auto-refresh applied).
-
-    Guarantee: when a provider has ZERO enabled accounts, behavior is identical
-    to before B5.1 — we fall back to ``provider.api_key``. If an account lookup
-    fails (e.g. refresh error), we log and fall back to ``provider.api_key`` so
-    the gateway still serves requests instead of 500-ing.
+    Thin wrapper over :func:`select_provider_credential_with_account` kept for
+    backward compatibility (B5.5 added the account-id return).
 
     :param provider: a loaded :class:`Provider`.
     :param session: an active SQLAlchemy session.
     :returns: the credential string to forward upstream.
+    """
+    credential, _account_id = select_provider_credential_with_account(
+        provider, session
+    )
+    return credential
+
+
+def select_provider_credential_with_account(
+    provider: Provider, session: Session
+) -> "tuple[str, Optional[int]]":
+    """Round-robin account selection returning ``(credential, account_id)``.
+
+    B5.5: the gateway needs the chosen ``ProviderAccount.id`` to attribute a
+    ``UsageRecord`` per account (quota tracking per subscription account).
+    Semantics are identical to :func:`select_provider_credential`:
+
+    * zero enabled accounts -> ``(provider.api_key, None)`` (legacy fallback);
+    * an account whose token cannot be resolved -> log + ``(provider.api_key,
+      None)`` so the gateway still serves the request.
     """
     accounts = (
         session.query(ProviderAccount)
@@ -231,13 +245,13 @@ def select_provider_credential(provider: Provider, session: Session) -> str:
         .all()
     )
     if not accounts:
-        return provider.api_key  # legacy fallback — unchanged behavior
+        return provider.api_key, None  # legacy fallback — unchanged behavior
 
     idx = _ROUND_ROBIN.get(provider.id, 0) % len(accounts)
     _ROUND_ROBIN[provider.id] = idx + 1
     account = accounts[idx]
     try:
-        return get_valid_token(account, session)
+        return get_valid_token(account, session), account.id
     except Exception as exc:  # noqa: BLE001 - never crash the gateway on refresh
         log_error_exc(
             "select_provider_credential failed; falling back to provider.api_key",
@@ -245,7 +259,7 @@ def select_provider_credential(provider: Provider, session: Session) -> str:
             exc=exc,
             context={"provider_id": provider.id, "account_id": account.id},
         )
-        return provider.api_key
+        return provider.api_key, None
 
 
 __all__ = [
@@ -254,4 +268,5 @@ __all__ = [
     "REDIRECT_BASE",
     "get_valid_token",
     "select_provider_credential",
+    "select_provider_credential_with_account",
 ]

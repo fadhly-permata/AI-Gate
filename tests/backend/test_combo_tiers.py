@@ -182,28 +182,23 @@ def test_three_tier_orders_subscription_cheap_free(monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
-# quota-aware scaffold (no-op)
+# quota-aware ordering (B5.5): no quota data -> order unchanged (fail-open)
 # --------------------------------------------------------------------------- #
-def test_quota_aware_order_is_noop_and_logs(monkeypatch):
+def test_quota_aware_order_keeps_order_without_quota_data(monkeypatch):
     sf = _make_sessionmaker()
-    # Logging writes via the global SessionLocal; rebind so LogEntry lands in sf.
+    # Logging + usage lookups write via the global SessionLocal; rebind to sf.
     monkeypatch.setattr(db_mod, "SessionLocal", sf)
     _seed_three_tier(sf)
     with sf() as session:
         combo = session.query(Combo).filter_by(name="tiered").first()
         before = [c.upstream_model for c in combo_routing.build_candidates(combo, session)]
-    # Re-run and capture ordering + log.
+    # No provider has quota_limit -> all "has quota" -> tier order preserved.
+    assert before == ["sub1", "sub5", "cheap", "free"], before
     with sf() as session:
         combo = session.query(Combo).filter_by(name="tiered").first()
         after = combo_routing.build_candidates(combo, session)
         after_models = [c.upstream_model for c in after]
     assert after_models == before, after_models
-
-    # The scaffold must log the B5.5 placeholder (writes to LogEntry).
-    with sf() as session:
-        rows = session.query(LogEntry).all()
-    msgs = " ".join(r.message for r in rows)
-    assert "quota tracking not yet available (B5.5)" in msgs
 
 
 # --------------------------------------------------------------------------- #
@@ -299,7 +294,8 @@ def test_cadangan_antar_akun_retries_next_account_on_429(monkeypatch):
     _seed_provider_with_accounts(sf, n_accounts=2)
     # Force the FIRST attempt to use account #1's credential deterministically.
     monkeypatch.setattr(
-        combo_routing, "select_provider_credential", lambda p, s: "key1"
+        combo_routing, "select_provider_credential_with_account",
+        lambda p, s: ("key1", None),
     )
     client = _client(monkeypatch, sf)
 
@@ -363,7 +359,10 @@ def test_5xx_does_not_spin_on_accounts(monkeypatch):
         ])
         session.commit()
 
-    monkeypatch.setattr(combo_routing, "select_provider_credential", lambda p, s: "k1")
+    monkeypatch.setattr(
+        combo_routing, "select_provider_credential_with_account",
+        lambda p, s: ("k1", None),
+    )
     client = _client(monkeypatch, sf)
 
     r1 = respx.post("http://p1.test/v1/chat/completions").mock(
