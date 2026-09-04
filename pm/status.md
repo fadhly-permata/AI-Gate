@@ -474,6 +474,31 @@
 - BACKLOG B5.6 `[x]`. **B5.7 aktif** (be-dev+fe-dev, sekuensial): Export/Import
   Setting lokal (JSON) — pengganti cloud sync (PRD §2.4.4). be-dev dulu.
 
+## Fix BAHAYA terminal: PTY mati pas tab di-minimize — 2026-09-03 SELESAI
+- User: minimize Chrome / pindah tab -> terminal sering disconnected; BAHAYA kalau
+  lagi jalanin agentic (aider) bisa rusak kerjaan.
+- AKAR MASALAH: `terminal/router.py` `finally` manggil `pty.kill()` tiap WS putus.
+  Chrome nge-freeze tab background -> WS close -> server BUNUH shell -> aider mati
+  di tengah operasi.
+- FIX (be-dev + fe-dev, sekuensial):
+  - `terminal/session.py` (baru): registry PtySession, reader thread + ring buffer
+    256KB independen WS. Disconnect = DETACH (bukan kill). Reattach = replay buffer.
+    `{"type":"close"}` = kill eksplisit (satu-satunya jalur client). reaper_loop
+    cuma beresin yang exited/idle>grace (`terminal_idle_reap_minutes`=60). Commit `74e71e9`.
+  - fe-dev `terminal.js`: auto-reconnect same tab_id (backoff 0.5..15s),
+    visibilitychange->visible fast-path, closeTab kirim `{"type":"close"}`, resize
+    re-sent, status Reconnecting/Reconnected. Commit `a070c31`.
+  - BUG KUNCI (ditemukan PM via e2e): registry di-key int dari `_resolve_tab_id`
+    yang MINT new TerminalTab tiap connect UUID -> reconnect = shell baru (reattach
+    gak pernah kejadian + DB row leak). FIX: key registry pakai STRING tab_id client;
+    DB tab dibuat sekali. Commit `c3fb43c`.
+- VERIFIKASI LIVE (R20, e2e WS): connect UUID -> perintah `for i..echo TICK$i; sleep`
+  -> putus WS 5s -> reconnect UUID sama -> replay berisi TICK3 & TICK6 (dihasilkan
+  SELAMA putus). **PTY SURVIVED + REATTACH WORKS.** pytest 310 passed, vitest 242.
+- Server di-restart (PID 24130). Catatan be-dev: restart SERVER tetep matiin child
+  PTY (mereka child proses) — di luar scope; butuh daemonized PTY buat tahan restart
+  gateway.
+
 ## Fix CLI launch (aider gak init provider/model) — 2026-09-03 SELESAI
 - User: launch aider (udah ke-install) gak auto-init pake provider+model terpilih.
 - AKAR MASALAH: (1) gateway resolver cuma ngerti ref `provider:X`/`combo:X`, nama
