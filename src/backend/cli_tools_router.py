@@ -19,9 +19,10 @@ Pydantic **v1** only (rule R10): ``BaseModel`` + ``class Config``.
 
 from __future__ import annotations
 
+import os
 import shutil
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -30,7 +31,7 @@ from sqlalchemy.orm import Session
 
 from backend.config.db import SessionLocal
 from backend.config.settings import get as get_setting
-from backend.log import log_info
+from backend.log import log_info, log_warning
 from backend.models import CLITool, CLIToolGroup, Endpoint
 
 LOG_SOURCE = "backend.cli_tools.router"
@@ -80,8 +81,22 @@ class ResolveRequest(BaseModel):
 
 
 class ResolveDTO(BaseModel):
+    """Launch payload for one tool.
+
+    ``binary_found`` is a **hint** only (server-side PATH probe — see
+    ``_which_with_extra_paths``): the PTY the tool is finally spawned in has the
+    user's real login PATH, which the gateway process may not. The frontend
+    therefore branches on the binary itself::
+
+        if command -v <binary_name>; then <run_command>; else <install_command>; fi
+
+    which is why ``install_command`` is ALWAYS present (never nulled when the
+    binary happens to be found) and ``binary_name`` is exposed.
+    """
+
     binary_found: bool
-    install_command: Optional[str]
+    binary_name: str
+    install_command: str
     run_command: str
     env: Dict[str, str]
     model: Optional[str]
@@ -93,6 +108,70 @@ class ResolveDTO(BaseModel):
 # --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
+# Extra directories searched when probing for a CLI binary.
+#
+# WHY: ``shutil.which`` uses the SERVER process's PATH. aigate is often started
+# from a shell whose PATH does not include where the user installed a tool
+# (pip/pipx ``~/.local/bin``, ``~/.cargo/bin``, npm global, a pyenv shim, the
+# Termux prefix...). The tool is then reported as missing and the frontend runs
+# its INSTALL command even though the tool is installed and would run fine in
+# the interactive PTY (which has the real login PATH). Searching these common
+# install dirs server-side makes the hint far more accurate. Still only a hint:
+# the frontend re-checks with ``command -v <binary_name>`` inside the PTY.
+_EXTRA_PATH_DIRS: Tuple[str, ...] = (
+    "~/.local/bin",  # pip --user / pipx
+    "~/.cargo/bin",  # rust/cargo installs
+    "~/bin",  # classic per-user bin
+    "$PREFIX/bin",  # Termux prefix bin (pkg installs)
+    "/data/data/com.termux/files/usr/bin",  # Termux absolute fallback
+    "~/.pyenv/shims",  # pyenv-managed python CLIs
+    "~/.npm-global/bin",  # npm global (custom prefix)
+    "~/.deno/bin",  # deno install
+    "~/go/bin",  # go install
+    "/usr/local/bin",  # system-wide local installs
+)
+
+
+def _extra_search_paths() -> List[str]:
+    """Resolve ``_EXTRA_PATH_DIRS`` to the ones that actually exist right now.
+
+    ``~`` expands to ``$HOME`` and ``$PREFIX`` to the environment's Termux
+    prefix (absent on non-Termux hosts, so that entry simply drops out). Best
+    effort: a missing/unreadable dir is skipped, never an error.
+    """
+    out: List[str] = []
+    seen = set()
+    for raw in _EXTRA_PATH_DIRS:
+        path = os.path.expandvars(os.path.expanduser(raw))
+        if not path or path in seen:
+            continue
+        seen.add(path)
+        try:
+            if os.path.isdir(path):
+                out.append(path)
+        except OSError as exc:  # R12: log, never swallow silently
+            log_warning(
+                f"cli probe: cannot stat extra path '{path}': {exc}",
+                source=LOG_SOURCE,
+            )
+    return out
+
+
+def _which_with_extra_paths(binary: str) -> Optional[str]:
+    """``shutil.which`` over PATH + common user install dirs.
+
+    Returns the resolved absolute path, or ``None`` when the binary is not found
+    anywhere. The extended PATH is ``os.environ["PATH"]`` first (so the normal
+    lookup order wins) followed by the existing dirs from
+    ``_extra_search_paths()``.
+    """
+    if not binary:
+        return None
+    base = os.environ.get("PATH", "")
+    extended = os.pathsep.join([p for p in [base] if p] + _extra_search_paths())
+    return shutil.which(binary, path=extended)
+
+
 def _tool_to_dto(tool: CLITool) -> ToolDTO:
     return ToolDTO(
         id=tool.id,
@@ -273,8 +352,12 @@ def list_cli_tools() -> dict:
 def resolve_cli_tool(req: ResolveRequest) -> dict:
     """Resolve a tool for launch: check binary, build run/install + env.
 
-    ``binary_found`` = ``shutil.which(tool.binary_name) is not None``.
-    When not found, ``install_command`` is returned; otherwise it is null.
+    ``binary_found`` = ``_which_with_extra_paths(tool.binary_name) is not None``
+    — PATH plus common user install dirs. It is a HINT only: the server process
+    may still not see a binary the interactive PTY can run, so the frontend
+    re-checks with ``command -v <binary_name>`` inside the PTY and only installs
+    when that fails. ``install_command`` is therefore ALWAYS returned (the tool's
+    install string, never null), together with ``binary_name``.
     ``env`` carries ``OPENAI_API_BASE`` (gateway) + ``OPENAI_API_KEY``
     (plaintext internal key, ADR-007). Unknown tool -> 404 ``tool_not_found``.
     """
@@ -289,8 +372,12 @@ def resolve_cli_tool(req: ResolveRequest) -> dict:
                 f"tool '{req.tool}' not found", "tool_not_found"
             )
 
-        binary_found = shutil.which(tool.binary_name) is not None
-        install_command = tool.install_command if not binary_found else None
+        binary_path = _which_with_extra_paths(tool.binary_name)
+        binary_found = binary_path is not None
+        # Always expose the install command: the frontend's PTY-side
+        # ``command -v`` check is authoritative, so it needs the string even when
+        # the server-side hint says the binary is present.
+        install_command = tool.install_command or ""
 
         base = _resolve_gateway_base(session)
         key = _resolve_internal_key(session)
@@ -311,6 +398,7 @@ def resolve_cli_tool(req: ResolveRequest) -> dict:
 
         result = ResolveDTO(
             binary_found=binary_found,
+            binary_name=tool.binary_name,
             install_command=install_command,
             run_command=run_command,
             env=env,
@@ -322,8 +410,8 @@ def resolve_cli_tool(req: ResolveRequest) -> dict:
         # API response above still returns it plaintext per ADR-007.
         logged_command = run_command.replace(key, "***") if key else run_command
         log_info(
-            f"resolve: tool='{req.tool}' binary_found={binary_found} "
-            f"model={req.model}",
+            f"resolve: tool='{req.tool}' binary='{tool.binary_name}' "
+            f"binary_found={binary_found} path={binary_path} model={req.model}",
             source=LOG_SOURCE,
             context={"run_command": logged_command},
         )

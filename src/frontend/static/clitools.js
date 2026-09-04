@@ -10,26 +10,73 @@
 
   /* ---------------------------------------------------------------
    * PURE HELPER (importable + testable via vitest)
-   * Build the shell command string to run/install a CLI tool.
+   *
+   * Build a PTY-side, SELF-DECIDING shell command to launch a CLI tool.
+   *
+   * WHY self-deciding: `binary_found` in the DTO is computed by the SERVER
+   * process's PATH, which may not include where the user actually installed
+   * the tool (~/.local/bin, pipx, npm global, a venv, Termux prefix...). The
+   * interactive PTY has the user's real login PATH, so `command -v` THERE is
+   * authoritative. We therefore never trust `binary_found` to pick install vs
+   * run — the emitted command checks the binary itself and only installs when
+   * genuinely absent:
+   *
+   *   export OPENAI_API_BASE='<base>'
+   *   export OPENAI_API_KEY='<key>'
+   *   if command -v <binary_name> >/dev/null 2>&1; then
+   *     <run_command>
+   *   else
+   *     <install_command>
+   *   fi
+   *
    * @param {object} dto - resolve DTO from POST /api/cli-tools/resolve
-   *   { binary_found:bool, install_command:str|null,
-   *     run_command:str, env:{OPENAI_API_BASE, OPENAI_API_KEY}, model }
+   *   { binary_found:bool (HINT only, ignored here), binary_name:str,
+   *     install_command:str (may be ""), run_command:str,
+   *     env:{OPENAI_API_BASE, OPENAI_API_KEY}, model }
    * @returns {string} command to send into the terminal.
    * --------------------------------------------------------------- */
+
+  /* POSIX single-quote wrapping: wrap in '...' and escape any embedded '
+   * via the '\'' idiom (close-quote, escaped-quote, reopen-quote). Safe for
+   * arbitrary base/key values, incl. spaces and single quotes. */
+  function shSingleQuote(s) {
+    s = s == null ? "" : String(s);
+    return "'" + s.replace(/'/g, "'\\''") + "'";
+  }
+
   function buildLaunchCommand(dto) {
     dto = dto || {};
-    if (!dto.binary_found) {
-      // Binary absent -> install command (string). May be null -> empty.
-      return dto.install_command != null ? String(dto.install_command) : "";
-    }
     var env = dto.env || {};
     var base = env.OPENAI_API_BASE != null ? env.OPENAI_API_BASE : "";
     var key = env.OPENAI_API_KEY != null ? env.OPENAI_API_KEY : "";
     var run = dto.run_command != null ? String(dto.run_command) : "";
+    var install = dto.install_command != null ? String(dto.install_command) : "";
+
+    // Binary to probe: prefer dto.binary_name; fall back (defensively) to the
+    // first token of run_command when it is missing/blank.
+    var binary = dto.binary_name != null ? String(dto.binary_name).trim() : "";
+    if (!binary) {
+      var toks = run.trim().split(/\s+/);
+      binary = toks[0] || "";
+    }
+
+    // `then` body: run_command, or a `:` no-op if empty (empty body is a
+    // shell syntax error). `else` body: install_command, or a clear message
+    // when no install command is configured.
+    var thenBody = run.trim() !== "" ? run : ":";
+    var elseBody = install.trim() !== ""
+      ? install
+      : 'echo "aigate: \'' + binary + "' not installed and no install command configured\"";
+
     // ADR-007: plaintext OPENAI_API_KEY injected into the local shell is fine.
-    return "export OPENAI_API_BASE='" + base + "'\n" +
-           "export OPENAI_API_KEY='" + key + "'\n" +
-           run + "\n";
+    // Env exports kept for generic tools that read OPENAI_API_BASE/KEY.
+    return "export OPENAI_API_BASE=" + shSingleQuote(base) + "\n" +
+           "export OPENAI_API_KEY=" + shSingleQuote(key) + "\n" +
+           "if command -v " + binary + " >/dev/null 2>&1; then\n" +
+           "  " + thenBody + "\n" +
+           "else\n" +
+           "  " + elseBody + "\n" +
+           "fi\n";
   }
 
   window.aigate = window.aigate || {};
@@ -190,13 +237,13 @@
       headers: { "Content-Type": "application/json", "Accept": "application/json" },
       body: JSON.stringify({ tool: currentTool.name, model: model || undefined })
     }).then(function (dto) {
-      if (dto && !dto.binary_found) {
-        // Binary missing: show the install hint before launching the install cmd.
-        var hint = el("cliHint");
-        if (hint) {
-          hint.hidden = false;
-          hint.textContent = getStr("cli.installing") + " (" + currentTool.name + ")";
-        }
+      // The emitted command self-decides (PTY-side `command -v`), so we must
+      // NOT claim "installing" — the tool may already be installed and simply
+      // launch. Neutral hint; `binary_found` is only a server-side PATH hint.
+      var hint = el("cliHint");
+      if (hint) {
+        hint.hidden = false;
+        hint.textContent = getStr("cli.launching_or_installing");
       }
       var command = window.aigate.buildLaunchCommand(dto);
       // Reuse B3.3 terminal manager: open a NEW tab and run the command.

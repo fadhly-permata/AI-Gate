@@ -9,6 +9,10 @@ also covers the logger. We additionally patch ``backend.cli_tools_router``.
 
 from __future__ import annotations
 
+import os
+import shutil
+import stat
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -349,4 +353,167 @@ def test_resolve_aider_key_not_persisted_to_logentry(monkeypatch) -> None:
     assert entries, "resolve must log an entry"
     assert all("secret-key-abc" not in (e.message or "") for e in entries)
     assert any("***" in (e.message or "") for e in entries)
+
+
+# =========================================================================== #
+# 6. Robust binary detection + always-present install_command.
+#
+# WHY: ``shutil.which`` only saw the SERVER process PATH. aigate started from a
+# shell without e.g. ~/.local/bin reported aider as missing, so the frontend ran
+# the INSTALL command for a tool that was already installed and would run fine
+# in the PTY (real login PATH). Fix: broaden detection over common user install
+# dirs AND always expose binary_name + install_command so the frontend can do
+# the authoritative PTY-side check:
+#   if command -v <binary_name>; then <run_command>; else <install_command>; fi
+# =========================================================================== #
+FAKE_TOOL = "aigate-fake-cli-tool"
+
+
+def _make_fake_binary(directory: str, name: str) -> str:
+    """Create an executable stub ``<directory>/<name>`` and return its path."""
+    os.makedirs(directory, exist_ok=True)
+    path = os.path.join(directory, name)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write("#!/bin/sh\necho stub\n")
+    os.chmod(path, os.stat(path).st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+    return path
+
+
+def test_which_with_extra_paths_finds_binary_off_base_path(monkeypatch, tmp_path) -> None:
+    """A binary in ~/.local/bin is found even though it is NOT on the base PATH."""
+    fake_home = tmp_path / "home"
+    installed = _make_fake_binary(str(fake_home / ".local" / "bin"), FAKE_TOOL)
+
+    monkeypatch.setenv("HOME", str(fake_home))
+    monkeypatch.delenv("PREFIX", raising=False)
+    # base PATH = an empty dir -> plain which() cannot see the tool.
+    empty = tmp_path / "emptybin"
+    empty.mkdir()
+    monkeypatch.setenv("PATH", str(empty))
+
+    assert shutil.which(FAKE_TOOL) is None  # sanity: old detection fails here
+    assert cli_tools_router._which_with_extra_paths(FAKE_TOOL) == installed
+
+
+def test_which_with_extra_paths_none_for_absent_binary(monkeypatch, tmp_path) -> None:
+    """A genuinely absent binary still resolves to None (no false positive)."""
+    monkeypatch.setenv("HOME", str(tmp_path / "nohome"))
+    monkeypatch.delenv("PREFIX", raising=False)
+    empty = tmp_path / "emptybin"
+    empty.mkdir()
+    monkeypatch.setenv("PATH", str(empty))
+
+    assert cli_tools_router._which_with_extra_paths(FAKE_TOOL) is None
+    # empty/None-ish binary name is handled without touching the filesystem
+    assert cli_tools_router._which_with_extra_paths("") is None
+
+
+def test_which_with_extra_paths_still_honours_base_path(monkeypatch, tmp_path) -> None:
+    """Base PATH entries keep working (extended search is additive, not a replace)."""
+    on_path = _make_fake_binary(str(tmp_path / "sysbin"), FAKE_TOOL)
+    monkeypatch.setenv("HOME", str(tmp_path / "nohome"))
+    monkeypatch.delenv("PREFIX", raising=False)
+    monkeypatch.setenv("PATH", str(tmp_path / "sysbin"))
+
+    assert cli_tools_router._which_with_extra_paths(FAKE_TOOL) == on_path
+
+
+def test_extra_search_paths_only_returns_existing_dirs(monkeypatch, tmp_path) -> None:
+    """Non-existent candidate dirs are skipped; the real HOME ones are kept."""
+    fake_home = tmp_path / "home"
+    (fake_home / ".cargo" / "bin").mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(fake_home))
+    monkeypatch.delenv("PREFIX", raising=False)
+
+    paths = cli_tools_router._extra_search_paths()
+    assert str(fake_home / ".cargo" / "bin") in paths
+    # ~/.local/bin was never created -> must not appear
+    assert str(fake_home / ".local" / "bin") not in paths
+    # every returned entry really is a directory
+    assert all(os.path.isdir(p) for p in paths)
+
+
+def test_resolve_reports_binary_found_via_extra_paths(monkeypatch, tmp_path) -> None:
+    """End-to-end: resolve flips binary_found True for a tool installed in a
+    user dir missing from the server PATH (the original bug)."""
+    sf = _make_sf()
+    _seed_all(sf)
+
+    fake_home = tmp_path / "home"
+    _make_fake_binary(str(fake_home / ".npm-global" / "bin"), "llm")
+    monkeypatch.setenv("HOME", str(fake_home))
+    monkeypatch.delenv("PREFIX", raising=False)
+    empty = tmp_path / "emptybin"
+    empty.mkdir()
+    monkeypatch.setenv("PATH", str(empty))
+
+    client = _client(monkeypatch, sf)
+    r = client.post("/api/cli-tools/resolve", json={"tool": "llm"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["binary_found"] is True
+    assert body["binary_name"] == "llm"
+
+
+def test_resolve_exposes_binary_name(monkeypatch) -> None:
+    """``binary_name`` is part of ResolveDTO (frontend needs it for command -v)."""
+    sf = _make_sf()
+    _seed_all(sf)
+    client = _client(monkeypatch, sf)
+
+    r = client.post("/api/cli-tools/resolve", json={"tool": "open-interpreter"})
+    assert r.status_code == 200
+    body = r.json()
+    assert set(body) == {
+        "binary_found",
+        "binary_name",
+        "install_command",
+        "run_command",
+        "env",
+        "model",
+    }
+    # name != binary for this preset (open-interpreter -> interpreter)
+    assert body["binary_name"] == "interpreter"
+
+
+def test_resolve_install_command_present_when_binary_found(monkeypatch) -> None:
+    """install_command is ALWAYS the tool's install string — even when the
+    server-side hint says the binary was found (behaviour intentionally changed:
+    it used to be null when found). The frontend builds the 'else install'
+    branch from it, so it must never be null/missing."""
+    sf = _make_sf()
+    _seed_all(sf)
+    client = _client(monkeypatch, sf)
+
+    monkeypatch.setattr(
+        cli_tools_router,
+        "_which_with_extra_paths",
+        lambda binary: f"/fake/bin/{binary}",
+    )
+
+    r = client.post("/api/cli-tools/resolve", json={"tool": "llm"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["binary_found"] is True
+    assert body["install_command"] == "pip install llm"
+    assert body["install_command"] is not None
+
+    # and the PTY-side branch the frontend builds is fully populated
+    assert body["run_command"].startswith("llm")
+    assert body["binary_name"] == "llm"
+
+
+def test_resolve_install_command_present_when_not_found(monkeypatch) -> None:
+    """Not-found case is unchanged: install_command still returned."""
+    sf = _make_sf()
+    _seed_all(sf)
+    client = _client(monkeypatch, sf)
+
+    monkeypatch.setattr(
+        cli_tools_router, "_which_with_extra_paths", lambda binary: None
+    )
+    body = client.post("/api/cli-tools/resolve", json={"tool": "aider"}).json()
+    assert body["binary_found"] is False
+    assert body["install_command"]  # non-empty install string
+    assert body["binary_name"] == "aider"
 
