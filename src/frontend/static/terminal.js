@@ -30,6 +30,27 @@
     return JSON.stringify({ type: "resize", cols: cols, rows: rows });
   }
 
+  // JSON close control frame. This is the ONLY thing that tells the backend to
+  // KILL the PTY. Sent on a DELIBERATE tab close (the X button), never on a
+  // transient WS drop — so a minimized/backgrounded tab keeps its shell running.
+  function buildCloseFrame() {
+    return JSON.stringify({ type: "close" });
+  }
+
+  /* Exponential backoff delay (ms) for reconnect attempt N (0-indexed).
+     0.5s, 1s, 2s, 4s, 8s, then capped at ~15s. Pure + testable. */
+  function computeBackoffDelay(attempt, opts) {
+    opts = opts || {};
+    var base = opts.base != null ? opts.base : 500;
+    var factor = opts.factor != null ? opts.factor : 2;
+    var cap = opts.cap != null ? opts.cap : 15000;
+    var n = Number(attempt) || 0;
+    if (n < 0) n = 0;
+    var d = base * Math.pow(factor, n);
+    if (d > cap) d = cap;
+    return d;
+  }
+
   /* Map a swipe velocity (px/ms, vertical; negative = upward) to a terminal
      scroll delta in lines.
        - sign is preserved (up swipe -> negative lines -> scroll toward top)
@@ -126,6 +147,73 @@
     }
   }
 
+  /* ---- Reconnect / reattach (backend PTY now survives WS drops) ----
+   * A tab's WebSocket may close because Chrome froze a minimized/backgrounded
+   * tab. The backend keeps the PTY alive + buffers output, so we reconnect to
+   * the SAME tab_id (reattach + replay) with exponential backoff. We only send
+   * the {"type":"close"} kill frame when the user DELIBERATELY closes a tab. */
+
+  // Write a dim status line into the terminal (ADR-011 surface status/errors).
+  function writeStatus(tab, text) {
+    if (!tab || !tab.term) return;
+    try { tab.term.write("\r\n\x1b[2m" + text + "\x1b[0m\r\n"); } catch (e) {}
+  }
+
+  // Schedule a reconnect for a tab (unless it was deliberately closed).
+  function scheduleReconnect(tab, immediate) {
+    if (!tab || tab.userClosed) return;
+    if (tab.reconnectTimer) { clearTimeout(tab.reconnectTimer); tab.reconnectTimer = null; }
+
+    var delay;
+    if (immediate) {
+      delay = 0;                 // visibilitychange fast-path: skip backoff
+      tab.reconnectAttempt = 0;  // a fresh, user-driven attempt
+    } else {
+      delay = computeBackoffDelay(tab.reconnectAttempt);
+      tab.reconnectAttempt = (tab.reconnectAttempt || 0) + 1;
+    }
+
+    // Only show "Reconnecting…" once per drop episode (don't spam on retries).
+    if (!tab.reconnectShown) {
+      tab.reconnectShown = true;
+      writeStatus(tab, t("term.reconnecting"));
+    }
+
+    tab.reconnectTimer = setTimeout(function () {
+      tab.reconnectTimer = null;
+      if (tab.userClosed) return;
+      connectSocket(tab);
+    }, delay);
+  }
+
+  /* (Re)open the WebSocket for an EXISTING tab, reusing its tab_id so the
+     backend reattaches to the still-running PTY and replays buffered output. */
+  function connectSocket(tab) {
+    if (!tab || tab.userClosed) return;
+    var ws = new WebSocket(buildTerminalWsUrl(tab.id));
+    tab.ws = ws;
+
+    ws.onopen = function () {
+      // Successful reattach: reset backoff + status, re-send current size.
+      tab.reconnectAttempt = 0;
+      if (tab.reconnectShown) {
+        tab.reconnectShown = false;
+        writeStatus(tab, t("term.reconnected"));
+      }
+      sendResize(tab);
+    };
+    ws.onmessage = function (ev) {
+      // TEXT frame = terminal output (guard against echoing control JSON).
+      if (typeof ev.data === "string" && ev.data.charAt(0) === "{") return;
+      tab.term.write(ev.data);
+    };
+    ws.onclose = function () {
+      if (tab.userClosed) return;      // deliberate close → final, no reconnect
+      scheduleReconnect(tab, false);   // transient drop → reattach with backoff
+    };
+    ws.onerror = function () { /* surfaced via onclose */ };
+  }
+
   function createTabButton(tab) {
     var btn = document.createElement("button");
     btn.type = "button";
@@ -183,7 +271,13 @@
     fit.fit();
 
     var ws = new WebSocket(buildTerminalWsUrl(id));
-    var tab = { id: id, term: term, fit: fit, ws: ws, container: container, tuiMode: false };
+    var tab = {
+      id: id, term: term, fit: fit, ws: ws, container: container, tuiMode: false,
+      userClosed: false,          // true only when the user closes the tab
+      reconnectTimer: null,       // pending reconnect setTimeout handle
+      reconnectAttempt: 0,        // backoff step counter (reset on open)
+      reconnectShown: false       // "Reconnecting…" shown for this episode
+    };
     tabs.set(id, tab);
 
     term.write("\x1b[2m" + t("term.connecting") + "\x1b[0m\r\n");
@@ -197,9 +291,17 @@
       if (typeof ev.data === "string" && ev.data.charAt(0) === "{") return;
       term.write(ev.data);
     };
-    ws.onopen = function () { sendResize(tab); };
+    ws.onopen = function () {
+      tab.reconnectAttempt = 0;
+      if (tab.reconnectShown) {
+        tab.reconnectShown = false;
+        writeStatus(tab, t("term.reconnected"));
+      }
+      sendResize(tab);
+    };
     ws.onclose = function () {
-      term.write("\r\n\x1b[33m" + t("term.disconnected") + "\x1b[0m\r\n");
+      if (tab.userClosed) return;      // deliberate close → final
+      scheduleReconnect(tab, false);   // transient drop → reattach with backoff
     };
     ws.onerror = function () { /* surface via onclose */ };
 
@@ -255,6 +357,14 @@
   function closeTab(id) {
     var tab = tabs.get(id);
     if (!tab) return;
+
+    // DELIBERATE close: stop reconnecting, tell the backend to KILL the PTY,
+    // then drop the socket. This is the ONLY path that sends {"type":"close"}.
+    tab.userClosed = true;
+    if (tab.reconnectTimer) { clearTimeout(tab.reconnectTimer); tab.reconnectTimer = null; }
+    try {
+      if (tab.ws && tab.ws.readyState === WebSocket.OPEN) tab.ws.send(buildCloseFrame());
+    } catch (e) {}
     try { tab.ws.close(); } catch (e) {}
     try { tab.term.dispose(); } catch (e) {}
     if (tab.button && tab.button.remove) tab.button.remove();
@@ -379,6 +489,18 @@
     setupSwipe();
     window.addEventListener("resize", debounce(refitActive, 120));
 
+    // Fast-path: when the page becomes visible again (e.g. restored from a
+    // minimized tab), if the ACTIVE tab's socket is down, reconnect NOW instead
+    // of waiting out the backoff — so the session resumes immediately.
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState !== "visible") return;
+      var tab = activeTab();
+      if (!tab || tab.userClosed) return;
+      var down = !tab.ws ||
+        (tab.ws.readyState !== WebSocket.OPEN && tab.ws.readyState !== WebSocket.CONNECTING);
+      if (down) scheduleReconnect(tab, true);
+    });
+
     // Keep xterm themes in sync with the global theme toggle.
     if (typeof MutationObserver !== "undefined") {
       var obs = new MutationObserver(function (muts) {
@@ -402,6 +524,8 @@
     buildTerminalWsUrl: buildTerminalWsUrl,
     tabTitle: tabTitle,
     buildResizeFrame: buildResizeFrame,
+    buildCloseFrame: buildCloseFrame,
+    computeBackoffDelay: computeBackoffDelay,
     // manager hooks (used by app.js nav handler):
     onShow: function () {
       if (!activeId) openTab();
@@ -411,7 +535,11 @@
     closeTab: closeTab,
     activate: activate,
     refitActive: refitActive,
-    launchInNewTab: launchInNewTab
+    launchInNewTab: launchInNewTab,
+    // test/introspection hooks (reconnect logic):
+    _tabs: tabs,
+    _scheduleReconnect: scheduleReconnect,
+    _connectSocket: connectSocket
   };
   // Convenience alias for app.js.
   window.aigate.terminalManager = window.aigate.terminal;
