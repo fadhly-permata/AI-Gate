@@ -801,7 +801,7 @@
                    2-col grid (Provider|Model / Priority|Weight) so nothing is
                    orphaned by mid-row wrap; buttons on their own aligned row.
                    Element ids unchanged — combos.js + tests depend on them. -->
-              <div class="combo-member-form">
+              <div class="combo-member-form" id="comboMemberForm">
                 <div class="combo-member-fields">
                   <div class="combo-member-field">
                     <label class="form-label" for="comboMemberProvider"
@@ -811,8 +811,12 @@
                   <div class="combo-member-field">
                     <label class="form-label" for="comboMemberModel"
                            data-i18n="combos.member.model">Model</label>
-                    <input class="form-input" type="text" id="comboMemberModel"
-                           name="comboMemberModel" list="comboMemberModelList" autocomplete="off" />
+                    <div class="combo-model-control">
+                      <input class="form-input" type="text" id="comboMemberModel"
+                             name="comboMemberModel" list="comboMemberModelList" autocomplete="off" />
+                      <span class="combo-model-spinner" id="comboMemberModelSpinner"
+                            hidden aria-hidden="true"><i class="fa fa-spinner fa-spin"></i></span>
+                    </div>
                     <datalist id="comboMemberModelList"></datalist>
                   </div>
                   <div class="combo-member-field">

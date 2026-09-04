@@ -40,7 +40,7 @@ function withComboModalDom() {
         '<input type="checkbox" id="comboEnabled" />' +
         '<p id="comboMemberMsg"></p>' +
         '<table id="comboMembersTable"><tbody id="comboMembersBody"></tbody></table>' +
-        '<div class="combo-member-form">' +
+        '<div class="combo-member-form" id="comboMemberForm">' +
           '<div class="combo-member-fields">' +
             '<div class="combo-member-field">' +
               '<label class="form-label" for="comboMemberProvider" data-i18n="combos.member.provider">Provider</label>' +
@@ -48,7 +48,10 @@ function withComboModalDom() {
             '</div>' +
             '<div class="combo-member-field">' +
               '<label class="form-label" for="comboMemberModel" data-i18n="combos.member.model">Model</label>' +
-              '<input id="comboMemberModel" list="comboMemberModelList" />' +
+              '<div class="combo-model-control">' +
+                '<input id="comboMemberModel" list="comboMemberModelList" />' +
+                '<span class="combo-model-spinner" id="comboMemberModelSpinner" hidden aria-hidden="true"></span>' +
+              '</div>' +
               '<datalist id="comboMemberModelList"></datalist>' +
             '</div>' +
             '<div class="combo-member-field">' +
@@ -225,13 +228,148 @@ describe("combos members — provider/model dropdown chaining", () => {
     }));
     await window.aigate.combos.loadProviders();
     const models = window.aigate.combos.populateModelOptions(1);
-    expect(models.map((m) => m.model_id)).toEqual(["llama-3.1", "gpt-4o"]);
+    // Cached models are now sorted by name (case-insensitive): GPT-4o < Llama 3.1.
+    expect(models.map((m) => m.model_id)).toEqual(["gpt-4o", "llama-3.1"]);
     const dl = document.getElementById("comboMemberModelList").innerHTML;
     expect(dl).toContain('value="llama-3.1"');
     expect(dl).toContain('value="gpt-4o"');
     // Provider with no discovered models -> empty options, free-text still allowed.
     expect(window.aigate.combos.populateModelOptions(2)).toEqual([]);
     expect(document.getElementById("comboMemberModelList").innerHTML).toBe("");
+  });
+});
+
+describe("combos members — auto model fetch on provider change", () => {
+  beforeEach(() => { withComboModalDom(); });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  // Flush pending microtasks (fetchJson chains .then/.catch) to completion.
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  // A 200 JSON response (discover always returns HTTP 200, even on ok:false).
+  const body = (payload) => Promise.resolve({
+    ok: true, headers: { get: () => "application/json" },
+    json: () => Promise.resolve(payload)
+  });
+  const dlValues = () => Array.from(
+    document.getElementById("comboMemberModelList").querySelectorAll("option")
+  ).map((o) => o.getAttribute("value"));
+
+  it("changing the provider POSTs /api/providers/<id>/discover", async () => {
+    const calls = [];
+    vi.stubGlobal("fetch", vi.fn((url, opts) => {
+      const u = String(url);
+      calls.push({ url: u, method: opts && opts.method });
+      if (u === "/api/providers") return jsonResponse(sampleProviders());
+      if (u === "/api/providers/1/discover") return body({ ok: true, models: [] });
+      return body({});
+    }));
+    await window.aigate.combos.loadProviders();
+    const sel = document.getElementById("comboMemberProvider");
+    sel.value = "1";
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+    await tick();
+    const disc = calls.find((c) => c.url === "/api/providers/1/discover" && c.method === "POST");
+    expect(disc).toBeTruthy();
+  });
+
+  it("discover models are sorted by name (case-insensitive) in the datalist", async () => {
+    vi.stubGlobal("fetch", vi.fn((url) => {
+      const u = String(url);
+      if (u === "/api/providers") return jsonResponse(sampleProviders());
+      if (u === "/api/providers/1/discover") {
+        return body({ ok: true, models: [
+          { id: 1, model_id: "zeta", model_name: "Zeta" },
+          { id: 2, model_id: "Alpha", model_name: "alpha" },
+          { id: 3, model_id: "mid", model_name: "Mid" }
+        ] });
+      }
+      return body({});
+    }));
+    await window.aigate.combos.loadProviders();
+    const models = await window.aigate.combos.fetchModelsForProvider(1);
+    // Sort key = model_name (lowercased): alpha < Mid < Zeta.
+    expect(models.map((m) => m.model_id)).toEqual(["Alpha", "mid", "zeta"]);
+    expect(dlValues()).toEqual(["Alpha", "mid", "zeta"]);
+  });
+
+  it("loading state is applied first, then cleared after the fetch resolves", async () => {
+    let resolveDisc;
+    const gate = new Promise((r) => { resolveDisc = r; });
+    vi.stubGlobal("fetch", vi.fn((url) => {
+      const u = String(url);
+      if (u === "/api/providers") return jsonResponse(sampleProviders());
+      if (u === "/api/providers/1/discover") return gate.then(() => body({ ok: true, models: [] }));
+      return body({});
+    }));
+    await window.aigate.combos.loadProviders();
+    const mo = document.getElementById("comboMemberModel");
+    const add = document.getElementById("comboMemberAddBtn");
+    const form = document.getElementById("comboMemberForm");
+    const spinner = document.getElementById("comboMemberModelSpinner");
+
+    const pr = window.aigate.combos.fetchModelsForProvider(1);
+    // Applied synchronously, BEFORE the fetch resolves:
+    expect(mo.disabled).toBe(true);
+    expect(add.disabled).toBe(true);
+    expect(form.getAttribute("aria-busy")).toBe("true");
+    expect(spinner.hidden).toBe(false);
+    expect(mo.placeholder).toBe(window.I18N.en["combos.member.loading"]);
+
+    resolveDisc();
+    await pr;
+    // Cleared after resolve:
+    expect(mo.disabled).toBe(false);
+    expect(add.disabled).toBe(false);
+    expect(form.getAttribute("aria-busy")).toBe("false");
+    expect(spinner.hidden).toBe(true);
+    expect(mo.placeholder).toBe(window.I18N.en["combos.member.model_ph"]);
+  });
+
+  it("discover {ok:false} falls back to cached models (sorted) + load_failed note", async () => {
+    vi.stubGlobal("fetch", vi.fn((url) => {
+      const u = String(url);
+      if (u === "/api/providers") return jsonResponse(sampleProviders());
+      if (u === "/api/providers/1/discover") return body({ ok: false, error: "no network" });
+      return body({});
+    }));
+    await window.aigate.combos.loadProviders();
+    const models = await window.aigate.combos.fetchModelsForProvider(1);
+    // provider 1 cached: Llama 3.1 + GPT-4o -> sorted by name: GPT-4o, Llama 3.1.
+    expect(models.map((m) => m.model_id)).toEqual(["gpt-4o", "llama-3.1"]);
+    expect(dlValues()).toEqual(["gpt-4o", "llama-3.1"]);
+    const msg = document.getElementById("comboMemberMsg");
+    expect(msg.textContent).toContain(window.I18N.en["combos.member.load_failed"]);
+    expect(msg.className).toContain("settings-msg-warn");
+    // Loading cleared even on the fallback path (field usable again).
+    expect(document.getElementById("comboMemberModel").disabled).toBe(false);
+  });
+
+  it("race guard: only the latest provider fetch is applied (stale ignored)", async () => {
+    let resolveA, resolveB;
+    const gateA = new Promise((r) => { resolveA = r; });
+    const gateB = new Promise((r) => { resolveB = r; });
+    vi.stubGlobal("fetch", vi.fn((url) => {
+      const u = String(url);
+      if (u === "/api/providers") return jsonResponse(sampleProviders());
+      if (u === "/api/providers/1/discover") {
+        return gateA.then(() => body({ ok: true, models: [{ id: 1, model_id: "stale-a", model_name: "Stale A" }] }));
+      }
+      if (u === "/api/providers/2/discover") {
+        return gateB.then(() => body({ ok: true, models: [{ id: 2, model_id: "fresh-b", model_name: "Fresh B" }] }));
+      }
+      return body({});
+    }));
+    await window.aigate.combos.loadProviders();
+    const sel = document.getElementById("comboMemberProvider");
+    sel.value = "1"; sel.dispatchEvent(new Event("change", { bubbles: true })); // seq 1 (will be stale)
+    sel.value = "2"; sel.dispatchEvent(new Event("change", { bubbles: true })); // seq 2 (latest)
+    resolveB();          // latest resolves FIRST
+    await tick();
+    expect(dlValues()).toEqual(["fresh-b"]);
+    resolveA();          // stale resolves LATER -> must be ignored
+    await tick();
+    expect(dlValues()).toEqual(["fresh-b"]); // unchanged by the stale response
+    expect(document.getElementById("comboMemberModel").disabled).toBe(false);
   });
 });
 
@@ -434,7 +572,8 @@ describe("combos strategy select — three_tier (B5.2)", () => {
       "combos.member.weight", "combos.member.remove", "combos.member.edit",
       "combos.member.confirm_delete", "combos.member.provider_ph",
       "combos.member.model_ph", "combos.member.cancel_edit",
-      "combos.member.provider_required"
+      "combos.member.provider_required", "combos.member.loading",
+      "combos.member.load_failed"
     ].forEach((k) => {
       expect(window.I18N.en[k]).toBeDefined();
       expect(window.I18N.id[k]).toBeDefined();

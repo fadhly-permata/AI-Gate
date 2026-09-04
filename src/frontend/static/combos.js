@@ -13,7 +13,15 @@
      (membersBuffer) and sent in one shot in the POST /api/combos body
      `members:[...]` on Save.
    ADR-011: every failure surfaces in #comboMemberMsg / #comboMsg — never
-   swallowed. */
+    swallowed.
+
+    Model field (auto-fetch): changing #comboMemberProvider (or preselecting a
+    provider in edit mode) POSTs /api/providers/{id}/discover, sorts the
+    returned models by name (case-insensitive), and repopulates the datalist.
+    A loading state (disabled field + Add, aria-busy, spinner, "Loading
+    models…" placeholder) shows while fetching; on discover failure it falls
+    back to the provider's cached models with a subtle note. A request-sequence
+    token drops stale/out-of-order responses (race guard). */
 
 (function () {
   "use strict";
@@ -62,6 +70,7 @@
   var membersBuffer = [];       // client-side buffer for a NEW combo
   var editingMemberId = null;   // server member id loaded into the sub-form
   var editingBufferIndex = null; // buffer index loaded into the sub-form
+  var modelFetchSeq = 0;        // race-guard token for the model auto-fetch
 
   /* ---- Pure mapping (importable + testable) ---- */
   function mapComboToRow(c) {
@@ -190,21 +199,132 @@
     sel.value = keep;
   }
 
-  /* Fill the model datalist from the chosen provider's discovered models.
-     Empty list -> free-text input still works (no options rendered). */
-  function populateModelOptions(providerId) {
+  /* Sort a model list by display name, ascending, case-insensitive.
+     Sort key = model_name || model_id. Returns a NEW array (never mutates). */
+  function sortModelsByName(models) {
+    return (Array.isArray(models) ? models : []).slice().sort(function (a, b) {
+      var an = String((a && (a.model_name || a.model_id)) || "").toLowerCase();
+      var bn = String((b && (b.model_name || b.model_id)) || "").toLowerCase();
+      if (an < bn) return -1;
+      if (an > bn) return 1;
+      return 0;
+    });
+  }
+
+  /* Render a (already-sorted) model list into the #comboMemberModelList
+     datalist. Empty list -> no options (free-text input still works). */
+  function renderModelOptions(models) {
     var dl = el("comboMemberModelList");
-    if (!dl) return [];
-    var p = null;
-    for (var i = 0; i < providersCache.length; i++) {
-      if (String(providersCache[i].id) === String(providerId)) { p = providersCache[i]; break; }
-    }
-    var models = (p && Array.isArray(p.models)) ? p.models : [];
-    dl.innerHTML = models.map(function (m) {
+    if (!dl) return;
+    dl.innerHTML = (models || []).map(function (m) {
       return '<option value="' + escapeHtml(m.model_id) + '">' +
         escapeHtml(m.model_name || m.model_id) + "</option>";
     }).join("");
+  }
+
+  /* Cached models for a provider id (from providersCache), UNSORTED. */
+  function cachedModelsFor(providerId) {
+    for (var i = 0; i < providersCache.length; i++) {
+      if (String(providersCache[i].id) === String(providerId)) {
+        return Array.isArray(providersCache[i].models) ? providersCache[i].models : [];
+      }
+    }
+    return [];
+  }
+
+  /* Toggle the sub-form "loading models" state. Deliberately does NOT touch
+     the model input's VALUE (so an edit-mode prefill survives); it only
+     disables the field + Add button, swaps the placeholder to the loading
+     text, shows the spinner, sets aria-busy on the sub-form, and clears the
+     datalist options. */
+  function setModelLoading(on) {
+    var mo = el("comboMemberModel");
+    var add = el("comboMemberAddBtn");
+    var form = el("comboMemberForm");
+    var spinner = el("comboMemberModelSpinner");
+    var dl = el("comboMemberModelList");
+    if (on) {
+      if (mo) { mo.disabled = true; mo.placeholder = getStr("combos.member.loading"); }
+      if (add) add.disabled = true;
+      if (form) form.setAttribute("aria-busy", "true");
+      if (spinner) spinner.hidden = false;
+      if (dl) dl.innerHTML = "";
+    } else {
+      if (mo) { mo.disabled = false; mo.placeholder = getStr("combos.member.model_ph"); }
+      if (add) add.disabled = false;
+      if (form) form.setAttribute("aria-busy", "false");
+      if (spinner) spinner.hidden = true;
+    }
+  }
+
+  /* Fill the model datalist from the chosen provider's CACHED models, sorted.
+     Empty list -> free-text input still works (no options rendered). */
+  function populateModelOptions(providerId) {
+    var models = sortModelsByName(cachedModelsFor(providerId));
+    renderModelOptions(models);
     return models;
+  }
+
+  /* Apply a sorted model list as the FALLBACK path (discover failed): render
+     it, clear loading, and surface a subtle note. Stale requests are ignored. */
+  function applyFallback(seq, models) {
+    if (seq !== modelFetchSeq) return models; // a newer fetch owns the UI now
+    renderModelOptions(models);
+    setModelLoading(false);
+    setMemberMsg(getStr("combos.member.load_failed"), "warn");
+    return models;
+  }
+
+  /* Fallback chain: providersCache first; if it has no models for this
+     provider, GET /api/providers/{id}; if that fails too, empty (free-text). */
+  function fallbackFromCache(providerId, seq) {
+    var cached = sortModelsByName(cachedModelsFor(providerId));
+    if (cached.length) return applyFallback(seq, cached);
+    return fetchJson(PROVIDERS_API + "/" + encodeURIComponent(providerId)).then(function (p) {
+      return applyFallback(seq, sortModelsByName((p && Array.isArray(p.models)) ? p.models : []));
+    }).catch(function () {
+      return applyFallback(seq, []);
+    });
+  }
+
+  /* Auto-fetch a provider's models on demand:
+       loading -> POST /discover -> sort -> populate -> (fallback) -> clear.
+     Race-guarded via modelFetchSeq: only the most-recent request may touch the
+     DOM, so out-of-order responses from a fast provider switch are dropped.
+     Returns a Promise<models[]>. */
+  function fetchModelsForProvider(providerId) {
+    // No provider selected: clear options + invalidate any in-flight fetch.
+    if (providerId === "" || providerId == null) {
+      modelFetchSeq++;
+      renderModelOptions([]);
+      setModelLoading(false);
+      return Promise.resolve([]);
+    }
+    var seq = ++modelFetchSeq;
+    setModelLoading(true);
+    return fetchJson(PROVIDERS_API + "/" + encodeURIComponent(providerId) + "/discover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" }
+    }).then(function (res) {
+      if (seq !== modelFetchSeq) return []; // stale — a newer fetch won
+      if (res && res.ok === true && Array.isArray(res.models)) {
+        // Keep the cache fresh so a later fallback reflects this discovery.
+        for (var i = 0; i < providersCache.length; i++) {
+          if (String(providersCache[i].id) === String(providerId)) {
+            providersCache[i].models = res.models; break;
+          }
+        }
+        var models = sortModelsByName(res.models);
+        renderModelOptions(models);
+        setModelLoading(false);
+        return models;
+      }
+      // {ok:false} (e.g. no network) -> fall back to cached models.
+      return fallbackFromCache(providerId, seq);
+    }).catch(function () {
+      if (seq !== modelFetchSeq) return []; // stale
+      return fallbackFromCache(providerId, seq); // transport error -> fallback
+    });
   }
 
   /* ---- Members table render ---- */
@@ -263,21 +383,28 @@
   function resetMemberForm() {
     editingMemberId = null;
     editingBufferIndex = null;
+    modelFetchSeq++; // invalidate any in-flight model fetch (race guard)
     var p = el("comboMemberProvider"); if (p) p.value = "";
-    var mo = el("comboMemberModel"); if (mo) { mo.value = ""; mo.placeholder = getStr("combos.member.model_ph"); }
+    var mo = el("comboMemberModel");
+    if (mo) { mo.value = ""; mo.disabled = false; mo.placeholder = getStr("combos.member.model_ph"); }
     var pr = el("comboMemberPriority"); if (pr) pr.value = "0";
     var w = el("comboMemberWeight"); if (w) w.value = "1";
     var dl = el("comboMemberModelList"); if (dl) dl.innerHTML = "";
     var add = el("comboMemberAddBtn");
-    if (add) add.textContent = getStr("combos.member.add");
+    if (add) { add.textContent = getStr("combos.member.add"); add.disabled = false; }
     var cancel = el("comboMemberCancelEdit"); if (cancel) cancel.hidden = true;
+    var form = el("comboMemberForm"); if (form) form.setAttribute("aria-busy", "false");
+    var spinner = el("comboMemberModelSpinner"); if (spinner) spinner.hidden = true;
   }
 
   function fillMemberForm(m) {
     var p = el("comboMemberProvider");
     if (p) p.value = m.provider_id != null ? String(m.provider_id) : "";
-    populateModelOptions(m.provider_id);
     var mo = el("comboMemberModel"); if (mo) mo.value = m.provider_model || "";
+    // Edit-mode preselect: auto-fetch + sort this provider's models. The fetch
+    // only repopulates the datalist (loading state never clears the value set
+    // above), so the member being edited keeps its model while options refresh.
+    fetchModelsForProvider(m.provider_id);
     var pr = el("comboMemberPriority"); if (pr) pr.value = String(m.priority != null ? m.priority : 0);
     var w = el("comboMemberWeight"); if (w) w.value = String(m.weight != null ? m.weight : 1);
     var add = el("comboMemberAddBtn");
@@ -484,12 +611,8 @@
     if (memCancel) memCancel.addEventListener("click", function (e) {
       e.preventDefault(); resetMemberForm();
     });
-    var memProvider = el("comboMemberProvider");
-    if (memProvider) memProvider.addEventListener("change", function () {
-      // Switching provider repopulates the model options (chained dropdown).
-      var mo = el("comboMemberModel"); if (mo) mo.value = "";
-      populateModelOptions(memProvider.value);
-    });
+    // NOTE: the provider-change handler is a document-level delegated listener
+    // registered at module load (see below) so it survives modal DOM rebuilds.
     // Enter inside the members sub-form adds/updates the member, never saves
     // the whole combo form.
     ["comboMemberProvider", "comboMemberModel", "comboMemberPriority", "comboMemberWeight"]
@@ -504,6 +627,17 @@
     if (mo) mo.placeholder = getStr("combos.member.model_ph");
   }
 
+  /* ---- Provider change -> auto-fetch + sort models (chained dropdown) ----
+     Delegated on `document` and registered ONCE at module load, so it keeps
+     working even when the modal DOM is rebuilt (re-renders / tests). Native
+     `change` bubbles, so the select inside the modal reaches this handler. */
+  document.addEventListener("change", function (e) {
+    if (!e.target || e.target.id !== "comboMemberProvider") return;
+    // Switching provider clears the stale model value, then fetches fresh.
+    var mo = el("comboMemberModel"); if (mo) mo.value = "";
+    fetchModelsForProvider(e.target.value);
+  });
+
   /* ---- Expose hook for app.js nav handler + tests ---- */
   window.aigate = window.aigate || {};
   window.aigate.combos = {
@@ -515,6 +649,9 @@
     loadProviders: loadProviders,
     renderProviderOptions: renderProviderOptions,
     populateModelOptions: populateModelOptions,
+    fetchModelsForProvider: fetchModelsForProvider,
+    sortModelsByName: sortModelsByName,
+    setModelLoading: setModelLoading,
     renderMembers: renderMembers,
     memberFormValues: memberFormValues,
     submitMemberForm: submitMemberForm,

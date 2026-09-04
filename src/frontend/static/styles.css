@@ -340,9 +340,11 @@ body.sidebar-collapsed .nav-item {
 
 .settings-msg-ok { color: #28a745; }
 .settings-msg-error { color: #dc3545; }
+.settings-msg-warn { color: #b8860b; }
 
 [data-theme="dark"] .settings-msg-ok { color: #5dd879; }
 [data-theme="dark"] .settings-msg-error { color: #ff6b6b; }
+[data-theme="dark"] .settings-msg-warn { color: #e0b64b; }
 
 /* Small screens: force collapse-friendly base */
 @media (max-width: 600px) {
@@ -604,6 +606,18 @@ body[data-device="phone"] .modal { width: 100%; }
   width: 100%;
   max-width: none;
 }
+/* Model field: input + inline loading spinner (shown while auto-fetch runs). */
+.combo-model-control { position: relative; display: flex; align-items: center; }
+.combo-model-control .form-input { flex: 1 1 auto; min-width: 0; }
+.combo-model-spinner {
+  position: absolute;
+  right: 8px;
+  display: inline-flex;
+  color: var(--muted, #888);
+  font-size: 14px;
+  pointer-events: none;
+}
+.combo-model-spinner[hidden] { display: none; }
 .combo-member-actions {
   display: flex;
   align-items: center;
