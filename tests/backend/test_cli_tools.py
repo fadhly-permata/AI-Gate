@@ -530,8 +530,9 @@ def test_resolve_install_command_present_when_not_found(monkeypatch) -> None:
 
 # =========================================================================== #
 # 7. opencode launch builder: writes opencode.json (custom OpenAI-compatible
-#    provider) via a single-quoted heredoc, then runs opencode with the chosen
-#    model as ``aigate/<model>`` (or the TUI when none chosen).
+#    provider + top-level default ``model``) via a single-quoted heredoc, then
+#    opens the interactive TUI (plain ``opencode`` — never ``opencode run``,
+#    which is one-shot and hangs waiting on stdin in the PTY).
 # =========================================================================== #
 _HEREDOC_OPEN = "<<'AIGATE_EOF'\n"
 _HEREDOC_CLOSE = "\nAIGATE_EOF\n"
@@ -548,7 +549,7 @@ def _extract_heredoc_json(run_command: str) -> dict:
 
 
 def test_resolve_opencode_writes_config_and_runs(monkeypatch) -> None:
-    """opencode -> heredoc config (provider aigate) + ``opencode run --model``."""
+    """opencode -> heredoc config (provider aigate + top-level model) + TUI."""
     sf = _make_sf()
     _seed_all(sf)
     _seed_endpoint(sf)  # key = plain-key-xyz
@@ -576,10 +577,17 @@ def test_resolve_opencode_writes_config_and_runs(monkeypatch) -> None:
     assert "gpt-5.5" in prov["models"]
     assert prov["models"]["gpt-5.5"]["name"] == "gpt-5.5"
 
-    # 3. opencode is launched with the selected model as aigate/<raw>.
-    assert "opencode run --model aigate/gpt-5.5" in rc
-    # the raw provider: ref must NOT leak into the --model value.
-    assert "provider:" not in rc.split(_HEREDOC_CLOSE)[-1]
+    # 3. top-level default model preselects aigate/<raw> in the TUI.
+    assert cfg["model"] == "aigate/gpt-5.5"
+    # key order: $schema, model, provider
+    assert list(cfg) == ["$schema", "model", "provider"]
+
+    # 4. interactive TUI launched — NEVER the one-shot ``opencode run``.
+    tail = rc.split(_HEREDOC_CLOSE)[-1]
+    assert tail == "opencode"
+    assert "opencode run" not in rc
+    # the raw provider: ref must NOT leak into the command tail.
+    assert "provider:" not in tail
 
     # env still injected (OPENAI_API_KEY belt-and-suspenders).
     assert body["env"]["OPENAI_API_BASE"] == "http://localhost:8080/v1"
@@ -610,16 +618,20 @@ def test_resolve_opencode_lists_discovered_models(monkeypatch) -> None:
         json={"tool": "opencode", "model": "provider:B.AI:gpt-5.5"},
     )
     assert r.status_code == 200
-    cfg = _extract_heredoc_json(r.json()["run_command"])
+    rc = r.json()["run_command"]
+    cfg = _extract_heredoc_json(rc)
     models = cfg["provider"]["aigate"]["models"]
     assert set(models) == {"gpt-5.5", "o3"}
     assert models["o3"]["name"] == "o3"
-    # still launches the specifically requested model.
-    assert "opencode run --model aigate/gpt-5.5" in r.json()["run_command"]
+    # default model preselects the requested one; TUI (never ``opencode run``).
+    assert cfg["model"] == "aigate/gpt-5.5"
+    assert rc.split(_HEREDOC_CLOSE)[-1] == "opencode"
+    assert "opencode run" not in rc
 
 
 def test_resolve_opencode_no_model_opens_tui(monkeypatch) -> None:
-    """No model chosen -> plain ``opencode`` (TUI), config still written."""
+    """No model chosen -> plain ``opencode`` (TUI), config still written,
+    and NO top-level ``model`` key (nothing to preselect)."""
     sf = _make_sf()
     _seed_all(sf)
     _seed_endpoint(sf)
@@ -630,15 +642,17 @@ def test_resolve_opencode_no_model_opens_tui(monkeypatch) -> None:
     rc = r.json()["run_command"]
     cfg = _extract_heredoc_json(rc)
     assert cfg["provider"]["aigate"]["models"] == {}
+    assert "model" not in cfg
     tail = rc.split(_HEREDOC_CLOSE)[-1]
     assert tail == "opencode"
     assert "run --model" not in tail
 
 
 def test_resolve_opencode_combo_ref(monkeypatch) -> None:
-    """combo:<name> -> opencode.json models map has key ``combo:<name>`` and
-    the launch is ``opencode run --model aigate/combo:<name>`` (the gateway
-    resolver already routes combo refs, so the combo must be selectable)."""
+    """combo:<name> -> opencode.json models map has key ``combo:<name>``, the
+    top-level default model is ``aigate/combo:<name>``, and the interactive TUI
+    is launched (the gateway resolver already routes combo refs, so the combo
+    must be selectable)."""
     sf = _make_sf()
     _seed_all(sf)
     _seed_endpoint(sf)  # key = plain-key-xyz
@@ -665,6 +679,10 @@ def test_resolve_opencode_combo_ref(monkeypatch) -> None:
     assert "combo:Test" in prov["models"]
     assert prov["models"]["combo:Test"]["name"] == "combo:Test"
 
-    # 3. launched as aigate/combo:Test (provider id + combo ref).
-    assert "opencode run --model aigate/combo:Test" in rc
+    # 3. default model = aigate/combo:Test (provider id + combo ref).
+    assert cfg["model"] == "aigate/combo:Test"
+
+    # 4. interactive TUI launched (never one-shot ``opencode run``).
+    assert rc.split(_HEREDOC_CLOSE)[-1] == "opencode"
+    assert "opencode run" not in rc
     assert r.json()["model"] == "combo:Test"

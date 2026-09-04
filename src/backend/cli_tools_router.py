@@ -337,15 +337,20 @@ def _opencode_builder(ctx: _LaunchCtx) -> str:
     ``OPENAI_API_KEY`` env (belt-and-suspenders; the gateway ignores the key
     while access control is off).
 
-    Launch: ``opencode run --model aigate/<raw_model>`` when a concrete model was
-    chosen, else plain ``opencode`` (TUI). The env exports (OPENAI_API_BASE/KEY)
-    are injected by the caller exactly as for aider — this builder only emits the
-    config write + the command.
+    Launch: plain ``opencode`` (the interactive TUI) — ``opencode run`` is
+    one-shot and would sit waiting on stdin inside the PTY. The model is
+    preselected via the top-level ``model`` key of the generated config
+    (``aigate/<modelID>``, opencode docs: top-level ``model`` = default model,
+    format ``providerID/modelID``). When no concrete model was chosen, no
+    ``model`` key is written and the TUI still opens with whatever config
+    exists. The env exports (OPENAI_API_BASE/KEY) are injected by the caller
+    exactly as for aider — this builder only emits the config write + the
+    command.
 
     Combo refs (``combo:<name>``): the combo is exposed as a selectable model id
     (key ``combo:<name>``, name identical) so opencode can DISCOVER + SELECT it;
     the gateway resolver already routes ``combo:<name>`` via the combo, so the
-    launch is ``opencode run --model aigate/combo:<name>``.
+    default model is ``aigate/combo:<name>``.
     """
     model = ctx.model or ""
     if model.startswith("combo:"):
@@ -358,25 +363,27 @@ def _opencode_builder(ctx: _LaunchCtx) -> str:
         if not model_ids and ctx.raw_model:
             model_ids = [ctx.raw_model]
 
-    config = {
+    config: Dict[str, object] = {
         "$schema": "https://opencode.ai/config.json",
-        "provider": {
-            _OPENCODE_PROVIDER_ID: {
-                "npm": "@ai-sdk/openai-compatible",
-                "name": _OPENCODE_PROVIDER_ID,
-                "options": {"baseURL": ctx.base, "apiKey": ctx.key},
-                "models": {mid: {"name": mid} for mid in model_ids},
-            }
-        },
+    }
+    if ctx.raw_model:
+        # Top-level default model: providerID/modelID (raw ref, same reduction
+        # as the models map — combo refs stay ``combo:<name>`` verbatim).
+        config["model"] = f"{_OPENCODE_PROVIDER_ID}/{ctx.raw_model}"
+    config["provider"] = {
+        _OPENCODE_PROVIDER_ID: {
+            "npm": "@ai-sdk/openai-compatible",
+            "name": _OPENCODE_PROVIDER_ID,
+            "options": {"baseURL": ctx.base, "apiKey": ctx.key},
+            "models": {mid: {"name": mid} for mid in model_ids},
+        }
     }
     cfg_json = json.dumps(config, indent=2)
 
     # Single-quoted heredoc delimiter -> the shell writes the JSON verbatim.
+    # Always launch the interactive TUI; the model comes from the config.
     cmd = "cat > opencode.json <<'AIGATE_EOF'\n" + cfg_json + "\nAIGATE_EOF\n"
-    if ctx.raw_model:
-        cmd += f"opencode run --model {_OPENCODE_PROVIDER_ID}/{ctx.raw_model}"
-    else:
-        cmd += "opencode"
+    cmd += "opencode"
     return cmd
 
 
