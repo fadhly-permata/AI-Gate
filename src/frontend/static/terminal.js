@@ -143,10 +143,20 @@
   var tabs = new Map();      // id -> { id, term, fit, ws, container, button, tuiMode }
   var activeId = null;
   var tabBarEl, containersEl, stageEl, bodyEl, newTabBtn;
+  var emptyEl = null;        // centered hint shown while no tab exists
+  var emptyNewTabBtn = null; // the hint's own "New Tab" affordance
   var stageResizeObs = null; // BUG2: ResizeObserver on the shared .term-stage
   var debouncedRefit = null;  // BUG2: debounced refitActive() for resize storms
 
   function activeTab() { return activeId ? tabs.get(activeId) : null; }
+
+  /* Empty state (redesign): the panel shows a centered hint instead of a blank
+     surface whenever no tab exists (i.e. before the first session opens). Pure
+     DOM toggle, guarded so it is a no-op in test fixtures without the element. */
+  function updateEmptyState() {
+    if (!emptyEl) return;
+    emptyEl.hidden = tabs.size > 0;
+  }
 
   // Is the active terminal scroll position at a buffer edge? (for damping)
   function atEdge(term) {
@@ -311,6 +321,7 @@
     btn.type = "button";
     btn.className = "term-tab";
     btn.setAttribute("role", "tab");
+    btn.setAttribute("aria-selected", "false");
     btn.dataset.tabId = tab.id;
 
     var label = document.createElement("span");
@@ -335,7 +346,14 @@
     });
 
     tab.button = btn;
-    tabBarEl.insertBefore(btn, newTabBtn);
+    // Tabs are appended to the scrolling strip. The "+" button lives OUTSIDE the
+    // strip (pinned in the toolbar) so it stays reachable when the tabs overflow;
+    // insertBefore is kept only for the case where it is still inside the strip.
+    if (newTabBtn && newTabBtn.parentNode === tabBarEl) {
+      tabBarEl.insertBefore(btn, newTabBtn);
+    } else {
+      tabBarEl.appendChild(btn);
+    }
   }
 
   function openTab() {
@@ -386,6 +404,7 @@
     wireSocket(tab, ws);
 
     createTabButton(tab);
+    updateEmptyState();
     activate(id);
     return tab;
   }
@@ -417,7 +436,14 @@
     tabs.forEach(function (tab) {
       var show = tab.id === id;
       if (tab.container) tab.container.style.display = show ? "block" : "none";
-      if (tab.button) tab.button.classList.toggle("active", show);
+      if (tab.button) {
+        tab.button.classList.toggle("active", show);
+        // ARIA tab semantics + keep the active tab visible in a scrolling strip.
+        try { tab.button.setAttribute("aria-selected", show ? "true" : "false"); } catch (e) {}
+        if (show && tab.button.scrollIntoView) {
+          try { tab.button.scrollIntoView({ block: "nearest", inline: "nearest" }); } catch (e) {}
+        }
+      }
     });
     refitActive();
     observeActiveStage();
@@ -478,6 +504,7 @@
       if (!it.done) activate(it.value);
       else { activeId = null; openTab(); } // keep at least one tab alive
     }
+    updateEmptyState();
   }
 
   /* ---- Floating control ---- */
@@ -578,9 +605,12 @@
     stageEl = document.getElementById("termStage");
     bodyEl = document.getElementById("terminalBody");
     newTabBtn = document.getElementById("termNewTab");
+    emptyEl = document.getElementById("termEmpty");
+    emptyNewTabBtn = document.getElementById("termEmptyNewTab");
     if (!tabBarEl || !containersEl) return; // not on this page / test env
 
     if (newTabBtn) newTabBtn.addEventListener("click", openTab);
+    if (emptyNewTabBtn) emptyNewTabBtn.addEventListener("click", openTab);
     var fs = document.getElementById("termFullscreen");
     if (fs) fs.addEventListener("click", toggleFullscreen);
     var pst = document.getElementById("termPaste");
@@ -589,6 +619,7 @@
     if (tui) tui.addEventListener("click", toggleTui);
 
     setupSwipe();
+    updateEmptyState();
     window.addEventListener("resize", debounce(refitActive, 120));
 
     // BUG2: refit xterm whenever the ACTIVE stage box actually changes size —

@@ -600,28 +600,30 @@
         </div>
       </section>
 
-      <!-- Terminal view (B3.1): FLATTENED — toolbar + stage only. No card / pane /
-           header chrome (the sidebar nav already labels this view "Terminal"). The
-           view is an exact-fit flex column (see .terminal-view in styles.css) so the
-           stage fills the remaining workspace height with no page scroll. -->
+      <!-- Terminal view (B3.1): ONE cohesive panel. #terminalBody is the panel
+           frame; row 1 = tab strip (tabs + "+" + controls), row 2 = terminal
+           surface. Both rows share the --term-pad inset so the xterm glyph
+           column is flush with the tab strip and symmetric left/right. The view
+           stays an exact-fit flex column (see .terminal-view in styles.css) so
+           the stage fills the remaining workspace height with no page scroll. -->
       <section class="view terminal-view" data-view="terminal">
         <div class="terminal-body" id="terminalBody">
-          <!-- Multi-tab terminal (B3.3) -->
+          <!-- Tab strip + controls (B3.3). The "+" button sits OUTSIDE the
+               scrolling #termTabBar so it stays pinned and reachable even when
+               many tabs overflow the strip. -->
           <div class="term-toolbar">
-            <div class="term-tabs" id="termTabBar" role="tablist">
-              <button class="icon-btn term-newtab" id="termNewTab" type="button"
-                      data-i18n-aria="term.new_tab" title="New Tab">
-                <i class="fa fa-plus"></i>
-              </button>
-            </div>
-          </div>
+            <div class="term-tabs" id="termTabBar" role="tablist"></div>
 
-          <div class="term-stage" id="termStage">
-            <!-- One container per tab; xterm mounted here -->
-            <div class="term-containers" id="termContainers"></div>
+            <button class="icon-btn term-newtab" id="termNewTab" type="button"
+                    data-i18n-aria="term.new_tab" title="New Tab">
+              <i class="fa fa-plus"></i>
+            </button>
 
-            <!-- Floating control overlay (FSD §2.5.0) -->
-            <div class="term-floating" id="termFloating">
+            <!-- Control cluster (FSD §2.5.0): docked to the right end of the tab
+                 strip — top-right of the panel, same height as the tabs, so it
+                 never covers the tabs or the first line of terminal output. -->
+            <div class="term-floating" id="termFloating" role="group"
+                 data-i18n-aria="term.controls" aria-label="Terminal controls">
               <button class="icon-btn term-ctl" id="termFullscreen" type="button"
                       data-i18n-aria="term.fullscreen" title="Fullscreen">
                 <i class="fa fa-expand"></i>
@@ -634,6 +636,19 @@
                       data-i18n-aria="term.tui_mode" title="TUI Mode" aria-pressed="false">
                 <i class="fa fa-hand-pointer"></i>
               </button>
+            </div>
+          </div>
+
+          <div class="term-stage" id="termStage">
+            <!-- One container per tab; xterm mounted here -->
+            <div class="term-containers" id="termContainers"></div>
+
+            <!-- Empty state: shown while no tab exists (terminal.js toggles it) -->
+            <div class="term-empty" id="termEmpty" hidden>
+              <i class="fa fa-terminal term-empty-icon" aria-hidden="true"></i>
+              <p class="term-empty-text" data-i18n="term.empty">No terminal session yet.</p>
+              <button class="btn btn-primary term-empty-btn" id="termEmptyNewTab" type="button"
+                      data-i18n="term.new_tab">New Tab</button>
             </div>
           </div>
         </div>

@@ -27,6 +27,32 @@
      0 when hidden; JS measures the panel and sets this via ResizeObserver so
      the fixed panel never overlaps the terminal / view content. */
   --log-h: 0px;
+
+  /* ---- Terminal panel tokens (redesign) ----
+     ONE inset token (--term-pad) drives BOTH the tab strip padding and the
+     terminal surface inset, so the xterm glyph column and the tab strip can
+     never drift apart: the strip pads all four sides with it, the surface pads
+     left (glyph column flush with the first tab) and top/bottom on the .xterm
+     box (the only padding FitAddon subtracts from its row budget). The xterm
+     viewport scrollbar is sized to the same token and lives in the right
+     gutter, so the panel reads symmetric on both sides.
+     The terminal surface is always dark (xterm theme bg #1e1e1e); only the
+     frame + the active-tab tint follow the app theme. */
+  --term-pad: 8px;
+  --term-gap: 6px;
+  --term-ctl: 30px;          /* one height: tabs, + button, floating controls */
+  --term-tab-radius: 6px;
+  --term-surface: #1e1e1e;   /* == xterm theme.background (do not diverge) */
+  --term-chrome: #26292f;    /* tab strip */
+  --term-chrome-fg: #b9bfc9;
+  --term-chrome-fg-strong: #f4f6f9;
+  --term-divider: #14161a;   /* 1px seam between tab strip and surface */
+  --term-frame: #e3e6ea;
+  --term-tab-bg: rgba(255, 255, 255, 0.05);
+  --term-tab-bg-hover: rgba(255, 255, 255, 0.11);
+  --term-tab-border: rgba(255, 255, 255, 0.10);
+  --term-tab-active-bg: rgba(0, 123, 255, 0.22);
+  --term-empty-fg: #8b929c;
 }
 
 [data-theme="dark"] {
@@ -42,6 +68,10 @@
   --accent-contrast: #ffffff;
   --muted: #8b929c;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  /* Terminal: frame blends into the dark shell; active tab tint follows the
+     brighter dark accent. Surface/chrome stay identical (always-dark pane). */
+  --term-frame: #343a40;
+  --term-tab-active-bg: rgba(74, 158, 255, 0.22);
 }
 
 * { box-sizing: border-box; }
@@ -727,13 +757,18 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
   font-size: 20px;
 }
 
-/* ===== Terminal view (B3.1) — FLATTENED =====
-   No card / pane / header chrome: the view is just toolbar + stage. The ACTIVE
-   terminal view is an exact-fit flex column filling the workspace content box
-   (height:100% + overflow:hidden), so the stage takes EXACTLY the leftover
-   height — no min-height floor, no page scroll. When the Log Window is visible
-   its --log-h padding shrinks the workspace content box and the flex chain
-   re-fills the smaller box automatically. */
+/* ===== Terminal view (B3.1) — ONE COHESIVE PANEL =====
+   The tab strip and the terminal surface are two rows of a single framed panel
+   (.terminal-body): shared dark surface colour, one 1px seam between them, and
+   ONE horizontal inset token (--term-pad) used by both, so the glyph column and
+   the tab strip are flush-left and the panel is left/right symmetric.
+
+   Height chain (hard-won, do not regress): the active view is an exact-fit flex
+   column filling the workspace content box (height:100% + overflow:hidden); the
+   body and the stage flex-fill with min-height:0 and NO vh/px floor, so the
+   stage takes exactly the leftover height and the page never scrolls. When the
+   Log Window is visible its --log-h padding shrinks the workspace content box
+   and the whole chain re-fills the smaller box automatically. */
 .view[data-view="terminal"].is-active,
 .terminal-view.is-active {
   display: flex;
@@ -744,80 +779,127 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
 }
 
 .terminal-body {
+  /* The panel itself: one frame, one radius, one clip. No padding — the inset
+     lives in the toolbar and the terminal container so both share --term-pad. */
   padding: 0;
-  background: #1e1e1e;
+  background: var(--term-surface);
+  border: 1px solid var(--term-frame);
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   /* Exact-fit flex child: grows to fill the view, floor is 0 (NOT a vh/px
      minimum — a floor taller than the leftover space was the scroll bug). */
   flex: 1 1 auto;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
 }
 
-/* ---- Multi-tab terminal (B3.3) ---- */
+/* ---- Tab strip: row 1 of the panel ---- */
 .term-toolbar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  background: #2a2d32;
-  border-bottom: 1px solid #111;
+  gap: var(--term-gap);
+  padding: var(--term-pad);
+  background: var(--term-chrome);
+  border-bottom: 1px solid var(--term-divider); /* the only seam in the panel */
   flex: 0 0 auto; /* natural height; the stage below grows to fill */
 }
 
 .term-tabs {
   display: flex;
-  align-items: stretch;
-  gap: 4px;
-  flex: 1 1 auto;
-  overflow-x: auto;
+  align-items: center;
+  gap: var(--term-gap);
+  /* Shrink-to-content: the "+" sits right after the last tab, and when the tabs
+     overflow the strip it shrinks to the available room and scrolls instead of
+     pushing the "+" / controls out of reach. */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-x: auto;      /* many tabs -> scroll the strip, never wrap */
+  overflow-y: hidden;
+  /* The strip scrollbar is hidden on purpose: a classic scrollbar would take
+     layout space and change the toolbar height (and thus the stage height)
+     when many tabs are open. Tabs stay reachable by wheel/trackpad and the
+     active tab is scrolled into view by terminal.js. */
+  scrollbar-width: none;
 }
+.term-tabs::-webkit-scrollbar { display: none; }
 
 .term-tab {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 10px;
-  border: none;
-  border-radius: 6px 6px 0 0;
-  background: #1e1e1e;
-  color: #c2c7d0;
+  flex: 0 0 auto;
+  height: var(--term-ctl);
+  padding: 0 10px;
+  border: 1px solid var(--term-tab-border);
+  border-radius: var(--term-tab-radius);
+  background: var(--term-tab-bg);
+  color: var(--term-chrome-fg);
   cursor: pointer;
   font-size: 12px;
   max-width: 160px;
   white-space: nowrap;
+  transition: background var(--transition), color var(--transition),
+              border-color var(--transition);
 }
-
+.term-tab:hover {
+  background: var(--term-tab-bg-hover);
+  color: var(--term-chrome-fg-strong);
+}
 .term-tab.active {
-  background: #111;
-  color: #fff;
+  background: var(--term-tab-active-bg);
+  border-color: var(--accent);
+  color: var(--term-chrome-fg-strong);
+}
+.term-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .term-tab-label {
   font-family: "Menlo", "Consolas", monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .term-tab-close {
-  margin-left: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
   font-size: 14px;
   line-height: 1;
-  color: #888;
+  color: var(--term-chrome-fg);
   cursor: pointer;
 }
-.term-tab-close:hover { color: #fff; }
+.term-tab-close:hover { background: var(--term-tab-bg-hover); color: #fff; }
 
-.term-newtab {
+/* "+" new-tab button: same box as a tab, reads as an affordance not a tab. */
+.term-toolbar .term-newtab {
   flex: 0 0 auto;
-  color: #c2c7d0;
-  width: 30px;
-  height: 30px;
+  width: var(--term-ctl);
+  height: var(--term-ctl);
+  border: 1px dashed var(--term-tab-border);
+  border-radius: var(--term-tab-radius);
+  background: transparent;
+  color: var(--term-chrome-fg);
+  font-size: 14px;
 }
-.term-newtab:hover { color: #fff; }
+.term-toolbar .term-newtab:hover {
+  background: var(--term-tab-bg-hover);
+  border-style: solid;
+  border-color: var(--accent);
+  color: var(--term-chrome-fg-strong);
+}
 
+/* ---- Terminal surface: row 2 of the panel ---- */
 .term-stage {
   position: relative;
   flex: 1 1 auto;
-  background: #1e1e1e;
+  background: var(--term-surface);
   /* Exact-fit: flex-fills whatever the toolbar leaves. NO min-height floor
      (the old 28vh pinned the stage taller than the leftover space on short
      viewports / when the Log Window reserved room -> page scroll). min-height:0
@@ -831,32 +913,91 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
   inset: 0;
 }
 
+/* The single horizontal inset, shared with the toolbar: it lives on the LEFT of
+   the terminal surface so the glyph column starts exactly where the tab strip
+   starts. FitAddon measures THIS element's border-box width and subtracts the
+   viewport scrollbar from it, so the left pad is absorbed into the scrollbar
+   gutter -> the glyph column ends up ~equidistant from both frame edges.
+   NO vertical padding here: FitAddon does NOT subtract a parent's padding-top/
+   bottom, so vertical padding on this box made it render more rows than fit and
+   the last row was clipped by the panel edge (worse in fullscreen). */
 .term-tab-container {
   width: 100%;
   height: 100%;
-  padding: 4px;
+  padding: 0 0 0 var(--term-pad);
 }
-.term-tab-container .xterm,
+/* The vertical inset lives on the .xterm element itself, which FitAddon DOES
+   subtract from the row budget -> the grid always fits inside the panel and the
+   first/last row are never clipped. */
+.term-tab-container .xterm {
+  height: 100%;
+  padding-top: var(--term-pad);
+  padding-bottom: var(--term-pad);
+}
 .term-tab-container .xterm-viewport { height: 100%; }
 
-/* Floating control overlay (FSD §2.5.0) */
-.term-floating {
+/* xterm's viewport is black by default and reserves a 15px classic scrollbar;
+   retint it to the panel surface and slim it to the shared inset so FitAddon
+   (which reads the real measured scrollbar width) keeps the columns symmetric. */
+.term-tab-container .xterm .xterm-viewport { background-color: var(--term-surface); }
+.term-tab-container .xterm .xterm-viewport::-webkit-scrollbar { width: var(--term-pad); }
+.term-tab-container .xterm .xterm-viewport::-webkit-scrollbar-track { background: transparent; }
+.term-tab-container .xterm .xterm-viewport::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: calc(var(--term-pad) / 2);
+}
+.term-tab-container .xterm .xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+/* ---- Empty state: no tabs yet (before the first session opens) ---- */
+.term-empty {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 20;
+  inset: 0;
   display: flex;
-  gap: 6px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: var(--term-pad);
+  text-align: center;
+  background: var(--term-surface);
+  color: var(--term-empty-fg);
+  font-size: 13px;
+}
+.term-empty[hidden] { display: none; }
+.term-empty-icon { font-size: 26px; opacity: 0.55; }
+.term-empty-text { margin: 0; max-width: 34ch; line-height: 1.5; }
+.term-empty .btn { font-size: 13px; padding: 8px 16px; }
+
+/* ---- Control cluster: right end of the tab strip ----
+   It used to float over the top-right of the terminal surface, where it covered
+   the first line of output. Docked into the strip it is top-right of the panel,
+   the same height as the tabs, and it can never overlap text or a tab. */
+.term-floating {
+  position: relative;
+  flex: 0 0 auto;
+  margin-left: auto;            /* always pinned to the right edge of the strip */
+  display: flex;
+  align-items: center;
+  gap: var(--term-gap);
+  padding-left: var(--term-gap);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
   pointer-events: none; /* only the buttons capture events */
 }
 .term-floating .term-ctl {
   pointer-events: auto;
-  width: 30px;
-  height: 30px;
-  background: rgba(0, 0, 0, 0.45);
-  color: #fff;
+  width: var(--term-ctl);
+  height: var(--term-ctl);
+  border-radius: var(--term-tab-radius);
+  background: var(--term-tab-bg);
+  color: var(--term-chrome-fg);
+  font-size: 14px;
 }
-.term-floating .term-ctl:hover { background: rgba(0, 0, 0, 0.75); }
+.term-floating .term-ctl:hover {
+  background: var(--term-tab-bg-hover);
+  color: var(--term-chrome-fg-strong);
+}
 .term-floating .term-ctl[aria-pressed="true"] {
   background: var(--accent);
   color: var(--accent-contrast);
@@ -878,6 +1019,9 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
   flex-direction: column;
   height: 100vh;   /* fallback */
   height: 100dvh;  /* dynamic viewport — excludes mobile URL/keyboard bars */
+  /* Edge-to-edge: drop the panel frame so nothing is rounded off-screen. */
+  border: none;
+  border-radius: 0;
 }
 .terminal-fullscreen .term-toolbar { flex: 0 0 auto; }
 .terminal-fullscreen .term-stage {
@@ -885,9 +1029,15 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
   min-height: 0;
   height: auto;
 }
-/* Keep the floating controls (fullscreen/paste/TUI) above the stage in
+/* Keep the controls (fullscreen/paste/TUI) stacked above the stage in
    fullscreen so they stay tappable. */
 .terminal-fullscreen .term-floating { z-index: 210; }
+
+/* Phone / narrow: bigger tap targets, same shared inset. */
+@media (max-width: 600px) {
+  .terminal-body { --term-ctl: 34px; --term-gap: 5px; }
+}
+body[data-device="phone"] .terminal-body { --term-ctl: 34px; --term-gap: 5px; }
 
 /* ===== Log Window (B3.1) — GLOBAL, fixed bottom-docked, show/hide ===== */
 .logwindow {
