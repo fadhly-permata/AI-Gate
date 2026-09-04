@@ -21,6 +21,7 @@ import pytest
 # --- lazy import check: modules must import even without the native deps ----- #
 import backend.terminal.pty as pty_mod  # noqa: E402
 import backend.terminal.router as router_mod  # noqa: E402
+import backend.terminal.session as session_mod  # noqa: E402
 
 from backend.terminal.pty import PtyError, spawn_shell  # noqa: E402
 
@@ -48,6 +49,9 @@ def test_modules_import_without_native_dep():
     assert hasattr(pty_mod, "spawn_shell")
     assert hasattr(pty_mod, "PtyError")
     assert hasattr(router_mod, "router")
+    # Session registry (PTY outlives the WS) must import without a native dep.
+    assert hasattr(session_mod, "get_or_create")
+    assert hasattr(session_mod, "PtySession")
 
 
 def test_spawn_raises_clear_pty_error_when_dep_missing():
@@ -109,4 +113,13 @@ def test_terminal_websocket_roundtrip(client):
                 if "hi-from-ws" in got:
                     break
             assert "hi-from-ws" in got, f"expected output from ws shell, got: {got!r}"
-        # Disconnect cleanup is exercised by leaving the `with` block.
+
+        # SAFETY behavior change: leaving the `with` block disconnects the WS
+        # but must NOT kill the shell — the session only DETACHES and stays
+        # registered (its PTY + reader keep running, like tmux). Cleanup here
+        # uses the explicit terminate path — the same one the client's
+        # {"type":"close"} control frame triggers.
+        assert len(session_mod.snapshot_sessions()) >= 1
+    for sess in session_mod.snapshot_sessions():
+        sess.terminate()
+    assert session_mod.snapshot_sessions() == []

@@ -39,6 +39,12 @@ DEFAULT_SETTINGS: dict[str, str] = {
     # enables per-request/response persistence on the gateway; default OFF
     # to avoid DB bloat. Read by backend.gateway.router per request.
     "request_log_enabled": "false",
+    # Terminal PTY reaper grace (minutes): a DETACHED session (no WS view)
+    # with no output for this long is reaped. Deliberately generous — a
+    # dropped WS must never kill a running shell; only truly-dead or
+    # extremely-long-orphaned PTYs are cleaned up. Read by
+    # backend.terminal.session._grace_seconds().
+    "terminal_idle_reap_minutes": "60",
 }
 
 

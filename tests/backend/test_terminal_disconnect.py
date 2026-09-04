@@ -6,8 +6,10 @@ Guards the rule: a normal terminal close must log at INFO, never ERROR.
   send-after-close RuntimeError, websockets ConnectionClosed*, plain bugs).
 * ``_pump`` behavior: disconnect-during-send → log_info, real error →
   log_error_exc (log fns monkeypatched on ``backend.terminal.router``).
-* ``_reader_loop`` behavior: EOF/OSError or shutdown-time read failure →
-  log_info, unexpected reader error → log_error_exc.
+* ``session._reader_loop`` behavior: EOF/OSError or shutdown-time read
+  failure → log_info, unexpected reader error → log_error_exc. (The reader
+  moved to ``backend.terminal.session`` when the PTY was decoupled from the
+  WebSocket; it now feeds the session ring buffer instead of a per-WS queue.)
 """
 
 from __future__ import annotations
@@ -21,7 +23,9 @@ from fastapi import WebSocketDisconnect
 from starlette.websockets import WebSocketState
 
 import backend.terminal.router as router_mod
-from backend.terminal.router import _is_disconnect_error, _pump, _reader_loop
+import backend.terminal.session as session_mod
+from backend.terminal.router import _is_disconnect_error, _pump
+from backend.terminal.session import PtySession
 
 try:
     from websockets.exceptions import ConnectionClosed, ConnectionClosedError
@@ -36,13 +40,16 @@ except ImportError:  # pragma: no cover - env without the websockets library
 # Helpers
 # --------------------------------------------------------------------------- #
 class _LogCapture:
-    """Stand-in for backend.terminal.router.log_info / log_error_exc."""
+    """Stand-in for a module's log_info / log_error_exc (default: router)."""
 
-    def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def __init__(
+        self, monkeypatch: pytest.MonkeyPatch, module: object = None
+    ) -> None:
         self.infos: list[str] = []
         self.errors: list[str] = []
-        monkeypatch.setattr(router_mod, "log_info", self._info)
-        monkeypatch.setattr(router_mod, "log_error_exc", self._error)
+        target = module if module is not None else router_mod
+        monkeypatch.setattr(target, "log_info", self._info)
+        monkeypatch.setattr(target, "log_error_exc", self._error)
 
     def _info(self, message: str, source: Optional[str] = None, **kw) -> None:
         self.infos.append(message)
@@ -196,28 +203,33 @@ def test_pump_happy_path_sends_and_stays_silent(monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
-# 3) _reader_loop: EOF/OSError/shutdown → INFO, unexpected → ERROR
+# 3) session._reader_loop: EOF/OSError/shutdown → INFO, unexpected → ERROR
 # --------------------------------------------------------------------------- #
+def _make_session(pty: "_FakePty") -> PtySession:
+    """A bare PtySession (no thread, no registry) for reader-loop tests."""
+    return PtySession(tab_id=1, pty=pty, cols=80, rows=24)
+
+
 def test_reader_eof_logs_info_not_error(monkeypatch):
-    logs = _LogCapture(monkeypatch)
-    pty = _FakePty([EOFError("read of closed file")])
-    stop = threading.Event()
-    _reader_loop(pty, asyncio.Queue(), None, stop)  # loop arg unused on error path
+    logs = _LogCapture(monkeypatch, session_mod)
+    sess = _make_session(_FakePty([EOFError("read of closed file")]))
+    session_mod._reader_loop(sess)
     assert logs.errors == []
     assert any("reader stopped" in m for m in logs.infos)
+    # pty dead → session marked exited (kept in registry; reaper cleans up).
+    assert sess.exited is True
 
 
 def test_reader_oserror_logs_info_not_error(monkeypatch):
-    logs = _LogCapture(monkeypatch)
-    pty = _FakePty([OSError(5, "Input/output error")])
-    stop = threading.Event()
-    _reader_loop(pty, asyncio.Queue(), None, stop)
+    logs = _LogCapture(monkeypatch, session_mod)
+    sess = _make_session(_FakePty([OSError(5, "Input/output error")]))
+    session_mod._reader_loop(sess)
     assert logs.errors == []
     assert any("reader stopped" in m for m in logs.infos)
 
 
 def test_reader_shutdown_time_error_logs_info_not_error(monkeypatch):
-    logs = _LogCapture(monkeypatch)
+    logs = _LogCapture(monkeypatch, session_mod)
 
     class _StopThenRaisePty(_FakePty):
         def __init__(self, stop: threading.Event):
@@ -228,37 +240,30 @@ def test_reader_shutdown_time_error_logs_info_not_error(monkeypatch):
             self._stop.set()  # shutdown began while blocked in read()
             raise RuntimeError("pty blew up mid-kill")
 
-    stop = threading.Event()
-    pty = _StopThenRaisePty(stop)
-    _reader_loop(pty, asyncio.Queue(), None, stop)
+    pty = _StopThenRaisePty(threading.Event())
+    sess = _make_session(pty)
+    pty._stop = sess.stop_event
+    session_mod._reader_loop(sess)
     assert logs.errors == []
     assert any("reader stopped" in m for m in logs.infos)
 
 
 def test_reader_unexpected_error_still_logs_error(monkeypatch):
-    logs = _LogCapture(monkeypatch)
-    pty = _FakePty([ValueError("genuinely unexpected")])
-    stop = threading.Event()
-    _reader_loop(pty, asyncio.Queue(), None, stop)
-    assert logs.infos == []
+    logs = _LogCapture(monkeypatch, session_mod)
+    sess = _make_session(_FakePty([ValueError("genuinely unexpected")]))
+    session_mod._reader_loop(sess)
     assert any("terminal reader error" in m for m in logs.errors)
+    # The read failure itself must be ERROR, never the INFO shutdown path.
+    assert not any("reader stopped" in m for m in logs.infos)
 
 
-def test_reader_feeds_queue_then_stops_on_eof(monkeypatch):
-    """Happy path: data reaches the async queue; EOF is INFO, not ERROR."""
-    logs = _LogCapture(monkeypatch)
-    pty = _FakePty([b"chunk-1", EOFError("pty closed")])
-
-    async def run() -> bytes:
-        queue: "asyncio.Queue[bytes]" = asyncio.Queue()
-        stop = threading.Event()
-        await asyncio.to_thread(
-            _reader_loop, pty, queue, asyncio.get_running_loop(), stop
-        )
-        # Reader thread already exited (EOF); the queued put is scheduled,
-        # so awaiting it inside the running loop is deterministic.
-        return await asyncio.wait_for(queue.get(), timeout=2)
-
-    assert asyncio.run(run()) == b"chunk-1"
+def test_reader_feeds_ring_buffer_then_stops_on_eof(monkeypatch):
+    """Happy path: data lands in the session ring buffer (detached → no live
+    queue); EOF is INFO, not ERROR."""
+    logs = _LogCapture(monkeypatch, session_mod)
+    sess = _make_session(_FakePty([b"chunk-1", EOFError("pty closed")]))
+    session_mod._reader_loop(sess)
+    assert list(sess.ring) == [b"chunk-1"]
+    assert sess.exited is True
     assert logs.errors == []
     assert any("reader stopped" in m for m in logs.infos)

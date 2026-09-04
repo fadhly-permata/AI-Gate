@@ -1,4 +1,4 @@
-"""WebSocket terminal endpoint (task B3.2).
+"""WebSocket terminal endpoint (task B3.2 — PTY lifetime decoupled from WS).
 
 Endpoint
 --------
@@ -13,21 +13,30 @@ tab_id resolution
 Message protocol (for frontend B3.3)
 ------------------------------------
 * **Server → client**: terminal output as TEXT frames (UTF-8 decoded bytes).
+  On (re)connect the server first REPLAYS the recent-output ring buffer, then
+  streams live output.
 * **Client → server (keystrokes)**: raw TEXT frames are written verbatim to
   the PTY (keystrokes / pasted text).
-* **Client → server (control)**: a TEXT frame that is JSON
-  ``{"type":"resize","cols":<int>,"rows":<int>}`` is treated as a resize
-  command and is NOT written to the PTY. Any other JSON / text is treated as
-  raw input (forwarded to the shell).
+* **Client → server (control)**: a TEXT frame that is JSON:
 
-Concurrency model
------------------
-PTY reads are blocking. A dedicated **daemon thread** calls
-``PtyProcess.read()`` and pushes decoded bytes into an ``asyncio.Queue`` via
-``asyncio.run_coroutine_threadsafe``. The async side awaits the queue and
-``send_text``\\ s to the client. Writes come from ``websocket.iter_text()`` on
-the event loop. On disconnect (or process exit) the PTY is killed, the tab's
-``pty_pid`` is cleared, and everything is logged (ADR-011).
+  - ``{"type":"resize","cols":<int>,"rows":<int>}`` → resize the PTY.
+  - ``{"type":"close"}`` → **explicitly terminate this session** (kill the
+    PTY + drop it from the registry). This is the ONLY client path that
+    kills the shell — send it when the user deliberately closes the tab.
+
+  Any other JSON / text is treated as raw input (forwarded to the shell).
+
+Concurrency model (SAFETY: disconnect ≠ kill)
+---------------------------------------------
+PTY lifetime is owned by the server-side registry in
+``backend.terminal.session`` — NOT by this WebSocket. A dedicated daemon
+thread per session reads the PTY into a ring buffer and (while attached) an
+``asyncio.Queue``. On WS connect we ``get_or_create`` the session (reattach,
+never respawn a live one), replay the buffer, and pump live output. On
+disconnect / send failure we **detach only**: the shell keeps running and
+buffering so a reattach (tab unfreeze, network recovery) sees everything.
+Only ``{"type":"close"}`` or the reaper (exited PTY / long-orphaned idle
+session) terminate the process. All teardown is logged (ADR-011).
 """
 
 from __future__ import annotations
@@ -35,7 +44,6 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import threading
 from typing import Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -44,7 +52,8 @@ from starlette.websockets import WebSocketState
 from backend.config.db import SessionLocal
 from backend.log import log_error_exc, log_info
 from backend.models import TerminalSession, TerminalTab
-from backend.terminal.pty import PtyError, PtyProcess, spawn_shell
+from backend.terminal.pty import PtyError
+from backend.terminal.session import PtySession, get_or_create
 
 LOG_SOURCE = "backend.terminal.router"
 
@@ -120,59 +129,15 @@ def _create_tab() -> int:
         return tab.id
 
 
-def _update_tab_pid(tid: int, pid: str) -> None:
-    try:
-        with SessionLocal() as s:
-            tab = s.get(TerminalTab, tid)
-            if tab is not None:
-                tab.pty_pid = pid
-                s.commit()
-    except Exception as exc:  # noqa: BLE001 - best-effort bookkeeping
-        log_error_exc(
-            f"terminal: update tab pid failed tab={tid}", source=LOG_SOURCE, exc=exc
-        )
-
-
-def _reader_loop(
-    pty: PtyProcess,
-    queue: "asyncio.Queue[bytes]",
-    loop: asyncio.AbstractEventLoop,
-    stop_event: threading.Event,
-) -> None:
-    """Blocking reader: feeds decoded PTY output into the async queue.
-
-    Runs as a daemon thread. A read failure during shutdown (``stop_event``
-    set) or an EOF/OSError from the killed PTY is expected teardown → INFO,
-    not ERROR. Only genuinely unexpected reads while still running are
-    logged as errors.
-    """
-    while not stop_event.is_set():
-        try:
-            data = pty.read()
-        except Exception as exc:  # noqa: BLE001 - classified below
-            if stop_event.is_set() or isinstance(exc, (EOFError, OSError)):
-                # Normal shutdown: pty.kill()/close makes read() raise EOF/OSError.
-                log_info(
-                    f"terminal reader stopped during shutdown: {exc!r}",
-                    source=LOG_SOURCE,
-                )
-            else:
-                log_error_exc("terminal reader error", source=LOG_SOURCE, exc=exc)
-            break
-        if not data and not pty.is_alive():
-            break  # EOF + dead → done
-        if not data:
-            continue  # transient empty read
-        asyncio.run_coroutine_threadsafe(queue.put(data), loop)
-
-
 async def _pump(
     websocket: WebSocket, queue: "asyncio.Queue[bytes]", tid: int
 ) -> None:
-    """Async side: drain the queue and send frames to the client.
+    """Async side: drain the session queue and send frames to the client.
 
     A send failure caused by the client going away (disconnect) is normal
-    teardown → INFO; only unexpected send errors are logged as ERROR.
+    teardown → INFO; only unexpected send errors are logged as ERROR. The
+    PTY is NOT touched here — the handler's ``finally`` detaches the view
+    while the session (shell + reader + buffer) keeps running.
     """
     while True:
         data = await queue.get()
@@ -198,10 +163,11 @@ async def terminal_ws(websocket: WebSocket, tab_id: str) -> None:
     log_info(f"terminal ws connect tab_id={tab_id}", source=LOG_SOURCE)
 
     tid = _resolve_tab_id(tab_id)
+    loop = asyncio.get_running_loop()
 
-    # Spawn the shell. On failure, log and close gracefully.
+    # Reattach to the live session for this tab, or spawn one (never both).
     try:
-        pty = spawn_shell()
+        session: PtySession = get_or_create(tid)
     except PtyError as exc:
         log_error_exc(
             f"terminal ws spawn failed tab={tid}: {exc}", source=LOG_SOURCE, exc=exc
@@ -209,50 +175,81 @@ async def terminal_ws(websocket: WebSocket, tab_id: str) -> None:
         await websocket.close(code=1011)
         return
 
-    _update_tab_pid(tid, str(pty.pid))
-    log_info(f"terminal ws spawned pid={pty.pid} tab={tid}", source=LOG_SOURCE)
-
-    loop = asyncio.get_running_loop()
-    queue: "asyncio.Queue[bytes]" = asyncio.Queue()
-    stop_event = threading.Event()
-
-    reader = threading.Thread(
-        target=_reader_loop, args=(pty, queue, loop, stop_event), daemon=True
+    replay, queue = session.attach(websocket, loop)
+    log_info(
+        f"terminal ws attached tab={tid} pid={session.pty.pid} replay_chunks={len(replay)}",
+        source=LOG_SOURCE,
     )
-    reader.start()
+
+    # Catch-up: replay the ring buffer so a reattaching client sees recent
+    # output produced while it was away.
+    for chunk in replay:
+        try:
+            await websocket.send_text(chunk.decode("utf-8", "replace"))
+        except Exception as exc:  # noqa: BLE001 - classified below
+            if _is_disconnect_error(exc, websocket):
+                log_info(
+                    f"terminal ws client gone during replay tab={tid}",
+                    source=LOG_SOURCE,
+                )
+            else:
+                log_error_exc("terminal replay send error", source=LOG_SOURCE, exc=exc)
+            break
 
     pump_task = asyncio.create_task(_pump(websocket, queue, tid))
 
+    close_requested = False
     try:
         async for msg in websocket.iter_text():
-            # Control frame? JSON {"type":"resize",...} → resize, not keystroke.
+            # Control frame? JSON {"type":"resize"/"close",...} → not a keystroke.
             if msg.startswith("{"):
                 try:
                     obj = json.loads(msg)
-                    if isinstance(obj, dict) and obj.get("type") == "resize":
-                        cols = int(obj.get("cols", 80))
-                        rows = int(obj.get("rows", 24))
-                        pty.set_winsize(cols, rows)
-                        continue
-                except (ValueError, json.JSONDecodeError) as exc:
+                    if isinstance(obj, dict):
+                        mtype = obj.get("type")
+                        if mtype == "resize":
+                            cols = int(obj.get("cols", 80))
+                            rows = int(obj.get("rows", 24))
+                            session.resize(cols, rows)
+                            continue
+                        if mtype == "close":
+                            # Deliberate user close: the ONLY client path that
+                            # kills the shell.
+                            close_requested = True
+                            break
+                except (TypeError, ValueError, json.JSONDecodeError) as exc:
                     log_info(
                         f"terminal: non-JSON control frame ignored: {exc}",
                         source=LOG_SOURCE,
                     )
-            pty.write(msg.encode("utf-8"))
+            try:
+                session.write_text(msg)
+            except PtyError as exc:
+                log_error_exc(
+                    f"terminal ws write failed tab={tid}: {exc}",
+                    source=LOG_SOURCE,
+                    exc=exc,
+                )
     except WebSocketDisconnect:
         log_info(f"terminal ws client disconnected tab={tid}", source=LOG_SOURCE)
     except Exception as exc:  # noqa: BLE001 - never crash the loop silently
         log_error_exc("terminal ws loop error", source=LOG_SOURCE, exc=exc)
     finally:
-        stop_event.set()
         pump_task.cancel()
-        try:
-            pty.kill()
-        except Exception as exc:  # noqa: BLE001
-            log_error_exc("terminal kill error", source=LOG_SOURCE, exc=exc)
-        _update_tab_pid(tid, "")
-        log_info(f"terminal ws disconnect tab={tid}", source=LOG_SOURCE)
+        if close_requested:
+            session.terminate()
+            log_info(f"terminal ws closed by client tab={tid}", source=LOG_SOURCE)
+        else:
+            # SAFETY-CRITICAL: a dropped WS (tab freeze, network blip) must
+            # NOT kill the shell — detach the view only. The PTY keeps
+            # running + buffering; the reaper handles truly-dead/orphaned
+            # sessions later.
+            session.detach(websocket)
+            log_info(
+                f"terminal ws detached tab={tid} pid={session.pty.pid} "
+                f"(pty kept alive)",
+                source=LOG_SOURCE,
+            )
         try:
             await websocket.close()
         except Exception as exc:  # noqa: BLE001 - already closing

@@ -7,6 +7,7 @@ exposes the gateway/management REST API. Runs native as a Python app
 Run with: `uvicorn backend.server:app`
 """
 
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -66,7 +67,17 @@ async def lifespan(_app: FastAPI):
             "lifespan: seed_cli_tools failed during startup",
             source="backend.server.lifespan",
         )
-    yield
+    # Terminal PTY reaper: sweeps sessions whose PTY exited or that stayed
+    # detached + idle beyond the grace period. PTYs deliberately OUTLIVE
+    # their WebSocket (a dropped WS must never kill a running shell), so the
+    # reaper is their only automatic cleanup path. Never crash startup on it.
+    from backend.terminal.session import reaper_loop
+
+    reaper_task = asyncio.create_task(reaper_loop())
+    try:
+        yield
+    finally:
+        reaper_task.cancel()
 
 
 app = FastAPI(title="aigate", version="0.0.1", lifespan=lifespan)
