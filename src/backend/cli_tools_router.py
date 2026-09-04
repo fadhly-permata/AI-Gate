@@ -38,6 +38,12 @@ LOG_SOURCE = "backend.cli_tools.router"
 # Default gateway base when no ``gateway_base_url`` Setting exists (FSD §2.4/2.6).
 DEFAULT_GATEWAY_BASE = "http://localhost:8080/v1"
 
+# Placeholder OPENAI_API_KEY handed to a launched CLI when NO access-controlled
+# Endpoint exists. The gateway ignores this key entirely while access control is
+# off, but CLIs like aider refuse to start with an empty ``--openai-api-key`` /
+# ``OPENAI_API_KEY``. A non-empty dummy lets them boot; it is never a real secret.
+PLACEHOLDER_API_KEY = "aigate-local"
+
 router = APIRouter()
 
 
@@ -120,7 +126,9 @@ def _resolve_gateway_base(session: Session) -> str:
 def _resolve_internal_key(session: Session) -> str:
     """Plaintext ``internal_api_key`` of first access-controlled Endpoint (R11).
 
-    Returns ``""`` when no access-controlled endpoint exists.
+    Returns ``PLACEHOLDER_API_KEY`` when no access-controlled endpoint exists:
+    the gateway ignores the key while access control is off, but CLIs like aider
+    refuse to launch with an empty key, so a non-empty dummy is injected instead.
     """
     ep = (
         session.query(Endpoint)
@@ -129,7 +137,7 @@ def _resolve_internal_key(session: Session) -> str:
         .first()
     )
     if ep is None:
-        return ""
+        return PLACEHOLDER_API_KEY
     return ep.internal_api_key  # ADR-007: returned plaintext
 
 

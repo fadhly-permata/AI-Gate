@@ -150,8 +150,10 @@ def test_resolve_tool_by_name(monkeypatch) -> None:
     assert body["run_command"].startswith("llm")
     # gateway env injected
     assert body["env"]["OPENAI_API_BASE"] == "http://localhost:8080/v1"
-    # no access-controlled endpoint seeded -> empty key (ADR-007 plaintext "")
-    assert body["env"]["OPENAI_API_KEY"] == ""
+    # no access-controlled endpoint seeded -> non-empty placeholder so CLIs like
+    # aider accept the key (gateway ignores it while access control is off).
+    assert body["env"]["OPENAI_API_KEY"] == cli_tools_router.PLACEHOLDER_API_KEY
+    assert body["env"]["OPENAI_API_KEY"] != ""
     # llm binary not on PATH in sandbox -> install command present
     assert body["binary_found"] is False
     assert body["install_command"] == "pip install llm"
@@ -273,6 +275,33 @@ def test_resolve_aider_no_model_segment_omits_model(monkeypatch) -> None:
     assert "--openai-api-base" in rc
     assert "--openai-api-key" in rc
     assert "--model" not in rc
+
+
+def test_resolve_aider_no_endpoint_uses_placeholder_key(monkeypatch) -> None:
+    """No access-controlled endpoint -> aider gets the non-empty placeholder key
+    in BOTH env and run_command (aider refuses to boot on an empty key)."""
+    sf = _make_sf()
+    _seed_all(sf)  # NOTE: no endpoint seeded
+    client = _client(monkeypatch, sf)
+
+    placeholder = cli_tools_router.PLACEHOLDER_API_KEY
+    assert placeholder  # must be non-empty by design
+
+    r = client.post(
+        "/api/cli-tools/resolve",
+        json={"tool": "aider", "model": "provider:B.AI:gpt-5.5"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+
+    # env carries the placeholder (not empty).
+    assert body["env"]["OPENAI_API_KEY"] == placeholder
+    assert body["env"]["OPENAI_API_KEY"] != ""
+    # aider run_command embeds the placeholder via --openai-api-key (non-empty).
+    rc = body["run_command"]
+    assert f"--openai-api-key {placeholder}" in rc
+    assert "--openai-api-key " in rc
+    assert "--openai-api-key\n" not in rc  # never a dangling empty flag
 
 
 def test_resolve_non_aider_generic_form_preserved(monkeypatch) -> None:
