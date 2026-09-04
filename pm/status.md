@@ -474,6 +474,22 @@
 - BACKLOG B5.6 `[x]`. **B5.7 aktif** (be-dev+fe-dev, sekuensial): Export/Import
   Setting lokal (JSON) — pengganti cloud sync (PRD §2.4.4). be-dev dulu.
 
+## Combobox model searchable 2026-09-03 — SELESAI
+- User: model combo udah muncul tapi GAK BISA SEARCH (select gak bisa diketik); + "iya"
+  fix Providers juga (datalist mati di mobile).
+- fe-dev: komponen reusable `static/combobox.js` (`createCombobox`) = input teks + panel
+  `<ul>` custom yang ke-FILTER pas ngetik (case-insensitive), klik/keyboard select,
+  free-text (model custom), loading row, mobile-safe (bukan native select/datalist),
+  a11y roles. Dipakai utk combo member Model (ganti select+__custom__) DAN provider
+  default-model (ganti #provModel datalist). Auto-fetch/sort/race-guard -> setOptions.
+  i18n `combobox.loading/no_match/search_ph`.
+- Verifikasi PM (R20): vitest **225 passed**; Chromium live -> 47 model, ketik 'claude'
+  filter ke 11 (all match), klik -> value 'claude-fable-5', free-text 'my-custom-xyz' OK,
+  0 error. Commit `b5e373f`.
+- Catatan fe-dev: panel flip-above cuma dihitung saat open (gak denger visualViewport
+  pas keyboard mobile muncul) -> worst case user scroll modal. Input nampilin model_id
+  (bukan display name) setelah dipilih — disengaja (value/label unambiguous).
+
 ## Cek log error + cleanup 2026-09-03 — SELESAI
 - User: "cek log error". Hasil /api/logs severity=error: 41 baris.
   - 39x `settings.get('port')` = HISTORIS (terakhir 20:47, sebelum restart; 0 setelah)
