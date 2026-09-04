@@ -47,9 +47,25 @@ describe("index.html structure — missing views + global Log Window", () => {
     expect(srcs.indexOf("app.js")).toBeLessThan(srcs.indexOf("combos.js"));
   });
 
-  it("Log Window has collapse toggle + severity filter + refresh", () => {
-    expect(doc.getElementById("logCollapseBtn")).not.toBeNull();
+  it("Log Window keeps severity filter + refresh; the old collapse button is gone", () => {
     expect(doc.getElementById("logSeverity")).not.toBeNull();
     expect(doc.getElementById("logRefreshBtn")).not.toBeNull();
+    expect(doc.getElementById("logCollapseBtn")).toBeNull();
+  });
+
+  it("topbar has a Log Window toggle placed BEFORE the theme toggle", () => {
+    const right = doc.querySelector(".topbar-right");
+    expect(right).not.toBeNull();
+    const logBtn = right.querySelector("#logWindowToggle");
+    const themeBtn = right.querySelector("#themeToggle");
+    expect(logBtn).not.toBeNull();
+    expect(themeBtn).not.toBeNull();
+    // logWindowToggle must precede themeToggle in document order.
+    const btns = Array.from(right.querySelectorAll("button"));
+    expect(btns.indexOf(logBtn)).toBeLessThan(btns.indexOf(themeBtn));
+    // Accessible + toggle semantics.
+    expect(logBtn.getAttribute("type")).toBe("button");
+    expect(logBtn.hasAttribute("aria-pressed")).toBe(true);
+    expect(logBtn.hasAttribute("aria-label")).toBe(true);
   });
 });

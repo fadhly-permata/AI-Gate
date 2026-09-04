@@ -449,9 +449,10 @@
   window.aigate.buildLogsQuery = buildLogsQuery;
 
   /* Log Window (global) helpers — exposed for tests + external control. */
-  window.aigate.applyLogCollapse = applyLogCollapse;
-  window.aigate.toggleLogCollapse = toggleLogCollapse;
-  window.aigate.isLogCollapsed = isLogCollapsed;
+  window.aigate.applyLogVisible = applyLogVisible;
+  window.aigate.toggleLogVisible = toggleLogVisible;
+  window.aigate.isLogVisible = isLogVisible;
+  window.aigate.measureLogHeight = measureLogHeight;
   window.aigate.loadLogs = loadLogs;
   window.aigate.startLogAutoRefresh = startLogAutoRefresh;
   window.aigate.stopLogAutoRefresh = stopLogAutoRefresh;
@@ -1046,9 +1047,10 @@
   /* ===== Terminal view + Log Window (B3.1) ===== */
   var LOGS_API = "/api/logs";
   var TERM_COLLAPSE_KEY = "aigate.terminalCollapsed";
-  var LOG_COLLAPSE_KEY = "aigate.logCollapsed";
+  var LOG_VISIBLE_KEY = "aigate.logVisible";
   var LOG_AUTO_REFRESH_MS = 3000;
   var logRefreshTimer = null;
+  var logResizeObserver = null;
 
   /* ---- Collapsible terminal pane ---- */
   function applyTermCollapse(collapsed) {
@@ -1071,31 +1073,65 @@
     write(TERM_COLLAPSE_KEY, collapsed ? "collapsed" : "expanded");
   }
 
-  /* ---- Collapsible (global) Log Window ---- */
-  function applyLogCollapse(collapsed) {
+  /* ---- Global Log Window: show/hide (NOT expand/collapse) ----
+     The whole #logWindow panel is toggled via the topbar icon. When visible we
+     reserve its height at the bottom of the workspace (--log-h) so the fixed,
+     bottom-docked panel never overlaps the terminal / view content. */
+  function setLogHeightVar(px) {
+    var h = px > 0 ? px : 0;
+    document.documentElement.style.setProperty("--log-h", h + "px");
+  }
+
+  /* Measure the docked panel and publish --log-h. jsdom returns 0 (no layout),
+     which is fine — the class/attr logic is what the tests assert. */
+  function measureLogHeight() {
     var lw = document.getElementById("logWindow");
-    if (lw) lw.classList.toggle("logwindow-collapsed", !!collapsed);
-    var btn = document.getElementById("logCollapseBtn");
+    if (!lw || lw.hidden) { setLogHeightVar(0); return; }
+    var h = 0;
+    if (typeof lw.getBoundingClientRect === "function") {
+      h = lw.getBoundingClientRect().height || 0;
+    }
+    if (!h && lw.offsetHeight) h = lw.offsetHeight;
+    setLogHeightVar(h);
+  }
+
+  function applyLogVisible(visible) {
+    visible = !!visible;
+    var lw = document.getElementById("logWindow");
+    if (lw) lw.hidden = !visible;
+    document.body.classList.toggle("log-visible", visible);
+    var btn = document.getElementById("logWindowToggle");
     if (btn) {
-      var icon = btn.querySelector("i");
-      if (icon) icon.className = collapsed ? "fa fa-chevron-down" : "fa fa-chevron-up";
-      var label = getStr(collapsed ? "log.expand" : "log.collapse");
+      btn.setAttribute("aria-pressed", visible ? "true" : "false");
+      var label = getStr(visible ? "log.hide" : "log.show");
       btn.setAttribute("title", label);
       btn.setAttribute("aria-label", label);
-      btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
     }
+    // Reserve space only while shown; collapse the reservation when hidden.
+    if (visible) measureLogHeight();
+    else setLogHeightVar(0);
   }
 
-  function toggleLogCollapse() {
-    var lw = document.getElementById("logWindow");
-    var collapsed = lw ? !lw.classList.contains("logwindow-collapsed") : false;
-    applyLogCollapse(collapsed);
-    write(LOG_COLLAPSE_KEY, collapsed ? "collapsed" : "expanded");
+  function toggleLogVisible() {
+    var next = !isLogVisible();
+    applyLogVisible(next);
+    write(LOG_VISIBLE_KEY, next ? "1" : "0");
   }
 
-  function isLogCollapsed() {
+  function isLogVisible() {
     var lw = document.getElementById("logWindow");
-    return !!(lw && lw.classList.contains("logwindow-collapsed"));
+    return !!(lw && !lw.hidden);
+  }
+
+  /* Keep --log-h in sync when the panel resizes (logs grow, sidebar toggles).
+     Guarded: ResizeObserver is absent in headless test envs. */
+  function observeLogWindow() {
+    if (typeof ResizeObserver !== "function") return;
+    var lw = document.getElementById("logWindow");
+    if (!lw) return;
+    if (logResizeObserver) { try { logResizeObserver.disconnect(); } catch (e) {} }
+    logResizeObserver = new ResizeObserver(function () { measureLogHeight(); });
+    logResizeObserver.observe(lw);
   }
 
   /* ---- Log Window ---- */
@@ -1201,6 +1237,8 @@
         // Keep terminal collapse-button label in sync with the new locale.
         var pane = document.getElementById("terminalPane");
         if (pane) applyTermCollapse(pane.classList.contains("terminal-collapsed"));
+        // Keep the Log Window toggle's aria/title label in sync with the locale.
+        applyLogVisible(isLogVisible());
       });
     });
 
@@ -1340,7 +1378,7 @@
     var termCollapseBtn = document.getElementById("termCollapseBtn");
     if (termCollapseBtn) termCollapseBtn.addEventListener("click", toggleTermCollapse);
 
-    // --- Log Window (B3.1) — now GLOBAL, visible on every view ---
+    // --- Log Window (B3.1) — GLOBAL, shown on every view, toggled from topbar ---
     var logRefreshBtn = document.getElementById("logRefreshBtn");
     if (logRefreshBtn) logRefreshBtn.addEventListener("click", function () {
       loadLogs();
@@ -1349,12 +1387,13 @@
     if (logSeverity) logSeverity.addEventListener("change", function () {
       loadLogs();
     });
-    var logCollapseBtn = document.getElementById("logCollapseBtn");
-    if (logCollapseBtn) logCollapseBtn.addEventListener("click", toggleLogCollapse);
+    var logWindowToggle = document.getElementById("logWindowToggle");
+    if (logWindowToggle) logWindowToggle.addEventListener("click", toggleLogVisible);
 
-    // --- Global Log Window: restore collapse + start auto-refresh once ---
-    var logCol = read(LOG_COLLAPSE_KEY, "expanded") === "collapsed";
-    applyLogCollapse(logCol);
+    // --- Global Log Window: restore show/hide + start auto-refresh once ---
+    var logVisible = read(LOG_VISIBLE_KEY, "1") !== "0";
+    applyLogVisible(logVisible);
+    observeLogWindow();
     // Start auto-refresh globally (runs across all view switches). Guarded so
     // headless test envs without fetch() don't error on import.
     if (typeof fetch === "function") {

@@ -30,6 +30,13 @@
       </div>
 
       <div class="topbar-right">
+        <!-- Log Window show/hide toggle (global) -->
+        <button id="logWindowToggle" class="icon-btn" type="button"
+                data-i18n-aria="btn.log_window" aria-label="Log Window"
+                title="Log Window" aria-pressed="true">
+          <i class="fa fa-list"></i>
+        </button>
+
         <!-- Theme toggle -->
         <button id="themeToggle" class="icon-btn" type="button"
                 aria-label="Toggle theme" title="Theme">
@@ -952,7 +959,7 @@
       </div>
       </main>
 
-      <!-- Global Log Window (B3.1): visible on every view, collapsible -->
+      <!-- Global Log Window (B3.1): shown on every view, toggled from the topbar -->
       <div class="logwindow" id="logWindow">
         <div class="logwindow-head">
           <h2 class="logwindow-title">
@@ -960,10 +967,6 @@
             <span data-i18n="term.log_window">Log Window</span>
           </h2>
           <div class="logwindow-controls">
-            <button class="icon-btn" id="logCollapseBtn" type="button"
-                    data-i18n-aria="log.collapse" title="Collapse">
-              <i class="fa fa-chevron-up"></i>
-            </button>
             <label class="form-label" for="logSeverity" data-i18n="term.severity">Severity</label>
             <select class="form-input" id="logSeverity">
               <option value="all" data-i18n="term.sev_all">All</option>

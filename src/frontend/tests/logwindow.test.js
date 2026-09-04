@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 
-// i18n dict so window.I18N (and getStr resolution) is available — the collapse
-// tests exercise applyLogCollapse/toggleLogCollapse which read i18n labels.
+// i18n dict so window.I18N (and getStr resolution) is available — the show/hide
+// tests exercise applyLogVisible/toggleLogVisible which read i18n labels.
 import "../static/i18n.js";
 // app.js is an IIFE that attaches pure helpers onto window.aigate and runs
 // init() against the (jsdom) document. Importing for side effects exposes the
@@ -92,13 +92,21 @@ describe("buildLogsQuery (B3.1)", () => {
   });
 });
 
-describe("Log Window is global + collapsible (B3.1)", () => {
+describe("Log Window is global + show/hide (B3.1 rework)", () => {
   beforeEach(() => {
     localStorage.clear();
+    document.body.className = "";
+    document.documentElement.style.removeProperty("--log-h");
     document.body.innerHTML =
+      '<header class="topbar"><div class="topbar-right">' +
+        '<button id="logWindowToggle" class="icon-btn" type="button" aria-pressed="true"></button>' +
+        '<button id="themeToggle" class="icon-btn" type="button"></button>' +
+      '</div></header>' +
+      '<main class="workspace"></main>' +
       '<div class="logwindow" id="logWindow">' +
         '<div class="logwindow-head">' +
-          '<button id="logCollapseBtn"><i class="fa fa-chevron-up"></i></button>' +
+          '<select id="logSeverity"></select>' +
+          '<button id="logRefreshBtn"></button>' +
         '</div>' +
         '<div class="logwindow-body">' +
           '<p id="logMsg"></p>' +
@@ -107,28 +115,65 @@ describe("Log Window is global + collapsible (B3.1)", () => {
       '</div>';
   });
 
-  it("is expanded by default and exposes toggle/state helpers", () => {
-    expect(window.aigate.isLogCollapsed()).toBe(false);
-    expect(typeof window.aigate.toggleLogCollapse).toBe("function");
-    expect(typeof window.aigate.applyLogCollapse).toBe("function");
+  it("is visible by default and exposes toggle/state helpers", () => {
+    expect(window.aigate.isLogVisible()).toBe(true);
+    expect(typeof window.aigate.toggleLogVisible).toBe("function");
+    expect(typeof window.aigate.applyLogVisible).toBe("function");
+    expect(typeof window.aigate.measureLogHeight).toBe("function");
   });
 
-  it("toggleLogCollapse flips state, toggles the class, and persists to localStorage", () => {
-    window.aigate.toggleLogCollapse();
-    expect(window.aigate.isLogCollapsed()).toBe(true);
-    expect(document.getElementById("logWindow").classList.contains("logwindow-collapsed")).toBe(true);
-    expect(localStorage.getItem("aigate.logCollapsed")).toBe("collapsed");
-
-    window.aigate.toggleLogCollapse();
-    expect(window.aigate.isLogCollapsed()).toBe(false);
-    expect(localStorage.getItem("aigate.logCollapsed")).toBe("expanded");
+  it("the old collapse API is gone", () => {
+    expect(window.aigate.toggleLogCollapse).toBeUndefined();
+    expect(window.aigate.applyLogCollapse).toBeUndefined();
+    expect(window.aigate.isLogCollapsed).toBeUndefined();
   });
 
-  it("applyLogCollapse(true) collapses and (false) expands via class", () => {
-    window.aigate.applyLogCollapse(true);
-    expect(document.getElementById("logWindow").classList.contains("logwindow-collapsed")).toBe(true);
-    window.aigate.applyLogCollapse(false);
-    expect(document.getElementById("logWindow").classList.contains("logwindow-collapsed")).toBe(false);
+  it("toggleLogVisible hides the panel, drops body.log-visible, and persists", () => {
+    // Start from a known-visible state.
+    window.aigate.applyLogVisible(true);
+    expect(document.getElementById("logWindow").hidden).toBe(false);
+    expect(document.body.classList.contains("log-visible")).toBe(true);
+
+    window.aigate.toggleLogVisible(); // -> hidden
+    expect(window.aigate.isLogVisible()).toBe(false);
+    expect(document.getElementById("logWindow").hidden).toBe(true);
+    expect(document.body.classList.contains("log-visible")).toBe(false);
+    expect(localStorage.getItem("aigate.logVisible")).toBe("0");
+    // Hidden -> no reserved space.
+    expect(document.documentElement.style.getPropertyValue("--log-h")).toBe("0px");
+
+    window.aigate.toggleLogVisible(); // -> visible again
+    expect(window.aigate.isLogVisible()).toBe(true);
+    expect(document.getElementById("logWindow").hidden).toBe(false);
+    expect(document.body.classList.contains("log-visible")).toBe(true);
+    expect(localStorage.getItem("aigate.logVisible")).toBe("1");
+  });
+
+  it("applyLogVisible(true) sets body.log-visible + a --log-h reservation", () => {
+    window.aigate.applyLogVisible(true);
+    expect(document.body.classList.contains("log-visible")).toBe(true);
+    expect(document.getElementById("logWindow").hidden).toBe(false);
+    // The reservation var is always written when shown (jsdom measures 0px, but
+    // the property must be present so the workspace padding rule has a value).
+    expect(document.documentElement.style.getPropertyValue("--log-h")).toBe("0px");
+  });
+
+  it("applyLogVisible(false) removes the class and zeroes the reservation", () => {
+    window.aigate.applyLogVisible(true);
+    window.aigate.applyLogVisible(false);
+    expect(document.body.classList.contains("log-visible")).toBe(false);
+    expect(document.getElementById("logWindow").hidden).toBe(true);
+    expect(document.documentElement.style.getPropertyValue("--log-h")).toBe("0px");
+  });
+
+  it("reflects state on the header toggle (aria-pressed + label)", () => {
+    const btn = document.getElementById("logWindowToggle");
+    window.aigate.applyLogVisible(true);
+    expect(btn.getAttribute("aria-pressed")).toBe("true");
+    expect(btn.getAttribute("aria-label")).toBe(window.I18N.en["log.hide"]);
+    window.aigate.applyLogVisible(false);
+    expect(btn.getAttribute("aria-pressed")).toBe("false");
+    expect(btn.getAttribute("aria-label")).toBe(window.I18N.en["log.show"]);
   });
 
   it("exposes auto-refresh controls that are safe to call repeatedly", () => {
