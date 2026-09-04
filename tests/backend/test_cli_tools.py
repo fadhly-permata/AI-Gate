@@ -17,7 +17,7 @@ import backend.cli_presets as cli_presets
 import backend.cli_tools_router as cli_tools_router
 import backend.config.db as db_mod
 from backend.config.db import Base
-from backend.models import CLITool, CLIToolGroup, Endpoint
+from backend.models import CLITool, CLIToolGroup, Endpoint, LogEntry
 from fastapi.testclient import TestClient
 
 from backend.server import app
@@ -196,3 +196,128 @@ def test_resolve_unknown_tool_404(monkeypatch) -> None:
     err = r.json()["error"]
     assert err["code"] == "tool_not_found"
     assert err["type"] == "not_found"
+
+
+# =========================================================================== #
+# 5. aider custom-endpoint launch form (task: CLI-tool gateway init)
+# =========================================================================== #
+def _seed_endpoint(sf: sessionmaker, key: str = "plain-key-xyz") -> None:
+    with sf() as s:
+        s.add(
+            Endpoint(
+                name="ep",
+                access_control_enabled=True,
+                internal_api_key=key,
+            )
+        )
+        s.commit()
+
+
+def test_resolve_aider_custom_endpoint_form(monkeypatch) -> None:
+    """aider gets --openai-api-base/--openai-api-key + --model openai/<raw>."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve",
+        json={"tool": "aider", "model": "provider:B.AI:gpt-5.5"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    rc = body["run_command"]
+
+    # aider's documented OpenAI-compatible form; provider: prefix stripped to
+    # the raw model, wrapped in aider's openai/ namespace.
+    assert "--openai-api-base" in rc
+    assert "--openai-api-key" in rc
+    assert "--model openai/gpt-5.5" in rc
+    assert "http://localhost:8080/v1" in rc
+    assert "plain-key-xyz" in rc
+    # the raw provider: ref must NOT leak into the aider --model value.
+    assert "provider:" not in rc
+
+    # env still injected (aider reads these too).
+    assert body["env"]["OPENAI_API_BASE"] == "http://localhost:8080/v1"
+    assert body["env"]["OPENAI_API_KEY"] == "plain-key-xyz"
+    # model echoed as requested.
+    assert body["model"] == "provider:B.AI:gpt-5.5"
+
+
+def test_resolve_aider_bare_model(monkeypatch) -> None:
+    """A bare model id is passed straight through as openai/<model>."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve", json={"tool": "aider", "model": "gpt-5.5"}
+    )
+    rc = r.json()["run_command"]
+    assert "--model openai/gpt-5.5" in rc
+
+
+def test_resolve_aider_no_model_segment_omits_model(monkeypatch) -> None:
+    """provider:<name> (no model) -> aider omits --model, keeps endpoint flags."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve", json={"tool": "aider", "model": "provider:B.AI"}
+    )
+    rc = r.json()["run_command"]
+    assert "--openai-api-base" in rc
+    assert "--openai-api-key" in rc
+    assert "--model" not in rc
+
+
+def test_resolve_non_aider_generic_form_preserved(monkeypatch) -> None:
+    """Non-aider tools keep the generic <binary> <flags> --model <ref> form."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve",
+        json={"tool": "claude", "model": "provider:B.AI:gpt-5.5"},
+    )
+    body = r.json()
+    assert body["run_command"] == (
+        "claude openai-compatible --model provider:B.AI:gpt-5.5"
+    )
+    # generic tools do NOT get aider's custom-endpoint flags.
+    assert "--openai-api-base" not in body["run_command"]
+    assert body["env"]["OPENAI_API_BASE"] == "http://localhost:8080/v1"
+    assert body["env"]["OPENAI_API_KEY"] == "plain-key-xyz"
+
+
+def test_resolve_aider_key_not_persisted_to_logentry(monkeypatch) -> None:
+    """R12/skill: the plaintext key embedded in aider's run_command must be
+    masked in LogEntry (the API response still returns it plaintext, ADR-007)."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf, key="secret-key-abc")
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve",
+        json={"tool": "aider", "model": "provider:B.AI:gpt-5.5"},
+    )
+    # response carries the real key (ADR-007 plaintext to the caller)...
+    assert "secret-key-abc" in r.json()["run_command"]
+    # ...but the persisted LogEntry must NOT leak it.
+    with sf() as s:
+        entries = (
+            s.query(LogEntry)
+            .filter_by(source="backend.cli_tools.router")
+            .all()
+        )
+    assert entries, "resolve must log an entry"
+    assert all("secret-key-abc" not in (e.message or "") for e in entries)
+    assert any("***" in (e.message or "") for e in entries)
+

@@ -20,7 +20,8 @@ Pydantic **v1** only (rule R10): ``BaseModel`` + ``class Config``.
 from __future__ import annotations
 
 import shutil
-from typing import Dict, List, Optional
+from dataclasses import dataclass
+from typing import Callable, Dict, List, Optional
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -142,6 +143,91 @@ def _not_found(message: str, code: str) -> JSONResponse:
 
 
 # --------------------------------------------------------------------------- #
+# Per-tool launch strategy
+#
+# Each CLI tool is launched with a command built by a strategy keyed on the
+# tool's ``binary_name``. ``aider`` is the currently-known tool that needs the
+# explicit custom-endpoint flags (``--openai-api-base`` / ``--openai-api-key`` /
+# ``--model openai/<model>``); every other tool falls back to the generic
+# ``<binary> <flags> --model <model>`` form and relies on the injected
+# ``OPENAI_API_BASE`` / ``OPENAI_API_KEY`` env. Add confirmed tools to
+# ``_LAUNCH_BUILDERS`` as their custom-endpoint form is verified.
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class _LaunchCtx:
+    """Inputs a launch builder needs to compose a tool's run command."""
+
+    binary_name: str
+    default_flags: str
+    model: Optional[str]  # the aigate model ref exactly as requested
+    raw_model: Optional[str]  # ref stripped to what the CLI sends upstream
+    base: str  # gateway base url (also injected as OPENAI_API_BASE)
+    key: str  # plaintext internal key (also injected as OPENAI_API_KEY)
+
+
+def _raw_model_for_ref(model: Optional[str]) -> Optional[str]:
+    """Reduce an aigate model ref to the concrete id a CLI should send upstream.
+
+    * ``provider:<name>:<m>`` -> ``<m>``
+    * ``provider:<name>``     -> ``None`` (no concrete model chosen)
+    * ``combo:<name>``        -> ``combo:<name>`` (kept verbatim)
+    * bare ``<m>``            -> ``<m>`` (aigate now bare-resolves it)
+    """
+    if not model:
+        return None
+    if model.startswith("provider:"):
+        rest = model[len("provider:"):]
+        if ":" in rest:
+            _name, model_id = rest.split(":", 1)
+            return model_id
+        return None  # provider:<name> with no model segment
+    return model  # combo:<name> or a bare model id
+
+
+def _generic_builder(ctx: _LaunchCtx) -> str:
+    """Default launch form: ``<binary> <flags> --model <model>`` + env injection.
+
+    The tool reads ``OPENAI_API_BASE`` / ``OPENAI_API_KEY`` from the injected
+    env; ``--model`` carries the aigate ref verbatim (aigate resolves it).
+    """
+    parts: List[str] = [ctx.binary_name]
+    if ctx.default_flags:
+        parts.append(ctx.default_flags)
+    if ctx.model:
+        parts += ["--model", ctx.model]
+    return " ".join(parts)
+
+
+def _aider_builder(ctx: _LaunchCtx) -> str:
+    """aider's documented OpenAI-compatible form (custom endpoint + model).
+
+    The ``openai/`` prefix makes aider accept an arbitrary model name and
+    forward ``<raw_model>`` to aigate (which now bare-resolves it). When no
+    concrete model was chosen (``provider:<name>``), the ``--model`` part is
+    omitted so aider uses its own default / aigate's provider default.
+    """
+    parts: List[str] = [ctx.binary_name]
+    if ctx.default_flags:
+        parts.append(ctx.default_flags)
+    parts += ["--openai-api-base", ctx.base, "--openai-api-key", ctx.key]
+    if ctx.raw_model:
+        parts += ["--model", f"openai/{ctx.raw_model}"]
+    return " ".join(parts)
+
+
+# binary_name -> builder. Anything absent uses ``_generic_builder``.
+_LAUNCH_BUILDERS: Dict[str, Callable[[_LaunchCtx], str]] = {
+    "aider": _aider_builder,
+}
+
+
+def _build_run_command(ctx: _LaunchCtx) -> str:
+    """Dispatch to the tool's launch builder (aider form) or the generic one."""
+    builder = _LAUNCH_BUILDERS.get(ctx.binary_name, _generic_builder)
+    return builder(ctx)
+
+
+# --------------------------------------------------------------------------- #
 # Routes
 # --------------------------------------------------------------------------- #
 @router.get("/api/cli-tools")
@@ -198,16 +284,22 @@ def resolve_cli_tool(req: ResolveRequest) -> dict:
         binary_found = shutil.which(tool.binary_name) is not None
         install_command = tool.install_command if not binary_found else None
 
-        run_command = tool.binary_name
-        if tool.default_flags:
-            run_command += " " + tool.default_flags
-        if req.model:
-            run_command += f" --model {req.model}"
-
+        base = _resolve_gateway_base(session)
+        key = _resolve_internal_key(session)
         env = {
-            "OPENAI_API_BASE": _resolve_gateway_base(session),
-            "OPENAI_API_KEY": _resolve_internal_key(session),
+            "OPENAI_API_BASE": base,
+            "OPENAI_API_KEY": key,
         }
+
+        ctx = _LaunchCtx(
+            binary_name=tool.binary_name,
+            default_flags=tool.default_flags or "",
+            model=req.model,
+            raw_model=_raw_model_for_ref(req.model),
+            base=base,
+            key=key,
+        )
+        run_command = _build_run_command(ctx)
 
         result = ResolveDTO(
             binary_found=binary_found,
@@ -217,11 +309,15 @@ def resolve_cli_tool(req: ResolveRequest) -> dict:
             model=req.model,
         ).dict()
 
+        # R12 / skill: never persist a secret to LogEntry. aider embeds the
+        # plaintext key in run_command, so mask it in the LOGGED copy only — the
+        # API response above still returns it plaintext per ADR-007.
+        logged_command = run_command.replace(key, "***") if key else run_command
         log_info(
             f"resolve: tool='{req.tool}' binary_found={binary_found} "
             f"model={req.model}",
             source=LOG_SOURCE,
-            context={"run_command": run_command},
+            context={"run_command": logged_command},
         )
         return result
 
