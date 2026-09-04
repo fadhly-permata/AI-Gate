@@ -9,8 +9,9 @@ Exposes:
   model uses ``extra="allow"`` so unknown OpenAI fields are preserved.
   Streaming is rejected with a 400 envelope (streaming SSE is a later task).
 * ``GET /v1/models`` — list available models derived from ``ProviderModel``
-  rows (id ``provider:<provider>:<model_id>``) plus ``Combo`` rows
+  rows (id ``provider:<provider>:<model_id>``) plus ENABLED ``Combo`` rows
   (id ``combo:<name>``), in OpenAI ``{"object":"list","data":[...]}`` shape.
+  Listing combos makes them discoverable/selectable by OpenAI-compatible CLIs.
 
 Hard rule R12 / ADR-011: every failure path logs to ``LogEntry`` via
 ``backend.log`` before raising. The adapter re-raises its own ``UpstreamError``
@@ -284,7 +285,12 @@ async def list_models() -> dict:
                 }
             )
 
-        for combo in session.query(Combo).all():
+        # Combos are exposed as selectable models so any OpenAI-compatible
+        # client (e.g. opencode's /models) can DISCOVER them; the gateway
+        # resolver already accepts ``combo:<name>`` as a model reference. Only
+        # ENABLED combos are listed (a disabled combo must not be selectable).
+        # A combo with no members is still listed (it may be configured later).
+        for combo in session.query(Combo).filter(Combo.enabled.is_(True)).all():
             data.append(
                 {
                     "id": f"combo:{combo.name}",

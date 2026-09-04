@@ -341,10 +341,22 @@ def _opencode_builder(ctx: _LaunchCtx) -> str:
     chosen, else plain ``opencode`` (TUI). The env exports (OPENAI_API_BASE/KEY)
     are injected by the caller exactly as for aider — this builder only emits the
     config write + the command.
+
+    Combo refs (``combo:<name>``): the combo is exposed as a selectable model id
+    (key ``combo:<name>``, name identical) so opencode can DISCOVER + SELECT it;
+    the gateway resolver already routes ``combo:<name>`` via the combo, so the
+    launch is ``opencode run --model aigate/combo:<name>``.
     """
-    model_ids = list(ctx.provider_models)
-    if not model_ids and ctx.raw_model:
-        model_ids = [ctx.raw_model]
+    model = ctx.model or ""
+    if model.startswith("combo:"):
+        # Combo ref -> the combo itself is the selectable model id (verbatim).
+        model_ids = [model]
+    else:
+        # Provider / bare ref -> enumerate the provider's discovered models so
+        # the whole provider is browsable; fall back to the requested model.
+        model_ids = list(ctx.provider_models)
+        if not model_ids and ctx.raw_model:
+            model_ids = [ctx.raw_model]
 
     config = {
         "$schema": "https://opencode.ai/config.json",

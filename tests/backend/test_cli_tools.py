@@ -22,7 +22,15 @@ import backend.cli_presets as cli_presets
 import backend.cli_tools_router as cli_tools_router
 import backend.config.db as db_mod
 from backend.config.db import Base
-from backend.models import CLITool, CLIToolGroup, Endpoint, LogEntry, Provider, ProviderModel
+from backend.models import (
+    CLITool,
+    CLIToolGroup,
+    Combo,
+    Endpoint,
+    LogEntry,
+    Provider,
+    ProviderModel,
+)
 from fastapi.testclient import TestClient
 
 from backend.server import app
@@ -625,3 +633,38 @@ def test_resolve_opencode_no_model_opens_tui(monkeypatch) -> None:
     tail = rc.split(_HEREDOC_CLOSE)[-1]
     assert tail == "opencode"
     assert "run --model" not in tail
+
+
+def test_resolve_opencode_combo_ref(monkeypatch) -> None:
+    """combo:<name> -> opencode.json models map has key ``combo:<name>`` and
+    the launch is ``opencode run --model aigate/combo:<name>`` (the gateway
+    resolver already routes combo refs, so the combo must be selectable)."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)  # key = plain-key-xyz
+    with sf() as s:
+        s.add(Combo(name="Test", strategy="fallback", enabled=True))
+        s.commit()
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve",
+        json={"tool": "opencode", "model": "combo:Test"},
+    )
+    assert r.status_code == 200
+    rc = r.json()["run_command"]
+
+    # 1. config written via the single-quoted heredoc + valid JSON.
+    cfg = _extract_heredoc_json(rc)
+    prov = cfg["provider"]["aigate"]
+    assert prov["npm"] == "@ai-sdk/openai-compatible"
+    assert prov["options"]["baseURL"] == "http://localhost:8080/v1"
+    assert prov["options"]["apiKey"] == "plain-key-xyz"
+
+    # 2. the combo is the selectable model id (key == name == combo:Test).
+    assert "combo:Test" in prov["models"]
+    assert prov["models"]["combo:Test"]["name"] == "combo:Test"
+
+    # 3. launched as aigate/combo:Test (provider id + combo ref).
+    assert "opencode run --model aigate/combo:Test" in rc
+    assert r.json()["model"] == "combo:Test"

@@ -261,6 +261,41 @@ def test_list_models_contains_provider_and_combo(monkeypatch) -> None:
     assert "combo:default" in ids
 
 
+def test_list_models_lists_enabled_combo_alongside_provider_models(
+    monkeypatch,
+) -> None:
+    """An ENABLED combo is discoverable via /v1/models next to provider models,
+    with the OpenAI entry shape (id ``combo:<name>``, object ``model``). A
+    DISABLED combo must NOT be listed (not selectable by an OpenAI client)."""
+    sf = _make_sessionmaker()
+    _seed(sf)  # seeds provider:test:gpt-4o + enabled combo:default
+    with sf() as session:
+        session.add(Combo(name="Test", strategy="fallback", enabled=True))
+        session.add(Combo(name="Off", strategy="fallback", enabled=False))
+        session.commit()
+    _patch_db(monkeypatch, sf)
+    client = TestClient(app)
+
+    resp = client.get("/v1/models")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["object"] == "list"
+    by_id = {entry["id"]: entry for entry in body["data"]}
+
+    # provider entries kept as-is.
+    assert "provider:test:gpt-4o" in by_id
+    # enabled combos (seeded + newly added) are listed.
+    assert "combo:default" in by_id
+    assert "combo:Test" in by_id
+    # disabled combo is NOT listed.
+    assert "combo:Off" not in by_id
+
+    # combo entry matches the OpenAI model shape.
+    combo_entry = by_id["combo:Test"]
+    assert combo_entry["object"] == "model"
+    assert combo_entry["owned_by"] == "aigate"
+
+
 # --- /api/logs ------------------------------------------------------------
 
 
