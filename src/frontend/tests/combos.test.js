@@ -6,6 +6,9 @@ import { JSDOM } from "jsdom";
 
 // i18n dict (window.I18N) so getStr() resolves labels during render.
 import "../static/i18n.js";
+// combobox.js exposes window.aigate.createCombobox (loaded before app.js /
+// combos.js in index.html — same order here).
+import "../static/combobox.js";
 // app.js exposes window.aigate.fetchJson / escapeHtml / getStr used by the module.
 import "../static/app.js";
 // The Combos module registers window.aigate.combos and wires its DOM (guarded).
@@ -49,14 +52,11 @@ function withComboModalDom() {
             '<div class="combo-member-field">' +
               '<label class="form-label" for="comboMemberModel" data-i18n="combos.member.model">Model</label>' +
               '<div class="combo-model-control">' +
-                '<div class="combo-model-select-row">' +
-                  '<select id="comboMemberModel">' +
-                    '<option value="" data-i18n="combos.member.model_ph">— select model —</option>' +
-                    '<option value="__custom__" data-i18n="combos.member.model_custom">Other (type manually)…</option>' +
-                  '</select>' +
+                '<div class="combo-model-select-row aigate-combo">' +
+                  '<input type="text" id="comboMemberModel" autocomplete="off" />' +
+                  '<ul id="comboMemberModelList" role="listbox" hidden></ul>' +
                   '<span class="combo-model-spinner" id="comboMemberModelSpinner" hidden aria-hidden="true"></span>' +
                 '</div>' +
-                '<input type="text" id="comboMemberModelCustom" hidden />' +
               '</div>' +
             '</div>' +
             '<div class="combo-member-field">' +
@@ -113,21 +113,24 @@ function sampleCombo(members) {
   };
 }
 
-// ---- Model SELECT readers (the widget is a <select>, NOT a <datalist>) ----
+// ---- Model COMBOBOX readers (text input + custom <ul> panel; the old
+// <select> + "__custom__" free-text box and any <datalist> are gone) ----
 
-// Every option value of #comboMemberModel, in DOM order.
-const modelOptionValues = () => Array.from(
-  document.getElementById("comboMemberModel").querySelectorAll("option")
-).map((o) => o.getAttribute("value"));
+const modelInput = () => document.getElementById("comboMemberModel");
+const modelList = () => document.getElementById("comboMemberModelList");
 
-// Only the discovered model ids (placeholder "" + the __custom__ sentinel out).
-const modelIds = () => modelOptionValues().filter((v) => v !== "" && v !== "__custom__");
+// The rendered option rows (data-value = model id), in DOM order.
+const modelOptionEls = () => Array.from(modelList().querySelectorAll('li[role="option"]'));
+const modelOptionValues = () => modelOptionEls().map((li) => li.getAttribute("data-value"));
+// Every rendered option is a real model id now (no placeholder / sentinel).
+const modelIds = modelOptionValues;
+const modelLabels = () => modelOptionEls().map((li) => li.textContent);
 
-// Text of the placeholder <option value=""> (carries the loading message).
-const modelPlaceholderText = () => {
-  const opt = document.querySelector('#comboMemberModel option[value=""]');
-  return opt ? opt.textContent : null;
-};
+// Type into the combobox input (fires the delegated filter + open handler).
+function typeModel(v) {
+  modelInput().value = v;
+  modelInput().dispatchEvent(new Event("input", { bubbles: true }));
+}
 
 describe("combos mapper + render (B2.4)", () => {
   beforeEach(() => { withDom(); });
@@ -242,7 +245,7 @@ describe("combos members — provider/model dropdown chaining", () => {
     expect(opts).toEqual(["", "1", "2"]);
   });
 
-  it("populateModelOptions fills the model SELECT from the chosen provider's models", async () => {
+  it("populateModelOptions fills the model COMBOBOX from the chosen provider's models", async () => {
     vi.stubGlobal("fetch", vi.fn((url) => {
       if (String(url).indexOf("/api/providers") !== -1) return jsonResponse(sampleProviders());
       return jsonResponse({});
@@ -251,12 +254,16 @@ describe("combos members — provider/model dropdown chaining", () => {
     const models = window.aigate.combos.populateModelOptions(1);
     // Cached models are now sorted by name (case-insensitive): GPT-4o < Llama 3.1.
     expect(models.map((m) => m.model_id)).toEqual(["gpt-4o", "llama-3.1"]);
-    // Structure: placeholder + sorted models + the custom (free-text) option.
-    expect(modelOptionValues()).toEqual(["", "gpt-4o", "llama-3.1", "__custom__"]);
-    // Provider with no discovered models -> placeholder + custom only, and the
-    // free-text box still takes a value.
+    // The combobox panel offers exactly the sorted model ids (no sentinel).
+    expect(modelOptionValues()).toEqual(["gpt-4o", "llama-3.1"]);
+    // Labels show the model NAME (id as fallback).
+    expect(modelLabels()).toEqual(["GPT-4o", "Llama 3.1"]);
+    // Provider with no discovered models -> empty option list, and free text
+    // is still accepted (the input IS the value).
     expect(window.aigate.combos.populateModelOptions(2)).toEqual([]);
-    expect(modelOptionValues()).toEqual(["", "__custom__"]);
+    expect(modelOptionValues()).toEqual([]);
+    window.aigate.combos.setModelValue("hand-typed");
+    expect(window.aigate.combos.modelFieldValue()).toBe("hand-typed");
   });
 });
 
@@ -290,7 +297,7 @@ describe("combos members — auto model fetch on provider change", () => {
     expect(disc).toBeTruthy();
   });
 
-  it("after a fetch #comboMemberModel is a SELECT: placeholder + sorted models + custom", async () => {
+  it("after a fetch #comboMemberModel is a combobox INPUT + custom <ul> panel", async () => {
     vi.stubGlobal("fetch", vi.fn((url) => {
       const u = String(url);
       if (u === "/api/providers") return jsonResponse(sampleProviders());
@@ -307,26 +314,27 @@ describe("combos members — auto model fetch on provider change", () => {
     const models = await window.aigate.combos.fetchModelsForProvider(1);
     // Sort key = model_name (lowercased): alpha < Mid < Zeta.
     expect(models.map((m) => m.model_id)).toEqual(["Alpha", "mid", "zeta"]);
-    const sel = document.getElementById("comboMemberModel");
-    // A real <select> (mobile-usable), NOT an <input list=...> + <datalist>.
-    expect(sel.tagName).toBe("SELECT");
-    expect(sel.getAttribute("list")).toBeNull();
-    expect(document.getElementById("comboMemberModelList")).toBeNull();
-    // Order: placeholder first, models sorted, __custom__ last.
-    expect(modelOptionValues()).toEqual(["", "Alpha", "mid", "zeta", "__custom__"]);
-    // Labels show the model NAME (id as fallback), value carries the id.
-    const labels = Array.from(sel.querySelectorAll("option")).map((o) => o.textContent);
-    expect(labels).toEqual([
-      window.I18N.en["combos.member.model_ph"], "alpha", "Mid", "Zeta",
-      window.I18N.en["combos.member.model_custom"]
-    ]);
-    // Re-rendered structural options keep their data-i18n hook, so a later
-    // applyLocale() still translates them (model names must NOT be translated).
-    expect(sel.querySelector('option[value=""]').getAttribute("data-i18n"))
-      .toBe("combos.member.model_ph");
-    expect(sel.querySelector('option[value="__custom__"]').getAttribute("data-i18n"))
-      .toBe("combos.member.model_custom");
-    expect(sel.querySelector('option[value="mid"]').getAttribute("data-i18n")).toBeNull();
+    // A searchable combobox input (mobile-working + type-to-search), NOT a
+    // <select> and NOT an <input list=...> + <datalist>.
+    const inp = modelInput();
+    expect(inp.tagName).toBe("INPUT");
+    expect(inp.getAttribute("role")).toBe("combobox");
+    expect(inp.getAttribute("list")).toBeNull();
+    expect(inp.getAttribute("aria-controls")).toBe("comboMemberModelList");
+    expect(inp.getAttribute("aria-autocomplete")).toBe("list");
+    const ul = modelList();
+    expect(ul.tagName).toBe("UL");
+    expect(ul.getAttribute("role")).toBe("listbox");
+    // Options: the sorted model ids, labels = model names (id fallback).
+    expect(modelIds()).toEqual(["Alpha", "mid", "zeta"]);
+    expect(modelLabels()).toEqual(["alpha", "Mid", "Zeta"]);
+    // Model names are DATA, never i18n hooks (they must not be translated).
+    expect(ul.querySelectorAll("[data-i18n]").length).toBe(0);
+    // Typing filters the fetched list (case-insensitive substring).
+    typeModel("MI");
+    expect(modelIds()).toEqual(["mid"]);
+    typeModel("");
+    expect(modelIds()).toEqual(["Alpha", "mid", "zeta"]);
   });
 
   it("loading state is applied first, then cleared after the fetch resolves", async () => {
@@ -339,31 +347,33 @@ describe("combos members — auto model fetch on provider change", () => {
       return body({});
     }));
     await window.aigate.combos.loadProviders();
-    const mo = document.getElementById("comboMemberModel");
-    const custom = document.getElementById("comboMemberModelCustom");
+    const inp = modelInput();
     const add = document.getElementById("comboMemberAddBtn");
     const form = document.getElementById("comboMemberForm");
     const spinner = document.getElementById("comboMemberModelSpinner");
 
     const pr = window.aigate.combos.fetchModelsForProvider(1);
-    // Applied synchronously, BEFORE the fetch resolves:
-    expect(mo.tagName).toBe("SELECT");
-    expect(mo.disabled).toBe(true);
-    expect(custom.disabled).toBe(true);   // BOTH halves of the control lock up
+    // Applied synchronously, BEFORE the fetch resolves: the combobox input is
+    // disabled + aria-busy, the Add button locks, the spinner shows, and the
+    // panel carries a "Loading models…" row instead of options.
+    expect(inp.tagName).toBe("INPUT");
+    expect(inp.disabled).toBe(true);
+    expect(inp.getAttribute("aria-busy")).toBe("true");
     expect(add.disabled).toBe(true);
     expect(form.getAttribute("aria-busy")).toBe("true");
     expect(spinner.hidden).toBe(false);
-    expect(modelPlaceholderText()).toBe(window.I18N.en["combos.member.loading"]);
+    expect(modelList().textContent).toContain(window.I18N.en["combos.member.loading"]);
+    expect(modelOptionValues()).toEqual([]);
 
     resolveDisc();
     await pr;
     // Cleared after resolve:
-    expect(mo.disabled).toBe(false);
-    expect(custom.disabled).toBe(false);
+    expect(inp.disabled).toBe(false);
+    expect(inp.getAttribute("aria-busy")).toBe("false");
     expect(add.disabled).toBe(false);
     expect(form.getAttribute("aria-busy")).toBe("false");
     expect(spinner.hidden).toBe(true);
-    expect(modelPlaceholderText()).toBe(window.I18N.en["combos.member.model_ph"]);
+    expect(modelList().textContent).not.toContain(window.I18N.en["combos.member.loading"]);
   });
 
   it("discover {ok:false} falls back to cached models (sorted) + load_failed note", async () => {
@@ -414,7 +424,7 @@ describe("combos members — auto model fetch on provider change", () => {
   });
 });
 
-describe("combos members — custom (free-text) model option", () => {
+describe("combos members — searchable combobox model field (free text native)", () => {
   beforeEach(() => { withComboModalDom(); });
   afterEach(() => { vi.unstubAllGlobals(); });
 
@@ -423,10 +433,8 @@ describe("combos members — custom (free-text) model option", () => {
     ok: true, headers: { get: () => "application/json" },
     json: () => Promise.resolve(payload)
   });
-  const sel = () => document.getElementById("comboMemberModel");
-  const custom = () => document.getElementById("comboMemberModelCustom");
 
-  // Seed the select with provider 1's cached models (sorted) via the real path.
+  // Seed the combobox with provider 1's models (sorted) via the real path.
   async function withDiscoveredModels() {
     vi.stubGlobal("fetch", vi.fn((url) => {
       const u = String(url);
@@ -443,125 +451,102 @@ describe("combos members — custom (free-text) model option", () => {
     await window.aigate.combos.fetchModelsForProvider(1);
   }
 
-  it("the custom box starts hidden and is revealed by choosing __custom__", async () => {
-    await withDiscoveredModels();
-    expect(custom().hidden).toBe(true);
-    sel().value = "__custom__";
-    sel().dispatchEvent(new Event("change", { bubbles: true }));
-    expect(custom().hidden).toBe(false);
-    // Choosing a real model again hides it.
-    sel().value = "gpt-4o";
-    sel().dispatchEvent(new Event("change", { bubbles: true }));
-    expect(custom().hidden).toBe(true);
-  });
-
-  it("memberFormValues() resolves __custom__ to the typed text, else the option value", async () => {
+  it("memberFormValues() returns the SELECTED option value", async () => {
     await withDiscoveredModels();
     document.getElementById("comboMemberProvider").value = "1";
     document.getElementById("comboMemberPriority").value = "2";
     document.getElementById("comboMemberWeight").value = "0.5";
-
-    sel().value = "gpt-4o";
-    custom().value = "leftover-should-be-ignored";
+    // Click the "GPT-4o" option in the panel.
+    const gpt = modelOptionEls().find((li) => li.getAttribute("data-value") === "gpt-4o");
+    gpt.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(window.aigate.combos.memberFormValues()).toEqual({
       provider_id: 1, provider_model: "gpt-4o", priority: 2, weight: 0.5
     });
+    // Selecting an option closes the panel.
+    expect(modelList().hidden).toBe(true);
+  });
 
-    sel().value = "__custom__";
-    custom().value = "   my-local-model   ";
+  it("memberFormValues() returns the TYPED free-text value (custom model)", async () => {
+    await withDiscoveredModels();
+    document.getElementById("comboMemberProvider").value = "1";
+    typeModel("   my-local-model   ");
     expect(window.aigate.combos.memberFormValues().provider_model).toBe("my-local-model");
-
-    // __custom__ with an empty box resolves to "" (no phantom "__custom__").
-    custom().value = "   ";
+    // An empty input resolves to "" (no phantom sentinel).
+    typeModel("   ");
     expect(window.aigate.combos.memberFormValues().provider_model).toBe("");
+  });
+
+  it("typing filters the discovered list (case-insensitive substring)", async () => {
+    await withDiscoveredModels();
+    typeModel("LLAMA");
+    expect(modelIds()).toEqual(["llama-3.1"]);
+    typeModel("");
+    expect(modelIds()).toEqual(["gpt-4o", "llama-3.1"]);
   });
 
   it("submitMemberForm blocks an empty model with combos.member.model_required (ADR-011)", async () => {
     await withDiscoveredModels();
     document.getElementById("comboMemberProvider").value = "1";
-    sel().value = "__custom__";
-    custom().value = "";
+    window.aigate.combos.setModelValue("");
     await window.aigate.combos.submitMemberForm();
     const msg = document.getElementById("comboMemberMsg");
     expect(msg.textContent).toContain(window.I18N.en["combos.member.model_required"]);
     expect(msg.className).toContain("settings-msg-error");
   });
 
-  it("fillMemberForm with an UNKNOWN model -> __custom__ + box populated + visible", async () => {
+  it("fillMemberForm with an UNKNOWN model round-trips it as free text", async () => {
     await withDiscoveredModels();   // list knows llama-3.1 + gpt-4o only
     window.aigate.combos.fillMemberForm({
       provider_id: 1, provider_model: "not-discovered-yet", priority: 1, weight: 1
     });
     await tick();
-    expect(sel().value).toBe("__custom__");
-    expect(custom().value).toBe("not-discovered-yet");
-    expect(custom().hidden).toBe(false);
+    expect(modelInput().value).toBe("not-discovered-yet");
     expect(window.aigate.combos.memberFormValues().provider_model).toBe("not-discovered-yet");
   });
 
-  it("fillMemberForm with a KNOWN model selects the option and keeps the box hidden", async () => {
+  it("fillMemberForm with a KNOWN model sets the value", async () => {
     await withDiscoveredModels();
     window.aigate.combos.fillMemberForm({
       provider_id: 1, provider_model: "llama-3.1", priority: 0, weight: 1
     });
     await tick();
-    expect(sel().value).toBe("llama-3.1");
-    expect(custom().value).toBe("");
-    expect(custom().hidden).toBe(true);
+    expect(modelInput().value).toBe("llama-3.1");
     expect(window.aigate.combos.memberFormValues().provider_model).toBe("llama-3.1");
   });
 
-  it("a pending custom value is upgraded to the real option once discovery lists it", async () => {
-    // Empty list first: the edit value can only live in the custom box.
-    vi.stubGlobal("fetch", vi.fn((url) => {
-      const u = String(url);
-      if (u === "/api/providers") return jsonResponse(sampleProviders());
-      if (u === "/api/providers/1/discover") {
-        return body({ ok: true, models: [{ id: 1, model_id: "llama-3.1", model_name: "Llama 3.1" }] });
-      }
-      return body({});
-    }));
-    await window.aigate.combos.loadProviders();
-    window.aigate.combos.fillMemberForm({ provider_id: 1, provider_model: "llama-3.1" });
-    await tick();
-    expect(sel().value).toBe("llama-3.1");     // no longer __custom__
-    expect(custom().hidden).toBe(true);
-    expect(custom().value).toBe("");
-  });
-
-  it("renderModelOptions keeps a still-offered selection and resets a vanished one", async () => {
+  it("renderModelOptions keeps the current value (free text is native, no reset)", async () => {
     await withDiscoveredModels();
-    sel().value = "gpt-4o";
+    window.aigate.combos.setModelValue("gpt-4o");
     window.aigate.combos.populateModelOptions(1);      // same list -> kept
-    expect(sel().value).toBe("gpt-4o");
+    expect(modelInput().value).toBe("gpt-4o");
     window.aigate.combos.populateModelOptions(2);      // provider 2 has no models
-    expect(sel().value).toBe("");                      // reset to placeholder
-    expect(modelOptionValues()).toEqual(["", "__custom__"]);
+    // The value survives an option refresh even when the list goes empty —
+    // the input holds ANY string (this is what replaced the __custom__ box).
+    expect(modelInput().value).toBe("gpt-4o");
+    expect(modelOptionValues()).toEqual([]);
   });
 
-  it("setModelLoading(true) disables the SELECT and the custom box, then re-enables", () => {
+  it("setModelLoading(true) disables the input + shows the loading row, then re-enables", () => {
     window.aigate.combos.setModelLoading(true);
-    expect(sel().disabled).toBe(true);
-    expect(custom().disabled).toBe(true);
+    expect(modelInput().disabled).toBe(true);
+    expect(modelInput().getAttribute("aria-busy")).toBe("true");
     expect(document.getElementById("comboMemberModelSpinner").hidden).toBe(false);
-    expect(modelPlaceholderText()).toBe(window.I18N.en["combos.member.loading"]);
+    expect(modelList().textContent).toContain(window.I18N.en["combos.member.loading"]);
     window.aigate.combos.setModelLoading(false);
-    expect(sel().disabled).toBe(false);
-    expect(custom().disabled).toBe(false);
-    expect(modelPlaceholderText()).toBe(window.I18N.en["combos.member.model_ph"]);
+    expect(modelInput().disabled).toBe(false);
+    expect(modelInput().getAttribute("aria-busy")).toBe("false");
+    expect(modelList().textContent).not.toContain(window.I18N.en["combos.member.loading"]);
   });
 
-  it("switching provider clears BOTH the select and the custom box", async () => {
+  it("switching provider clears the model value", async () => {
     await withDiscoveredModels();
-    sel().value = "__custom__";
-    custom().value = "hand-typed";
+    window.aigate.combos.setModelValue("hand-typed");
     const prov = document.getElementById("comboMemberProvider");
     prov.value = "2";
     prov.dispatchEvent(new Event("change", { bubbles: true }));
     await tick();
-    expect(sel().value).toBe("");
-    expect(custom().value).toBe("");
-    expect(custom().hidden).toBe(true);
+    expect(modelInput().value).toBe("");
+    expect(window.aigate.combos.modelFieldValue()).toBe("");
   });
 });
 
@@ -755,7 +740,7 @@ describe("combos strategy select — three_tier (B5.2)", () => {
     expect(opt.getAttribute("data-i18n")).toBe("combos.strategy.three_tier");
   });
 
-  it("i18n has EN + ID labels for three_tier and every combos.member(s) key", () => {
+  it("i18n has EN + ID labels for three_tier, every combos.member(s) key + the combobox keys", () => {
     expect(window.I18N.en["combos.strategy.three_tier"]).toContain("Three-tier");
     expect(window.I18N.id["combos.strategy.three_tier"]).toContain("Tiga tingkat");
     [
@@ -763,19 +748,24 @@ describe("combos strategy select — three_tier (B5.2)", () => {
       "combos.member.provider", "combos.member.model", "combos.member.priority",
       "combos.member.weight", "combos.member.remove", "combos.member.edit",
       "combos.member.confirm_delete", "combos.member.provider_ph",
-      "combos.member.model_ph", "combos.member.cancel_edit",
-      "combos.member.provider_required", "combos.member.loading",
-      "combos.member.load_failed", "combos.member.model_custom",
-      "combos.member.model_custom_ph", "combos.member.model_required"
+      "combos.member.cancel_edit", "combos.member.provider_required",
+      "combos.member.loading", "combos.member.load_failed",
+      "combos.member.model_required",
+      "combobox.loading", "combobox.no_match", "combobox.search_ph"
     ].forEach((k) => {
       expect(window.I18N.en[k]).toBeDefined();
       expect(window.I18N.id[k]).toBeDefined();
     });
-    // The select placeholder + manual-entry labels read as intended.
-    expect(window.I18N.en["combos.member.model_custom"]).toContain("Other");
-    expect(window.I18N.id["combos.member.model_custom"]).toContain("Lainnya");
-    expect(window.I18N.en["combos.member.model_ph"]).toContain("select model");
-    expect(window.I18N.id["combos.member.model_ph"]).toContain("pilih model");
+    // The combobox strings read as intended (EN + ID parity).
+    expect(window.I18N.en["combobox.no_match"]).toContain("No models match");
+    expect(window.I18N.id["combobox.no_match"]).toContain("Tidak ada model");
+    expect(window.I18N.en["combobox.search_ph"]).toContain("Search");
+    expect(window.I18N.id["combobox.search_ph"]).toContain("Cari");
+    expect(window.I18N.en["combobox.loading"]).toBe(window.I18N.en["combos.member.loading"]);
+    expect(window.I18N.id["combobox.loading"]).toBe(window.I18N.id["combos.member.loading"]);
+    // The dead __custom__ sentinel keys are gone.
+    expect(window.I18N.en["combos.member.model_custom"]).toBeUndefined();
+    expect(window.I18N.en["combos.member.model_ph"]).toBeUndefined();
   });
 });
 
@@ -831,7 +821,7 @@ describe("combos members — add-member sub-form layout + labels (visual fix)", 
 
   it("keeps every member-editor element id unchanged (logic/tests depend on them)", () => {
     [
-      "comboMemberProvider", "comboMemberModel", "comboMemberModelCustom",
+      "comboMemberProvider", "comboMemberModel", "comboMemberModelList",
       "comboMemberPriority", "comboMemberWeight", "comboMemberAddBtn",
       "comboMemberCancelEdit", "comboMembersBody", "comboMembersTable",
       "comboMemberMsg"
@@ -840,27 +830,24 @@ describe("combos members — add-member sub-form layout + labels (visual fix)", 
     });
   });
 
-  it("Model is a real <select> + custom text box, NOT a <datalist> (mobile fix)", () => {
-    const sel = doc.getElementById("comboMemberModel");
-    expect(sel.tagName).toBe("SELECT");
-    expect(sel.getAttribute("list")).toBeNull();
-    // The old datalist is gone for good (Android does not render it).
-    expect(doc.getElementById("comboMemberModelList")).toBeNull();
-    expect(doc.querySelector("#comboMemberModel ~ datalist")).toBeNull();
-    // Option order: placeholder, then the manual-entry sentinel.
-    const values = Array.from(sel.querySelectorAll("option")).map((o) => o.value);
-    expect(values).toEqual(["", "__custom__"]);
-    // Both are i18n-wired so applyLocale() can translate them.
-    expect(sel.querySelector('option[value=""]').getAttribute("data-i18n"))
-      .toBe("combos.member.model_ph");
-    expect(sel.querySelector('option[value="__custom__"]').getAttribute("data-i18n"))
-      .toBe("combos.member.model_custom");
-    // The free-text box ships hidden and sits in the same control area.
-    const custom = doc.getElementById("comboMemberModelCustom");
-    expect(custom.tagName).toBe("INPUT");
-    expect(custom.getAttribute("type")).toBe("text");
-    expect(custom.hasAttribute("hidden")).toBe(true);
-    expect(custom.closest(".combo-model-control")).not.toBeNull();
-    expect(sel.closest(".combo-model-control")).toBe(custom.closest(".combo-model-control"));
+  it("Model is a searchable combobox (input + <ul> panel), NOT a select/datalist", () => {
+    const inp = doc.getElementById("comboMemberModel");
+    expect(inp.tagName).toBe("INPUT");
+    expect(inp.getAttribute("type")).toBe("text");
+    expect(inp.getAttribute("role")).toBe("combobox");
+    expect(inp.getAttribute("aria-controls")).toBe("comboMemberModelList");
+    expect(inp.getAttribute("aria-autocomplete")).toBe("list");
+    expect(inp.getAttribute("list")).toBeNull();
+    // The custom <ul> panel (mobile-working) ships hidden.
+    const ul = doc.getElementById("comboMemberModelList");
+    expect(ul.tagName).toBe("UL");
+    expect(ul.getAttribute("role")).toBe("listbox");
+    expect(ul.hasAttribute("hidden")).toBe(true);
+    // No <datalist> anywhere in the shipped page (Android does not render it),
+    // and the old __custom__ free-text box is gone.
+    expect(doc.querySelector("datalist")).toBeNull();
+    expect(doc.getElementById("comboMemberModelCustom")).toBeNull();
+    // Input + panel share the same control wrapper.
+    expect(inp.closest(".combo-model-control")).toBe(ul.closest(".combo-model-control"));
   });
 });

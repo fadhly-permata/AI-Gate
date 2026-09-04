@@ -606,17 +606,16 @@ body[data-device="phone"] .modal { width: 100%; }
   width: 100%;
   max-width: none;
 }
-/* Model field: a real <select> (works on Android/mobile, unlike <datalist>)
-   stacked above a free-text box that only appears when "Other (type
-   manually)" is chosen. The spinner overlays the select row only, so it
-   never lands on the custom input. */
+/* Model field: a searchable combobox (text input + custom <ul> panel that
+   filters as you type). Works on Android (unlike <datalist>) and supports
+   type-to-search (unlike a <select>). The spinner overlays the input row. */
 .combo-model-control { display: flex; flex-direction: column; gap: 6px; }
 .combo-model-control [hidden] { display: none; }
 .combo-model-select-row { position: relative; display: flex; align-items: center; }
 .combo-model-select-row .form-input { flex: 1 1 auto; min-width: 0; }
 .combo-model-spinner {
   position: absolute;
-  right: 28px; /* clear the native select arrow */
+  right: 10px; /* clear the text cursor; combobox has no native arrow */
   top: 50%;
   transform: translateY(-50%);
   display: inline-flex;
@@ -625,6 +624,59 @@ body[data-device="phone"] .modal { width: 100%; }
   pointer-events: none;
 }
 .combo-model-spinner[hidden] { display: none; }
+
+/* ===== Searchable combobox (combobox.js) =====
+   The wrapper (.aigate-combo) is position:relative; the panel
+   (.aigate-combo-list) is absolutely positioned under the input, scrollable,
+   with >=40px touch rows. It flips above the input (.aigate-combo-up) when it
+   would overflow the viewport bottom (short screens / mobile keyboard).
+   Theme-safe: uses the same custom properties as the rest of the UI. */
+.aigate-combo { position: relative; }
+.aigate-combo-list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 40;
+  max-height: 220px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 4px 0 0;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.aigate-combo-list[hidden] { display: none; }
+.aigate-combo-list.aigate-combo-up {
+  top: auto;
+  bottom: 100%;
+  margin: 0 0 4px;
+}
+.aigate-combo-list .aigate-combo-opt {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: var(--fg);
+  cursor: pointer;
+  line-height: 1.2;
+}
+.aigate-combo-list .aigate-combo-opt:hover,
+.aigate-combo-list .aigate-combo-opt.aigate-combo-active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+.aigate-combo-list .aigate-combo-msg {
+  padding: 10px 12px;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--muted);
+}
+
 .combo-member-actions {
   display: flex;
   align-items: center;

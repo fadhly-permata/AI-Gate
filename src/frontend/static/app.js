@@ -396,7 +396,7 @@
   window.aigate.saveProvider = saveProvider;
   window.aigate.openEditModal = openEditModal;
   window.aigate.discoverModels = discoverModels;
-  window.aigate.populateModelDatalist = populateModelDatalist;
+  window.aigate.populateModelCombobox = populateModelCombobox;
 
   /* Shared helpers — exposed so the Combos / Proxy Pools / Endpoints modules
      (and tests) reuse the exact same fetch/escape/i18n behavior. */
@@ -478,6 +478,53 @@
     if (!m) return;
     m.textContent = text || "";
     m.className = "settings-msg" + (kind ? " settings-msg-" + kind : "");
+  }
+
+  /* ---- Provider default-model: searchable combobox (combobox.js) ----
+     #provModel is a text input + a custom <ul> panel (#provModelList) that
+     filters as you type. This replaces the old <input list> + <datalist>,
+     which never pops a dropdown on Android. The controller is created LAZILY
+     and resolves its elements by id on every call, so it survives DOM
+     rebuilds (tests). If combobox.js is somehow absent, the plain input still
+     works (free text is the value either way). */
+  var provModelCombo = null;
+
+  function provModelCtl() {
+    if (!provModelCombo && window.aigate &&
+        typeof window.aigate.createCombobox === "function") {
+      provModelCombo = window.aigate.createCombobox({
+        inputId: "provModel",
+        listId: "provModelList"
+      });
+    }
+    return provModelCombo;
+  }
+
+  // The current default-model string (combobox value == input value).
+  function provModelValue() {
+    var c = provModelCtl();
+    if (c) return c.getValue();
+    var i = provEl("provModel");
+    return i ? String(i.value || "") : "";
+  }
+
+  // Sort a model list by display name, ascending, case-insensitive.
+  // Sort key = model_name || model_id. Returns a NEW array (never mutates).
+  function sortModelsByName(models) {
+    return (Array.isArray(models) ? models : []).slice().sort(function (a, b) {
+      var an = String((a && (a.model_name || a.model_id)) || "").toLowerCase();
+      var bn = String((b && (b.model_name || b.model_id)) || "").toLowerCase();
+      if (an < bn) return -1;
+      if (an > bn) return 1;
+      return 0;
+    });
+  }
+
+  // Map a raw ModelDTO list -> combobox {value,label} options (sorted by name).
+  function modelOptions(models) {
+    return sortModelsByName(models).map(function (m) {
+      return { value: m.model_id, label: m.model_name || m.model_id };
+    });
   }
 
   function escapeHtml(s) {
@@ -611,6 +658,10 @@
     provEl("provId").value = "";
     provEl("provModalTitle").textContent = getStr("providers.add");
     renderHeadersEditor([]);
+    // Fresh provider: clear any stale discovered options + value from a prior
+    // edit (free text still works with an empty option list).
+    var c = provModelCtl();
+    if (c) { c.setOptions([]); c.setValue(""); c.close(); }
     provEl("provModal").hidden = false;
   }
 
@@ -624,7 +675,12 @@
       // ADR-007: show api_key as plaintext (no redaction).
       provEl("provApiKey").value = p.api_key != null ? p.api_key : "";
       provEl("provEnabled").checked = !!p.enabled;
-      provEl("provModel").value = p.default_model != null ? p.default_model : "";
+      // Default model: seed the combobox with this provider's known models
+      // (sorted) and set the stored value. A custom (undiscovered) value is
+      // still shown because the input holds any string.
+      var mc = provModelCtl();
+      if (mc) { mc.setOptions(modelOptions(p.models)); mc.setValue(p.default_model); }
+      else provEl("provModel").value = p.default_model != null ? p.default_model : "";
       provEl("provModalTitle").textContent = getStr("providers.edit");
       renderHeadersEditor(headersToRows(p.custom_headers));
       provEl("provModal").hidden = false;
@@ -646,7 +702,7 @@
       type: provEl("provType").value,
       base_url: provEl("provBaseUrl").value,
       api_key: provEl("provApiKey").value,
-      model: provEl("provModel").value
+      model: provModelValue()
     };
     fetch("/api/providers/test", {
       method: "POST",
@@ -683,7 +739,7 @@
       type: provEl("provType").value,
       base_url: provEl("provBaseUrl").value,
       api_key: provEl("provApiKey").value,
-      default_model: provEl("provModel").value,
+      default_model: provModelValue(),
       enabled: provEl("provEnabled").checked,
       custom_headers: collectHeaders()
     };
@@ -718,19 +774,12 @@
     }).join("");
   }
 
-  // Fill #provModelList with discovered model_ids so the form's Model input
-  // offers autocomplete. Keep existing options unique; clear first.
-  function populateModelDatalist(models) {
-    var list = provEl("provModelList");
-    if (!list) return;
-    list.innerHTML = "";
-    (models || []).forEach(function (m) {
-      var id = m && m.model_id;
-      if (id == null || id === "") return;
-      var opt = document.createElement("option");
-      opt.value = id;
-      list.appendChild(opt);
-    });
+  // Load discovered models into the #provModel combobox panel (sorted by name).
+  // Replaces the old populateModelDatalist(): a <datalist> never pops on
+  // Android, so the searchable combobox renders its own <ul> instead.
+  function populateModelCombobox(models) {
+    var c = provModelCtl();
+    if (c) c.setOptions(modelOptions(models));
   }
 
   function openDetail(id) {
@@ -756,9 +805,12 @@
     if (!id) return;
     openDetail(id);
     setModelMsg(getStr("providers.discovering"), "");
+    var mc = provModelCtl();
+    if (mc) mc.setLoading(true); // disable field + "Loading models…" panel row
     fetchJson(PROV_API + "/" + id + "/discover", {
       method: "POST", headers: { "Content-Type": "application/json" }
     }).then(function (res) {
+      if (mc) mc.setLoading(false);
       // Contract: {"ok":true,"models":[...]} OR {"ok":false,"error":"<msg>"}
       if (res && res.ok === false) {
         setModelMsg(res.error || getStr("providers.error"), "error");
@@ -766,10 +818,11 @@
       }
       var models = (res && res.models) ? res.models : [];
       renderModels(models);
-      populateModelDatalist(models);
+      populateModelCombobox(models);
       setModelMsg(getStr("providers.discovered") + " (" + models.length + ")", "ok");
       loadProviders(); // refresh model counts in the list
     }).catch(function (err) {
+      if (mc) mc.setLoading(false);
       setModelMsg(err.message, "error");
     });
   }

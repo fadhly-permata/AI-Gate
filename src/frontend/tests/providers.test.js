@@ -1,15 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+import { JSDOM } from "jsdom";
 
 // i18n.js attaches window.I18N + window.applyLocale (jsdom provides DOM).
 import "../static/i18n.js";
+// combobox.js attaches window.aigate.createCombobox (loaded before app.js in
+// index.html — same order here).
+import "../static/combobox.js";
 // app.js wires the UI and exposes window.aigate.mapProviderToRow /
 // window.aigate.buildHeadersDict / window.aigate.headersToRows.
 import "../static/app.js";
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 // Let async .then chains (fetchJson / testProviderConnection) resolve.
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-// Build the provider add/edit modal DOM the functions expect.
+// Build the provider add/edit modal DOM the functions expect. #provModel is a
+// searchable COMBOBOX: a text input + a custom <ul> panel (NOT <datalist>).
 function withProviderModalDom() {
   document.body.innerHTML =
     '<div id="provModal">' +
@@ -22,7 +32,10 @@ function withProviderModalDom() {
         '</select>' +
         '<input id="provBaseUrl" />' +
         '<input id="provApiKey" />' +
-        '<input id="provModel" />' +
+        '<div class="aigate-combo">' +
+          '<input type="text" id="provModel" />' +
+          '<ul id="provModelList" role="listbox" hidden></ul>' +
+        '</div>' +
         '<input type="checkbox" id="provEnabled" />' +
         '<div id="provHeaders"></div>' +
       '</form>' +
@@ -32,7 +45,8 @@ function withProviderModalDom() {
     '</div>';
 }
 
-// Build the detail/datalist DOM discoverModels() + populateModelDatalist() use.
+// Build the detail DOM discoverModels() uses PLUS the #provModel combobox it
+// feeds via populateModelCombobox()/setLoading().
 function withDetailDom() {
   document.body.innerHTML =
     '<div id="provDetail">' +
@@ -40,9 +54,17 @@ function withDetailDom() {
       '<p id="provModelMsg"></p>' +
       '<tbody id="provModelsBody"></tbody>' +
     '</div>' +
-    '<datalist id="provModelList"></datalist>' +
+    '<div class="aigate-combo">' +
+      '<input type="text" id="provModel" />' +
+      '<ul id="provModelList" role="listbox" hidden></ul>' +
+    '</div>' +
     '<p id="provMsg"></p>';
 }
+
+// The combobox panel's rendered option values (model ids), in DOM order.
+const provModelOptionValues = () => Array.from(
+  document.getElementById("provModelList").querySelectorAll('li[role="option"]')
+).map((li) => li.getAttribute("data-value"));
 
 describe("mapProviderToRow (pure helper)", () => {
   it("flattens a ProviderDTO into table-row data", () => {
@@ -248,10 +270,10 @@ describe("saveProvider persists default_model (B2.2)", () => {
   });
 });
 
-describe("discoverModels populates the Model datalist (B2.2)", () => {
+describe("discoverModels populates the Model combobox (B2.2)", () => {
   beforeEach(() => { withDetailDom(); });
 
-  it("fills #provModelList with discovered model_ids", async () => {
+  it("fills the #provModel combobox panel with discovered model_ids (sorted)", async () => {
     vi.stubGlobal("fetch", vi.fn((url) => Promise.resolve({
       ok: true,
       headers: { get: () => "application/json" },
@@ -268,10 +290,62 @@ describe("discoverModels populates the Model datalist (B2.2)", () => {
     window.aigate.discoverModels("p1");
     await flush();
 
-    const opts = Array.from(document.getElementById("provModelList").options)
-      .map((o) => o.value);
-    expect(opts).toContain("gpt-4");
-    expect(opts).toContain("gpt-3.5");
+    // The combobox panel offers the discovered ids, sorted by name:
+    // GPT-3.5 < GPT-4. NOT a <datalist> (Android never pops one).
+    expect(provModelOptionValues()).toEqual(["gpt-3.5", "gpt-4"]);
+    expect(document.getElementById("provModelList").tagName).toBe("UL");
+    expect(document.getElementById("provModel").getAttribute("role")).toBe("combobox");
+    // Loading cleared once the fetch landed (field usable again).
+    expect(document.getElementById("provModel").disabled).toBe(false);
+    expect(document.getElementById("provModel").getAttribute("aria-busy")).toBe("false");
     vi.unstubAllGlobals();
+  });
+
+  it("shows the loading state on the combobox while the fetch is in flight", async () => {
+    let resolveDisc;
+    const gate = new Promise((r) => { resolveDisc = r; });
+    vi.stubGlobal("fetch", vi.fn((url) => {
+      if (String(url).indexOf("/discover") !== -1) return gate;
+      return Promise.resolve({
+        ok: true, headers: { get: () => "application/json" },
+        json: () => Promise.resolve({ id: "p1", name: "ACME", models: [] })
+      });
+    }));
+
+    window.aigate.discoverModels("p1");
+    // Synchronously (before the fetch resolves): input locked + loading row.
+    expect(document.getElementById("provModel").disabled).toBe(true);
+    expect(document.getElementById("provModel").getAttribute("aria-busy")).toBe("true");
+    expect(document.getElementById("provModelList").textContent)
+      .toContain(window.I18N.en["combobox.loading"]);
+
+    resolveDisc({
+      ok: true, headers: { get: () => "application/json" },
+      json: () => Promise.resolve({ ok: true, models: [{ model_id: "m1", model_name: "M1" }] })
+    });
+    await flush();
+    expect(document.getElementById("provModel").disabled).toBe(false);
+    expect(document.getElementById("provModelList").textContent)
+      .not.toContain(window.I18N.en["combobox.loading"]);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("index.html wires #provModel as a combobox (mobile fix)", () => {
+  const doc = new JSDOM(
+    readFileSync(join(__dirname, "..", "static", "index.html"), "utf8")
+  ).window.document;
+
+  it("provModel is a role=combobox input + a <ul role=listbox> panel, no datalist", () => {
+    const inp = doc.getElementById("provModel");
+    expect(inp.tagName).toBe("INPUT");
+    expect(inp.getAttribute("role")).toBe("combobox");
+    expect(inp.getAttribute("aria-controls")).toBe("provModelList");
+    expect(inp.getAttribute("list")).toBeNull();
+    const ul = doc.getElementById("provModelList");
+    expect(ul.tagName).toBe("UL");
+    expect(ul.getAttribute("role")).toBe("listbox");
+    expect(ul.hasAttribute("hidden")).toBe(true);
+    expect(doc.querySelector("datalist")).toBeNull();
   });
 });

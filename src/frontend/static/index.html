@@ -699,8 +699,18 @@
             </div>
             <div class="form-row">
               <label class="form-label" for="provModel" data-i18n="providers.model">Model</label>
-              <input list="provModelList" id="provModel" name="default_model" class="form-input" />
-              <datalist id="provModelList"></datalist>
+              <!-- Searchable combobox (combobox.js): text input + custom <ul>
+                   panel that filters as you type. Replaces <input list> +
+                   <datalist>, which never pops a dropdown on Android. The
+                   input value IS the model string, so free text (custom
+                   models) still works. -->
+              <div class="aigate-combo">
+                <input class="form-input" type="text" id="provModel" name="default_model"
+                       autocomplete="off" placeholder="Search or type a model…"
+                       role="combobox" aria-expanded="false" aria-controls="provModelList"
+                       aria-autocomplete="list" />
+                <ul class="aigate-combo-list" id="provModelList" role="listbox" hidden></ul>
+              </div>
             </div>
             <div class="form-row">
               <label class="form-label" for="provEnabled" data-i18n="providers.enabled">Enabled</label>
@@ -812,22 +822,23 @@
                     <label class="form-label" for="comboMemberModel"
                            data-i18n="combos.member.model">Model</label>
                     <div class="combo-model-control">
-                      <!-- Real <select> (not <input list> + <datalist>): mobile /
-                           Android browsers do not render a usable datalist
-                           dropdown, so the list was unreachable on phones. The
-                           select always ends with an "Other (type manually)"
-                           option that reveals #comboMemberModelCustom, so
-                           undiscovered models stay enterable. -->
-                      <div class="combo-model-select-row">
-                        <select class="form-input" id="comboMemberModel" name="comboMemberModel">
-                          <option value="" data-i18n="combos.member.model_ph">— select model —</option>
-                          <option value="__custom__" data-i18n="combos.member.model_custom">Other (type manually)…</option>
-                        </select>
+                      <!-- Searchable combobox (combobox.js): text input + custom
+                           <ul> panel that filters as you type. Works on Android
+                           (unlike <datalist>) and supports type-to-search
+                           (unlike a <select>). Free text is native: the input
+                           value IS the model string, so undiscovered models
+                           need no "Other" sentinel or extra box. -->
+                      <div class="combo-model-select-row aigate-combo">
+                        <input class="form-input" type="text" id="comboMemberModel"
+                               name="comboMemberModel" autocomplete="off"
+                               placeholder="Search or type a model…"
+                               role="combobox" aria-expanded="false"
+                               aria-controls="comboMemberModelList" aria-autocomplete="list" />
+                        <ul class="aigate-combo-list" id="comboMemberModelList"
+                            role="listbox" hidden></ul>
                         <span class="combo-model-spinner" id="comboMemberModelSpinner"
                               hidden aria-hidden="true"><i class="fa fa-spinner fa-spin"></i></span>
                       </div>
-                      <input class="form-input" type="text" id="comboMemberModelCustom"
-                             name="comboMemberModelCustom" autocomplete="off" hidden />
                     </div>
                   </div>
                   <div class="combo-member-field">
@@ -1008,6 +1019,9 @@
   <script src="i18n.js" defer></script>
   <!-- Device simulation helper (B4.2) — must load before app.js uses it -->
   <script src="device.js" defer></script>
+  <!-- Searchable combobox widget (model pickers) — must load before app.js /
+       combos.js, which call window.aigate.createCombobox -->
+  <script src="combobox.js" defer></script>
   <!-- App bootstrap (defer preserves order) -->
   <script src="app.js" defer></script>
   <!-- Combos / Proxy Pools / Endpoints management (B2.4 / B2.3 / B2.5) -->
