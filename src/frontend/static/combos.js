@@ -17,11 +17,17 @@
 
     Model field (auto-fetch): changing #comboMemberProvider (or preselecting a
     provider in edit mode) POSTs /api/providers/{id}/discover, sorts the
-    returned models by name (case-insensitive), and repopulates the datalist.
-    A loading state (disabled field + Add, aria-busy, spinner, "Loading
-    models…" placeholder) shows while fetching; on discover failure it falls
-    back to the provider's cached models with a subtle note. A request-sequence
-    token drops stale/out-of-order responses (race guard). */
+    returned models by name (case-insensitive), and repopulates the SELECT
+    #comboMemberModel. A real <select> is used (NOT <input list> + <datalist>):
+    Android/mobile browsers do not render a usable datalist dropdown, so the
+    list was unreachable on phones. The select always ends with an
+    "__custom__" option that reveals the free-text #comboMemberModelCustom box,
+    so undiscovered models stay enterable and edit-mode values that are not in
+    the discovered list round-trip correctly.
+    A loading state (disabled select + custom box + Add, aria-busy, spinner,
+    "Loading models…" placeholder option) shows while fetching; on discover
+    failure it falls back to the provider's cached models with a subtle note.
+    A request-sequence token drops stale/out-of-order responses (race guard). */
 
 (function () {
   "use strict";
@@ -64,6 +70,10 @@
   var PROVIDERS_API = "/api/providers";
   var selectedId = null;
 
+  /* Sentinel option value in #comboMemberModel that reveals the free-text
+     custom-model box. Never a real model id. */
+  var CUSTOM_MODEL_VALUE = "__custom__";
+
   /* ---- Members-editor state ---- */
   var providersCache = [];      // GET /api/providers data[]
   var currentMembers = [];      // server members of the combo being edited
@@ -71,6 +81,7 @@
   var editingMemberId = null;   // server member id loaded into the sub-form
   var editingBufferIndex = null; // buffer index loaded into the sub-form
   var modelFetchSeq = 0;        // race-guard token for the model auto-fetch
+  var modelLoading = false;     // true while a discover fetch is in flight
 
   /* ---- Pure mapping (importable + testable) ---- */
   function mapComboToRow(c) {
@@ -211,15 +222,121 @@
     });
   }
 
-  /* Render a (already-sorted) model list into the #comboMemberModelList
-     datalist. Empty list -> no options (free-text input still works). */
+  /* ---- Model control: <select> + free-text custom box ----
+     A real <select> replaces the old <input list> + <datalist>: mobile /
+     Android browsers do not render a usable datalist dropdown, so the
+     auto-fetched list was unreachable there. Free-text entry is preserved via
+     the trailing "__custom__" option, which reveals #comboMemberModelCustom. */
+
+  /* The placeholder <option value=""> of #comboMemberModel (never removed). */
+  function modelPlaceholder() {
+    var sel = el("comboMemberModel");
+    if (!sel || !sel.options) return null;
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === "") return sel.options[i];
+    }
+    return null;
+  }
+
+  /* Reflect the loading state in the placeholder option's text (a <select> has
+     no placeholder attribute, so the option carries the "Loading models…"
+     message the old text input showed). */
+  function setModelPlaceholderText(text) {
+    var ph = modelPlaceholder();
+    if (ph) ph.textContent = text;
+  }
+
+  /* True when the select already offers an option with this exact value. */
+  function hasModelOption(value) {
+    var sel = el("comboMemberModel");
+    if (!sel || !sel.options || value == null || value === "") return false;
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === String(value)) return true;
+    }
+    return false;
+  }
+
+  /* Show the free-text box only while "Other (type manually)" is selected.
+     focus=true pulls the caret into it (user-driven selection only). */
+  function syncCustomVisibility(focus) {
+    var sel = el("comboMemberModel");
+    var custom = el("comboMemberModelCustom");
+    if (!custom) return;
+    var isCustom = !!(sel && sel.value === CUSTOM_MODEL_VALUE);
+    custom.hidden = !isCustom;
+    if (isCustom && focus && typeof custom.focus === "function") custom.focus();
+  }
+
+  /* Load a model id into the control: pick the matching option when the list
+     has it; otherwise switch to "__custom__" and put the value in the free-text
+     box, so an undiscovered model still round-trips on edit. */
+  function setModelValue(value) {
+    var sel = el("comboMemberModel");
+    var custom = el("comboMemberModelCustom");
+    value = value == null ? "" : String(value);
+    if (!sel) return;
+    // A <select> can only hold a value it offers: seed the base options first
+    // when nothing has been rendered yet (e.g. edit before the first fetch).
+    if (!sel.options || !sel.options.length) renderModelOptions([]);
+    if (value && hasModelOption(value)) {
+      sel.value = value;
+      if (custom) custom.value = "";
+    } else if (value) {
+      sel.value = CUSTOM_MODEL_VALUE;
+      if (custom) custom.value = value;
+    } else {
+      sel.value = "";
+      if (custom) custom.value = "";
+    }
+    syncCustomVisibility(false);
+  }
+
+  /* Clear the model control back to the placeholder (provider switch / reset). */
+  function clearModelSelection() {
+    var sel = el("comboMemberModel");
+    var custom = el("comboMemberModelCustom");
+    if (sel) sel.value = "";
+    if (custom) { custom.value = ""; custom.hidden = true; }
+  }
+
+  /* Render a (already-sorted) model list into the #comboMemberModel SELECT:
+     placeholder + sorted models + the trailing "Other (type manually)" option.
+     The current selection survives when the new list still offers it (or when
+     it is "__custom__"); otherwise it resets to the placeholder. A pending
+     custom value that the refreshed list now knows is upgraded to the real
+     option. Empty list -> just placeholder + custom (free-text still works). */
   function renderModelOptions(models) {
-    var dl = el("comboMemberModelList");
-    if (!dl) return;
-    dl.innerHTML = (models || []).map(function (m) {
-      return '<option value="' + escapeHtml(m.model_id) + '">' +
-        escapeHtml(m.model_name || m.model_id) + "</option>";
-    }).join("");
+    var sel = el("comboMemberModel");
+    if (!sel) return;
+    var custom = el("comboMemberModelCustom");
+    var keep = sel.value;
+    var typed = custom ? String(custom.value || "").trim() : "";
+    var list = models || [];
+    sel.innerHTML = '<option value="" data-i18n="combos.member.model_ph">' +
+        escapeHtml(getStr(modelLoading ? "combos.member.loading" : "combos.member.model_ph")) +
+      "</option>" +
+      list.map(function (m) {
+        return '<option value="' + escapeHtml(m.model_id) + '">' +
+          escapeHtml(m.model_name || m.model_id) + "</option>";
+      }).join("") +
+      '<option value="' + escapeHtml(CUSTOM_MODEL_VALUE) + '" data-i18n="combos.member.model_custom">' +
+        escapeHtml(getStr("combos.member.model_custom")) + "</option>";
+
+    if (keep === CUSTOM_MODEL_VALUE) {
+      // Upgrade to a real option once the model is actually known.
+      if (typed && hasModelOption(typed)) {
+        sel.value = typed;
+        if (custom) custom.value = "";
+      } else {
+        sel.value = CUSTOM_MODEL_VALUE;
+        if (custom) custom.value = typed;
+      }
+    } else if (hasModelOption(keep)) {
+      sel.value = keep;
+    } else {
+      sel.value = "";
+    }
+    syncCustomVisibility(false);
   }
 
   /* Cached models for a provider id (from providersCache), UNSORTED. */
@@ -233,32 +350,37 @@
   }
 
   /* Toggle the sub-form "loading models" state. Deliberately does NOT touch
-     the model input's VALUE (so an edit-mode prefill survives); it only
-     disables the field + Add button, swaps the placeholder to the loading
-     text, shows the spinner, sets aria-busy on the sub-form, and clears the
-     datalist options. */
+     the selected model VALUE (so an edit-mode prefill survives); it disables
+     the select AND the custom box + the Add button, swaps the placeholder
+     option text to the loading message, shows the spinner, and sets aria-busy
+     on the sub-form. The option list is kept (a <select> cannot hold a value
+     whose option was removed) and is replaced when the fetch lands. */
   function setModelLoading(on) {
+    modelLoading = !!on;
     var mo = el("comboMemberModel");
+    var custom = el("comboMemberModelCustom");
     var add = el("comboMemberAddBtn");
     var form = el("comboMemberForm");
     var spinner = el("comboMemberModelSpinner");
-    var dl = el("comboMemberModelList");
-    if (on) {
-      if (mo) { mo.disabled = true; mo.placeholder = getStr("combos.member.loading"); }
+    if (modelLoading) {
+      if (mo) mo.disabled = true;
+      if (custom) custom.disabled = true;
       if (add) add.disabled = true;
       if (form) form.setAttribute("aria-busy", "true");
       if (spinner) spinner.hidden = false;
-      if (dl) dl.innerHTML = "";
     } else {
-      if (mo) { mo.disabled = false; mo.placeholder = getStr("combos.member.model_ph"); }
+      if (mo) mo.disabled = false;
+      if (custom) custom.disabled = false;
       if (add) add.disabled = false;
       if (form) form.setAttribute("aria-busy", "false");
       if (spinner) spinner.hidden = true;
     }
+    setModelPlaceholderText(
+      getStr(modelLoading ? "combos.member.loading" : "combos.member.model_ph"));
   }
 
-  /* Fill the model datalist from the chosen provider's CACHED models, sorted.
-     Empty list -> free-text input still works (no options rendered). */
+  /* Fill the model select from the chosen provider's CACHED models, sorted.
+     Empty list -> placeholder + custom only (free-text still works). */
   function populateModelOptions(providerId) {
     var models = sortModelsByName(cachedModelsFor(providerId));
     renderModelOptions(models);
@@ -371,10 +493,21 @@
   }
 
   /* ---- Sub-form (add member / edit member) ---- */
+
+  /* Effective model: the free-text box when "Other (type manually)" is chosen,
+     otherwise the selected option value ("" = placeholder = nothing picked). */
+  function modelFieldValue() {
+    var sel = el("comboMemberModel");
+    var custom = el("comboMemberModelCustom");
+    var v = sel ? String(sel.value || "") : "";
+    if (v === CUSTOM_MODEL_VALUE) return custom ? String(custom.value || "").trim() : "";
+    return v;
+  }
+
   function memberFormValues() {
     return normalizeMember({
       provider_id: el("comboMemberProvider") ? el("comboMemberProvider").value : "",
-      provider_model: el("comboMemberModel") ? el("comboMemberModel").value : "",
+      provider_model: modelFieldValue(),
       priority: el("comboMemberPriority") ? el("comboMemberPriority").value : 0,
       weight: el("comboMemberWeight") ? el("comboMemberWeight").value : 1
     });
@@ -385,25 +518,29 @@
     editingBufferIndex = null;
     modelFetchSeq++; // invalidate any in-flight model fetch (race guard)
     var p = el("comboMemberProvider"); if (p) p.value = "";
-    var mo = el("comboMemberModel");
-    if (mo) { mo.value = ""; mo.disabled = false; mo.placeholder = getStr("combos.member.model_ph"); }
+    renderModelOptions([]);   // placeholder + custom only
+    clearModelSelection();
     var pr = el("comboMemberPriority"); if (pr) pr.value = "0";
     var w = el("comboMemberWeight"); if (w) w.value = "1";
-    var dl = el("comboMemberModelList"); if (dl) dl.innerHTML = "";
     var add = el("comboMemberAddBtn");
     if (add) { add.textContent = getStr("combos.member.add"); add.disabled = false; }
     var cancel = el("comboMemberCancelEdit"); if (cancel) cancel.hidden = true;
     var form = el("comboMemberForm"); if (form) form.setAttribute("aria-busy", "false");
     var spinner = el("comboMemberModelSpinner"); if (spinner) spinner.hidden = true;
+    setModelLoading(false);   // re-enable select + custom box, reset placeholder
   }
 
   function fillMemberForm(m) {
+    m = m || {};
     var p = el("comboMemberProvider");
     if (p) p.value = m.provider_id != null ? String(m.provider_id) : "";
-    var mo = el("comboMemberModel"); if (mo) mo.value = m.provider_model || "";
+    // Select the member's model when the list already knows it; otherwise fall
+    // back to "__custom__" + the free-text box so unknown models still edit.
+    setModelValue(m.provider_model);
     // Edit-mode preselect: auto-fetch + sort this provider's models. The fetch
-    // only repopulates the datalist (loading state never clears the value set
-    // above), so the member being edited keeps its model while options refresh.
+    // only repopulates the select (the loading state never clears the value set
+    // above), so the member being edited keeps its model while options refresh;
+    // a model that the refresh newly discovers is upgraded off "__custom__".
     fetchModelsForProvider(m.provider_id);
     var pr = el("comboMemberPriority"); if (pr) pr.value = String(m.priority != null ? m.priority : 0);
     var w = el("comboMemberWeight"); if (w) w.value = String(m.weight != null ? m.weight : 1);
@@ -432,6 +569,11 @@
       setMemberMsg(getStr("combos.member.provider_required"), "error");
       return Promise.resolve();
     }
+    // Placeholder still selected (or "Other" with an empty box) -> no model.
+    if (!m.provider_model) {
+      setMemberMsg(getStr("combos.member.model_required"), "error");
+      return Promise.resolve();
+    }
     if (selectedId) {
       if (editingMemberId != null) {
         var eid = editingMemberId;
@@ -456,6 +598,10 @@
     m = normalizeMember(m);
     if (m.provider_id == null) {
       setMemberMsg(getStr("combos.member.provider_required"), "error");
+      return Promise.resolve();
+    }
+    if (!m.provider_model) {
+      setMemberMsg(getStr("combos.member.model_required"), "error");
       return Promise.resolve();
     }
     if (!selectedId) return Promise.resolve(bufferMemberLocal(m));
@@ -611,11 +757,13 @@
     if (memCancel) memCancel.addEventListener("click", function (e) {
       e.preventDefault(); resetMemberForm();
     });
-    // NOTE: the provider-change handler is a document-level delegated listener
-    // registered at module load (see below) so it survives modal DOM rebuilds.
+    // NOTE: the provider-change + model-change handlers are document-level
+    // delegated listeners registered at module load (see below) so they survive
+    // modal DOM rebuilds.
     // Enter inside the members sub-form adds/updates the member, never saves
     // the whole combo form.
-    ["comboMemberProvider", "comboMemberModel", "comboMemberPriority", "comboMemberWeight"]
+    ["comboMemberProvider", "comboMemberModel", "comboMemberModelCustom",
+      "comboMemberPriority", "comboMemberWeight"]
       .forEach(function (id) {
         var node = el(id);
         if (!node) return;
@@ -623,19 +771,28 @@
           if (e.key === "Enter") { e.preventDefault(); submitMemberForm(); }
         });
       });
-    var mo = el("comboMemberModel");
-    if (mo) mo.placeholder = getStr("combos.member.model_ph");
+    // The free-text box keeps the old "model id (free text ok)" hint; the
+    // <select> itself has no placeholder attribute (the option carries it).
+    var custom = el("comboMemberModelCustom");
+    if (custom) custom.placeholder = getStr("combos.member.model_custom_ph");
+    setModelPlaceholderText(getStr("combos.member.model_ph"));
   }
 
   /* ---- Provider change -> auto-fetch + sort models (chained dropdown) ----
-     Delegated on `document` and registered ONCE at module load, so it keeps
+     ---- Model change -> reveal the free-text box for "Other" ----
+     Delegated on `document` and registered ONCE at module load, so they keep
      working even when the modal DOM is rebuilt (re-renders / tests). Native
-     `change` bubbles, so the select inside the modal reaches this handler. */
+     `change` bubbles, so the selects inside the modal reach these handlers. */
   document.addEventListener("change", function (e) {
-    if (!e.target || e.target.id !== "comboMemberProvider") return;
-    // Switching provider clears the stale model value, then fetches fresh.
-    var mo = el("comboMemberModel"); if (mo) mo.value = "";
-    fetchModelsForProvider(e.target.value);
+    if (!e.target) return;
+    if (e.target.id === "comboMemberProvider") {
+      // Switching provider clears the stale model value, then fetches fresh.
+      clearModelSelection();
+      fetchModelsForProvider(e.target.value);
+    } else if (e.target.id === "comboMemberModel") {
+      // "__custom__" reveals (and focuses) the manual-entry box.
+      syncCustomVisibility(e.target.value === CUSTOM_MODEL_VALUE);
+    }
   });
 
   /* ---- Expose hook for app.js nav handler + tests ---- */
@@ -652,8 +809,14 @@
     fetchModelsForProvider: fetchModelsForProvider,
     sortModelsByName: sortModelsByName,
     setModelLoading: setModelLoading,
+    // Model control helpers (select + free-text custom box).
+    setModelValue: setModelValue,
+    modelFieldValue: modelFieldValue,
+    syncCustomVisibility: syncCustomVisibility,
+    CUSTOM_MODEL_VALUE: CUSTOM_MODEL_VALUE,
     renderMembers: renderMembers,
     memberFormValues: memberFormValues,
+    fillMemberForm: fillMemberForm,
     submitMemberForm: submitMemberForm,
     resetMemberForm: resetMemberForm,
     addMember: addMember,

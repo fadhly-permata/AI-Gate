@@ -606,12 +606,19 @@ body[data-device="phone"] .modal { width: 100%; }
   width: 100%;
   max-width: none;
 }
-/* Model field: input + inline loading spinner (shown while auto-fetch runs). */
-.combo-model-control { position: relative; display: flex; align-items: center; }
-.combo-model-control .form-input { flex: 1 1 auto; min-width: 0; }
+/* Model field: a real <select> (works on Android/mobile, unlike <datalist>)
+   stacked above a free-text box that only appears when "Other (type
+   manually)" is chosen. The spinner overlays the select row only, so it
+   never lands on the custom input. */
+.combo-model-control { display: flex; flex-direction: column; gap: 6px; }
+.combo-model-control [hidden] { display: none; }
+.combo-model-select-row { position: relative; display: flex; align-items: center; }
+.combo-model-select-row .form-input { flex: 1 1 auto; min-width: 0; }
 .combo-model-spinner {
   position: absolute;
-  right: 8px;
+  right: 28px; /* clear the native select arrow */
+  top: 50%;
+  transform: translateY(-50%);
   display: inline-flex;
   color: var(--muted, #888);
   font-size: 14px;

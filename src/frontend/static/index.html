@@ -812,12 +812,23 @@
                     <label class="form-label" for="comboMemberModel"
                            data-i18n="combos.member.model">Model</label>
                     <div class="combo-model-control">
-                      <input class="form-input" type="text" id="comboMemberModel"
-                             name="comboMemberModel" list="comboMemberModelList" autocomplete="off" />
-                      <span class="combo-model-spinner" id="comboMemberModelSpinner"
-                            hidden aria-hidden="true"><i class="fa fa-spinner fa-spin"></i></span>
+                      <!-- Real <select> (not <input list> + <datalist>): mobile /
+                           Android browsers do not render a usable datalist
+                           dropdown, so the list was unreachable on phones. The
+                           select always ends with an "Other (type manually)"
+                           option that reveals #comboMemberModelCustom, so
+                           undiscovered models stay enterable. -->
+                      <div class="combo-model-select-row">
+                        <select class="form-input" id="comboMemberModel" name="comboMemberModel">
+                          <option value="" data-i18n="combos.member.model_ph">— select model —</option>
+                          <option value="__custom__" data-i18n="combos.member.model_custom">Other (type manually)…</option>
+                        </select>
+                        <span class="combo-model-spinner" id="comboMemberModelSpinner"
+                              hidden aria-hidden="true"><i class="fa fa-spinner fa-spin"></i></span>
+                      </div>
+                      <input class="form-input" type="text" id="comboMemberModelCustom"
+                             name="comboMemberModelCustom" autocomplete="off" hidden />
                     </div>
-                    <datalist id="comboMemberModelList"></datalist>
                   </div>
                   <div class="combo-member-field">
                     <label class="form-label" for="comboMemberPriority"
