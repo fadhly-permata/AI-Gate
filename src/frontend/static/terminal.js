@@ -37,6 +37,30 @@
     return JSON.stringify({ type: "close" });
   }
 
+  // JSON pong control frame. Sent back over the SAME socket in reply to a
+  // server heartbeat {"type":"ping"} so the backend knows the client is alive.
+  function buildPongFrame() {
+    return JSON.stringify({ type: "pong" });
+  }
+
+  /* Classify an incoming WS TEXT frame as PTY output vs. a JSON control frame.
+     Cheap + guarded: we only attempt JSON.parse when the frame starts with "{"
+     AND contains the substring `"type"` — so ordinary PTY output (even output
+     that happens to begin with "{") is never parsed, and a malformed JSON-ish
+     chunk falls through as PTY output rather than being swallowed.
+     Returns { kind: "pty" } or { kind: "control", type }. Pure: no DOM/xterm. */
+  function classifyIncoming(data) {
+    if (typeof data === "string" && data.charAt(0) === "{" && data.indexOf('"type"') !== -1) {
+      var obj;
+      try { obj = JSON.parse(data); } catch (e) { return { kind: "pty" }; }
+      if (obj && typeof obj === "object" && typeof obj.type === "string") {
+        return { kind: "control", type: obj.type };
+      }
+      return { kind: "pty" };
+    }
+    return { kind: "pty" };
+  }
+
   /* Exponential backoff delay (ms) for reconnect attempt N (0-indexed).
      0.5s, 1s, 2s, 4s, 8s, then capped at ~15s. Pure + testable. */
   function computeBackoffDelay(attempt, opts) {
@@ -186,32 +210,98 @@
     }, delay);
   }
 
+  /* ---- Heartbeat liveness (client side of the server ping/pong) ----
+   * While attached, the backend sends a TEXT frame {"type":"ping","t":<sec>}
+   * every ~15s. We answer with {"type":"pong"} (never render the ping) and
+   * stamp tab.lastPingAt. A half-open socket (Chrome froze a backgrounded tab,
+   * or a silent network drop) stops delivering pings long before the browser
+   * fires onclose — so we arm a ONE-SHOT watchdog per tab (reused, not a heavy
+   * polling interval): each ping/open clears + re-arms a single setTimeout that
+   * fires LIVENESS_MS later. If it fires while the tab is ACTIVE + visible and
+   * no ping has arrived in that window, we force a reconnect to the SAME tab_id.
+   * Backgrounded tabs are left alone — the visibilitychange fast-path resumes
+   * them, and the server keeps buffering their PTY output. */
+  var LIVENESS_MS = 45000; // ~3 missed 15s pings before we treat the socket as dead
+
+  function armLiveness(tab) {
+    if (!tab || tab.userClosed) return;
+    if (tab.livenessTimer) clearTimeout(tab.livenessTimer);
+    tab.livenessTimer = setTimeout(function () {
+      tab.livenessTimer = null;
+      checkLiveness(tab);
+    }, LIVENESS_MS);
+  }
+
+  // Force a reconnect for a tab whose socket looks OPEN but has gone quiet.
+  function checkLiveness(tab) {
+    if (!tab || tab.userClosed) return;
+    if (tab.id !== activeId) return;                 // only the active pane
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+    if (tab.reconnectTimer) return;                  // a reconnect is already pending
+    if (!tab.ws || tab.ws.readyState !== WebSocket.OPEN) return; // half-open only; else onclose handles it
+    if (!tab.lastPingAt) return;                     // never connected/pinged
+    if (Date.now() - tab.lastPingAt < LIVENESS_MS) { armLiveness(tab); return; } // fired early — keep watching
+
+    // Stale + half-open: close the dead socket and reattach to the SAME tab_id.
+    // _forceReconnectNow tells the onclose handler to reconnect immediately
+    // (skip backoff) instead of double-scheduling.
+    tab._forceReconnectNow = true;
+    try { tab.ws.close(); } catch (e) {}
+  }
+
+  /* Handle one incoming TEXT frame: PTY output → render; control frame → act.
+     A ping is answered with a pong over the SAME ws and is NEVER written to the
+     terminal. Any other control frame is dropped (not rendered). Everything
+     else (including malformed JSON-ish chunks) is written as PTY output. */
+  function handleWsMessage(tab, ws, data) {
+    var info = classifyIncoming(data);
+    if (info.kind === "control") {
+      if (info.type === "ping") {
+        tab.lastPingAt = Date.now();
+        armLiveness(tab);
+        try {
+          if (ws && ws.readyState === WebSocket.OPEN) ws.send(buildPongFrame());
+        } catch (e) { /* socket raced closed — the next ping/reconnect covers it */ }
+      }
+      return; // control frames must never appear in the terminal
+    }
+    tab.term.write(data);
+  }
+
+  /* Wire a socket's handlers. Shared by the FIRST connection (openTab) and every
+     reattach (connectSocket) so ping/pong + liveness behave identically across
+     reconnects. */
+  function wireSocket(tab, ws) {
+    ws.onopen = function () {
+      tab.reconnectAttempt = 0;
+      if (tab.reconnectShown) {
+        tab.reconnectShown = false;
+        writeStatus(tab, t("term.reconnected"));
+      }
+      tab.lastPingAt = Date.now();   // fresh socket: start the liveness clock
+      armLiveness(tab);
+      sendResize(tab);
+    };
+    ws.onmessage = function (ev) { handleWsMessage(tab, ws, ev.data); };
+    ws.onclose = function () {
+      if (tab.userClosed) return;                    // deliberate close → final
+      if (tab._forceReconnectNow) {                  // liveness-triggered close
+        tab._forceReconnectNow = false;
+        scheduleReconnect(tab, true);                // immediate, same tab_id
+        return;
+      }
+      scheduleReconnect(tab, false);                 // transient drop → backoff
+    };
+    ws.onerror = function () { /* surfaced via onclose */ };
+  }
+
   /* (Re)open the WebSocket for an EXISTING tab, reusing its tab_id so the
      backend reattaches to the still-running PTY and replays buffered output. */
   function connectSocket(tab) {
     if (!tab || tab.userClosed) return;
     var ws = new WebSocket(buildTerminalWsUrl(tab.id));
     tab.ws = ws;
-
-    ws.onopen = function () {
-      // Successful reattach: reset backoff + status, re-send current size.
-      tab.reconnectAttempt = 0;
-      if (tab.reconnectShown) {
-        tab.reconnectShown = false;
-        writeStatus(tab, t("term.reconnected"));
-      }
-      sendResize(tab);
-    };
-    ws.onmessage = function (ev) {
-      // TEXT frame = terminal output (guard against echoing control JSON).
-      if (typeof ev.data === "string" && ev.data.charAt(0) === "{") return;
-      tab.term.write(ev.data);
-    };
-    ws.onclose = function () {
-      if (tab.userClosed) return;      // deliberate close → final, no reconnect
-      scheduleReconnect(tab, false);   // transient drop → reattach with backoff
-    };
-    ws.onerror = function () { /* surfaced via onclose */ };
+    wireSocket(tab, ws);
   }
 
   function createTabButton(tab) {
@@ -276,34 +366,22 @@
       userClosed: false,          // true only when the user closes the tab
       reconnectTimer: null,       // pending reconnect setTimeout handle
       reconnectAttempt: 0,        // backoff step counter (reset on open)
-      reconnectShown: false       // "Reconnecting…" shown for this episode
+      reconnectShown: false,      // "Reconnecting…" shown for this episode
+      lastPingAt: 0,              // ms stamp of the last heartbeat ping received
+      livenessTimer: null,        // one-shot watchdog setTimeout handle (re-armed per ping)
+      _forceReconnectNow: false   // set when a liveness close should skip backoff
     };
     tabs.set(id, tab);
 
     term.write("\x1b[2m" + t("term.connecting") + "\x1b[0m\r\n");
 
+    // Keystrokes always go to the tab's CURRENT socket (tab.ws), so input keeps
+    // working after a reconnect swaps in a new WebSocket.
     term.onData(function (d) {
-      if (ws.readyState === WebSocket.OPEN) ws.send(d);
+      var s = tab.ws;
+      if (s && s.readyState === WebSocket.OPEN) s.send(d);
     });
-    ws.onmessage = function (ev) {
-      // TEXT frame = terminal output (or JSON resize ack — backend only sends
-      // raw output here; we still guard against accidentally echoing control).
-      if (typeof ev.data === "string" && ev.data.charAt(0) === "{") return;
-      term.write(ev.data);
-    };
-    ws.onopen = function () {
-      tab.reconnectAttempt = 0;
-      if (tab.reconnectShown) {
-        tab.reconnectShown = false;
-        writeStatus(tab, t("term.reconnected"));
-      }
-      sendResize(tab);
-    };
-    ws.onclose = function () {
-      if (tab.userClosed) return;      // deliberate close → final
-      scheduleReconnect(tab, false);   // transient drop → reattach with backoff
-    };
-    ws.onerror = function () { /* surface via onclose */ };
+    wireSocket(tab, ws);
 
     createTabButton(tab);
     activate(id);
@@ -362,6 +440,7 @@
     // then drop the socket. This is the ONLY path that sends {"type":"close"}.
     tab.userClosed = true;
     if (tab.reconnectTimer) { clearTimeout(tab.reconnectTimer); tab.reconnectTimer = null; }
+    if (tab.livenessTimer) { clearTimeout(tab.livenessTimer); tab.livenessTimer = null; }
     try {
       if (tab.ws && tab.ws.readyState === WebSocket.OPEN) tab.ws.send(buildCloseFrame());
     } catch (e) {}
@@ -498,7 +577,10 @@
       if (!tab || tab.userClosed) return;
       var down = !tab.ws ||
         (tab.ws.readyState !== WebSocket.OPEN && tab.ws.readyState !== WebSocket.CONNECTING);
-      if (down) scheduleReconnect(tab, true);
+      if (down) { scheduleReconnect(tab, true); return; }
+      // Socket still looks OPEN after a freeze — but it may be half-open (no
+      // heartbeat). If it's gone quiet, force a fresh reattach on return.
+      checkLiveness(tab);
     });
 
     // Keep xterm themes in sync with the global theme toggle.
@@ -525,6 +607,8 @@
     tabTitle: tabTitle,
     buildResizeFrame: buildResizeFrame,
     buildCloseFrame: buildCloseFrame,
+    buildPongFrame: buildPongFrame,
+    classifyIncoming: classifyIncoming,
     computeBackoffDelay: computeBackoffDelay,
     // manager hooks (used by app.js nav handler):
     onShow: function () {
@@ -539,7 +623,9 @@
     // test/introspection hooks (reconnect logic):
     _tabs: tabs,
     _scheduleReconnect: scheduleReconnect,
-    _connectSocket: connectSocket
+    _connectSocket: connectSocket,
+    _checkLiveness: checkLiveness,
+    _LIVENESS_MS: LIVENESS_MS
   };
   // Convenience alias for app.js.
   window.aigate.terminalManager = window.aigate.terminal;

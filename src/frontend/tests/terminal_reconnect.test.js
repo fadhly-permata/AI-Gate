@@ -91,6 +91,7 @@ beforeEach(() => {
   const tabs = T()._tabs;
   tabs.forEach(function (tab) {
     if (tab.reconnectTimer) clearTimeout(tab.reconnectTimer);
+    if (tab.livenessTimer) clearTimeout(tab.livenessTimer);
     tab.userClosed = true;
   });
   tabs.clear();
@@ -257,10 +258,149 @@ describe("re-send resize on reattach", () => {
     const ws2 = MockWebSocket.instances[MockWebSocket.instances.length - 1];
     ws2._open();                   // reattach succeeds
     const resize = ws2.sent
-      .map(s => { try { return JSON.parse(s); } catch (e) { return null; } })
+      .map(s => { try { return JSON.parse(s); } catch ( e) { return null; } })
       .find(f => f && f.type === "resize");
     expect(resize).toBeTruthy();
     expect(resize.cols).toBe(tab.term.cols);
     expect(resize.rows).toBe(tab.term.rows);
+  });
+});
+
+/* ------------------------------------------------------------------
+ * HEARTBEAT: server ping -> client pong (never rendered) + liveness
+ * ------------------------------------------------------------------ */
+
+describe("buildPongFrame (pure)", () => {
+  it("is the heartbeat reply control frame", () => {
+    expect(T().buildPongFrame()).toBe('{"type":"pong"}');
+  });
+});
+
+describe("classifyIncoming (pure)", () => {
+  it("flags a ping control frame", () => {
+    expect(T().classifyIncoming('{"type":"ping","t":1725000000}'))
+      .toEqual({ kind: "control", type: "ping" });
+  });
+  it("treats plain PTY text as output", () => {
+    expect(T().classifyIncoming("hello")).toEqual({ kind: "pty" });
+  });
+  it("treats JSON-ish PTY output WITHOUT a type field as output", () => {
+    expect(T().classifyIncoming('{"foo":1}')).toEqual({ kind: "pty" });
+  });
+  it("falls back to PTY output on malformed JSON that looks like a control frame", () => {
+    expect(T().classifyIncoming('{"type":')).toEqual({ kind: "pty" });
+  });
+});
+
+describe("heartbeat ping -> pong (not rendered)", () => {
+  it("answers a ping with a pong over the SAME ws and does NOT write it to the terminal", () => {
+    const tab = T().openTab();
+    tab.ws._open();
+    const before = tab.term.writes.length;
+
+    tab.ws._message('{"type":"ping","t":1725000000}');
+
+    // pong sent on the same socket...
+    expect(tab.ws.sent).toContain('{"type":"pong"}');
+    // ...and the ping never reaches xterm
+    expect(tab.term.writes.length).toBe(before);
+    expect(tab.term.writes.some(w => w.indexOf("ping") !== -1)).toBe(false);
+  });
+
+  it("writes normal PTY output and sends NO pong", () => {
+    const tab = T().openTab();
+    tab.ws._open();
+    tab.ws._message("hello");
+    expect(tab.term.writes).toContain("hello");
+    expect(tab.ws.sent).not.toContain('{"type":"pong"}');
+  });
+
+  it("drops other control frames without rendering or ponging", () => {
+    const tab = T().openTab();
+    tab.ws._open();
+    const before = tab.term.writes.length;
+    tab.ws._message('{"type":"resize","cols":80,"rows":24}');
+    expect(tab.term.writes.length).toBe(before);
+    expect(tab.ws.sent).not.toContain('{"type":"pong"}');
+  });
+
+  it("still pongs on a RECONNECTED socket (handlers are rewired)", () => {
+    const tab = T().openTab();
+    tab.ws._open();
+    tab.ws._unexpectedClose();
+    vi.advanceTimersByTime(500);
+    const ws2 = MockWebSocket.instances[MockWebSocket.instances.length - 1];
+    ws2._open();
+    const before = tab.term.writes.length;
+    ws2._message('{"type":"ping","t":1}');
+    expect(ws2.sent).toContain('{"type":"pong"}');
+    expect(tab.term.writes.length).toBe(before);
+  });
+});
+
+describe("liveness reconnect (half-open socket)", () => {
+  it("forces a reconnect to the SAME tab_id when no ping arrives for >45s (active+visible)", () => {
+    const tab = T().openTab();
+    const ws1 = tab.ws;
+    const url = ws1.url;
+    const id = tab.id;
+    ws1._open();                   // starts the liveness clock (lastPingAt = now)
+
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true, get: () => "visible"
+    });
+
+    const n = MockWebSocket.instances.length;
+    vi.advanceTimersByTime(45001); // watchdog fires -> stale -> close + immediate reattach
+
+    const ws2 = MockWebSocket.instances[MockWebSocket.instances.length - 1];
+    expect(ws2).not.toBe(ws1);                 // a NEW socket was made
+    expect(tab.ws).toBe(ws2);
+    expect(ws2.url).toBe(url);                 // SAME tab_id -> reattach + replay
+    expect(ws2.url).toContain(encodeURIComponent(id));
+  });
+
+  it("a ping resets the watchdog, so a live socket is NOT prematurely reconnected", () => {
+    const tab = T().openTab();
+    tab.ws._open();
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true, get: () => "visible"
+    });
+    const n = MockWebSocket.instances.length;
+
+    vi.advanceTimersByTime(40000);             // under the 45s threshold
+    tab.ws._message('{"type":"ping","t":1}');  // heartbeat re-arms the watchdog
+    vi.advanceTimersByTime(40000);             // 40s since the ping (still < 45s)
+    expect(MockWebSocket.instances.length).toBe(n);   // no reconnect yet
+
+    vi.advanceTimersByTime(6000);              // cross the 45s idle mark
+    expect(MockWebSocket.instances.length).toBe(n + 1); // now it reconnects
+  });
+
+  it("does NOT force-reconnect a backgrounded (hidden) tab", () => {
+    const tab = T().openTab();
+    tab.ws._open();
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true, get: () => "hidden"
+    });
+    const n = MockWebSocket.instances.length;
+    vi.advanceTimersByTime(60000);             // stale, but hidden
+    expect(MockWebSocket.instances.length).toBe(n);    // left alone (visibilitychange resumes it)
+  });
+
+  it("does NOT force-reconnect an INACTIVE tab", () => {
+    const a = T().openTab();                   // tab A
+    const b = T().openTab();                   // tab B (active)
+    a.ws._open();
+    b.ws._open();
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true, get: () => "visible"
+    });
+    const n = MockWebSocket.instances.length;
+    vi.advanceTimersByTime(60000);             // both stale, but only B is active
+    // B (active) reconnects; A (inactive) must NOT be force-reconnected.
+    const reconnected = MockWebSocket.instances.slice(n)
+      .some(ws => ws.url === a.ws.url);
+    expect(reconnected).toBe(false);
   });
 });
