@@ -1046,32 +1046,10 @@
 
   /* ===== Terminal view + Log Window (B3.1) ===== */
   var LOGS_API = "/api/logs";
-  var TERM_COLLAPSE_KEY = "aigate.terminalCollapsed";
   var LOG_VISIBLE_KEY = "aigate.logVisible";
   var LOG_AUTO_REFRESH_MS = 3000;
   var logRefreshTimer = null;
   var logResizeObserver = null;
-
-  /* ---- Collapsible terminal pane ---- */
-  function applyTermCollapse(collapsed) {
-    var pane = document.getElementById("terminalPane");
-    if (pane) pane.classList.toggle("terminal-collapsed", !!collapsed);
-    var btn = document.getElementById("termCollapseBtn");
-    if (btn) {
-      var icon = btn.querySelector("i");
-      if (icon) icon.className = collapsed ? "fa fa-chevron-down" : "fa fa-chevron-up";
-      var label = getStr(collapsed ? "term.expand" : "term.collapse");
-      btn.setAttribute("title", label);
-      btn.setAttribute("aria-label", label);
-      btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
-    }
-  }
-
-  function toggleTermCollapse() {
-    var collapsed = !document.getElementById("terminalPane").classList.contains("terminal-collapsed");
-    applyTermCollapse(collapsed);
-    write(TERM_COLLAPSE_KEY, collapsed ? "collapsed" : "expanded");
-  }
 
   /* ---- Global Log Window: show/hide (NOT expand/collapse) ----
      The whole #logWindow panel is toggled via the topbar icon. When visible we
@@ -1195,15 +1173,6 @@
     }
   }
 
-  function initTerminalView() {
-    // Restore collapse state from localStorage (mirrors sidebar persistence).
-    // NOTE: the Log Window is now GLOBAL (lives outside this view) and its
-    // auto-refresh is started once in init(), so this only manages the
-    // terminal pane collapse.
-    var collapsed = read(TERM_COLLAPSE_KEY, "expanded") === "collapsed";
-    applyTermCollapse(collapsed);
-  }
-
   function init() {
     var theme = read(THEME_KEY, DEFAULT_THEME);
     var locale = read(LOCALE_KEY, DEFAULT_LOCALE);
@@ -1234,9 +1203,6 @@
         if (window.applyLocale) window.applyLocale(next);
         write(LOCALE_KEY, next);
         markActiveLang(next);
-        // Keep terminal collapse-button label in sync with the new locale.
-        var pane = document.getElementById("terminalPane");
-        if (pane) applyTermCollapse(pane.classList.contains("terminal-collapsed"));
         // Keep the Log Window toggle's aria/title label in sync with the locale.
         applyLogVisible(isLogVisible());
       });
@@ -1291,7 +1257,6 @@
           window.aigate.analytics.onShow();
         }
       } else if (view === "terminal") {
-        initTerminalView();
         // B3.3: open/refit the multi-tab terminal when its view is shown.
         if (window.aigate && window.aigate.terminalManager) {
           window.aigate.terminalManager.onShow();
@@ -1373,10 +1338,6 @@
     if (provModal) provModal.addEventListener("click", function (e) {
       if (e.target === provModal) hideModal(); // click backdrop closes
     });
-
-    // --- Terminal: collapse toggle ---
-    var termCollapseBtn = document.getElementById("termCollapseBtn");
-    if (termCollapseBtn) termCollapseBtn.addEventListener("click", toggleTermCollapse);
 
     // --- Log Window (B3.1) — GLOBAL, shown on every view, toggled from topbar ---
     var logRefreshBtn = document.getElementById("logRefreshBtn");

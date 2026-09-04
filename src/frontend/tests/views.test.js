@@ -4,6 +4,10 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { JSDOM } from "jsdom";
 
+// i18n.js is a side-effect module: attaches window.I18N (no document access at
+// load). Imported so the collapse-key regression guard can read the dicts.
+import "../static/i18n.js";
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const html = readFileSync(join(__dirname, "..", "static", "index.html"), "utf8");
 const dom = new JSDOM(html);
@@ -69,3 +73,32 @@ describe("index.html structure — missing views + global Log Window", () => {
     expect(logBtn.hasAttribute("aria-label")).toBe(true);
   });
 });
+
+describe("terminal expand/collapse feature removed (regression guard)", () => {
+  it("#termCollapseBtn is gone from the terminal header", () => {
+    expect(doc.getElementById("termCollapseBtn")).toBeNull();
+    // No element anywhere carries the removed i18n binding.
+    expect(doc.querySelector('[data-i18n-aria="term.collapse"]')).toBeNull();
+    expect(doc.querySelector('[data-i18n-aria="term.expand"]')).toBeNull();
+  });
+
+  it("terminal header title bar is KEPT (header + title still present)", () => {
+    const header = doc.querySelector(".terminal-header");
+    expect(header).not.toBeNull();
+    expect(header.querySelector(".terminal-title")).not.toBeNull();
+    expect(header.querySelector('[data-i18n="nav.terminal"]')).not.toBeNull();
+  });
+
+  it("term.collapse / term.expand i18n keys removed from BOTH locales (parity)", () => {
+    expect(window.I18N.en["term.collapse"]).toBeUndefined();
+    expect(window.I18N.en["term.expand"]).toBeUndefined();
+    expect(window.I18N.id["term.collapse"]).toBeUndefined();
+    expect(window.I18N.id["term.expand"]).toBeUndefined();
+    // EN/ID key-set parity is preserved after the removal.
+    const en = Object.keys(window.I18N.en);
+    const id = Object.keys(window.I18N.id);
+    expect(en.filter((k) => !id.includes(k))).toEqual([]);
+    expect(id.filter((k) => !en.includes(k))).toEqual([]);
+  });
+});
+

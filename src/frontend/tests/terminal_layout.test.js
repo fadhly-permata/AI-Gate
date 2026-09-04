@@ -96,6 +96,29 @@ describe("BUG2 — fullscreen fills the dynamic viewport (CSS)", () => {
   });
 });
 
+describe("terminal expand/collapse CSS removed (regression guard)", () => {
+  it("no .terminal-collapsed rules remain in the stylesheet", () => {
+    expect(css).not.toMatch(/\.terminal-collapsed/);
+    expect(css).not.toMatch(/:has\(\.terminal-pane\.terminal-collapsed\)/);
+  });
+
+  it("fill chain intact: pane + body still grow (collapse did not steal the flex)", () => {
+    const pane = ruleBlock(/(^|\n)\.terminal-pane\s*\{[^}]*\}/);
+    const body = ruleBlock(/(^|\n)\.terminal-body\s*\{[^}]*\}/);
+    expect(pane).toMatch(/flex:\s*1/);
+    expect(pane).toMatch(/min-height:\s*0/);
+    expect(body).toMatch(/flex:\s*1/);
+    expect(body).toMatch(/min-height:\s*28vh/);
+  });
+
+  it(".terminal-header title bar styling is KEPT", () => {
+    const header = ruleBlock(/(^|\n)\.terminal-header\s*\{[^}]*\}/);
+    expect(header, ".terminal-header rule present").toBeTruthy();
+    expect(header).toMatch(/display:\s*flex/);
+  });
+});
+
+
 /* =====================================================================
  * JS behaviour — ResizeObserver refit wiring.
  * Mocks MUST exist before terminal.js is imported (its IIFE runs init()).

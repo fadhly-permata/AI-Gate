@@ -758,11 +758,6 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
   min-height: 0;
 }
 
-/* Collapsed: only the header shows — drop the vertical fill so the card shrinks
-   back to the header instead of leaving a tall empty panel. */
-.terminal-pane.terminal-collapsed { flex: 0 0 auto; }
-.terminal-card:has(.terminal-pane.terminal-collapsed) { flex: 0 0 auto; }
-
 .terminal-header {
   display: flex;
   align-items: center;
@@ -780,13 +775,6 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
   font-weight: 600;
 }
 
-.terminal-header .icon-btn {
-  color: var(--sidebar-fg-hover);
-  width: 30px;
-  height: 30px;
-}
-.terminal-header .icon-btn:hover { background: rgba(255,255,255,0.12); }
-
 .terminal-body {
   padding: 0;
   background: #1e1e1e;
@@ -799,9 +787,6 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
   display: flex;
   flex-direction: column;
 }
-
-/* Collapsed: only header bar shows, body hidden. */
-.terminal-collapsed .terminal-body { display: none; }
 
 /* ---- Multi-tab terminal (B3.3) ---- */
 .term-toolbar {

@@ -600,21 +600,17 @@
         </div>
       </section>
 
-      <!-- Terminal view (B3.1): collapsible terminal pane + Log Window -->
+      <!-- Terminal view (B3.1): terminal pane + Log Window -->
       <section class="view" data-view="terminal">
         <div class="card terminal-card">
 
-          <!-- Collapsible terminal pane (placeholder; xterm wired in B3.3) -->
+          <!-- Terminal pane (xterm wired in B3.3) -->
           <div class="terminal-pane" id="terminalPane">
             <div class="terminal-header" id="terminalHeader">
               <span class="terminal-title">
                 <i class="fa fa-terminal"></i>
                 <span data-i18n="nav.terminal">Terminal</span>
               </span>
-              <button class="icon-btn" id="termCollapseBtn" type="button"
-                      data-i18n-aria="term.collapse" title="Collapse">
-                <i class="fa fa-chevron-up"></i>
-              </button>
             </div>
             <div class="terminal-body" id="terminalBody">
               <!-- Multi-tab terminal (B3.3) -->
