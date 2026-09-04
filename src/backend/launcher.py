@@ -25,7 +25,19 @@ def main() -> None:
 
     dev: bool = os.environ.get("AIGATE_DEV", "0") == "1"
 
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    # WebSocket keepalive (protocol level, uvicorn's `websockets` impl): the
+    # server pings every 15s and drops a connection whose pong is not back
+    # within 15s. This detects half-open/dead sockets fast (Chrome freezing a
+    # backgrounded tab, a network blip) so the transport tears down cleanly and
+    # the client can reconnect to the still-running PTY (see terminal.session).
+    # An APPLICATION-level heartbeat complements this (terminal.router).
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=port,
+        ws_ping_interval=15.0,
+        ws_ping_timeout=15.0,
+    )
 
 
 if __name__ == "__main__":

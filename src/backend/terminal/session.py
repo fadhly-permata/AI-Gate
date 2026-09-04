@@ -68,6 +68,18 @@ REAPER_INTERVAL_SECONDS = 60.0
 
 SETTING_IDLE_REAP_MINUTES = "terminal_idle_reap_minutes"
 
+# Application-level WebSocket heartbeat (complements uvicorn's protocol-level
+# ws_ping_* set in launcher.py). While a view is ATTACHED the router sends a
+# TEXT frame ``{"type":"ping","t":<unix_seconds>}`` every HEARTBEAT_INTERVAL
+# seconds so the client sees steady traffic and can spot a half-open/dead
+# socket quickly. If the client ponged at least once but then goes silent for
+# longer than PONG_TIMEOUT seconds, the router DETACHES the stale view (never
+# kills the PTY). Conservative on purpose: a client that never pongs (older
+# frontend) is never dropped for missing pongs, and a frozen-then-resumed tab
+# simply reattaches.
+HEARTBEAT_INTERVAL_SECONDS = 15.0
+PONG_TIMEOUT_SECONDS = 60.0
+
 
 # --------------------------------------------------------------------------- #
 # DB bookkeeping (own short-lived sessions; never leak connections)
@@ -137,6 +149,10 @@ class PtySession:
         self.exited = False
         self.created_ts = time.monotonic()
         self.last_output_ts = self.created_ts
+        # Heartbeat bookkeeping for the currently-attached view (guarded by
+        # ``lock``). None until the client's first pong arrives, so a client
+        # that does not implement the heartbeat is never dropped for it.
+        self.last_pong_ts: Optional[float] = None
 
     # ------------------------------------------------------------------ #
     # Reader thread (runs independent of any WS)
@@ -199,7 +215,31 @@ class PtySession:
             self.attached = websocket
             self.queue = queue
             self.loop = loop
+            # Fresh view: no pong seen yet on this connection.
+            self.last_pong_ts = None
             return replay, queue
+
+    def record_pong(self) -> None:
+        """Note that the attached client answered a heartbeat ping.
+
+        Called from the router's receive loop (event-loop thread). The first
+        pong arms the stale-view watchdog: from then on, silence beyond
+        ``PONG_TIMEOUT_SECONDS`` means the view is dead and may be detached.
+        """
+        with self.lock:
+            self.last_pong_ts = time.monotonic()
+
+    def heartbeat_stale(self, now: float, timeout: float) -> bool:
+        """True if an attached view has ponged before but gone silent too long.
+
+        Deliberately conservative: returns False when detached (nothing to
+        watch) and False until the FIRST pong (a client that never pongs is
+        not penalised). Only an established-then-silent heartbeat is stale.
+        """
+        with self.lock:
+            if self.attached is None or self.last_pong_ts is None:
+                return False
+            return (now - self.last_pong_ts) > timeout
 
     def detach(self, websocket: Any) -> None:
         """Detach a WS view (idempotent; no-op if another view already stole it).
@@ -434,7 +474,9 @@ async def reaper_loop(interval_seconds: float = REAPER_INTERVAL_SECONDS) -> None
 
 __all__ = [
     "DEFAULT_IDLE_REAP_MINUTES",
+    "HEARTBEAT_INTERVAL_SECONDS",
     "LOG_SOURCE",
+    "PONG_TIMEOUT_SECONDS",
     "REAPER_INTERVAL_SECONDS",
     "RING_MAX_BYTES",
     "SETTING_IDLE_REAP_MINUTES",
