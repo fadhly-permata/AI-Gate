@@ -474,6 +474,16 @@
 - BACKLOG B5.6 `[x]`. **B5.7 aktif** (be-dev+fe-dev, sekuensial): Export/Import
   Setting lokal (JSON) — pengganti cloud sync (PRD §2.4.4). be-dev dulu.
 
+## Combo model auto-fetch 2026-09-03 — SELESAI
+- User: model di combo harus auto-fetch tiap ganti provider + sort by name + loading.
+- fe-dev: `fetchModelsForProvider` -> `POST /api/providers/{id}/discover`, loading state
+  (disable Model+Add, aria-busy, spinner, placeholder 'Loading models…'), sort by name
+  (case-insensitive), fallback cached + note kalau discover gagal, race-guard seq.
+  i18n `combos.member.loading`/`.load_failed`.
+- Verifikasi PM (R20 — bukti nyata, bukan klaim): vitest **198 passed**; Chromium live
+  -> loading muncul->clear, discover ke-fire, **47 model** ke-fetch (B.AI), sorted, 0 error.
+- Commit `83eb2fa`. Server PID 26733 (refresh browser buat ngerasain).
+
 ## Insiden terminal gak kepake + R20 — 2026-09-03 (user marah)
 - User: "terminal ga bisa dipake" + "kacau kerjaan lu". PM ngaku salah: udah klaim
   "aplikasi jalan" padahal terminal (fitur inti) mati.
