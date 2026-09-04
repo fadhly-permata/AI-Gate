@@ -50,17 +50,19 @@ describe("BUG1 — terminal view height chain fills the workspace (CSS)", () => 
     expect(pane).toMatch(/min-height:\s*0/);
   });
 
-  it(".terminal-body grows (no longer pinned to the old 160px floor)", () => {
+  it(".terminal-body grows with a viewport-relative floor (no px pin)", () => {
     const body = ruleBlock(/(^|\n)\.terminal-body\s*\{[^}]*\}/);
     expect(body).toMatch(/flex:\s*1/);
-    expect(body).not.toMatch(/min-height:\s*160px/);
+    expect(body).toMatch(/min-height:\s*28vh/);        // scales with screen height
+    expect(body).not.toMatch(/min-height:\s*\d+px/);   // no absolute px floor
   });
 
-  it(".term-stage uses flex fill and drops the fixed 320px min-height", () => {
+  it(".term-stage flex-fills with a viewport-relative floor (no px pin)", () => {
     const stage = ruleBlock(/(^|\n)\.term-stage\s*\{[^}]*\}/);
     expect(stage, ".term-stage rule present").toBeTruthy();
     expect(stage).toMatch(/flex:\s*1/);
-    expect(stage).not.toMatch(/min-height:\s*320px/);
+    expect(stage).toMatch(/min-height:\s*28vh/);        // scales with screen height
+    expect(stage).not.toMatch(/min-height:\s*\d+px/);   // no absolute px floor
   });
 });
 

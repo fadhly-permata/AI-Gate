@@ -791,10 +791,11 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
   padding: 0;
   background: #1e1e1e;
   /* BUG1: was a fixed min-height:160px that pinned the pane small. Now it is a
-     flex child that grows to fill the card; keep only a small floor so it never
-     fully collapses on a very short viewport. */
+     flex child that grows to fill the card; the floor is viewport-relative
+     (28vh) so it scales across devices and never fully collapses on a short
+     screen — no absolute px anywhere in the terminal size chain. */
   flex: 1 1 auto;
-  min-height: 120px;
+  min-height: 28vh;
   display: flex;
   flex-direction: column;
 }
@@ -868,8 +869,9 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
   background: #1e1e1e;
   /* BUG1: was min-height:320px which, with no definite-height ancestor, pinned
      the stage to ~half the screen. Now the chain above gives it real space to
-     grow into; keep only a small floor as a safety net. */
-  min-height: 120px;
+     grow into; the safety-net floor is viewport-relative (28vh), not px, so it
+     scales with screen height across devices. */
+  min-height: 28vh;
   touch-action: none; /* we own swipe gestures; mouse wheel still scrolls xterm */
 }
 
