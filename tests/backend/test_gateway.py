@@ -137,19 +137,46 @@ def test_missing_model_returns_400_envelope(monkeypatch) -> None:
     assert body["error"]["code"] == "missing_model"
 
 
-def test_streaming_rejected_with_envelope(monkeypatch) -> None:
-    client = _client_with_db(monkeypatch)
+def test_streaming_rejected_for_translated_format(monkeypatch) -> None:
+    """``stream:true`` against a TRANSLATED (anthropic) provider -> 400
+    ``streaming_unsupported_format``. Per-chunk SSE translation for
+    anthropic/gemini is a documented limitation; OpenAI-format streaming works
+    (see ``test_gateway_stream.py``)."""
+    sf = _make_sessionmaker()
+    _seed(sf)
+    with sf() as session:
+        prov = Provider(
+            name="claude",
+            type="anthropic",
+            base_url="http://claude.test",
+            api_key="sk-x",
+            enabled=True,
+        )
+        session.add(prov)
+        session.flush()
+        session.add(
+            ProviderModel(
+                provider_id=prov.id,
+                model_id="claude-3-5-sonnet",
+                model_name="Claude 3.5 Sonnet",
+                capabilities="chat",
+            )
+        )
+        session.commit()
+    _patch_db(monkeypatch, sf)
+    client = TestClient(app)
     resp = client.post(
         "/v1/chat/completions",
         json={
-            "model": "provider:test",
+            "model": "provider:claude:claude-3-5-sonnet",
             "messages": [{"role": "user", "content": "halo"}],
             "stream": True,
         },
     )
     assert resp.status_code == 400
     body = resp.json()
-    assert body["error"]["code"] == "streaming_not_supported"
+    assert body["error"]["type"] == "invalid_request_error"
+    assert body["error"]["code"] == "streaming_unsupported_format"
 
 
 def test_unknown_model_returns_model_not_found(monkeypatch) -> None:

@@ -444,10 +444,78 @@ async def execute_combo(
     return result
 
 
+def resolve_combo_stream_target(combo_ref: "str | int") -> Optional[ResolvedTarget]:
+    """Pick the first usable OpenAI-format member for a STREAMING combo request.
+
+    SSE streaming is implemented only for OpenAI-compatible (pass-through)
+    upstreams; per-chunk translation for anthropic/gemini is a known limitation
+    (see ``provider_adapter.chat_completion_stream`` + the router). This resolves
+    the combo's candidates with the SAME strategy/quota ordering as
+    :func:`execute_combo` and returns the FIRST candidate whose canonical format
+    is ``openai`` so the gateway can stream from it directly.
+
+    :param combo_ref: the combo's ``name`` OR integer ``id`` (parity with
+      :func:`execute_combo`).
+    :returns: a ``format == 'openai'`` :class:`ResolvedTarget` for the first
+      usable member, or ``None`` when the combo HAS members but none are
+      OpenAI-compatible (the router maps that to the ``streaming_unsupported_format``
+      400 envelope).
+    :raises TargetNotFound: if no combo matches ``combo_ref``.
+    :raises UpstreamError: if the combo has no usable members at all
+      (``combo_no_members``) — mirrors :func:`execute_combo`.
+    """
+    with SessionLocal() as session:
+        if isinstance(combo_ref, int):
+            combo = session.get(Combo, combo_ref)
+        else:
+            combo = session.scalars(
+                select(Combo).where(Combo.name == combo_ref)
+            ).first()
+        if combo is None:
+            raise TargetNotFound(f"combo '{combo_ref}' not found")
+        candidates = build_candidates(combo, session)
+
+    if not candidates:
+        raise UpstreamError(
+            502,
+            {
+                "error": {
+                    "message": f"combo '{combo_ref}' has no usable members",
+                    "type": "upstream_error",
+                    "code": "combo_no_members",
+                }
+            },
+        )
+
+    for target in candidates:
+        if (target.format or "openai").lower() == "openai":
+            log_info(
+                "resolve_combo_stream_target: streaming via first OpenAI-format "
+                f"member (model={target.upstream_model})",
+                source=LOG_SOURCE,
+                context={
+                    "combo": str(combo_ref),
+                    "model": target.upstream_model,
+                    "provider_id": target.provider_id,
+                },
+            )
+            return target
+
+    # Combo has members but none are OpenAI-compatible -> caller returns the 400.
+    log_warning(
+        "resolve_combo_stream_target: combo has no OpenAI-format member to "
+        "stream from",
+        source=LOG_SOURCE,
+        context={"combo": str(combo_ref), "members": len(candidates)},
+    )
+    return None
+
+
 __all__ = [
     "build_candidates",
     "quota_aware_order",
     "select_member",
     "execute_combo",
+    "resolve_combo_stream_target",
     "provider_tier",
 ]

@@ -7,7 +7,10 @@ Exposes:
   validated model) to :mod:`backend.gateway.provider_adapter` so upstream gets
   the exact payload (pass-through of arbitrary OpenAI fields). The request
   model uses ``extra="allow"`` so unknown OpenAI fields are preserved.
-  Streaming is rejected with a 400 envelope (streaming SSE is a later task).
+  ``stream:true`` is proxied as an SSE ``text/event-stream`` for OpenAI-format
+  (pass-through) upstreams incl. combos; translated formats (anthropic/gemini)
+  return a ``streaming_unsupported_format`` 400 (per-chunk SSE translation is a
+  known, documented limitation).
 * ``GET /v1/models`` — list available models derived from ``ProviderModel``
   rows (id ``provider:<provider>:<model_id>``) plus ENABLED ``Combo`` rows
   (id ``combo:<name>``), in OpenAI ``{"object":"list","data":[...]}`` shape.
@@ -36,16 +39,17 @@ import json
 import logging
 import time
 from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 from fastapi import APIRouter, Request
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, ValidationError
 
 logger = logging.getLogger(__name__)
 
 from backend.config import settings as _settings
 from backend.config.db import SessionLocal
-from backend.combo_routing import execute_combo
+from backend.combo_routing import execute_combo, resolve_combo_stream_target
 from backend.gateway import provider_adapter
 from backend.gateway.errors import GatewayError
 from backend.gateway.resolver import ResolvedTarget, TargetNotFound, resolve_target
@@ -113,8 +117,13 @@ _REDACTED = "***REDACTED***"
 
 
 @router.post("/v1/chat/completions")
-async def chat_completions(request: Request) -> dict:
-    """OpenAI-compatible chat completion proxy (non-streaming).
+async def chat_completions(request: Request) -> Response:
+    """OpenAI-compatible chat completion proxy (non-streaming OR SSE stream).
+
+    Returns a JSON dict for a normal request, or a ``StreamingResponse``
+    (``text/event-stream``) when the client asked for ``stream:true`` against an
+    OpenAI-format upstream/combo. FastAPI passes a ``Response`` instance through
+    untouched, so the streaming case bypasses JSON serialization.
 
     B5.6 wrapper: times the request and persists a ``RequestLog`` debug row
     (success OR error path) when ``request_log_enabled`` is 'true'. The
@@ -143,8 +152,12 @@ async def chat_completions(request: Request) -> dict:
     return result
 
 
-async def _handle_chat_completion(request: Request, ctx: dict) -> dict:
-    """Validate + route + forward one chat completion (raises GatewayError)."""
+async def _handle_chat_completion(request: Request, ctx: dict) -> Union[dict, Response]:
+    """Validate + route + forward one chat completion (raises GatewayError).
+
+    Returns a JSON dict (non-streaming) or a ``StreamingResponse`` (SSE) when the
+    client requested ``stream:true`` against an OpenAI-format target/combo.
+    """
     try:
         payload = await request.json()
     except Exception:  # noqa: BLE001 - malformed body
@@ -196,17 +209,10 @@ async def _handle_chat_completion(request: Request, ctx: dict) -> dict:
             400, "field 'model' is required", "invalid_request_error", "missing_model"
         )
 
-    if payload.get("stream") is True:
-        log_warning(
-            "streaming requested but not supported",
-            source="backend.gateway.router",
-        )
-        raise GatewayError(
-            400,
-            "streaming not implemented yet (planned)",
-            "invalid_request_error",
-            "streaming_not_supported",
-        )
+    # NOTE: ``stream:true`` is NOT rejected here any more. Streaming is decided
+    # AFTER the target is resolved (we need its ``format``): OpenAI-format
+    # upstreams/combos are proxied as SSE; translated formats get a
+    # ``streaming_unsupported_format`` 400. See ``_streaming_response``.
 
     # ADR-008 / task B2.5: named Endpoint selected at request time via the
     # X-Aigate-Endpoint header. When present, routing + proxy binding are
@@ -244,6 +250,37 @@ async def _handle_chat_completion(request: Request, ctx: dict) -> dict:
 
     # B5.6: prefer the real upstream model id in the debug row.
     ctx["model"] = target.upstream_model
+
+    # --- SSE streaming (stream:true) ----------------------------------------
+    # Decided AFTER resolution so we know the target's format. A ``combo:``
+    # reference streams from its first usable OpenAI-format member; a plain
+    # provider streams from itself. Translated formats raise the 400 inside
+    # ``_streaming_response``.
+    if payload.get("stream") is True:
+        if target.combo_used:
+            combo_name = model[len("combo:"):]
+            try:
+                member = resolve_combo_stream_target(combo_name)
+            except TargetNotFound as exc:
+                log_warning(
+                    f"combo model reference not found for streaming: {model}",
+                    source="backend.gateway.router",
+                )
+                raise GatewayError(
+                    400, str(exc), "invalid_request_error", "model_not_found"
+                )
+            if member is None:
+                log_warning(
+                    "streaming requested for a combo with no OpenAI-compatible "
+                    "member",
+                    source="backend.gateway.router",
+                    context={"combo": combo_name},
+                )
+                raise _streaming_unsupported_error()
+            return await _streaming_response(
+                member, payload, None, ctx, endpoint_id=None
+            )
+        return await _streaming_response(target, payload, None, ctx, endpoint_id=None)
 
     # Combo strategy routing (B2.4): a ``combo:`` reference is resolved per its
     # strategy by backend.combo_routing.execute_combo (which itself calls the
@@ -353,6 +390,156 @@ def _record_usage_safe(
             exc=exc,
             context={"model_ref": target.model_ref},
         )
+
+
+# --------------------------------------------------------------------------- #
+# SSE streaming (stream:true) — OpenAI-format pass-through proxy
+# --------------------------------------------------------------------------- #
+# Known limitation: per-chunk SSE translation for anthropic/gemini is NOT
+# implemented. Those formats keep working non-streaming; a stream:true request
+# against them returns this clear 400 envelope instead of silently mis-proxying.
+STREAMING_UNSUPPORTED_MSG = (
+    "streaming is not yet supported for translated providers (anthropic/gemini); "
+    "use a non-stream request or an OpenAI-compatible provider"
+)
+
+
+def _streaming_unsupported_error() -> GatewayError:
+    """The 400 envelope for a stream:true request on a translated format."""
+    return GatewayError(
+        400, STREAMING_UNSUPPORTED_MSG, "invalid_request_error",
+        "streaming_unsupported_format",
+    )
+
+
+def _extract_usage_from_sse(raw: bytes) -> Optional[dict]:
+    """Best-effort pull of the final ``usage`` object from an SSE byte stream.
+
+    OpenAI emits usage only when the client asked for it
+    (``stream_options.include_usage``); the last ``data:`` frame carrying a
+    non-empty ``usage`` wins. Malformed / absent frames are skipped (never
+    raise) — this is telemetry best-effort, fail-open.
+    """
+    try:
+        text = raw.decode("utf-8", "replace")
+    except Exception:  # noqa: BLE001 - decode is defensive only
+        return None
+    usage: Optional[dict] = None
+    for line in text.splitlines():
+        line = line.strip()
+        if not line.startswith("data:"):
+            continue
+        data = line[len("data:"):].strip()
+        if not data or data == "[DONE]":
+            continue
+        try:
+            obj = json.loads(data)
+        except (ValueError, TypeError):
+            continue
+        if isinstance(obj, dict) and isinstance(obj.get("usage"), dict):
+            usage = obj["usage"]
+    return usage
+
+
+def _record_stream_usage_safe(
+    buf: bytearray,
+    target: ResolvedTarget,
+    endpoint_id: Optional[int],
+    saved_bytes: Optional[int],
+) -> None:
+    """Record a UsageRecord after a stream completes (fail-open, best-effort).
+
+    Parses the final usage chunk from the buffered SSE bytes when present; a
+    stream that never carried usage records 0/0 (same as a usage-less non-stream
+    response). Any failure is logged (R12) and swallowed — the client already
+    received the stream.
+    """
+    try:
+        usage = _extract_usage_from_sse(bytes(buf))
+        result = {"usage": usage} if usage else {}
+        _record_usage_safe(
+            result, target, endpoint_id=endpoint_id, saved_bytes=saved_bytes
+        )
+    except Exception as exc:  # noqa: BLE001 - fail-open mandated (B5.5)
+        log_error_exc(
+            "stream usage recording failed (fail-open; stream already delivered)",
+            source="backend.gateway.router",
+            exc=exc,
+            context={"model_ref": target.model_ref},
+        )
+
+
+async def _streaming_response(
+    target: ResolvedTarget,
+    payload: dict,
+    proxy_url: Optional[str],
+    ctx: dict,
+    endpoint_id: Optional[int] = None,
+) -> StreamingResponse:
+    """Build an SSE ``StreamingResponse`` proxying an OpenAI-format upstream.
+
+    The upstream generator is PRIMED (first chunk pulled) before the response is
+    returned, so a connect / timeout / HTTP-status failure surfaces as a normal
+    :class:`GatewayError` (rendered as the OpenAI JSON envelope by the handler)
+    rather than a committed-200 broken stream. Once primed, the first chunk plus
+    the remainder are forwarded verbatim; the upstream's own ``data: [DONE]`` is
+    passed through untouched. Usage is recorded after the stream completes
+    normally (not on client disconnect / mid-stream error).
+
+    :raises GatewayError: 400 ``streaming_unsupported_format`` for a translated
+      format; or the adapter's :class:`UpstreamError` during priming.
+    """
+    fmt = (target.format or "openai").lower()
+    if fmt != "openai":
+        log_warning(
+            f"streaming requested for translated format '{fmt}' (not supported "
+            f"yet); use a non-stream request or an OpenAI-compatible provider",
+            source="backend.gateway.router",
+            context={"model": target.model_ref, "format": fmt},
+        )
+        raise _streaming_unsupported_error()
+
+    agen = provider_adapter.chat_completion_stream(target, payload, proxy_url)
+    # Prime: pull the first chunk so upstream connect/HTTP errors raise HERE
+    # (mapped to a JSON envelope) instead of after the 200 SSE is committed.
+    try:
+        first = await agen.__anext__()
+    except StopAsyncIteration:
+        first = None  # upstream produced an empty stream
+    except Exception:
+        # UpstreamError (a GatewayError) or unexpected failure — the generator
+        # has already unwound its own httpx context; aclose() is a safe no-op.
+        await agen.aclose()
+        raise
+
+    async def body():
+        buf = bytearray()
+        completed = False
+        try:
+            if first is not None:
+                buf.extend(first)
+                yield first
+            async for chunk in agen:
+                buf.extend(chunk)
+                yield chunk
+            completed = True
+        finally:
+            # Always release the upstream client (covers normal end, mid-stream
+            # error, and early client disconnect / GeneratorExit).
+            await agen.aclose()
+            if completed:
+                _record_stream_usage_safe(
+                    buf,
+                    target,
+                    endpoint_id=endpoint_id,
+                    saved_bytes=ctx.get("saved_bytes"),
+                )
+
+    return StreamingResponse(
+        body(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -564,7 +751,7 @@ def _endpoint_authorized(request: Request, endpoint: Endpoint) -> bool:
 
 async def _route_via_endpoint(
     name: str, model: str, payload: dict, request: Request, ctx: dict
-) -> dict:
+) -> Union[dict, Response]:
     """Resolve + forward a request through a named Endpoint's binding.
 
     Loads the ``Endpoint`` by name, enforces access control when enabled,
@@ -667,6 +854,13 @@ async def _route_via_endpoint(
             )
             # B5.6: the debug row should carry the real upstream model id.
             ctx["model"] = target.upstream_model
+            # SSE streaming: an endpoint-bound provider is treated as OpenAI
+            # format (matching the non-stream path, which never translates on
+            # this binding), so stream:true is proxied straight through.
+            if payload.get("stream") is True:
+                return await _streaming_response(
+                    target, payload, proxy_url, ctx, endpoint_id=endpoint.id
+                )
             result = await provider_adapter.chat_completion(
                 target, payload, proxy_url
             )
@@ -681,6 +875,31 @@ async def _route_via_endpoint(
             return result
 
         if binding.bind_type == "combo":
+            # SSE streaming: resolve the combo's first usable OpenAI-format
+            # member and stream from it (translated-only combos -> 400).
+            if payload.get("stream") is True:
+                try:
+                    member = resolve_combo_stream_target(binding.bind_id)
+                except TargetNotFound as exc:
+                    log_warning(
+                        f"_route_via_endpoint: combo '{binding.bind_id}' not "
+                        f"found for streaming",
+                        source="backend.gateway.router",
+                    )
+                    raise GatewayError(
+                        400, str(exc), "invalid_request_error", "combo_not_found"
+                    )
+                if member is None:
+                    log_warning(
+                        "streaming requested for an endpoint combo with no "
+                        "OpenAI-compatible member",
+                        source="backend.gateway.router",
+                        context={"endpoint": name},
+                    )
+                    raise _streaming_unsupported_error()
+                return await _streaming_response(
+                    member, payload, proxy_url, ctx, endpoint_id=endpoint.id
+                )
             # B5.5: execute_combo records the UsageRecord (it knows the winning
             # member/account); the endpoint id is threaded through here.
             # B5.6: so is the token_saver savings estimate (None = no saver).
