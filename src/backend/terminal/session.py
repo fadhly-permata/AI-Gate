@@ -11,8 +11,12 @@ New model (tmux/wetty-style)
 ---------------------------
 * A :class:`PtySession` owns the PTY + a dedicated reader thread that runs
   **independently of any WS connection**.
-* Sessions live in a module-level registry keyed by ``tab_id``
-  (:func:`get_or_create`). The WebSocket is just a detachable *view*.
+* Sessions live in a module-level registry keyed by the client's **raw tab id
+  string** (:func:`get_or_create`) — e.g. the frontend's UUID, which it reuses
+  on every reconnect, so the same key always maps to the same running shell.
+  The WebSocket is just a detachable *view*. The DB ``TerminalTab`` row is
+  created ONCE per spawned session (``PtySession.db_tab_id``), never per
+  connect (the old per-connect int minting leaked rows and broke reattach).
 * While attached, output is streamed live through an ``asyncio.Queue``;
   always, output is appended to a bounded **ring buffer** so a reattaching
   client can replay recent output and catch up.
@@ -42,7 +46,7 @@ import asyncio
 import threading
 import time
 from collections import deque
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from backend.config import settings as settings_repo
 from backend.config.db import SessionLocal
@@ -109,11 +113,16 @@ class PtySession:
     ``terminate`` / ``try_reap`` are the only ways the PTY dies.
     """
 
-    def __init__(self, tab_id: int, pty: PtyProcess, cols: int, rows: int) -> None:
-        self.tab_id = tab_id
+    def __init__(self, tab_key: str, pty: PtyProcess, cols: int, rows: int) -> None:
+        # Registry key: the client's raw tab id string (stable across
+        # reconnects — this is what makes reattach work).
+        self.tab_key = tab_key
         self.pty = pty
         self.cols = cols
         self.rows = rows
+        # DB TerminalTab row bound to this session, created ONCE at spawn by
+        # get_or_create's ``create_tab`` hook (None → no row bookkeeping).
+        self.db_tab_id: Optional[int] = None
         # Output ring buffer (bytes chunks, capped at RING_MAX_BYTES total).
         self.ring: deque[bytes] = deque()
         self.ring_bytes = 0
@@ -138,7 +147,7 @@ class PtySession:
             target=_reader_loop,
             args=(self,),
             daemon=True,
-            name=f"pty-reader-{self.tab_id}",
+            name=f"pty-reader-{self.tab_key}",
         )
         self.reader.start()
 
@@ -162,7 +171,7 @@ class PtySession:
             asyncio.run_coroutine_threadsafe(queue.put(data), loop)
         except Exception as exc:  # noqa: BLE001 - loop closed → view gone, keep pty
             log_warning(
-                f"terminal live delivery failed tab={self.tab_id} (detaching): {exc!r}",
+                f"terminal live delivery failed tab={self.tab_key} (detaching): {exc!r}",
                 source=LOG_SOURCE,
             )
             with self.lock:
@@ -219,7 +228,7 @@ class PtySession:
             self.rows = rows
         except PtyError as exc:
             log_warning(
-                f"terminal resize failed tab={self.tab_id}: {exc}",
+                f"terminal resize failed tab={self.tab_key}: {exc}",
                 source=LOG_SOURCE,
             )
 
@@ -263,10 +272,11 @@ class PtySession:
             self.attached = None
             self.queue = None
             self.loop = None
-        unregister(self.tab_id, expected=self)
-        _update_tab_pid(self.tab_id, "")
+        unregister(self.tab_key, expected=self)
+        if self.db_tab_id is not None:
+            _update_tab_pid(self.db_tab_id, "")
         log_info(
-            f"terminal session terminated ({reason}) tab={self.tab_id} pid={pid}",
+            f"terminal session terminated ({reason}) tab={self.tab_key} pid={pid}",
             source=LOG_SOURCE,
         )
 
@@ -303,51 +313,81 @@ def _reader_loop(session: PtySession) -> None:
     if not pty.is_alive():
         with session.lock:
             session.exited = True
-        log_info(f"terminal pty exited tab={session.tab_id}", source=LOG_SOURCE)
+        log_info(f"terminal pty exited tab={session.tab_key}", source=LOG_SOURCE)
 
 
 # --------------------------------------------------------------------------- #
 # Registry (thread-safe)
 # --------------------------------------------------------------------------- #
-_sessions: dict[int, PtySession] = {}
+_sessions: dict[str, PtySession] = {}
 _registry_lock = threading.Lock()
 
 
-def get_or_create(tab_id: int, cols: int = 80, rows: int = 24) -> PtySession:
-    """Return the live session for ``tab_id``; spawn one only if absent.
+def get_or_create(
+    tab_key: str,
+    cols: int = 80,
+    rows: int = 24,
+    create_tab: Optional[Callable[[], int]] = None,
+) -> PtySession:
+    """Return the live session for ``tab_key``; spawn one only if absent.
 
-    SAFETY: an existing session is returned as-is — never respawned, so a
-    reconnecting client reattaches to the SAME running shell. A lazy reap
+    ``tab_key`` is the client's RAW tab id string (e.g. the frontend UUID).
+    The frontend reuses the same string on reconnect, so the same key maps
+    to the same running shell — reattach works, the PTY is never respawned
+    while live. SAFETY: an existing session is returned as-is; a lazy reap
     sweep runs first so exited sessions transparently respawn fresh shells.
-    Raises :class:`PtyError` (from ``spawn_shell``) only when creating.
+
+    ``create_tab`` is invoked ONLY when a NEW session is spawned, under the
+    registry lock, to create/resolve the DB ``TerminalTab`` row exactly once
+    per session; its id is stored as ``session.db_tab_id`` for pid
+    bookkeeping. Reattaches never call it (no duplicate rows, no DB leak).
+    Row-creation failures are logged best-effort — a DB hiccup must not
+    strand the freshly spawned PTY. Raises :class:`PtyError` (from
+    ``spawn_shell``) only when creating.
     """
     reap_idle()
     with _registry_lock:
-        existing = _sessions.get(tab_id)
+        existing = _sessions.get(tab_key)
         if existing is not None:
             return existing
         pty = spawn_shell(cols=cols, rows=rows)
-        session = PtySession(tab_id=tab_id, pty=pty, cols=cols, rows=rows)
-        _sessions[tab_id] = session
+        session = PtySession(tab_key=tab_key, pty=pty, cols=cols, rows=rows)
+        if create_tab is not None:
+            try:
+                session.db_tab_id = create_tab()
+            except Exception as exc:  # noqa: BLE001 - terminal stays usable
+                log_error_exc(
+                    f"terminal: cannot create tab row key={tab_key}",
+                    source=LOG_SOURCE,
+                    exc=exc,
+                )
+        _sessions[tab_key] = session
     session.start_reader()
-    _update_tab_pid(tab_id, str(pty.pid) if pty.pid is not None else "")
-    log_info(f"terminal session spawned tab={tab_id} pid={pty.pid}", source=LOG_SOURCE)
+    if session.db_tab_id is not None:
+        _update_tab_pid(
+            session.db_tab_id, str(pty.pid) if pty.pid is not None else ""
+        )
+    log_info(
+        f"terminal session spawned tab={tab_key} pid={pty.pid} "
+        f"db_tab={session.db_tab_id}",
+        source=LOG_SOURCE,
+    )
     return session
 
 
-def unregister(tab_id: int, expected: Optional[PtySession] = None) -> None:
-    """Remove ``tab_id`` from the registry (only if it is still ``expected``)."""
+def unregister(tab_key: str, expected: Optional[PtySession] = None) -> None:
+    """Remove ``tab_key`` from the registry (only if it is still ``expected``)."""
     with _registry_lock:
-        current = _sessions.get(tab_id)
+        current = _sessions.get(tab_key)
         if current is None or (expected is not None and current is not expected):
             return
-        _sessions.pop(tab_id, None)
+        _sessions.pop(tab_key, None)
 
 
-def get_session(tab_id: int) -> Optional[PtySession]:
+def get_session(tab_key: str) -> Optional[PtySession]:
     """Registry lookup (tests / introspection)."""
     with _registry_lock:
-        return _sessions.get(tab_id)
+        return _sessions.get(tab_key)
 
 
 def snapshot_sessions() -> list[PtySession]:
@@ -356,10 +396,10 @@ def snapshot_sessions() -> list[PtySession]:
         return list(_sessions.values())
 
 
-def reap_idle(now: Optional[float] = None) -> list[int]:
+def reap_idle(now: Optional[float] = None) -> list[str]:
     """Sweep the registry; terminate exited / long-orphaned sessions.
 
-    Returns the tab_ids reaped. Running-but-detached sessions are only
+    Returns the tab keys reaped. Running-but-detached sessions are only
     touched after the (generous) idle grace; attached sessions never.
     """
     grace = _grace_seconds()
@@ -367,14 +407,14 @@ def reap_idle(now: Optional[float] = None) -> list[int]:
         now = time.monotonic()
     with _registry_lock:
         candidates = list(_sessions.values())
-    reaped: list[int] = []
+    reaped: list[str] = []
     for session in candidates:
         try:
             if session.try_reap(now, grace):
-                reaped.append(session.tab_id)
+                reaped.append(session.tab_key)
         except Exception as exc:  # noqa: BLE001 - one bad session must not stop sweep
             log_error_exc(
-                f"terminal reap check failed tab={session.tab_id}",
+                f"terminal reap check failed tab={session.tab_key}",
                 source=LOG_SOURCE,
                 exc=exc,
             )

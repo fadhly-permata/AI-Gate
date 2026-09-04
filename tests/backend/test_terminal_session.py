@@ -118,25 +118,67 @@ def _recv_until(ws, needle: str, max_frames: int = 50) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# 1) get_or_create: spawn ONCE per tab_id, reattach never respawns
+# 1) get_or_create: spawn ONCE per tab key, reattach never respawns
 # --------------------------------------------------------------------------- #
-def test_get_or_create_same_session_no_respawn(fake_spawn):
-    s1 = get_or_create(11)
-    s2 = get_or_create(11, cols=120, rows=40)  # reattach-style second call
-    assert s1 is s2
+# The exact PM-reported bug: the frontend uses a UUID STRING as its tab id and
+# reuses it on reconnect. Two get_or_create calls with the same non-numeric
+# key MUST return the same session and spawn the PTY exactly ONCE.
+UUID_A = "20415af6-3b7e-4c8a-9d2f-1e6b5a4c3d2e"
+UUID_B = "77c9e1d2-0a1b-4c5d-8e9f-0123456789ab"
+
+
+def test_get_or_create_same_string_key_no_respawn(fake_spawn):
+    s1 = get_or_create(UUID_A)
+    s2 = get_or_create(UUID_A, cols=120, rows=40)  # reconnect: same UUID string
+    assert s1 is s2  # reattach to the SAME session (the bug: fresh shell)
     assert len(fake_spawn) == 1  # pty spawned exactly once
-    assert get_session(11) is s1
-    # A different tab gets its own session.
-    s3 = get_or_create(12)
+    assert get_session(UUID_A) is s1
+    # A different key gets its own session.
+    s3 = get_or_create(UUID_B)
     assert s3 is not s1
     assert len(fake_spawn) == 2
+    # Numeric ids keep working — keyed consistently as their string form.
+    s4 = get_or_create("11")
+    s5 = get_or_create("11")
+    assert s4 is s5
+    assert len(fake_spawn) == 3
+
+
+def test_get_or_create_db_tab_created_once_per_session(fake_spawn):
+    """create_tab runs only on a NEW spawn — reattaches never mint rows."""
+    created: list[int] = []
+
+    def factory() -> int:
+        created.append(len(created) + 77)
+        return created[-1]
+
+    s1 = get_or_create(UUID_A, create_tab=factory)
+    assert s1.db_tab_id == 77
+    s2 = get_or_create(UUID_A, create_tab=factory)  # reconnect: no new row
+    assert s2 is s1
+    assert created == [77]  # exactly ONE DB tab for two connects
+    s3 = get_or_create(UUID_B, create_tab=factory)  # new session → one row
+    assert s3.db_tab_id == 78
+    assert created == [77, 78]
+
+
+def test_get_or_create_db_tab_failure_keeps_session_usable(fake_spawn):
+    """A DB hiccup in create_tab must not strand/kill the spawned PTY."""
+
+    def boom() -> int:
+        raise RuntimeError("db down")
+
+    s1 = get_or_create(UUID_A, create_tab=boom)
+    assert s1.db_tab_id is None
+    assert len(fake_spawn) == 1
+    assert get_session(UUID_A) is s1  # live + reattachable despite no row
 
 
 def test_get_or_create_respawns_after_pty_exit(fake_spawn):
-    s1 = get_or_create(41)
+    s1 = get_or_create("41")
     s1.pty.killed = True  # simulate the shell process exiting
     assert _wait_until(lambda: s1.exited)  # reader marks it exited
-    s2 = get_or_create(41)  # lazy reap sweep drops the dead one → fresh spawn
+    s2 = get_or_create("41")  # lazy reap sweep drops the dead one → fresh spawn
     assert s2 is not s1
     assert len(fake_spawn) == 2
 
@@ -146,7 +188,7 @@ def test_get_or_create_respawns_after_pty_exit(fake_spawn):
 # --------------------------------------------------------------------------- #
 def test_detach_keeps_pty_alive_and_buffers_for_reattach():
     pty = FakePty(script=[])
-    sess = PtySession(tab_id=99, pty=pty, cols=80, rows=24)
+    sess = PtySession(tab_key="99", pty=pty, cols=80, rows=24)
     sess.start_reader()
     ws = object()
     # loop=None → live delivery skipped; ring buffer still records output.
@@ -175,7 +217,7 @@ def test_detach_keeps_pty_alive_and_buffers_for_reattach():
 # 3) Ring buffer: capped total size, keeps the most recent chunks
 # --------------------------------------------------------------------------- #
 def test_ring_buffer_capped_and_replays_recent():
-    sess = PtySession(tab_id=98, pty=FakePty(script=[]), cols=80, rows=24)
+    sess = PtySession(tab_key="98", pty=FakePty(script=[]), cols=80, rows=24)
     chunk = b"x" * 40960  # 40 KB
     for i in range(10):
         sess._publish(chunk + bytes([65 + i]))  # A..J, oldest first
@@ -195,14 +237,14 @@ def test_try_reap_rules():
 
     # Exited PTY → reaped immediately (kill + gone from registry).
     p1 = FakePty(script=[])
-    s1 = PtySession(tab_id=21, pty=p1, cols=80, rows=24)
+    s1 = PtySession(tab_key="21", pty=p1, cols=80, rows=24)
     s1.exited = True
     assert s1.try_reap(now, grace) is True
     assert p1.killed is True
 
     # Live + detached, idle within grace → NEVER reaped (running job safe).
     p2 = FakePty(script=[])
-    s2 = PtySession(tab_id=22, pty=p2, cols=80, rows=24)
+    s2 = PtySession(tab_key="22", pty=p2, cols=80, rows=24)
     s2.last_output_ts = now - 10
     assert s2.try_reap(now, grace) is False
     assert p2.killed is False
@@ -213,7 +255,7 @@ def test_try_reap_rules():
 
     # Attached (someone is watching) → never reaped, however idle.
     p3 = FakePty(script=[])
-    s3 = PtySession(tab_id=23, pty=p3, cols=80, rows=24)
+    s3 = PtySession(tab_key="23", pty=p3, cols=80, rows=24)
     s3.attach(object(), None)  # type: ignore[arg-type]
     s3.last_output_ts = now - 999999
     assert s3.try_reap(now, grace) is False
@@ -221,28 +263,31 @@ def test_try_reap_rules():
 
 
 def test_reap_idle_sweeps_registry(fake_spawn):
-    sess = get_or_create(31)
-    assert get_session(31) is sess
+    sess = get_or_create("31")
+    assert get_session("31") is sess
     sess.pty.killed = True  # shell exits
     assert _wait_until(lambda: sess.exited)
-    assert 31 in reap_idle()
-    assert get_session(31) is None
+    assert "31" in reap_idle()
+    assert get_session("31") is None
 
     # A fresh live-but-detached session survives the sweep.
-    sess2 = get_or_create(32)
+    sess2 = get_or_create("32")
     assert reap_idle() == []
-    assert get_session(32) is sess2
+    assert get_session("32") is sess2
 
 
 # --------------------------------------------------------------------------- #
 # 5) WS handler lifecycle: disconnect→detach, reconnect→replay, close→kill
 # --------------------------------------------------------------------------- #
 def test_ws_disconnect_reattach_close_lifecycle(client, fake_spawn):
+    """Backward-compat path: a NUMERIC existing tab id still works, keyed by
+    its string form, and reattaches to the same session across connects."""
     from backend.config.db import SessionLocal
     from backend.models import TerminalTab
     from backend.terminal.router import _create_tab
 
     tid = _create_tab()
+    key = str(tid)  # registry key is now the raw URL string
     with TestClient(client.app) as c:
         # -- connection 1: fresh spawn, keystrokes + resize reach the pty ---- #
         with c.websocket_connect(f"/ws/terminal/{tid}") as ws:
@@ -254,8 +299,10 @@ def test_ws_disconnect_reattach_close_lifecycle(client, fake_spawn):
         pty = fake_spawn[0]
 
         # SAFETY: disconnect DETACHED — it must NOT kill the shell.
-        sess = get_session(tid)
+        sess = get_session(key)
         assert sess is not None
+        assert sess.tab_key == key
+        assert sess.db_tab_id == tid  # bound to the EXISTING row, no new row
         assert _wait_until(lambda: sess.attached is None)
         assert pty.killed is False
         assert sess.reader is not None and sess.reader.is_alive()
@@ -273,7 +320,7 @@ def test_ws_disconnect_reattach_close_lifecycle(client, fake_spawn):
             got2 = _recv_until(ws2, "while-away")
         assert "hello-1" in got2 and "while-away" in got2
         assert len(fake_spawn) == 1  # reattached, never respawned
-        assert get_session(tid) is sess
+        assert get_session(key) is sess
 
         # -- connection 3: explicit {"type":"close"} kills + removes --------- #
         with c.websocket_connect(f"/ws/terminal/{tid}") as ws3:
@@ -284,9 +331,63 @@ def test_ws_disconnect_reattach_close_lifecycle(client, fake_spawn):
             except Exception:  # noqa: BLE001 - server closed the socket
                 pass
         assert pty.killed is True
-        assert get_session(tid) is None
+        assert get_session(key) is None
         with SessionLocal() as s:
             assert s.get(TerminalTab, tid).pty_pid == ""
+
+
+def test_ws_uuid_reconnect_same_session_single_tab_row(client, fake_spawn):
+    """CORE REGRESSION (PM live e2e): the frontend's UUID tab id must
+    reattach to the SAME session on reconnect — replaying the ring buffer,
+    never respawning the PTY and never minting an extra TerminalTab row."""
+    from backend.config.db import SessionLocal
+    from backend.models import TerminalTab
+
+    def tab_count() -> int:
+        with SessionLocal() as s:
+            return s.query(TerminalTab).count()
+
+    uuid_tab = UUID_A
+    base = tab_count()
+    with TestClient(client.app) as c:
+        # -- connect 1 (UUID): spawn + exactly ONE new TerminalTab row ------- #
+        with c.websocket_connect(f"/ws/terminal/{uuid_tab}") as ws:
+            got = _recv_until(ws, "hello-1")
+            assert "hello-1" in got
+        sess = get_session(uuid_tab)
+        assert sess is not None
+        assert len(fake_spawn) == 1
+        assert tab_count() == base + 1  # one row for the new session
+        pty = fake_spawn[0]
+        with SessionLocal() as s:
+            row = s.get(TerminalTab, sess.db_tab_id)
+            assert row is not None
+            assert row.pty_pid == str(pty.pid)
+
+        # Output produced while detached (tab minimized) is buffered...
+        pty._script.append(b"while-away\r\n")
+        assert _wait_until(lambda: b"while-away\r\n" in list(sess.ring))
+
+        # -- reconnect SAME UUID: same session, replay, no respawn, no row --- #
+        with c.websocket_connect(f"/ws/terminal/{uuid_tab}") as ws2:
+            got2 = _recv_until(ws2, "while-away")
+        assert "hello-1" in got2 and "while-away" in got2  # old job's output
+        assert len(fake_spawn) == 1  # THE BUG: this used to be a fresh shell
+        assert get_session(uuid_tab) is sess
+        assert tab_count() == base + 1  # no DB row leak on reconnect
+
+        # -- explicit close: kill + unregister by the string key ------------- #
+        with c.websocket_connect(f"/ws/terminal/{uuid_tab}") as ws3:
+            ws3.send_text('{"type":"close"}')
+            try:
+                while True:
+                    ws3.receive_text()
+            except Exception:  # noqa: BLE001 - server closed the socket
+                pass
+        assert pty.killed is True
+        assert get_session(uuid_tab) is None
+        with SessionLocal() as s:
+            assert s.get(TerminalTab, sess.db_tab_id).pty_pid == ""
 
 
 # --------------------------------------------------------------------------- #

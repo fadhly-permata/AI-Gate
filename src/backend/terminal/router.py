@@ -4,11 +4,22 @@ Endpoint
 --------
 ``WS /ws/terminal/{tab_id}``
 
-tab_id resolution
------------------
-* ``tab_id`` is a valid existing :class:`TerminalTab` id (int > 0) → reuse it.
-* Anything else (``0``, non-numeric, or unknown id) → create a fresh
-  :class:`TerminalSession` + :class:`TerminalTab` and use its new id.
+tab_id handling (SAFETY-CRITICAL: stable registry key)
+-------------------------------------------------------
+``tab_id`` (the RAW URL string) is the registry key of the PTY session. The
+frontend generates its own UUID per tab and REUSES it on every reconnect, so
+the same string must always map to the same live session — that is what makes
+reattach (buffer replay, running job kept alive) work. Minting a new int per
+connect (the old bug) respawned a fresh shell every time and leaked a
+TerminalTab row per reconnect.
+
+The DB :class:`TerminalTab` row is created ONLY when a NEW session spawns
+(first connect for a key), via :func:`_ensure_db_tab`:
+* numeric raw id naming an existing tab → reuse that row (backward compat);
+* anything else (UUID, ``0``, unknown id) → create a fresh
+  :class:`TerminalSession` + :class:`TerminalTab` and bind its id to the
+  session (``session.db_tab_id``).
+Reconnects never create a row and never respawn the PTY.
 
 Message protocol (for frontend B3.3)
 ------------------------------------
@@ -103,8 +114,15 @@ def _is_disconnect_error(exc: BaseException, websocket: Optional[WebSocket]) -> 
 # --------------------------------------------------------------------------- #
 # DB helpers (own short-lived sessions; never leak connections)
 # --------------------------------------------------------------------------- #
-def _resolve_tab_id(raw: str) -> int:
-    """Return an existing tab id or create a new session+tab and return its id."""
+def _ensure_db_tab(raw: str) -> int:
+    """Resolve/create the DB TerminalTab row to bind to a NEW session.
+
+    Backward compat: a numeric ``raw`` naming an existing tab reuses that
+    row. Anything else (UUID string, ``0``, unknown id) creates a fresh
+    TerminalSession + TerminalTab. Invoked ONCE per spawned session (via
+    ``get_or_create``'s ``create_tab`` hook) — reconnects never reach here,
+    which is what stops the old per-connect row leak.
+    """
     try:
         tid = int(raw)
     except (TypeError, ValueError):
@@ -130,7 +148,7 @@ def _create_tab() -> int:
 
 
 async def _pump(
-    websocket: WebSocket, queue: "asyncio.Queue[bytes]", tid: int
+    websocket: WebSocket, queue: "asyncio.Queue[bytes]", tab_key: str
 ) -> None:
     """Async side: drain the session queue and send frames to the client.
 
@@ -146,7 +164,7 @@ async def _pump(
         except Exception as exc:  # noqa: BLE001 - classified below
             if _is_disconnect_error(exc, websocket):
                 log_info(
-                    f"terminal ws client gone during send tab={tid}",
+                    f"terminal ws client gone during send tab={tab_key}",
                     source=LOG_SOURCE,
                 )
             else:
@@ -162,22 +180,29 @@ async def terminal_ws(websocket: WebSocket, tab_id: str) -> None:
     await websocket.accept()
     log_info(f"terminal ws connect tab_id={tab_id}", source=LOG_SOURCE)
 
-    tid = _resolve_tab_id(tab_id)
     loop = asyncio.get_running_loop()
 
-    # Reattach to the live session for this tab, or spawn one (never both).
+    # Reattach to the live session for this client key, or spawn one (never
+    # both). The registry key is the RAW URL string: the frontend reuses its
+    # UUID across reconnects, so the same key returns the SAME running shell.
+    # The DB tab row is created only on a fresh spawn (create_tab hook).
     try:
-        session: PtySession = get_or_create(tid)
+        session: PtySession = get_or_create(
+            tab_id, create_tab=lambda: _ensure_db_tab(tab_id)
+        )
     except PtyError as exc:
         log_error_exc(
-            f"terminal ws spawn failed tab={tid}: {exc}", source=LOG_SOURCE, exc=exc
+            f"terminal ws spawn failed tab={tab_id}: {exc}",
+            source=LOG_SOURCE,
+            exc=exc,
         )
         await websocket.close(code=1011)
         return
 
     replay, queue = session.attach(websocket, loop)
     log_info(
-        f"terminal ws attached tab={tid} pid={session.pty.pid} replay_chunks={len(replay)}",
+        f"terminal ws attached tab={tab_id} pid={session.pty.pid} "
+        f"replay_chunks={len(replay)}",
         source=LOG_SOURCE,
     )
 
@@ -189,14 +214,14 @@ async def terminal_ws(websocket: WebSocket, tab_id: str) -> None:
         except Exception as exc:  # noqa: BLE001 - classified below
             if _is_disconnect_error(exc, websocket):
                 log_info(
-                    f"terminal ws client gone during replay tab={tid}",
+                    f"terminal ws client gone during replay tab={tab_id}",
                     source=LOG_SOURCE,
                 )
             else:
                 log_error_exc("terminal replay send error", source=LOG_SOURCE, exc=exc)
             break
 
-    pump_task = asyncio.create_task(_pump(websocket, queue, tid))
+    pump_task = asyncio.create_task(_pump(websocket, queue, tab_id))
 
     close_requested = False
     try:
@@ -226,19 +251,23 @@ async def terminal_ws(websocket: WebSocket, tab_id: str) -> None:
                 session.write_text(msg)
             except PtyError as exc:
                 log_error_exc(
-                    f"terminal ws write failed tab={tid}: {exc}",
+                    f"terminal ws write failed tab={tab_id}: {exc}",
                     source=LOG_SOURCE,
                     exc=exc,
                 )
     except WebSocketDisconnect:
-        log_info(f"terminal ws client disconnected tab={tid}", source=LOG_SOURCE)
+        log_info(
+            f"terminal ws client disconnected tab={tab_id}", source=LOG_SOURCE
+        )
     except Exception as exc:  # noqa: BLE001 - never crash the loop silently
         log_error_exc("terminal ws loop error", source=LOG_SOURCE, exc=exc)
     finally:
         pump_task.cancel()
         if close_requested:
             session.terminate()
-            log_info(f"terminal ws closed by client tab={tid}", source=LOG_SOURCE)
+            log_info(
+                f"terminal ws closed by client tab={tab_id}", source=LOG_SOURCE
+            )
         else:
             # SAFETY-CRITICAL: a dropped WS (tab freeze, network blip) must
             # NOT kill the shell — detach the view only. The PTY keeps
@@ -246,7 +275,7 @@ async def terminal_ws(websocket: WebSocket, tab_id: str) -> None:
             # sessions later.
             session.detach(websocket)
             log_info(
-                f"terminal ws detached tab={tid} pid={session.pty.pid} "
+                f"terminal ws detached tab={tab_id} pid={session.pty.pid} "
                 f"(pty kept alive)",
                 source=LOG_SOURCE,
             )

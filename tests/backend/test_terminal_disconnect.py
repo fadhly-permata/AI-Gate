@@ -146,7 +146,7 @@ async def _run_pump_with_one_item(ws: _FakeWS) -> None:
     await queue.put(b"hello")
     # _pump loops forever on an empty queue; bound it with a timeout after the
     # first item is processed (it breaks out of the loop on send failure).
-    await asyncio.wait_for(_pump(ws, queue, tid=7), timeout=2)
+    await asyncio.wait_for(_pump(ws, queue, tab_key="7"), timeout=2)
 
 
 def test_pump_websocket_disconnect_logs_info_not_error(monkeypatch):
@@ -189,7 +189,7 @@ def test_pump_happy_path_sends_and_stays_silent(monkeypatch):
 
     async def run() -> None:
         await queue.put(b"hi")
-        task = asyncio.create_task(_pump(ws, queue, tid=1))
+        task = asyncio.create_task(_pump(ws, queue, tab_key="1"))
         for _ in range(100):
             if ws.sent:
                 break
@@ -207,7 +207,7 @@ def test_pump_happy_path_sends_and_stays_silent(monkeypatch):
 # --------------------------------------------------------------------------- #
 def _make_session(pty: "_FakePty") -> PtySession:
     """A bare PtySession (no thread, no registry) for reader-loop tests."""
-    return PtySession(tab_id=1, pty=pty, cols=80, rows=24)
+    return PtySession(tab_key="1", pty=pty, cols=80, rows=24)
 
 
 def test_reader_eof_logs_info_not_error(monkeypatch):
