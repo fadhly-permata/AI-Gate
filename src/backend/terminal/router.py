@@ -39,15 +39,56 @@ import threading
 from typing import Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from starlette.websockets import WebSocketState
 
 from backend.config.db import SessionLocal
 from backend.log import log_error_exc, log_info
 from backend.models import TerminalSession, TerminalTab
-from backend.terminal.pty import PtyError, spawn_shell
+from backend.terminal.pty import PtyError, PtyProcess, spawn_shell
 
 LOG_SOURCE = "backend.terminal.router"
 
 router = APIRouter()
+
+# ``websockets`` is an optional runtime dep (uvicorn's default WS impl). When
+# absent (e.g. wsproto) the disconnect-type tuple simply omits its exception.
+try:
+    from websockets.exceptions import ConnectionClosed as _WsConnectionClosed
+except ImportError:  # pragma: no cover - env without the websockets library
+    _WsConnectionClosed = None
+
+# Exception types that mean "the client/transport went away", not a real bug.
+_DISCONNECT_EXC_TYPES: "tuple[type[BaseException], ...]" = (WebSocketDisconnect,)
+if _WsConnectionClosed is not None:  # pragma: no cover - depends on env
+    _DISCONNECT_EXC_TYPES += (_WsConnectionClosed,)
+
+
+def _is_disconnect_error(exc: BaseException, websocket: Optional[WebSocket]) -> bool:
+    """True if ``exc`` means the WS client disconnected, not a real send failure.
+
+    An abrupt client close surfaces in several shapes, none of which is an
+    application error:
+
+    * :class:`WebSocketDisconnect` — starlette/fastapi saw the disconnect.
+    * ``websockets.exceptions.ConnectionClosed*`` — raised by uvicorn's
+      websockets implementation at the transport layer.
+    * starlette's ``RuntimeError('Cannot call "send" once a close message
+      has been sent.')`` — raised when the app tries to send after the
+      connection state already moved past CONNECTED.
+    * Any exception while ``websocket.client_state`` is already DISCONNECTED.
+    """
+    if isinstance(exc, _DISCONNECT_EXC_TYPES):
+        return True
+    if (
+        websocket is not None
+        and getattr(websocket, "client_state", None) == WebSocketState.DISCONNECTED
+    ):
+        return True
+    if isinstance(exc, RuntimeError):
+        msg = str(exc).lower()
+        if "send" in msg and ("close message" in msg or "disconnected" in msg):
+            return True
+    return False
 
 
 # --------------------------------------------------------------------------- #
@@ -92,6 +133,62 @@ def _update_tab_pid(tid: int, pid: str) -> None:
         )
 
 
+def _reader_loop(
+    pty: PtyProcess,
+    queue: "asyncio.Queue[bytes]",
+    loop: asyncio.AbstractEventLoop,
+    stop_event: threading.Event,
+) -> None:
+    """Blocking reader: feeds decoded PTY output into the async queue.
+
+    Runs as a daemon thread. A read failure during shutdown (``stop_event``
+    set) or an EOF/OSError from the killed PTY is expected teardown → INFO,
+    not ERROR. Only genuinely unexpected reads while still running are
+    logged as errors.
+    """
+    while not stop_event.is_set():
+        try:
+            data = pty.read()
+        except Exception as exc:  # noqa: BLE001 - classified below
+            if stop_event.is_set() or isinstance(exc, (EOFError, OSError)):
+                # Normal shutdown: pty.kill()/close makes read() raise EOF/OSError.
+                log_info(
+                    f"terminal reader stopped during shutdown: {exc!r}",
+                    source=LOG_SOURCE,
+                )
+            else:
+                log_error_exc("terminal reader error", source=LOG_SOURCE, exc=exc)
+            break
+        if not data and not pty.is_alive():
+            break  # EOF + dead → done
+        if not data:
+            continue  # transient empty read
+        asyncio.run_coroutine_threadsafe(queue.put(data), loop)
+
+
+async def _pump(
+    websocket: WebSocket, queue: "asyncio.Queue[bytes]", tid: int
+) -> None:
+    """Async side: drain the queue and send frames to the client.
+
+    A send failure caused by the client going away (disconnect) is normal
+    teardown → INFO; only unexpected send errors are logged as ERROR.
+    """
+    while True:
+        data = await queue.get()
+        try:
+            await websocket.send_text(data.decode("utf-8", "replace"))
+        except Exception as exc:  # noqa: BLE001 - classified below
+            if _is_disconnect_error(exc, websocket):
+                log_info(
+                    f"terminal ws client gone during send tab={tid}",
+                    source=LOG_SOURCE,
+                )
+            else:
+                log_error_exc("terminal send error", source=LOG_SOURCE, exc=exc)
+            break
+
+
 # --------------------------------------------------------------------------- #
 # WebSocket endpoint
 # --------------------------------------------------------------------------- #
@@ -119,36 +216,12 @@ async def terminal_ws(websocket: WebSocket, tab_id: str) -> None:
     queue: "asyncio.Queue[bytes]" = asyncio.Queue()
     stop_event = threading.Event()
 
-    def reader_thread() -> None:
-        """Blocking reader: feeds decoded PTY output into the async queue."""
-        while not stop_event.is_set():
-            try:
-                data = pty.read()
-            except Exception as exc:  # noqa: BLE001 - EOF / error → stop
-                log_error_exc("terminal reader error", source=LOG_SOURCE, exc=exc)
-                break
-            if not data and not pty.is_alive():
-                break  # EOF + dead → done
-            if not data:
-                continue  # transient empty read
-            asyncio.run_coroutine_threadsafe(queue.put(data), loop)
-
-    reader = threading.Thread(target=reader_thread, daemon=True)
+    reader = threading.Thread(
+        target=_reader_loop, args=(pty, queue, loop, stop_event), daemon=True
+    )
     reader.start()
 
-    async def pump() -> None:
-        """Async side: drain the queue and send frames to the client."""
-        while True:
-            data = await queue.get()
-            try:
-                await websocket.send_text(data.decode("utf-8", "replace"))
-            except WebSocketDisconnect:
-                break
-            except Exception as exc:  # noqa: BLE001
-                log_error_exc("terminal send error", source=LOG_SOURCE, exc=exc)
-                break
-
-    pump_task = asyncio.create_task(pump())
+    pump_task = asyncio.create_task(_pump(websocket, queue, tid))
 
     try:
         async for msg in websocket.iter_text():
