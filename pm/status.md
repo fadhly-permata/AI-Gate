@@ -474,6 +474,30 @@
 - BACKLOG B5.6 `[x]`. **B5.7 aktif** (be-dev+fe-dev, sekuensial): Export/Import
   Setting lokal (JSON) — pengganti cloud sync (PRD §2.4.4). be-dev dulu.
 
+## Fix CLI launch (aider gak init provider/model) — 2026-09-03 SELESAI
+- User: launch aider (udah ke-install) gak auto-init pake provider+model terpilih.
+- AKAR MASALAH: (1) gateway resolver cuma ngerti ref `provider:X`/`combo:X`, nama
+  model polos ditolak; (2) launch ngasih aider `--model provider:B.AI:gpt-5.5` (aider
+  nolak) + gak dikasih flag custom-endpoint aider; (3) key kosong (aider nolak).
+- FIX (be-dev):
+  - `resolver.py`: bare-model resolution (scan ProviderModel.model_id di provider
+    enabled; 1->route, N->default_provider/lowest-id logged, 0->400 helpful).
+  - `cli_tools_router.py`: per-tool launch strategy -> aider = `aider
+    --openai-api-base <base> --openai-api-key <key> --model openai/<raw>` (raw =
+    strip `provider:X:`); tool lain tetap generic env+`--model`.
+  - placeholder key `aigate-local` saat gak ada endpoint access-control (aider butuh
+    key non-kosong; gateway abaikan saat auth off). Commit `d4cc36c` + `db99596`.
+  - pytest **291 passed, 1 skipped**.
+- VERIFIKASI LIVE (server PID 5720): resolve aider -> `aider --openai-api-base
+  http://localhost:8080/v1 --openai-api-key aigate-local --model openai/gpt-5.5`,
+  env key non-empty. ✅
+- BELUM: end-to-end jalanin aider beneran (aider gak ada di PATH shell PM) -> user
+  harus tes di terminalnya: launch aider dari menu CLI Tools, pastiin sesi aider
+  jawab + request-log/UsageRecord aigate nunjukin routing ke provider terpilih.
+- Catatan restart: pola `setsid nohup ... &` di shell tool sering bikin perintah
+  nge-hang (tool timeout) tapi server tetep nyala; start di perintah TERPISAH (tanpa
+  kill-loop digabung) balik cepat.
+
 ## Combobox model searchable 2026-09-03 — SELESAI
 - User: model combo udah muncul tapi GAK BISA SEARCH (select gak bisa diketik); + "iya"
   fix Providers juga (datalist mati di mobile).
