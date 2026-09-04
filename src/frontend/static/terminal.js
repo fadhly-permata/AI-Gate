@@ -143,6 +143,8 @@
   var tabs = new Map();      // id -> { id, term, fit, ws, container, button, tuiMode }
   var activeId = null;
   var tabBarEl, containersEl, stageEl, bodyEl, newTabBtn;
+  var stageResizeObs = null; // BUG2: ResizeObserver on the shared .term-stage
+  var debouncedRefit = null;  // BUG2: debounced refitActive() for resize storms
 
   function activeTab() { return activeId ? tabs.get(activeId) : null; }
 
@@ -418,6 +420,7 @@
       if (tab.button) tab.button.classList.toggle("active", show);
     });
     refitActive();
+    observeActiveStage();
     var tab = tabs.get(id);
     if (tab) { try { tab.term.focus(); } catch (e) {} }
   }
@@ -430,6 +433,20 @@
       sendResize(tab);
       tab.term.focus();
     } catch (e) { /* xterm not laid out yet */ }
+  }
+
+  /* BUG2: re-target the single ResizeObserver at the ACTIVE tab's container so
+     FitAddon recomputes rows whenever THAT box actually changes size — covering
+     the mobile URL-bar collapse, orientation change, and fullscreen enter/exit
+     (none of which reliably fire a window resize). disconnect() first clears the
+     previous tab's target. No-op when ResizeObserver is unavailable (jsdom). */
+  function observeActiveStage() {
+    if (!stageResizeObs) return;
+    var tab = activeTab();
+    try { stageResizeObs.disconnect(); } catch (e) {}
+    if (tab && tab.container) {
+      try { stageResizeObs.observe(tab.container); } catch (e) {}
+    }
   }
 
   function closeTab(id) {
@@ -446,6 +463,12 @@
     } catch (e) {}
     try { tab.ws.close(); } catch (e) {}
     try { tab.term.dispose(); } catch (e) {}
+    // BUG2: stop observing the closed tab's stage box (the observer only ever
+    // watches the active container, so this is a targeted cleanup; reactivation
+    // below re-targets it at the surviving tab via observeActiveStage()).
+    if (stageResizeObs && tab.container) {
+      try { stageResizeObs.unobserve(tab.container); } catch (e) {}
+    }
     if (tab.button && tab.button.remove) tab.button.remove();
     if (tab.container && tab.container.remove) tab.container.remove();
     tabs.delete(id);
@@ -567,6 +590,18 @@
 
     setupSwipe();
     window.addEventListener("resize", debounce(refitActive, 120));
+
+    // BUG2: refit xterm whenever the ACTIVE stage box actually changes size —
+    // covers the mobile URL-bar collapse, orientation change, and fullscreen
+    // enter/exit, none of which reliably fire a window resize. Re-targeted at
+    // the active tab's container in observeActiveStage(); disconnected on close.
+    if (typeof ResizeObserver !== "undefined") {
+      debouncedRefit = debounce(refitActive, 100);
+      stageResizeObs = new ResizeObserver(function () {
+        if (debouncedRefit) debouncedRefit();
+      });
+      observeActiveStage();
+    }
 
     // Fast-path: when the page becomes visible again (e.g. restored from a
     // minimized tab), if the ACTIVE tab's socket is down, reconnect NOW instead

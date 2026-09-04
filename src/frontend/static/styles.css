@@ -722,9 +722,40 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
 }
 
 /* ===== Terminal view (B3.1) ===== */
-.terminal-card { padding: 0; overflow: hidden; }
 
-.terminal-pane { border-bottom: 1px solid var(--panel-border); }
+/* BUG1: the ACTIVE terminal view fills the workspace height so the xterm stage
+   (flex:1) actually grows instead of collapsing to a fixed min-height. Scoped
+   to the terminal view — every other view keeps normal block flow + scroll.
+   The whole chain (view -> card -> pane -> body -> stage) is a flex column with
+   min-height:0 so the definite height from .workspace propagates down. */
+.view[data-view="terminal"].is-active {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.terminal-card {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.terminal-pane {
+  border-bottom: 1px solid var(--panel-border);
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Collapsed: only the header shows — drop the vertical fill so the card shrinks
+   back to the header instead of leaving a tall empty panel. */
+.terminal-pane.terminal-collapsed { flex: 0 0 auto; }
+.terminal-card:has(.terminal-pane.terminal-collapsed) { flex: 0 0 auto; }
 
 .terminal-header {
   display: flex;
@@ -733,6 +764,7 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
   padding: 10px 14px;
   background: var(--sidebar-bg);
   color: var(--sidebar-fg-hover);
+  flex: 0 0 auto; /* natural height; the body takes the rest */
 }
 
 .terminal-title {
@@ -752,7 +784,11 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
 .terminal-body {
   padding: 0;
   background: #1e1e1e;
-  min-height: 160px;
+  /* BUG1: was a fixed min-height:160px that pinned the pane small. Now it is a
+     flex child that grows to fill the card; keep only a small floor so it never
+     fully collapses on a very short viewport. */
+  flex: 1 1 auto;
+  min-height: 120px;
   display: flex;
   flex-direction: column;
 }
@@ -768,6 +804,7 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
   padding: 6px 8px;
   background: #2a2d32;
   border-bottom: 1px solid #111;
+  flex: 0 0 auto; /* natural height; the stage below grows to fill */
 }
 
 .term-tabs {
@@ -823,7 +860,10 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
   position: relative;
   flex: 1 1 auto;
   background: #1e1e1e;
-  min-height: 320px;
+  /* BUG1: was min-height:320px which, with no definite-height ancestor, pinned
+     the stage to ~half the screen. Now the chain above gives it real space to
+     grow into; keep only a small floor as a safety net. */
+  min-height: 120px;
   touch-action: none; /* we own swipe gestures; mouse wheel still scrolls xterm */
 }
 
@@ -863,17 +903,32 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
   color: var(--accent-contrast);
 }
 
-/* Fullscreen toggle: expand the whole terminal body over the viewport. */
+/* Fullscreen toggle: expand the whole terminal body over the viewport.
+   BUG2: was `height: calc(100vh - 43px)` on the stage — 100vh is TALLER than
+   the visible viewport on Android/mobile (URL/keyboard bars), so the last rows
+   were clipped, and the hardcoded 43px toolbar height was fragile. Now the body
+   is a fixed flex column sized to the DYNAMIC viewport (100dvh, with a 100vh
+   fallback for engines that lack it); the toolbar keeps its natural height and
+   the stage flex-fills exactly whatever space is visible. */
 .terminal-fullscreen {
   position: fixed;
   inset: 0;
   z-index: 200;
   padding: 0 !important;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;   /* fallback */
+  height: 100dvh;  /* dynamic viewport — excludes mobile URL/keyboard bars */
 }
+.terminal-fullscreen .term-toolbar { flex: 0 0 auto; }
 .terminal-fullscreen .term-stage {
-  min-height: calc(100vh - 43px);
-  height: calc(100vh - 43px);
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
 }
+/* Keep the floating controls (fullscreen/paste/TUI) above the stage in
+   fullscreen so they stay tappable. */
+.terminal-fullscreen .term-floating { z-index: 210; }
 
 /* ===== Log Window (B3.1) — GLOBAL, fixed bottom-docked, collapsible ===== */
 .logwindow {

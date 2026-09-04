@@ -5,8 +5,15 @@
     "aigate": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "aigate",
-      "options": { "baseURL": "http://localhost:8080/v1", "apiKey": "aigate-local" },
-      "models": { "combo:Test": { "name": "combo:Test" } }
+      "options": {
+        "baseURL": "http://localhost:8080/v1",
+        "apiKey": "aigate-local"
+      },
+      "models": {
+        "combo:Test": {
+          "name": "combo:Test"
+        }
+      }
     }
   }
 }
