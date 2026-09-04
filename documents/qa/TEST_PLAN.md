@@ -38,6 +38,10 @@ Peta acceptance criteria dari BRD ke test case. Merujuk BRD
 | US-2.4.6 | Kuota tracking | dashboard kuota & reset countdown tepat | integration | green |
 | US-2.4.7 | Log + Analytics | debug log & laporan pemakaian tersedia | integration | green |
 | US-2.4.8 | Export/Import | export → import pulih setting | e2e | green |
+| US-2.9.1 | Chat streaming | kirim pesan → jawaban SSE bertahap via gateway | integration | todo |
+| US-2.9.2 | Multi-sesi + riwayat | sesi tersimpan; reload → riwayat utuh; buat/hapus sesi | integration | todo |
+| US-2.9.3 | Pilih tujuan | provider+model ATAU combo; combobox auto-fetch/search | e2e | todo |
+| US-2.9.4 | System prompt & parameter | system prompt + temperature diterapkan ke request | integration | todo |
 
 ## Quality gate (CI)
 - Semua unit test hijau.

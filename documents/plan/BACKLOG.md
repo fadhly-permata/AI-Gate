@@ -84,6 +84,18 @@ ini untuk delegasikan ke sub-agent (be-dev / fe-dev / qa) secara rapi.
 - [x] **B5.7** Export/Import Setting lokal (file JSON) — pengganti cloud sync
        (PRD §2.4.4, request user) — `be-dev` + `fe-dev` — Dep: B1.1
 
+## Fase 6 — Chat Playground (fitur baru PRD §2.9)
+- [ ] **B6.1** Chat backend: entity `ChatSession` + `ChatMessage` (ERD) + CRUD
+       `/api/chat/sessions` (+ messages) + endpoint `POST /api/chat/sessions/{id}/complete`
+       yang merakit riwayat → panggil gateway (streaming SSE) → simpan pesan
+       user & assistant. (PRD §2.9) — `be-dev` — Dep: B2.1, B2.4
+- [ ] **B6.2** Chat UI: halaman "Chat" (sidebar sesi, thread pesan, picker
+       provider/model/combo, render streaming, kirim/hapus) — vanilla JS (R13).
+       (PRD §2.9) — `fe-dev` — Dep: B6.1
+- [ ] **B6.3** Chat polish: system prompt + temperature per sesi, rename/hapus
+       sesi, i18n EN/ID, responsif/mobile, stop-generation. (PRD §2.9) —
+       `fe-dev` — Dep: B6.2
+
 ## Catatan
 - Urutan mempertimbangkan dependensi; jangan mulai Fase 2 sebelum B0.2 siap.
 - Tiap task selesai: update status di file ini + log ke `pm/status.md`.

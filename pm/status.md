@@ -474,6 +474,24 @@
 - BACKLOG B5.6 `[x]`. **B5.7 aktif** (be-dev+fe-dev, sekuensial): Export/Import
   Setting lokal (JSON) — pengganti cloud sync (PRD §2.4.4). be-dev dulu.
 
+## revise-docs 2026-09-03 — fitur Chat Playground (PRD §2.9) — DOKUMEN SELESAI
+- Request user: "/revise-docs gua pengen ada halaman chat kayak gemini/chatgpt".
+- Fitur baru: **Chat Playground** — UI percakapan ala Gemini/ChatGPT yang REUSE
+  gateway aigate (provider/combo terpilih), streaming SSE, riwayat multi-sesi di DB.
+- UPDATE (8 dokumen, semua di `documents/`):
+  - PRD §2.9 (definisi fitur).
+  - ERD: entitas `ChatSession` + `ChatMessage` + relasi + catatan konsistensi.
+  - FSD §2.9 (flow + IO + traceability US-2.9.x).
+  - TSD: ADR-014 (row) + §4.7 Chat (reuse gateway, SSE, history DB).
+  - BRD §5.9 (US-2.9.1..4) + baris matrix.
+  - API contract: `/api/chat/sessions` CRUD + `/complete` (SSE).
+  - TEST_PLAN: baris US-2.9.1..4 (status todo).
+  - BACKLOG: **Fase 6** B6.1 (chat backend) / B6.2 (chat UI) / B6.3 (polish).
+- SKIP: CLI_CONFIG_SCHEMA, SETUP, TERMINAL_UX (tak terkait chat).
+- Traceability PRD§2.9 -> BRD US-2.9 -> FSD §2.9 -> ERD/TSD dijaga.
+- BELUM implementasi. Lanjut: `/run-impl continue` -> B6.1 (be-dev) lalu B6.2/B6.3 (fe-dev).
+- Laporan: `.opencode/reports/20260904/revise/` (lihat file).
+
 ## Fix BAHAYA terminal: PTY mati pas tab di-minimize — 2026-09-03 SELESAI
 - User: minimize Chrome / pindah tab -> terminal sering disconnected; BAHAYA kalau
   lagi jalanin agentic (aider) bisa rusak kerjaan.

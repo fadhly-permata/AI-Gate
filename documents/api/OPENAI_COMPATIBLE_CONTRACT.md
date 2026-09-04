@@ -106,3 +106,14 @@ Mengambil log operasional dari tabel `LogEntry` (mode developer / observabilitas
 ### Token Saver toggle (PRD §2.4.1)
 - Field `token_saver` (enum: `off | rtk | caveman | ponytail`) di config
   Endpoint — diterapkan sebagai pre-translate hook (lihat TSD ADR-013).
+
+### Chat Playground (PRD §2.9 — reuse gateway, ADR-014)
+- `GET /api/chat/sessions` — daftar sesi. `POST /api/chat/sessions`
+  body `{title?, provider_id?, combo_id?, model, system_prompt?, temperature?}` → sesi.
+- `GET /api/chat/sessions/{id}` · `PUT /api/chat/sessions/{id}` (title/system_prompt/
+  temperature/model) · `DELETE /api/chat/sessions/{id}`.
+- `GET /api/chat/sessions/{id}/messages` — riwayat pesan (`{role, content, created_at}`).
+- `POST /api/chat/sessions/{id}/complete` — body `{content}` (pesan user baru).
+  Server simpan pesan user, rakit `messages` (system + riwayat + baru), teruskan ke
+  gateway `/v1/chat/completions` ke provider/combo sesi, **stream balik SSE**; saat
+  selesai simpan `ChatMessage(role=assistant)`. Client tetap format OpenAI.

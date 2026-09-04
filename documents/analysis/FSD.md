@@ -376,6 +376,36 @@ Secret tetap plaintext di DB (ADR-007).
 
 ---
 
+### 2.9 Chat Playground *(fitur tambahan aigate — PRD §2.9)*
+
+**Deskripsi fungsional**
+Halaman percakapan AI di web console ala Gemini/ChatGPT, memakai provider/combo
+yang sudah dikonfigurasi aigate. User memilih tujuan (Provider+Model atau Combo),
+mengirim pesan, dan menerima jawaban **streaming**. Riwayat tersimpan di DB
+(`ChatSession`, `ChatMessage`) sehingga multi-sesi + bertahan reload.
+
+**Input**
+- `ChatSession`: `title`, `provider_id?`/`combo_id?`, `model`, `system_prompt?`, `temperature?`.
+- Pesan user (string) + riwayat sesi.
+
+**Output**
+- Daftar sesi; thread pesan (role user/assistant/system); jawaban model (streaming SSE).
+
+**Process flow**
+1. User buka Chat → buat/pilih sesi → pilih provider+model atau combo (combobox auto-fetch/search).
+2. User kirim pesan → server simpan `ChatMessage(role=user)` → rakit `messages` (system + riwayat + pesan baru).
+3. Server teruskan ke gateway `/v1/chat/completions` (stream) ke provider/combo terpilih (format translator + token saver + kuota tetap berlaku).
+4. Delta streaming dikirim ke UI (SSE) dan dirender bertahap; saat selesai, `ChatMessage(role=assistant)` disimpan (+ tokens).
+5. User bisa ganti judul / hapus sesi / mulai sesi baru; semua tersimpan di DB.
+
+**Traceability**
+- US-2.9.1 (Percakapan streaming) — M
+- US-2.9.2 (Multi-sesi + riwayat di DB) — M
+- US-2.9.3 (Pilih provider/model/combo) — M
+- US-2.9.4 (System prompt & parameter) — S
+
+---
+
 ## 3. Cross-Feature Data Flows
 
 ```

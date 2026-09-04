@@ -131,6 +131,25 @@ aigate memiliki mode operasional ekstra (diaktifkan via flag run / env `AIGATE_D
   toggle fitur, preset CLI, dst.) disimpan di **SQLite (DB)**, bukan file
   terpisah. (Secret tetap plaintext di DB sesuai ADR-007 — tanpa enkripsi.)
 
+### 2.9 Chat Playground *(fitur tambahan aigate — UI percakapan ala Gemini/ChatGPT)*
+aigate menyediakan halaman **chat** di web console untuk mengobrol langsung dengan
+model AI lewat gateway — mirip Gemini/ChatGPT, tapi memakai provider/combo yang
+sudah dikonfigurasi di aigate (bukan layanan pihak ketiga).
+- **Pilih tujuan:** tiap sesi chat memakai satu **Provider+Model** atau satu
+  **Combo** (routing) yang sudah ada; picker model memakai combobox auto-fetch +
+  search (lihat §2.3/§2.7).
+- **Percakapan streaming:** user kirim pesan → respons model dialirkan **streaming**
+  (SSE) dan dirender bertahap. Payload dibangun dari riwayat sesi, diteruskan ke
+  gateway `/v1/chat/completions` (penerjemah format + token saver + kuota tetap
+  berlaku, transparan).
+- **Multi-sesi + riwayat:** daftar sesi di sidebar (buat/ganti nama/hapus). Riwayat
+  pesan **disimpan di DB** (`ChatSession`, `ChatMessage`) sehingga bertahan setelah
+  reload dan bisa dilanjutkan.
+- **Parameter:** system prompt per sesi, temperature, dll.
+- **Tetap lokal:** tidak ada pengiriman ke layanan chat pihak ketiga; hanya ke
+  provider yang user konfigurasi. Memakai fitur yang sudah ada (providers, combos,
+  format translator, token saver, usage tracking) — bukan mesin LLM baru.
+
 ---
 
 ## 3. Technology Stack Recommendations

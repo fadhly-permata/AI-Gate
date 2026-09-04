@@ -315,6 +315,17 @@ Terjemahan tidak merusak streaming (diterapkan per-chunk).
   otomatis bila hampir kedaluwarsa (tanpa login ulang). Flow OAuth via
   `/api/oauth/<provider>/start` + `/callback` (lihat API contract).
 
+### 4.7 Chat Playground (ADR-014)
+Modul **Chat** memberi UI percakapan ala Gemini/ChatGPT tanpa mesin LLM baru:
+- `POST /api/chat/sessions/{id}/complete` merakit `messages` dari `ChatMessage`
+  (system + riwayat) + pesan user baru, meneruskannya ke **gateway** internal
+  (`/v1/chat/completions`) ke Provider/Combo terpilih — sehingga penerjemah format
+  (ADR-012), token saver (ADR-013), kuota & usage tracking (B5.5) tetap berlaku.
+- Respons dialirkan ke UI sebagai **SSE streaming**; delta dirender bertahap; saat
+  selesai, `ChatMessage(role=assistant)` + token disimpan.
+- `ChatSession`/`ChatMessage` (ERD) menyimpan riwayat → multi-sesi, tahan reload.
+- Reuse penuh: tidak ada jalur LLM kedua; chat hanyalah klien dari gateway.
+
 ---
 
 ## 5. Security
@@ -378,6 +389,7 @@ Desain dibuat *contract-first* agar item roadmap (PRD §6) menempel tanpa refact
 | ADR-011 | Mandatory logging ke DB (severity + stacktrace pd warn/err), no empty catch | Accepted (2026-09-03) |
 | ADR-012 | Format Translation Engine (OpenAI↔Claude↔Gemini↔…, transparan) | Accepted (2026-09-03, adopsi 9router) |
 | ADR-013 | Token Saver hooks (RTK/Caveman/Ponytail, fail-open) + OAuth auto-refresh | Accepted (2026-09-03, adopsi 9router) |
+| ADR-014 | Chat Playground: reuse gateway `/v1/chat/completions` (SSE streaming) + riwayat `ChatSession`/`ChatMessage` di DB; tanpa mesin LLM baru | Accepted (2026-09-03, fitur baru PRD §2.9) |
 
 ---
 

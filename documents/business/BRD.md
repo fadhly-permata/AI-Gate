@@ -223,6 +223,24 @@ Sebagai Developer, saya ingin fitur Self-Heal di menu CLI-Tool yang membuat bran
 Sebagai Developer, saya ingin seluruh konfigurasi aplikasi tersimpan di SQLite, bukan file terpisah.
 - *Acceptance:* (1) Setting (port, mode, toggle, preset CLI) dibaca/ditulis via DB. (2) Tidak ada file config terpisah yang jadi sumber kebenaran.
 
+### 5.9 Chat Playground (rujukan PRD §2.9)
+
+**US-2.9.1 — Percakapan streaming** *(Must-have)*
+Sebagai User, saya ingin mengobrol dengan model AI lewat aigate dan melihat jawaban muncul bertahap (streaming), seperti ChatGPT/Gemini.
+- *Acceptance:* (1) Kirim pesan → jawaban di-stream (SSE) & dirender bertahap. (2) Jawaban memakai provider/combo terpilih via gateway (format translator + token saver berlaku). (3) Bisa stop generation.
+
+**US-2.9.2 — Multi-sesi + riwayat di DB** *(Must-have)*
+Sebagai User, saya ingin banyak sesi chat yang tersimpan & bisa dilanjutkan setelah reload.
+- *Acceptance:* (1) Sidebar daftar sesi (buat/ganti nama/hapus). (2) Riwayat pesan disimpan di DB (`ChatSession`/`ChatMessage`). (3) Buka sesi → pesan lama muncul.
+
+**US-2.9.3 — Pilih provider/model/combo** *(Must-have)*
+Sebagai User, saya ingin memilih tujuan chat: satu provider+model atau satu combo.
+- *Acceptance:* (1) Picker model auto-fetch + search (combobox). (2) Bisa pilih combo untuk routing. (3) Pilihan tersimpan per sesi.
+
+**US-2.9.4 — System prompt & parameter** *(Should-have)*
+Sebagai User, saya ingin mengatur system prompt & temperature per sesi.
+- *Acceptance:* (1) System prompt diterapkan ke request. (2) Temperature bisa diset.
+
 ## 6. Prioritas & Matrix Dampak
 
 | Fitur | Prioritas | Dampak bisnis | Alasan |
@@ -239,6 +257,7 @@ Sebagai Developer, saya ingin seluruh konfigurasi aplikasi tersimpan di SQLite, 
 | 2.3.4 / 2.3.5 3-tier + akun + kuota | Must | Tinggi | Zero-downtime coding |
 | 2.4.4 Format translation | Must | Tinggi | Kompatibilitas alat beragam |
 | 2.4.5/2.4.6/2.4.7/2.4.8 token saver, kuota, analitik, export | Should | Sedang | Efisiensi & portabilitas |
+| 2.9 Chat Playground | Should | Sedang-Tinggi | Uji provider/combo interaktif ala Gemini/ChatGPT |
 | Cost limits/telemetry (Roadmap §6) | Nice | Akan datang | Belum di-scope MVP |
 
 ## 7. Asumsi & Ketergantungan

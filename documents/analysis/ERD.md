@@ -361,6 +361,28 @@ Log permintaan (debug) level request/response.
 - `request` (text): header/isi (opsional, mode debug).
 - `response` (text): ringkasan jawaban.
 
+### ChatSession
+Sesi percakapan di Chat Playground (PRD §2.9). Satu sesi = satu percakapan dengan satu tujuan (provider+model ATAU combo).
+- `id` (int, PK)
+- `title` (string): judul sesi (auto dari pesan pertama / bisa diganti).
+- `provider_id` (int, FK → Provider, opsional): bila sesi terikat ke satu provider.
+- `combo_id` (int, FK → Combo, opsional): bila sesi memakai routing combo.
+- `model` (string): model/ref yang dipakai (mis. `provider:B.AI:gpt-5.5` atau `combo:fast`).
+- `system_prompt` (text, opsional): instruksi sistem sesi.
+- `temperature` (float, opsional): sampling temperature.
+- `created_at`, `updated_at` (datetime).
+
+### ChatMessage
+Satu pesan dalam sesi chat.
+- `id` (int, PK)
+- `session_id` (int, FK → ChatSession)
+- `role` (string): `system` | `user` | `assistant`.
+- `content` (text): isi pesan.
+- `tokens_in`, `tokens_out` (int, opsional): untuk telemetri.
+- `created_at` (datetime).
+
+Relasi: `ChatSession ||--o{ ChatMessage : "has"`; `ChatSession }o--o| Provider : "targets"`; `ChatSession }o--o| Combo : "routes via"`.
+
 ---
 
 ## 4. Catatan Konsistensi dengan PRD/BRD
@@ -375,6 +397,7 @@ Log permintaan (debug) level request/response.
 - `ProviderAccount` merefleksikan multi-akun + OAuth (PRD §2.1 / adopsi 9router): satu provider → banyak akun; token OAuth diperbarui otomatis.
 - `UsageRecord` merefleksikan Pelacak Kuota & Pemakaian (PRD §2.4.2) + Usage Analytics (PRD §2.4.3).
 - `RequestLog` merefleksikan Log Permintaan debug (PRD §2.4.3).
+- `ChatSession`/`ChatMessage` merefleksikan Chat Playground (PRD §2.9): riwayat percakapan disimpan di DB, terikat ke Provider/Combo + model.
 - Export/Import Setting (PRD §2.4.4) adalah serialisasi seluruh `Setting` + entitas di atas ke JSON (tanpa entitas baru).
 
 ---
