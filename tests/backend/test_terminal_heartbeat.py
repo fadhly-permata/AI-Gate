@@ -36,6 +36,7 @@ from backend.terminal.router import (
     INBOUND_KEYSTROKE,
     _classify_inbound,
     _heartbeat_loop,
+    _is_disconnect_error,
 )
 from backend.terminal.session import PtySession, snapshot_sessions
 
@@ -383,3 +384,52 @@ def test_attach_resets_last_pong_ts():
     # A reattach (new view) must clear the previous connection's pong state.
     sess.attach(_CaptureWS(), None)  # type: ignore[arg-type]
     assert sess.last_pong_ts is None
+
+
+# --------------------------------------------------------------------------- #
+# 5) Disconnect classification: transport teardown must NOT log as ERROR
+# --------------------------------------------------------------------------- #
+def test_is_disconnect_error_generic_valueerror_is_not_disconnect():
+    """A real bug (ValueError) on a CONNECTED socket is NOT a disconnect."""
+    ws = _CaptureWS()  # client_state == CONNECTED → not the state-based path
+    assert _is_disconnect_error(ValueError("boom"), ws) is False
+
+
+def test_is_disconnect_error_starlette_and_send_runtimeerror():
+    """WebSocketDisconnect + starlette's send-after-close RuntimeError count."""
+    from fastapi import WebSocketDisconnect
+
+    ws = _CaptureWS()
+    assert _is_disconnect_error(WebSocketDisconnect(), ws) is True
+    assert (
+        _is_disconnect_error(
+            RuntimeError('Cannot call "send" once a close message has been sent.'),
+            ws,
+        )
+        is True
+    )
+    # A DISCONNECTED client_state alone also means "client gone".
+    gone = _CaptureWS()
+    gone.client_state = WebSocketState.DISCONNECTED
+    assert _is_disconnect_error(ValueError("whatever"), gone) is True
+
+
+def test_is_disconnect_error_websockets_invalidstate_is_disconnect():
+    """Regression: uvicorn's sansio impl raises ``InvalidState`` (NOT a
+    ``ConnectionClosed`` subclass) when sending on a CONNECTING/CLOSING/CLOSED
+    connection during normal teardown. It must classify as a disconnect (INFO,
+    "client gone"), not an ERROR. Skips gracefully if websockets is absent."""
+    websockets_exceptions = pytest.importorskip("websockets.exceptions")
+    ws = _CaptureWS()  # CONNECTED → the True must come from the exception type
+    exc = websockets_exceptions.InvalidState(
+        "cannot send TEXT frame when connection state is CLOSING"
+    )
+    assert _is_disconnect_error(exc, ws) is True
+    # Defensive: the base + concrete ConnectionClosed* also classify.
+    assert _is_disconnect_error(websockets_exceptions.WebSocketException("x"), ws)
+    assert _is_disconnect_error(websockets_exceptions.ConnectionClosedOK(None, None), ws)
+    assert _is_disconnect_error(
+        websockets_exceptions.ConnectionClosedError(None, None), ws
+    )
+    # A generic ValueError is STILL not a disconnect.
+    assert _is_disconnect_error(ValueError("boom"), ws) is False

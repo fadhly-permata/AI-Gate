@@ -102,16 +102,39 @@ INBOUND_CONTROL = "control"  # handled/ignored control frame → NOT a keystroke
 INBOUND_CLOSE = "close"  # deliberate user close → terminate + break
 
 # ``websockets`` is an optional runtime dep (uvicorn's default WS impl). When
-# absent (e.g. wsproto) the disconnect-type tuple simply omits its exception.
+# absent (e.g. wsproto) the disconnect-type tuple simply omits its exceptions.
+# The sansio impl (uvicorn >=0.30) raises ``InvalidState`` — NOT a
+# ``ConnectionClosed`` subclass — when the app sends on a connection already in
+# CONNECTING/CLOSING/CLOSED, so a normal teardown send failure would otherwise
+# be mis-logged as ERROR. ``WebSocketException`` is the common base of every
+# websockets transport error; the concrete ``ConnectionClosed*``/``InvalidState``
+# names are listed too for clarity and to stay correct if the hierarchy shifts.
 try:
-    from websockets.exceptions import ConnectionClosed as _WsConnectionClosed
+    from websockets.exceptions import (
+        ConnectionClosed as _WsConnectionClosed,
+        ConnectionClosedError as _WsConnectionClosedError,
+        ConnectionClosedOK as _WsConnectionClosedOK,
+        InvalidState as _WsInvalidState,
+        WebSocketException as _WsWebSocketException,
+    )
 except ImportError:  # pragma: no cover - env without the websockets library
     _WsConnectionClosed = None
+    _WsConnectionClosedError = None
+    _WsConnectionClosedOK = None
+    _WsInvalidState = None
+    _WsWebSocketException = None
 
 # Exception types that mean "the client/transport went away", not a real bug.
 _DISCONNECT_EXC_TYPES: "tuple[type[BaseException], ...]" = (WebSocketDisconnect,)
-if _WsConnectionClosed is not None:  # pragma: no cover - depends on env
-    _DISCONNECT_EXC_TYPES += (_WsConnectionClosed,)
+for _ws_exc in (
+    _WsConnectionClosed,
+    _WsConnectionClosedError,
+    _WsConnectionClosedOK,
+    _WsInvalidState,
+    _WsWebSocketException,
+):
+    if _ws_exc is not None:  # pragma: no cover - depends on env
+        _DISCONNECT_EXC_TYPES += (_ws_exc,)
 
 
 def _is_disconnect_error(exc: BaseException, websocket: Optional[WebSocket]) -> bool:
@@ -123,6 +146,9 @@ def _is_disconnect_error(exc: BaseException, websocket: Optional[WebSocket]) -> 
     * :class:`WebSocketDisconnect` — starlette/fastapi saw the disconnect.
     * ``websockets.exceptions.ConnectionClosed*`` — raised by uvicorn's
       websockets implementation at the transport layer.
+    * ``websockets.exceptions.InvalidState`` (and, defensively, its base
+      ``WebSocketException``) — raised by the sansio impl when the app sends on
+      a connection already in CONNECTING/CLOSING/CLOSED (normal teardown).
     * starlette's ``RuntimeError('Cannot call "send" once a close message
       has been sent.')`` — raised when the app tries to send after the
       connection state already moved past CONNECTED.
