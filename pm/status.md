@@ -474,6 +474,25 @@
 - BACKLOG B5.6 `[x]`. **B5.7 aktif** (be-dev+fe-dev, sekuensial): Export/Import
   Setting lokal (JSON) — pengganti cloud sync (PRD §2.4.4). be-dev dulu.
 
+## Cek log error + cleanup 2026-09-03 — SELESAI
+- User: "cek log error". Hasil /api/logs severity=error: 41 baris.
+  - 39x `settings.get('port')` = HISTORIS (terakhir 20:47, sebelum restart; 0 setelah)
+    -> bukan bug aktif.
+  - 1x `terminal send error` (21:05) = BUG: disconnect klien dicatat ERROR
+    (pump() cuma nangkep WebSocketDisconnect, send_text pas klien cabut lempar
+    exception jenis lain). -> **be-dev fix** (`_is_disconnect_error`, turunkan ke
+    INFO utk disconnect/EOF normal). Commit `95c979e`. pytest **277 passed, 1 skipped**.
+  - 1x `providers.router test transport error` = benign (test koneksi URL salah).
+- **Auto-clear resolved** (sesuai instruksi user "kalo bukan bug aktif auto clear"):
+  hapus 40 baris error resolved (39 settings + 1 terminal) dari DB asli -> error
+  tinggal 1 (yang valid). 41 -> 1.
+- Restart server (PID 18812) biar fix terminal + websockets kebawa; WS handshake 101.
+- VERIFIKASI LIVE (R20): connect+disconnect terminal mendadak -> jumlah error TETAP 1
+  (gak nambah "terminal send error"); siklus terminal kecatat di INFO. Fix terbukti.
+- Catatan fe-dev (follow-up, belum dikerjain): bug `<datalist>` SAMA masih ada di
+  view Providers (`#provModelList` / providers.js populateModelDatalist) -> dropdown
+  default-model provider gak jalan di mobile juga. Perlu dikonversi ke <select> juga.
+
 ## Combo model auto-fetch 2026-09-03 — SELESAI
 - User: model di combo harus auto-fetch tiap ganti provider + sort by name + loading.
 - fe-dev: `fetchModelsForProvider` -> `POST /api/providers/{id}/discover`, loading state
