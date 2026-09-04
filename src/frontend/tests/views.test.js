@@ -74,19 +74,36 @@ describe("index.html structure — missing views + global Log Window", () => {
   });
 });
 
-describe("terminal expand/collapse feature removed (regression guard)", () => {
-  it("#termCollapseBtn is gone from the terminal header", () => {
+describe("terminal container chrome removed — flattened view (regression guard)", () => {
+  it("#termCollapseBtn is gone (collapse feature removed)", () => {
     expect(doc.getElementById("termCollapseBtn")).toBeNull();
     // No element anywhere carries the removed i18n binding.
     expect(doc.querySelector('[data-i18n-aria="term.collapse"]')).toBeNull();
     expect(doc.querySelector('[data-i18n-aria="term.expand"]')).toBeNull();
   });
 
-  it("terminal header title bar is KEPT (header + title still present)", () => {
-    const header = doc.querySelector(".terminal-header");
-    expect(header).not.toBeNull();
-    expect(header.querySelector(".terminal-title")).not.toBeNull();
-    expect(header.querySelector('[data-i18n="nav.terminal"]')).not.toBeNull();
+  it("terminal view is FLATTENED: no card / pane / header wrappers", () => {
+    const term = doc.querySelector('.view[data-view="terminal"]');
+    expect(term).not.toBeNull();
+    expect(term.classList.contains("terminal-view")).toBe(true);
+    expect(term.querySelector(".terminal-card")).toBeNull();
+    expect(term.querySelector(".terminal-pane")).toBeNull();
+    expect(term.querySelector(".terminal-header")).toBeNull();
+    expect(doc.getElementById("terminalPane")).toBeNull();
+    expect(doc.getElementById("terminalHeader")).toBeNull();
+    // #terminalBody is a DIRECT child of the view — just toolbar + stage.
+    const body = doc.getElementById("terminalBody");
+    expect(body).not.toBeNull();
+    expect(body.parentElement).toBe(term);
+    expect(body.querySelector(".term-toolbar")).not.toBeNull();
+    expect(body.querySelector(".term-stage")).not.toBeNull();
+  });
+
+  it("JS-referenced terminal IDs survive the flattening", () => {
+    ["terminalBody", "termStage", "termContainers", "termTabBar", "termNewTab",
+     "termFloating", "termFullscreen", "termPaste", "termTui"].forEach(function (id) {
+      expect(doc.getElementById(id), "#" + id + " present").not.toBeNull();
+    });
   });
 
   it("term.collapse / term.expand i18n keys removed from BOTH locales (parity)", () => {

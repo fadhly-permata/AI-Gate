@@ -727,63 +727,29 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
   font-size: 20px;
 }
 
-/* ===== Terminal view (B3.1) ===== */
-
-/* BUG1: the ACTIVE terminal view fills the workspace height so the xterm stage
-   (flex:1) actually grows instead of collapsing to a fixed min-height. Scoped
-   to the terminal view — every other view keeps normal block flow + scroll.
-   The whole chain (view -> card -> pane -> body -> stage) is a flex column with
-   min-height:0 so the definite height from .workspace propagates down. */
-.view[data-view="terminal"].is-active {
+/* ===== Terminal view (B3.1) — FLATTENED =====
+   No card / pane / header chrome: the view is just toolbar + stage. The ACTIVE
+   terminal view is an exact-fit flex column filling the workspace content box
+   (height:100% + overflow:hidden), so the stage takes EXACTLY the leftover
+   height — no min-height floor, no page scroll. When the Log Window is visible
+   its --log-h padding shrinks the workspace content box and the flex chain
+   re-fills the smaller box automatically. */
+.view[data-view="terminal"].is-active,
+.terminal-view.is-active {
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
-}
-
-.terminal-card {
-  padding: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 0;
-}
-
-.terminal-pane {
-  border-bottom: 1px solid var(--panel-border);
-  display: flex;
-  flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 0;
-}
-
-.terminal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  background: var(--sidebar-bg);
-  color: var(--sidebar-fg-hover);
-  flex: 0 0 auto; /* natural height; the body takes the rest */
-}
-
-.terminal-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
+  overflow: hidden; /* exact fit: scrollHeight == clientHeight, never scrolls */
 }
 
 .terminal-body {
   padding: 0;
   background: #1e1e1e;
-  /* BUG1: was a fixed min-height:160px that pinned the pane small. Now it is a
-     flex child that grows to fill the card; the floor is viewport-relative
-     (28vh) so it scales across devices and never fully collapses on a short
-     screen — no absolute px anywhere in the terminal size chain. */
+  /* Exact-fit flex child: grows to fill the view, floor is 0 (NOT a vh/px
+     minimum — a floor taller than the leftover space was the scroll bug). */
   flex: 1 1 auto;
-  min-height: 28vh;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -852,11 +818,11 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
   position: relative;
   flex: 1 1 auto;
   background: #1e1e1e;
-  /* BUG1: was min-height:320px which, with no definite-height ancestor, pinned
-     the stage to ~half the screen. Now the chain above gives it real space to
-     grow into; the safety-net floor is viewport-relative (28vh), not px, so it
-     scales with screen height across devices. */
-  min-height: 28vh;
+  /* Exact-fit: flex-fills whatever the toolbar leaves. NO min-height floor
+     (the old 28vh pinned the stage taller than the leftover space on short
+     viewports / when the Log Window reserved room -> page scroll). min-height:0
+     lets it shrink below content so the view never overflows the workspace. */
+  min-height: 0;
   touch-action: none; /* we own swipe gestures; mouse wheel still scrolls xterm */
 }
 

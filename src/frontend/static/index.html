@@ -600,52 +600,42 @@
         </div>
       </section>
 
-      <!-- Terminal view (B3.1): terminal pane + Log Window -->
-      <section class="view" data-view="terminal">
-        <div class="card terminal-card">
-
-          <!-- Terminal pane (xterm wired in B3.3) -->
-          <div class="terminal-pane" id="terminalPane">
-            <div class="terminal-header" id="terminalHeader">
-              <span class="terminal-title">
-                <i class="fa fa-terminal"></i>
-                <span data-i18n="nav.terminal">Terminal</span>
-              </span>
-            </div>
-            <div class="terminal-body" id="terminalBody">
-              <!-- Multi-tab terminal (B3.3) -->
-              <div class="term-toolbar">
-                <div class="term-tabs" id="termTabBar" role="tablist">
-                  <button class="icon-btn term-newtab" id="termNewTab" type="button"
-                          data-i18n-aria="term.new_tab" title="New Tab">
-                    <i class="fa fa-plus"></i>
-                  </button>
-                </div>
-              </div>
-
-              <div class="term-stage" id="termStage">
-                <!-- One container per tab; xterm mounted here -->
-                <div class="term-containers" id="termContainers"></div>
-
-                <!-- Floating control overlay (FSD §2.5.0) -->
-                <div class="term-floating" id="termFloating">
-                  <button class="icon-btn term-ctl" id="termFullscreen" type="button"
-                          data-i18n-aria="term.fullscreen" title="Fullscreen">
-                    <i class="fa fa-expand"></i>
-                  </button>
-                  <button class="icon-btn term-ctl" id="termPaste" type="button"
-                          data-i18n-aria="term.paste" title="Paste">
-                    <i class="fa fa-paste"></i>
-                  </button>
-                  <button class="icon-btn term-ctl" id="termTui" type="button"
-                          data-i18n-aria="term.tui_mode" title="TUI Mode" aria-pressed="false">
-                    <i class="fa fa-hand-pointer"></i>
-                  </button>
-                </div>
-              </div>
+      <!-- Terminal view (B3.1): FLATTENED — toolbar + stage only. No card / pane /
+           header chrome (the sidebar nav already labels this view "Terminal"). The
+           view is an exact-fit flex column (see .terminal-view in styles.css) so the
+           stage fills the remaining workspace height with no page scroll. -->
+      <section class="view terminal-view" data-view="terminal">
+        <div class="terminal-body" id="terminalBody">
+          <!-- Multi-tab terminal (B3.3) -->
+          <div class="term-toolbar">
+            <div class="term-tabs" id="termTabBar" role="tablist">
+              <button class="icon-btn term-newtab" id="termNewTab" type="button"
+                      data-i18n-aria="term.new_tab" title="New Tab">
+                <i class="fa fa-plus"></i>
+              </button>
             </div>
           </div>
 
+          <div class="term-stage" id="termStage">
+            <!-- One container per tab; xterm mounted here -->
+            <div class="term-containers" id="termContainers"></div>
+
+            <!-- Floating control overlay (FSD §2.5.0) -->
+            <div class="term-floating" id="termFloating">
+              <button class="icon-btn term-ctl" id="termFullscreen" type="button"
+                      data-i18n-aria="term.fullscreen" title="Fullscreen">
+                <i class="fa fa-expand"></i>
+              </button>
+              <button class="icon-btn term-ctl" id="termPaste" type="button"
+                      data-i18n-aria="term.paste" title="Paste">
+                <i class="fa fa-paste"></i>
+              </button>
+              <button class="icon-btn term-ctl" id="termTui" type="button"
+                      data-i18n-aria="term.tui_mode" title="TUI Mode" aria-pressed="false">
+                <i class="fa fa-hand-pointer"></i>
+              </button>
+            </div>
+          </div>
         </div>
       </section>
 

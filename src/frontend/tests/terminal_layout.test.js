@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { JSDOM } from "jsdom";
 
 /* =====================================================================
  * Terminal layout regression tests — BUG1 (half-height stage) + BUG2
@@ -30,39 +31,80 @@ function ruleBlock(selectorRe) {
 }
 
 describe("BUG1 — terminal view height chain fills the workspace (CSS)", () => {
-  it("active terminal view is a flex column that fills its parent height", () => {
-    const block = ruleBlock(/\.view\[data-view="terminal"\]\.is-active\s*\{[^}]*\}/);
+  it("active terminal view is a flex column that fills + clips its parent", () => {
+    const block = ruleBlock(/\.view\[data-view="terminal"\]\.is-active[^{]*\{[^}]*\}/);
     expect(block, ".view[data-view=terminal].is-active rule present").toBeTruthy();
     expect(block).toMatch(/display:\s*flex/);
     expect(block).toMatch(/flex-direction:\s*column/);
     expect(block).toMatch(/height:\s*100%/);
     expect(block).toMatch(/min-height:\s*0/);
+    expect(block).toMatch(/overflow:\s*hidden/); // exact fit -> never scrolls
   });
 
-  it("card + pane are flex columns that grow (min-height:0)", () => {
-    const card = ruleBlock(/(^|\n)\.terminal-card\s*\{[^}]*\}/);
-    const pane = ruleBlock(/(^|\n)\.terminal-pane\s*\{[^}]*\}/);
-    expect(card).toMatch(/flex-direction:\s*column/);
-    expect(card).toMatch(/flex:\s*1/);
-    expect(card).toMatch(/min-height:\s*0/);
-    expect(pane).toMatch(/flex-direction:\s*column/);
-    expect(pane).toMatch(/flex:\s*1/);
-    expect(pane).toMatch(/min-height:\s*0/);
+  it("container chrome CSS is GONE (card / pane / header flattened away)", () => {
+    expect(ruleBlock(/(^|\n)\.terminal-card\s*\{[^}]*\}/)).toBeNull();
+    expect(ruleBlock(/(^|\n)\.terminal-pane\s*\{[^}]*\}/)).toBeNull();
+    expect(ruleBlock(/(^|\n)\.terminal-header\s*\{[^}]*\}/)).toBeNull();
+    expect(ruleBlock(/(^|\n)\.terminal-title\s*\{[^}]*\}/)).toBeNull();
   });
 
-  it(".terminal-body grows with a viewport-relative floor (no px pin)", () => {
+  it(".terminal-body flex-fills with NO floor (min-height:0, no vh/px pin)", () => {
     const body = ruleBlock(/(^|\n)\.terminal-body\s*\{[^}]*\}/);
     expect(body).toMatch(/flex:\s*1/);
-    expect(body).toMatch(/min-height:\s*28vh/);        // scales with screen height
-    expect(body).not.toMatch(/min-height:\s*\d+px/);   // no absolute px floor
+    expect(body).toMatch(/min-height:\s*0/);
+    expect(body).not.toMatch(/min-height:\s*\d+(vh|px)/); // the 28vh floor is gone
   });
 
-  it(".term-stage flex-fills with a viewport-relative floor (no px pin)", () => {
+  it(".term-stage flex-fills with NO floor (min-height:0, no vh/px pin)", () => {
     const stage = ruleBlock(/(^|\n)\.term-stage\s*\{[^}]*\}/);
     expect(stage, ".term-stage rule present").toBeTruthy();
     expect(stage).toMatch(/flex:\s*1/);
-    expect(stage).toMatch(/min-height:\s*28vh/);        // scales with screen height
-    expect(stage).not.toMatch(/min-height:\s*\d+px/);   // no absolute px floor
+    expect(stage).toMatch(/min-height:\s*0/);
+    expect(stage).not.toMatch(/min-height:\s*\d+(vh|px)/); // the 28vh floor is gone
+  });
+
+  it("no vh floor survives anywhere in the terminal size chain", () => {
+    expect(css).not.toMatch(/min-height:\s*28vh/);
+  });
+});
+
+/* =====================================================================
+ * NO-PAGE-SCROLL guard (light-touch, structural). The scroll bug was a
+ * min-height floor taller than the leftover space. Exact fit = the view
+ * clips (overflow:hidden) and every child flex-fills with min-height:0,
+ * so scrollHeight == clientHeight. We assert the STRUCTURE that guarantees
+ * it — not pixel values (jsdom has no layout engine).
+ * ===================================================================== */
+describe("terminal view cannot page-scroll (structural guard)", () => {
+  const html = readFileSync(join(__dirname, "..", "static", "index.html"), "utf8");
+  const doc = new JSDOM(html).window.document;
+
+  it("HTML: #terminalBody is a direct child of the terminal view (no wrappers)", () => {
+    const view = doc.querySelector('.view[data-view="terminal"]');
+    const body = doc.getElementById("terminalBody");
+    expect(view).not.toBeNull();
+    expect(body.parentElement).toBe(view);
+    expect(view.querySelector(".terminal-card")).toBeNull();
+    expect(view.querySelector(".terminal-pane")).toBeNull();
+    expect(view.querySelector(".terminal-header")).toBeNull();
+    // The stage is a direct child of the body (toolbar + stage only).
+    expect(doc.getElementById("termStage").parentElement).toBe(body);
+  });
+
+  it("CSS: view clips + body/stage flex-fill with min-height:0 (no floor)", () => {
+    const view = ruleBlock(/\.view\[data-view="terminal"\]\.is-active[^{]*\{[^}]*\}/);
+    const body = ruleBlock(/(^|\n)\.terminal-body\s*\{[^}]*\}/);
+    const stage = ruleBlock(/(^|\n)\.term-stage\s*\{[^}]*\}/);
+    const toolbar = ruleBlock(/(^|\n)\.term-toolbar\s*\{[^}]*\}/);
+    expect(view).toMatch(/overflow:\s*hidden/);
+    expect(view).toMatch(/height:\s*100%/);
+    expect(body).toMatch(/flex:\s*1 1 auto/);
+    expect(body).toMatch(/min-height:\s*0/);
+    expect(toolbar).toMatch(/flex:\s*0 0 auto/);
+    expect(stage).toMatch(/flex:\s*1 1 auto/);
+    expect(stage).toMatch(/min-height:\s*0/);
+    // No vh/px floor anywhere in the chain (the old 28vh caused the overflow).
+    [view, body, stage].forEach((b) => expect(b).not.toMatch(/min-height:\s*\d+(vh|px)/));
   });
 });
 
@@ -102,19 +144,14 @@ describe("terminal expand/collapse CSS removed (regression guard)", () => {
     expect(css).not.toMatch(/:has\(\.terminal-pane\.terminal-collapsed\)/);
   });
 
-  it("fill chain intact: pane + body still grow (collapse did not steal the flex)", () => {
-    const pane = ruleBlock(/(^|\n)\.terminal-pane\s*\{[^}]*\}/);
+  it("fill chain intact: body still grows with min-height:0 (no floor steals space)", () => {
     const body = ruleBlock(/(^|\n)\.terminal-body\s*\{[^}]*\}/);
-    expect(pane).toMatch(/flex:\s*1/);
-    expect(pane).toMatch(/min-height:\s*0/);
     expect(body).toMatch(/flex:\s*1/);
-    expect(body).toMatch(/min-height:\s*28vh/);
+    expect(body).toMatch(/min-height:\s*0/);
   });
 
-  it(".terminal-header title bar styling is KEPT", () => {
-    const header = ruleBlock(/(^|\n)\.terminal-header\s*\{[^}]*\}/);
-    expect(header, ".terminal-header rule present").toBeTruthy();
-    expect(header).toMatch(/display:\s*flex/);
+  it(".terminal-header title bar styling is GONE (chrome flattened away)", () => {
+    expect(ruleBlock(/(^|\n)\.terminal-header\s*\{[^}]*\}/)).toBeNull();
   });
 });
 
