@@ -22,7 +22,7 @@ from __future__ import annotations
 import os
 import shutil
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -31,8 +31,9 @@ from sqlalchemy.orm import Session
 
 from backend.config.db import SessionLocal
 from backend.config.settings import get as get_setting
-from backend.log import log_info, log_warning
+from backend.log import log_info
 from backend.models import CLITool, CLIToolGroup, Endpoint
+from backend.paths import extra_path_dirs as _extra_path_dirs_impl
 
 LOG_SOURCE = "backend.cli_tools.router"
 
@@ -118,43 +119,15 @@ class ResolveDTO(BaseModel):
 # the interactive PTY (which has the real login PATH). Searching these common
 # install dirs server-side makes the hint far more accurate. Still only a hint:
 # the frontend re-checks with ``command -v <binary_name>`` inside the PTY.
-_EXTRA_PATH_DIRS: Tuple[str, ...] = (
-    "~/.local/bin",  # pip --user / pipx
-    "~/.cargo/bin",  # rust/cargo installs
-    "~/bin",  # classic per-user bin
-    "$PREFIX/bin",  # Termux prefix bin (pkg installs)
-    "/data/data/com.termux/files/usr/bin",  # Termux absolute fallback
-    "~/.pyenv/shims",  # pyenv-managed python CLIs
-    "~/.npm-global/bin",  # npm global (custom prefix)
-    "~/.deno/bin",  # deno install
-    "~/go/bin",  # go install
-    "/usr/local/bin",  # system-wide local installs
-)
+#
+# SINGLE SOURCE OF TRUTH: the dir list + existence filtering live in
+# ``backend.paths`` so CLI detection and the PTY spawn env (terminal/pty.py)
+# always agree on which dirs count as "the user's install dirs".
 
 
 def _extra_search_paths() -> List[str]:
-    """Resolve ``_EXTRA_PATH_DIRS`` to the ones that actually exist right now.
-
-    ``~`` expands to ``$HOME`` and ``$PREFIX`` to the environment's Termux
-    prefix (absent on non-Termux hosts, so that entry simply drops out). Best
-    effort: a missing/unreadable dir is skipped, never an error.
-    """
-    out: List[str] = []
-    seen = set()
-    for raw in _EXTRA_PATH_DIRS:
-        path = os.path.expandvars(os.path.expanduser(raw))
-        if not path or path in seen:
-            continue
-        seen.add(path)
-        try:
-            if os.path.isdir(path):
-                out.append(path)
-        except OSError as exc:  # R12: log, never swallow silently
-            log_warning(
-                f"cli probe: cannot stat extra path '{path}': {exc}",
-                source=LOG_SOURCE,
-            )
-    return out
+    """Existing user-install dirs (see ``backend.paths.extra_path_dirs``)."""
+    return _extra_path_dirs_impl()
 
 
 def _which_with_extra_paths(binary: str) -> Optional[str]:

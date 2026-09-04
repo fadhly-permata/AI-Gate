@@ -12,12 +12,21 @@ clear :class:`PtyError` (never a raw ``ImportError``).
 
 Platform detection uses ``sys.platform`` so Termux (``linux``) takes the
 POSIX branch.
+
+The spawned shell gets an **augmented PATH** (see :func:`build_spawn_env`):
+the server process PATH plus the user install dirs from ``backend.paths``
+(``~/.local/bin``, ``~/.cargo/bin``, ...), so CLI tools the user installed are
+findable inside the terminal even when aigate itself was started with a
+narrow PATH.
 """
 
 from __future__ import annotations
 
+import os
 import sys
-from typing import Optional
+from typing import Dict, Optional
+
+from backend.paths import extra_path_dirs
 
 LOG_SOURCE = "backend.terminal.pty"
 
@@ -139,6 +148,39 @@ class PtyProcess:
 # ---------------------------------------------------------------------- #
 # Spawn factory
 # ---------------------------------------------------------------------- #
+def build_spawn_env() -> Optional[Dict[str, str]]:
+    """Env for the spawned shell: server env + user install dirs on PATH.
+
+    WHY: ``_Pty.spawn`` without ``env`` inherits the SERVER process env. When
+    aigate is started from a shell with a narrow PATH, the interactive PTY
+    cannot see tools the user installed via ``pip install --user``/pipx
+    (``~/.local/bin``), cargo (``~/.cargo/bin``), npm global, etc. — so
+    ``command -v aider`` fails inside the terminal even though aider is
+    installed. The extra dirs come from :func:`backend.paths.extra_path_dirs`
+    (the SAME source of truth used by CLI-tool detection in
+    ``cli_tools_router``, so the "binary found" hint and the shell agree).
+
+    Existing PATH entries are kept and searched first; extra dirs are appended.
+    Returns ``None`` on any failure so the caller falls back to the default
+    spawn (a broken PATH must never prevent the terminal from opening).
+    """
+    try:
+        env = dict(os.environ)
+        base = env.get("PATH", "")
+        extras = extra_path_dirs()
+        parts = [p for p in base.split(os.pathsep) if p] + extras
+        env["PATH"] = os.pathsep.join(parts)
+        return env
+    except Exception as exc:  # noqa: BLE001 - PATH build is best-effort
+        from backend.log import log_warning
+
+        log_warning(
+            f"pty: failed to build augmented PATH, using inherited env: {exc}",
+            source=LOG_SOURCE,
+        )
+        return None
+
+
 def spawn_shell(cols: int = 80, rows: int = 24) -> PtyProcess:
     """Spawn an interactive shell and return a :class:`PtyProcess`.
 
@@ -165,10 +207,11 @@ def _spawn_posix(cols: int, rows: int) -> PtyProcess:
             "Install with `pip install ptyprocess` (or `pip install -e .`)."
         ) from exc
     try:
+        env = build_spawn_env()
         try:
-            impl = _Pty.spawn(["bash", "-i"])
+            impl = _Pty.spawn(["bash", "-i"], env=env)
         except Exception:  # noqa: BLE001 - bash missing → fall back to sh
-            impl = _Pty.spawn(["sh"])
+            impl = _Pty.spawn(["sh"], env=env)
         impl.setwinsize(rows, cols)
         return PtyProcess(impl, "posix")
     except PtyError:
@@ -186,8 +229,14 @@ def _spawn_windows(cols: int, rows: int) -> PtyProcess:
             "Install with `pip install pywinpty` (or `pip install -e .`)."
         ) from exc
     try:
+        env = build_spawn_env()
         impl = PTY(cols, rows)
-        impl.spawn("cmd.exe")
+        if env is None:  # PATH build failed → default spawn (no env kwarg)
+            impl.spawn("cmd.exe")
+        else:
+            # pywinpty accepts env as a mapping; augments cmd.exe's PATH with
+            # the same user install dirs CLI detection searches.
+            impl.spawn("cmd.exe", env=env)
         return PtyProcess(impl, "win")
     except PtyError:
         raise
@@ -195,4 +244,4 @@ def _spawn_windows(cols: int, rows: int) -> PtyProcess:
         raise PtyError(f"failed to spawn Windows shell: {exc}") from exc
 
 
-__all__ = ["PtyError", "PtyProcess", "spawn_shell"]
+__all__ = ["PtyError", "PtyProcess", "spawn_shell", "build_spawn_env"]
