@@ -9,6 +9,7 @@ also covers the logger. We additionally patch ``backend.cli_tools_router``.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import stat
@@ -21,7 +22,7 @@ import backend.cli_presets as cli_presets
 import backend.cli_tools_router as cli_tools_router
 import backend.config.db as db_mod
 from backend.config.db import Base
-from backend.models import CLITool, CLIToolGroup, Endpoint, LogEntry
+from backend.models import CLITool, CLIToolGroup, Endpoint, LogEntry, Provider, ProviderModel
 from fastapi.testclient import TestClient
 
 from backend.server import app
@@ -517,3 +518,110 @@ def test_resolve_install_command_present_when_not_found(monkeypatch) -> None:
     assert body["install_command"]  # non-empty install string
     assert body["binary_name"] == "aider"
 
+
+
+# =========================================================================== #
+# 7. opencode launch builder: writes opencode.json (custom OpenAI-compatible
+#    provider) via a single-quoted heredoc, then runs opencode with the chosen
+#    model as ``aigate/<model>`` (or the TUI when none chosen).
+# =========================================================================== #
+_HEREDOC_OPEN = "<<'AIGATE_EOF'\n"
+_HEREDOC_CLOSE = "\nAIGATE_EOF\n"
+
+
+def _extract_heredoc_json(run_command: str) -> dict:
+    """Pull the JSON body written by ``cat > opencode.json <<'AIGATE_EOF'``."""
+    assert "cat > opencode.json" in run_command
+    assert _HEREDOC_OPEN in run_command
+    assert _HEREDOC_CLOSE in run_command
+    start = run_command.index(_HEREDOC_OPEN) + len(_HEREDOC_OPEN)
+    end = run_command.index(_HEREDOC_CLOSE, start)
+    return json.loads(run_command[start:end])
+
+
+def test_resolve_opencode_writes_config_and_runs(monkeypatch) -> None:
+    """opencode -> heredoc config (provider aigate) + ``opencode run --model``."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)  # key = plain-key-xyz
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve",
+        json={"tool": "opencode", "model": "provider:B.AI:gpt-5.5"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    rc = body["run_command"]
+
+    # 1. config is written via a single-quoted heredoc.
+    assert "cat > opencode.json" in rc
+    cfg = _extract_heredoc_json(rc)
+
+    # 2. valid JSON with the custom provider under id ``aigate``.
+    prov = cfg["provider"]["aigate"]
+    assert prov["npm"] == "@ai-sdk/openai-compatible"
+    assert prov["name"] == "aigate"
+    assert prov["options"]["baseURL"] == "http://localhost:8080/v1"
+    assert prov["options"]["apiKey"] == "plain-key-xyz"
+    # no provider seeded -> falls back to the requested model id only.
+    assert "gpt-5.5" in prov["models"]
+    assert prov["models"]["gpt-5.5"]["name"] == "gpt-5.5"
+
+    # 3. opencode is launched with the selected model as aigate/<raw>.
+    assert "opencode run --model aigate/gpt-5.5" in rc
+    # the raw provider: ref must NOT leak into the --model value.
+    assert "provider:" not in rc.split(_HEREDOC_CLOSE)[-1]
+
+    # env still injected (OPENAI_API_KEY belt-and-suspenders).
+    assert body["env"]["OPENAI_API_BASE"] == "http://localhost:8080/v1"
+    assert body["env"]["OPENAI_API_KEY"] == "plain-key-xyz"
+    assert body["model"] == "provider:B.AI:gpt-5.5"
+
+
+def test_resolve_opencode_lists_discovered_models(monkeypatch) -> None:
+    """When the provider has discovered models, all are enumerated in the config."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    with sf() as s:
+        p = Provider(name="B.AI", type="openai", base_url="https://x", api_key="k")
+        s.add(p)
+        s.commit()
+        s.add_all(
+            [
+                ProviderModel(provider_id=p.id, model_id="gpt-5.5", model_name="GPT 5.5"),
+                ProviderModel(provider_id=p.id, model_id="o3", model_name="o3"),
+            ]
+        )
+        s.commit()
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve",
+        json={"tool": "opencode", "model": "provider:B.AI:gpt-5.5"},
+    )
+    assert r.status_code == 200
+    cfg = _extract_heredoc_json(r.json()["run_command"])
+    models = cfg["provider"]["aigate"]["models"]
+    assert set(models) == {"gpt-5.5", "o3"}
+    assert models["o3"]["name"] == "o3"
+    # still launches the specifically requested model.
+    assert "opencode run --model aigate/gpt-5.5" in r.json()["run_command"]
+
+
+def test_resolve_opencode_no_model_opens_tui(monkeypatch) -> None:
+    """No model chosen -> plain ``opencode`` (TUI), config still written."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    client = _client(monkeypatch, sf)
+
+    r = client.post("/api/cli-tools/resolve", json={"tool": "opencode"})
+    assert r.status_code == 200
+    rc = r.json()["run_command"]
+    cfg = _extract_heredoc_json(rc)
+    assert cfg["provider"]["aigate"]["models"] == {}
+    tail = rc.split(_HEREDOC_CLOSE)[-1]
+    assert tail == "opencode"
+    assert "run --model" not in tail

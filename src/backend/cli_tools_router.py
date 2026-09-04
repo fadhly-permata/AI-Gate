@@ -19,10 +19,11 @@ Pydantic **v1** only (rule R10): ``BaseModel`` + ``class Config``.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
-from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional
+from dataclasses import dataclass, field
+from typing import Callable, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -32,7 +33,7 @@ from sqlalchemy.orm import Session
 from backend.config.db import SessionLocal
 from backend.config.settings import get as get_setting
 from backend.log import log_info
-from backend.models import CLITool, CLIToolGroup, Endpoint
+from backend.models import CLITool, CLIToolGroup, Endpoint, Provider, ProviderModel
 from backend.paths import extra_path_dirs as _extra_path_dirs_impl
 
 LOG_SOURCE = "backend.cli_tools.router"
@@ -223,6 +224,48 @@ class _LaunchCtx:
     raw_model: Optional[str]  # ref stripped to what the CLI sends upstream
     base: str  # gateway base url (also injected as OPENAI_API_BASE)
     key: str  # plaintext internal key (also injected as OPENAI_API_KEY)
+    # Discovered model ids for the provider named in ``model`` (empty when the
+    # ref is not a ``provider:<name>`` form or nothing was discovered). Used by
+    # builders that must enumerate the provider's models in a config file
+    # (e.g. opencode's ``opencode.json``).
+    provider_models: List[str] = field(default_factory=list)
+
+
+def _provider_name_for_ref(model: Optional[str]) -> Optional[str]:
+    """Extract the provider name from a ``provider:<name>[:<model>]`` ref.
+
+    Returns ``None`` for bare model ids / combo refs (no provider segment).
+    """
+    if not model or not model.startswith("provider:"):
+        return None
+    rest = model[len("provider:"):]
+    if ":" in rest:
+        name, _mid = rest.split(":", 1)
+        return name or None
+    return rest or None
+
+
+def _discovered_models_for_ref(
+    session: Session, model: Optional[str]
+) -> List[str]:
+    """Discovered ``ProviderModel.model_id`` list for the provider in ``model``.
+
+    Empty when the ref carries no provider, the provider is unknown, or nothing
+    has been discovered for it. Ordered by id (stable).
+    """
+    name = _provider_name_for_ref(model)
+    if not name:
+        return []
+    provider = session.query(Provider).filter(Provider.name == name).first()
+    if provider is None:
+        return []
+    rows = (
+        session.query(ProviderModel)
+        .filter(ProviderModel.provider_id == provider.id)
+        .order_by(ProviderModel.id)
+        .all()
+    )
+    return [r.model_id for r in rows]
 
 
 def _raw_model_for_ref(model: Optional[str]) -> Optional[str]:
@@ -275,9 +318,60 @@ def _aider_builder(ctx: _LaunchCtx) -> str:
     return " ".join(parts)
 
 
+# Fixed provider id opencode uses for the aigate gateway (model selected as
+# ``aigate/<model_id>``). Kept in sync with the ``opencode.json`` we write.
+_OPENCODE_PROVIDER_ID = "aigate"
+
+
+def _opencode_builder(ctx: _LaunchCtx) -> str:
+    """opencode's documented custom-provider form (opencode.ai/docs/providers).
+
+    opencode reads ``opencode.json`` from the working dir. We write a custom
+    OpenAI-compatible provider (npm ``@ai-sdk/openai-compatible``) whose
+    ``options.baseURL`` points at the aigate gateway and whose ``models`` map
+    lists the provider's discovered model ids (falling back to just the
+    requested model when nothing was discovered). The JSON is built with
+    ``json.dumps`` (never string-concatenated) so quoting/escaping is correct,
+    and handed to the shell via a single-quoted heredoc (``<<'AIGATE_EOF'``) so
+    nothing is expanded. We set BOTH ``options.apiKey`` and rely on the injected
+    ``OPENAI_API_KEY`` env (belt-and-suspenders; the gateway ignores the key
+    while access control is off).
+
+    Launch: ``opencode run --model aigate/<raw_model>`` when a concrete model was
+    chosen, else plain ``opencode`` (TUI). The env exports (OPENAI_API_BASE/KEY)
+    are injected by the caller exactly as for aider — this builder only emits the
+    config write + the command.
+    """
+    model_ids = list(ctx.provider_models)
+    if not model_ids and ctx.raw_model:
+        model_ids = [ctx.raw_model]
+
+    config = {
+        "$schema": "https://opencode.ai/config.json",
+        "provider": {
+            _OPENCODE_PROVIDER_ID: {
+                "npm": "@ai-sdk/openai-compatible",
+                "name": _OPENCODE_PROVIDER_ID,
+                "options": {"baseURL": ctx.base, "apiKey": ctx.key},
+                "models": {mid: {"name": mid} for mid in model_ids},
+            }
+        },
+    }
+    cfg_json = json.dumps(config, indent=2)
+
+    # Single-quoted heredoc delimiter -> the shell writes the JSON verbatim.
+    cmd = "cat > opencode.json <<'AIGATE_EOF'\n" + cfg_json + "\nAIGATE_EOF\n"
+    if ctx.raw_model:
+        cmd += f"opencode run --model {_OPENCODE_PROVIDER_ID}/{ctx.raw_model}"
+    else:
+        cmd += "opencode"
+    return cmd
+
+
 # binary_name -> builder. Anything absent uses ``_generic_builder``.
 _LAUNCH_BUILDERS: Dict[str, Callable[[_LaunchCtx], str]] = {
     "aider": _aider_builder,
+    "opencode": _opencode_builder,
 }
 
 
@@ -366,6 +460,7 @@ def resolve_cli_tool(req: ResolveRequest) -> dict:
             raw_model=_raw_model_for_ref(req.model),
             base=base,
             key=key,
+            provider_models=_discovered_models_for_ref(session, req.model),
         )
         run_command = _build_run_command(ctx)
 
