@@ -917,6 +917,61 @@ def _oterm_builder(ctx: _LaunchCtx) -> str:
     return cmd + f"OTERM_DATA_DIR={shlex.quote(_OTERM_DATA_DIR)} " + " ".join(parts)
 
 
+# --------------------------------------------------------------------------- #
+# openhands (OpenHands CLI, PyPI ``openhands``, repo OpenHands/OpenHands-CLI
+# v1.16.0) — documented LLM_* env route + --override-with-envs.
+#
+# IMPORTANT package correction: the preset used to install ``openhands-ai``,
+# which since the 1.x restructure is the Agent-CANVAS/server stack (its PyPI
+# description is the agent-canvas README; deps are openhands-agent-server/sdk/
+# tools) and does NOT provide the terminal CLI. The interactive TUI ships in
+# the separate PyPI package ``openhands`` (OpenHands/OpenHands-CLI,
+# [project.scripts] openhands = "openhands_cli.entrypoint:main"; docs
+# installation page: "uv tool install openhands --python 3.12").
+#
+# Documented launch form (all read 2026-09-06):
+#   OpenHands-CLI README "Configuration": "By default, environment variables
+#   like `LLM_API_KEY`, `LLM_MODEL`, and `LLM_BASE_URL` are ignored; pass
+#   `--override-with-envs` to apply them (not persisted)."
+#   docs command-reference: `--override-with-envs` — "Apply environment
+#   variables (LLM_API_KEY, LLM_MODEL, LLM_BASE_URL) to override stored
+#   settings"; bare `openhands` = "Terminal (TUI) ... Interactive development"
+#   (NOT `--headless -t`, which is the one-shot CI mode).
+#   docs llms/local-llms: model string is litellm-style — "must match an `id`
+#   returned by GET /v1/models after the `openai/` prefix" — so the model is
+#   sent as ``openai/<raw>`` (LiteLLM strips the prefix, the gateway receives
+#   the raw id / verbatim combo ref and resolves it; it serves both
+#   /v1/chat/completions and /v1/models).
+#
+# The env prefix is per-command and explicitly NOT persisted, so the user's
+# ``~/.openhands/`` config dir is never written to (kilo-pattern reasoning
+# without needing a config file at all). The key appears in the command line
+# (ADR-007 local plaintext route; the resolve log masks it).
+#
+# No Docker needed for this mode: the TUI runs the agent locally (docs
+# installation "Option 1: Without a Sandbox"); Docker is only for `openhands
+# serve` (web GUI) and the sandbox options. Caveats recorded for the operator:
+# the CLI repo declares itself "no longer actively maintained" (Agent Canvas is
+# the flagship) and requires Python 3.12 (pyproject ``==3.12.*``).
+#
+# No model chosen -> LLM_MODEL is omitted (the CLI's own default applies;
+# nothing is invented); base+key still override so the tool points at aigate.
+# --------------------------------------------------------------------------- #
+def _openhands_builder(ctx: _LaunchCtx) -> str:
+    """openhands' documented LLM_* env form + interactive TUI."""
+    env: List[str] = []
+    if ctx.raw_model:
+        env.append(f"LLM_MODEL={shlex.quote(f'openai/{ctx.raw_model}')}")
+    env.append(f"LLM_BASE_URL={shlex.quote(ctx.base)}")
+    env.append(f"LLM_API_KEY={shlex.quote(ctx.key)}")
+    parts: List[str] = [ctx.binary_name]
+    if ctx.default_flags:
+        parts.append(ctx.default_flags)
+    # Required: without it the CLI ignores the LLM_* env vars by default.
+    parts.append("--override-with-envs")
+    return " ".join(env + parts)
+
+
 # binary_name -> builder. Anything absent uses ``_generic_builder``.
 _LAUNCH_BUILDERS: Dict[str, Callable[[_LaunchCtx], str]] = {
     "aider": _aider_builder,
@@ -929,6 +984,7 @@ _LAUNCH_BUILDERS: Dict[str, Callable[[_LaunchCtx], str]] = {
     "kilo": _kilo_builder,
     "interpreter": _interpreter_builder,
     "oterm": _oterm_builder,
+    "openhands": _openhands_builder,
 }
 
 

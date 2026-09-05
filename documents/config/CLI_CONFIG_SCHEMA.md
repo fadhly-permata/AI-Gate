@@ -39,7 +39,7 @@ groups:
   - id: autonomous_agents     # Grup B
     label: "Autonomous Software Agents"
     tools:
-      - { name: openhands,        binary: openhands,        install: "pip install openhands-ai",    launch: pending }
+      - { name: openhands,        binary: openhands,        install: "pip install openhands",       launch: verified }
       - { name: swe-agent,        binary: swe-agent,        install: null,                          launch: unsupported }
       - { name: open-interpreter, binary: interpreter,      install: "pip install open-interpreter", launch: verified }
       - { name: autogpt,          binary: autogpt,          install: null,                          launch: unsupported }
@@ -225,6 +225,29 @@ ini berubah mengikuti builder, bukan data user), diekspos lewat `ToolDTO`
   dalam project — bukan permukaan CLI, jadi tidak ada yang bisa disuntik saat
   launch → `unsupported` (`not_a_cli`). DOCS-verified (docs.crewai.com
   v1.15.20 + source repo, dibaca 2026-09-06).
+- **openhands** — TUI interaktif ada, tapi nama paketnya SUDAH BERUBAH: binary
+  `openhands` dikirim oleh paket PyPI `openhands` (repo `OpenHands/OpenHands-CLI`,
+  `[project.scripts] openhands = "openhands_cli.entrypoint:main"`; docs
+  installation: "uv tool install openhands --python 3.12"), BUKAN lagi
+  `openhands-ai` yang sejak restructure 1.x adalah stack Agent Canvas /
+  agent-server (deps-nya openhands-agent-server/sdk/tools, tanpa CLI terminal) —
+  jadi string install preset dikoreksi ke `pip install openhands`. Bentuk
+  launch (route env, terdokumentasi): `LLM_MODEL=openai/<model>
+  LLM_BASE_URL=<base> LLM_API_KEY=<key> openhands --override-with-envs` —
+  README CLI: "By default, environment variables like `LLM_API_KEY`,
+  `LLM_MODEL`, and `LLM_BASE_URL` are ignored; pass `--override-with-envs` to
+  apply them (not persisted)" (flag-nya WAJIB, dua-duanya di command-reference
+  docs). Model gaya litellm `openai/<id>` (docs llms/local-llms: "must match an
+  `id` returned by GET /v1/models after the `openai/` prefix") — LiteLLM lepas
+  prefix, gateway terima id mentah / combo verbatim. `openhands` tanpa arg =
+  TUI interaktif (BUKAN `--headless -t` yang one-shot CI). Env prefix per-command
+  dan tidak dipersist, jadi `~/.openhands/` user gak disentuh; key nongol di
+  command line (rute env resmi tool-nya; log resolve tetap di-mask). TUI jalan
+  lokal TANPA Docker (Docker cuma untuk `openhands serve` / sandbox). Catatan
+  operator: CLI butuh Python 3.12 (pyproject `==3.12.*`) dan repo-nya declare
+  "no longer actively maintained" (flagship pindah ke Agent Canvas) — masih
+  terdokumentasi + rilis 1.16.0 (2026-05-08). DOCS-VERIFIED only (docs & source
+  dibaca 2026-09-06; gak install/jalankan).
 - **gemini** — dokumen resminya (docs/cli/model.md + settings.md) TIDAK
   mengenal provider OpenAI-compatible; hanya API Gemini → `unsupported`
   (`gemini_only`), bukan sekadar belum dikerjain.

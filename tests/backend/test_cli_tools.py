@@ -228,6 +228,10 @@ def test_list_cli_tools(monkeypatch) -> None:
     # (`crewai run`/`crewai chat` need a generated crew project in the CWD and
     # take no model/base-url at launch) — not a launchable assistant
     assert modes["crewai"] == ("unsupported", "not_a_cli")
+    # verified: the TUI ships as PyPI `openhands` (install string corrected from
+    # the stale `openhands-ai` server-stack name) with the documented LLM_* env
+    # route + --override-with-envs
+    assert modes["openhands"] == ("verified", "")
 
 
 # =========================================================================== #
@@ -1684,3 +1688,115 @@ def test_resolve_oterm_json_encodes_a_base_url_with_metacharacters(monkeypatch) 
     assert "http://host/v1;rm -rf" in block
     tail = rc.split(_HEREDOC_CLOSE)[-1]
     assert "rm -rf" not in tail
+
+
+# =========================================================================== #
+# 17. openhands launch builder — documented LLM_* env route + the REQUIRED
+# --override-with-envs flag (OpenHands-CLI README "Configuration": "By default,
+# environment variables like `LLM_API_KEY`, `LLM_MODEL`, and `LLM_BASE_URL` are
+# ignored; pass `--override-with-envs` to apply them (not persisted)"; docs
+# command-reference lists the same three vars for the flag).
+#
+# The model is litellm-style `openai/<raw>` (docs llms/local-llms: the Custom
+# Model "must match an `id` returned by GET /v1/models after the `openai/`
+# prefix") — LiteLLM strips the prefix, so the gateway receives the raw id /
+# verbatim combo ref. Bare `openhands` opens the interactive TUI; `--headless
+# -t` is the one-shot CI mode and is never emitted. The env prefix is per-
+# command and NOT persisted, so ~/.openhands/ (user-owned config) is untouched.
+# DOCS-VERIFIED only (no install/run; CLI needs Python 3.12, repo declares
+# itself no-longer-maintained in favour of Agent Canvas — see schema bullet).
+# =========================================================================== #
+def test_resolve_openhands_exact_env_override_form(monkeypatch) -> None:
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)  # key = plain-key-xyz
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve",
+        json={"tool": "openhands", "model": "provider:B.AI:gpt-5.5"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    # exact command: LLM_* env prefix + interactive TUI + the required flag
+    assert body["run_command"] == (
+        "LLM_MODEL=openai/gpt-5.5 LLM_BASE_URL=http://localhost:8080/v1 "
+        "LLM_API_KEY=plain-key-xyz openhands --override-with-envs"
+    )
+    # the provider: ref must NOT leak; the gateway receives the raw id
+    assert "provider:" not in body["run_command"]
+    # interactive TUI, never the one-shot headless mode
+    assert "--headless" not in body["run_command"]
+    assert " -t " not in body["run_command"]
+    # generic env injection still present for the other routes
+    assert body["env"]["OPENAI_API_BASE"] == "http://localhost:8080/v1"
+    assert body["env"]["OPENAI_API_KEY"] == "plain-key-xyz"
+    assert body["model"] == "provider:B.AI:gpt-5.5"
+
+
+def test_resolve_openhands_combo_ref_keeps_openai_prefix(monkeypatch) -> None:
+    """combo:<name> stays verbatim after the openai/ prefix (gateway routes it)."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    with sf() as s:
+        s.add(Combo(name="Test", strategy="fallback", enabled=True))
+        s.commit()
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve", json={"tool": "openhands", "model": "combo:Test"}
+    )
+    rc = r.json()["run_command"]
+    assert rc.startswith("LLM_MODEL=openai/combo:Test ")
+
+
+def test_resolve_openhands_no_model_omits_llm_model(monkeypatch) -> None:
+    """provider:<name> (no model) -> no LLM_MODEL (tool default applies),
+    base+key still point at the gateway, flag kept, nothing invented."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve", json={"tool": "openhands", "model": "provider:B.AI"}
+    )
+    rc = r.json()["run_command"]
+    assert rc == (
+        "LLM_BASE_URL=http://localhost:8080/v1 LLM_API_KEY=plain-key-xyz "
+        "openhands --override-with-envs"
+    )
+    assert "LLM_MODEL" not in rc
+
+
+def test_resolve_openhands_quotes_shell_metacharacters(monkeypatch) -> None:
+    """Every interpolated env value is shlex-quoted (inline prefix = shell)."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf, key="k;echo pwned")
+    with sf() as s:
+        s.add(Setting(key="gateway_base_url", value="http://host/v1;rm -rf"))
+        s.commit()
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve", json={"tool": "openhands", "model": "m 1"}
+    )
+    rc = r.json()["run_command"]
+    assert "'openai/m 1'" in rc
+    assert "'http://host/v1;rm -rf'" in rc
+    assert "'k;echo pwned'" in rc
+
+
+def test_resolve_openhands_install_string_is_the_cli_package(monkeypatch) -> None:
+    """`openhands-ai` is the Agent Canvas/server stack (no terminal CLI since
+    1.x); the TUI binary ships as PyPI `openhands` — the preset must install
+    the package that actually provides it."""
+    sf = _make_sf()
+    _seed_all(sf)
+    client = _client(monkeypatch, sf)
+
+    body = client.post("/api/cli-tools/resolve", json={"tool": "openhands"}).json()
+    assert body["install_command"] == "pip install openhands"
+    assert body["binary_name"] == "openhands"

@@ -85,7 +85,7 @@ CLI_PRESETS: list[dict] = [
         "code": "autonomous_agents",
         "name": "Autonomous Software Agents",
         "tools": [
-            {"name": "openhands", "binary": "openhands", "install": _pip("openhands-ai")},
+            {"name": "openhands", "binary": "openhands", "install": _pip("openhands")},
             {"name": "swe-agent", "binary": "swe-agent", "install": NO_INSTALL},
             {"name": "open-interpreter", "binary": "interpreter", "install": _pip("open-interpreter")},
             {"name": "autogpt", "binary": "autogpt", "install": NO_INSTALL},
@@ -178,7 +178,12 @@ LAUNCH_SUPPORT: Dict[str, LaunchSupport] = {
     "cline": LaunchSupport(LAUNCH_VERIFIED),
     "kilo": LaunchSupport(LAUNCH_VERIFIED),
     # --- Group B: autonomous agents ---
-    "openhands": LaunchSupport(LAUNCH_PENDING),
+    # The interactive TUI ships as PyPI `openhands` (repo OpenHands/OpenHands-CLI,
+    # [project.scripts] openhands=...); `openhands-ai` since 1.x is the Agent
+    # Canvas/server stack and provides no terminal CLI, so the install string
+    # below was corrected to match the binary. Launch form: documented LLM_*
+    # env route + --override-with-envs (see _openhands_builder).
+    "openhands": LaunchSupport(LAUNCH_VERIFIED),
     # pip artifact = Python open-interpreter 0.4.3 (PyPI, 2024-10-26); its
     # --api_base/--api_key/--model form is documented (see _interpreter_builder).
     # NOT the new Rust agent that now occupies the GitHub repo (curl-installed,
