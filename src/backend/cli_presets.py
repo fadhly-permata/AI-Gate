@@ -191,7 +191,9 @@ LAUNCH_SUPPORT: Dict[str, LaunchSupport] = {
     "autogpt": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_INSTALL_UNVERIFIED),
     # --- Group C: chat & shell ---
     "llm": LaunchSupport(LAUNCH_VERIFIED),
-    "oterm": LaunchSupport(LAUNCH_PENDING),
+    # openaiCompatible config block + OTERM_DATA_DIR override are documented
+    # (ggozad.github.io/oterm app_config.md, v0.24.0) — see _oterm_builder.
+    "oterm": LaunchSupport(LAUNCH_VERIFIED),
     "gptme": LaunchSupport(LAUNCH_VERIFIED),
     "sgpt": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_INSTALL_UNVERIFIED),
     "mods": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NO_BINARY),

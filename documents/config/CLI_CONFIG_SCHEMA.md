@@ -51,7 +51,7 @@ groups:
       - { name: llm,    binary: llm,    install: "pip install llm",   launch: verified }
       - { name: sgpt,   binary: sgpt,   install: null,                launch: unsupported }
       - { name: mods,   binary: mods,   install: null,                launch: unsupported }
-      - { name: oterm,  binary: oterm,  install: "pip install oterm", launch: pending }
+      - { name: oterm,  binary: oterm,  install: "pip install oterm", launch: verified }
       - { name: gptme,  binary: gptme,  install: "pip install gptme", launch: verified }
       - { name: aichat, binary: aichat, install: "cargo install aichat",          launch: verified }
 ```
@@ -176,6 +176,28 @@ ini berubah mengikuti builder, bukan data user), diekspos lewat `ToolDTO`
   `--api_base`/`--api_key` — preset ini menarget artefak pip (Python), jadi dasar
   verifikasinya dokumen Python + README PyPI, BUKAN dokumen Rust. DOCS-VERIFIED
   only (gak menjalankan installer / binary).
+- **oterm** (ggozad/oterm, PyPI 0.24.0) — TIDAK ada flag CLI untuk
+  model/base/key (source `cli/oterm.py`: cuma `--version/--upgrade/--config/
+  --db/--data-dir`); satu-satunya rute terdokumentasi = file config: tulis
+  `config.json` MILIK kita sendiri di direktori namespaced `.oterm-aigate/`,
+  lalu tunjuk lewat env resminya: `OTERM_DATA_DIR=.oterm-aigate oterm`.
+  Isinya blok `openaiCompatible.aigate = { base_url: <gateway>, api_key:
+  "${OPENAI_API_KEY}" }` — endpoint bernama dengan `base_url` + `api_key`
+  reference env (docs: ggozad.github.io/oterm/app_config/ bagian
+  "openaiCompatible — custom OpenAI-compatible endpoints" + "Where config.json
+  lives"; source: `providers/__init__.py` expand `${VAR}`, `agent.py`
+  `openai-compat/<name>` → pydantic-ai `OpenAIChatModel` = wire
+  chat-completions yang gateway serve). Key gak pernah nyentuh disk (pola
+  kilo). Kenapa BUKAN `~/.local/share/oterm/config.json`: itu path user —
+  nulis di situ = nimpa theme/keymap/mcpServers punya dia; efek samping yang
+  dipilih sadar: chat history (`store.db` satu direktori) mulai fresh untuk
+  launch ini. Model TIDAK bisa disuntik saat launch — dialog new-chat oterm
+  yang milih/ketik; gateway expose `GET /v1/models` jadi suggestion live, dan
+  ref aigate (`combo:<n>`, `provider:<n>:<id>`, id mentah) bisa diketik polos
+  karena oterm meneruskan model apa adanya ke gateway. Akibatnya command
+  IDENTIK untuk semua bentuk ref dan gak ada yang diarang. `oterm` tanpa
+  argumen = TUI interaktif. DOCS-VERIFIED only (docs & source dibaca
+  2026-09-05; gak install/jalankan).
 - **gemini** — dokumen resminya (docs/cli/model.md + settings.md) TIDAK
   mengenal provider OpenAI-compatible; hanya API Gemini → `unsupported`
   (`gemini_only`), bukan sekadar belum dikerjain.

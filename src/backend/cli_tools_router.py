@@ -792,6 +792,34 @@ def _cline_builder(ctx: _LaunchCtx) -> str:
 # own default model and still points at the gateway; nothing is invented.
 # OI has no documented way to enumerate/select several models per session (the
 # model is fixed at launch), so provider_models is deliberately unused here.
+#
+# IF THE PRESET'S INSTALL STRING EVER MOVES TO THE CURRENT (RUST) RELEASE, this
+# builder must be rewritten — that release has no --api_base/--api_key at all.
+# Its verified route (docs read 2026-09-05, release line rust-v0.0.40) is a
+# provider entry under [model_providers.<id>] passed per-run with `-c`, which
+# docs/config.md ranks ABOVE user/project/profile config, so nothing is written
+# to disk:
+#   interpreter -c model_provider='"aigate"' \
+#     -c model_providers.aigate.base_url='"<gateway>/v1"' \
+#     -c model_providers.aigate.env_key='"OPENAI_API_KEY"' \
+#     -c model_providers.aigate.wire_api='"chat"' -m <raw>
+#   * docs/providers.md ("Wire APIs"): wire_api "chat" = "OpenAI-compatible Chat
+#     Completions requests" — the default is "responses", which is exactly why
+#     codex is unsupported here and this fork is not.
+#   * docs/providers.md ("Authentication"): env_key "reads a bearer token from an
+#     environment variable" -> the key stays off disk AND off the command line.
+#   * docs/cli-reference.md: `-c key=value` + `-m/--model`; bare `interpreter`
+#     starts the TUI; dotted nested paths are documented in the flag's own help
+#     text (codex-rs/utils/cli/src/config_override.rs).
+#   * models are NOT enumerable in that table (no `models` field in
+#     ModelProviderInfo); docs/models.md says the picker reads the provider's
+#     live /models endpoint, which the gateway serves.
+# Follow-up candidate for the CURRENT (Python) form above: `--api_key` puts the
+# plaintext key in argv (visible in `ps`). Its own help text says the flag
+# "will override environment variables" and validate_llm_settings.py probes
+# os.environ["OPENAI_API_KEY"], so dropping the flag and relying on the exported
+# key is probably enough — but the upstream example passes --api_key explicitly,
+# so it was kept rather than traded on an inference about LiteLLM.
 # --------------------------------------------------------------------------- #
 def _interpreter_builder(ctx: _LaunchCtx) -> str:
     """open-interpreter's documented OpenAI-compatible flag form + chat."""
@@ -809,6 +837,86 @@ def _interpreter_builder(ctx: _LaunchCtx) -> str:
     return " ".join(parts)
 
 
+# --------------------------------------------------------------------------- #
+# oterm (Textual terminal client, PyPI ``oterm`` 0.24.0) — documented
+# ``openaiCompatible`` config block + ``OTERM_DATA_DIR`` override.
+#
+# docs/app_config.md (ggozad.github.io/oterm/app_config/, read 2026-09-05):
+#   - "openaiCompatible — custom OpenAI-compatible endpoints": named entries
+#     with ``base_url`` (required) + ``api_key`` (optional; "Reference an
+#     environment variable with ${VAR}"). "When configured, an OpenAI
+#     Compatible provider appears in the provider dropdown."
+#   - config.json lives in ``OTERM_DATA_DIR`` ("Override the location entirely
+#     by setting OTERM_DATA_DIR") — the documented config-path env var.
+#   - "If the endpoint exposes /v1/models, suggestions appear as you type" —
+#     the gateway serves GET /v1/models, so model ENUMERATION is live from
+#     aigate and provider_models needs no copying into the config.
+# Source cross-checks (same date): src/oterm/providers/__init__.py
+# (``get_openai_compatible_providers`` reads the ``openaiCompatible`` appConfig
+# block; ``_resolve_api_key`` expands ``${VAR}``), src/oterm/agent.py
+# (``openai-compat/<name>`` -> pydantic-ai ``OpenAIChatModel`` +
+# ``OpenAIProvider(base_url=...)`` = the chat-completions wire the gateway
+# serves), src/oterm/cli/oterm.py (the CLI has NO model/base/key flags — the
+# config file is the only documented route).
+#
+# The kilo pattern applies: oterm's config.json lives in its data dir, which
+# by default (~/.local/share/oterm, or $XDG_DATA_HOME/oterm) is USER-owned —
+# writing there would clobber the user's theme/keymap/mcpServers. So aigate
+# writes its OWN namespaced dir (``.oterm-aigate/config.json`` — a path oterm
+# only ever reads when OTERM_DATA_DIR points at it) and scopes the override to
+# the launch command. Consequence, documented here on purpose: chat history
+# (store.db lives in the same dir) starts fresh for these launches; the user's
+# own oterm data is never touched. The key never lands on disk: the config
+# carries ``${OPENAI_API_KEY}`` and the launcher exports that variable (an
+# unresolvable ``${VAR}`` would HIDE the provider — see get_available_providers
+# — so the always-non-empty exported key, real or placeholder, is required).
+#
+# Model refs cannot be injected at launch (no flag, no config key — the model
+# is typed/picked in oterm's new-chat dialog), so the command is identical for
+# every ref shape and NOTHING is invented: the user types the aigate ref
+# (``gpt-5.5``, ``combo:Test``, ``provider:B.AI:gpt-5.5``) or picks a
+# gateway-suggested model id; oterm forwards it verbatim and the gateway
+# resolves it. Bare ``oterm`` opens the interactive TUI (never a one-shot).
+# --------------------------------------------------------------------------- #
+_OTERM_PROVIDER_ID = "aigate"  # named endpoint key under openaiCompatible
+# Our own data dir; config.json inside it is oterm's hardcoded filename, so
+# the NAMESPACED DIRECTORY carries the isolation (never a user-owned path).
+_OTERM_DATA_DIR = ".oterm-aigate"
+_OTERM_CONFIG_PATH = ".oterm-aigate/config.json"
+# The key is NOT written to disk: the launcher exports OPENAI_API_KEY for every
+# tool and oterm expands ${OPENAI_API_KEY} at load time.
+_OTERM_ENV_KEY = "OPENAI_API_KEY"
+
+
+def _oterm_builder(ctx: _LaunchCtx) -> str:
+    """oterm's documented openaiCompatible form (namespaced data dir + TUI)."""
+    config: Dict[str, object] = {
+        "openaiCompatible": {
+            _OTERM_PROVIDER_ID: {
+                "base_url": ctx.base,
+                # Env reference, not the secret itself (documented; resolved
+                # from the exported OPENAI_API_KEY at startup).
+                "api_key": f"${{{_OTERM_ENV_KEY}}}",
+            }
+        }
+    }
+    cfg_json = json.dumps(config, indent=2)
+
+    # mkdir -p first: the redirect would otherwise fail on a fresh directory.
+    # Single-quoted heredoc -> ${OPENAI_API_KEY} is written verbatim, not
+    # expanded by the shell (oterm resolves it, not bash).
+    cmd = (
+        f"mkdir -p {_OTERM_DATA_DIR}\n"
+        f"cat > {_OTERM_CONFIG_PATH} <<'AIGATE_EOF'\n" + cfg_json + "\nAIGATE_EOF\n"
+    )
+    parts: List[str] = [ctx.binary_name]
+    if ctx.default_flags:
+        parts.append(ctx.default_flags)
+    # Env prefix scopes the data-dir override to this one command (same route
+    # as kilo's KILO_CONFIG / aichat's AICHAT_CONFIG_FILE).
+    return cmd + f"OTERM_DATA_DIR={shlex.quote(_OTERM_DATA_DIR)} " + " ".join(parts)
+
+
 # binary_name -> builder. Anything absent uses ``_generic_builder``.
 _LAUNCH_BUILDERS: Dict[str, Callable[[_LaunchCtx], str]] = {
     "aider": _aider_builder,
@@ -820,6 +928,7 @@ _LAUNCH_BUILDERS: Dict[str, Callable[[_LaunchCtx], str]] = {
     "cline": _cline_builder,
     "kilo": _kilo_builder,
     "interpreter": _interpreter_builder,
+    "oterm": _oterm_builder,
 }
 
 

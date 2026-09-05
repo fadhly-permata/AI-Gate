@@ -219,6 +219,7 @@ def test_list_cli_tools(monkeypatch) -> None:
     assert modes["gptme"] == ("verified", "")
     assert modes["kilo"] == ("verified", "")
     assert modes["open-interpreter"] == ("verified", "")
+    assert modes["oterm"] == ("verified", "")
 
 
 # =========================================================================== #
@@ -459,12 +460,9 @@ def test_resolve_non_aider_generic_form_preserved(monkeypatch) -> None:
     _seed_endpoint(sf)
     client = _client(monkeypatch, sf)
 
-    # Temporarily verify a builder-less tool to exercise the fallback route.
-    monkeypatch.setitem(
-        cli_presets.LAUNCH_SUPPORT,
-        "oterm",
-        cli_presets.LaunchSupport(cli_presets.LAUNCH_VERIFIED),
-    )
+    # oterm is verified but now HAS a builder — drop it for this test so the
+    # builder-less fallback route is still exercised.
+    monkeypatch.delitem(cli_tools_router._LAUNCH_BUILDERS, "oterm")
 
     r = client.post(
         "/api/cli-tools/resolve",
@@ -1541,3 +1539,135 @@ def test_resolve_open_interpreter_quotes_shell_metacharacters(monkeypatch) -> No
     assert "'http://host/v1;rm -rf'" in rc
     assert "'k;echo pwned'" in rc
     assert "'openai/m 1'" in rc
+
+
+# =========================================================================== #
+# 16. oterm launch builder — documented openaiCompatible config block +
+# OTERM_DATA_DIR override (ggozad.github.io/oterm app_config.md, v0.24.0).
+#
+# oterm's config.json lives in its data dir; the default (~/.local/share/oterm)
+# is USER-owned, so aigate writes its OWN namespaced dir (.oterm-aigate) and
+# scopes the override to the launch command (kilo pattern). The key is NOT on
+# disk: the config carries ${OPENAI_API_KEY} (oterm expands it at load) and the
+# launcher exports it. There is no model/base/key CLI flag, so the command is
+# identical for every ref shape and nothing is invented; the model is picked in
+# oterm's new-chat dialog (gateway /v1/models feeds suggestions).
+# =========================================================================== #
+OTERM_CFG = ".oterm-aigate/config.json"
+OTERM_TAIL = "OTERM_DATA_DIR=.oterm-aigate oterm"
+
+
+def _oterm_cfg(run_command: str) -> dict:
+    return json.loads(_heredoc_block(run_command, OTERM_CFG))
+
+
+def test_resolve_oterm_writes_namespaced_config_and_opens_tui(monkeypatch) -> None:
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)  # key = plain-key-xyz
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve",
+        json={"tool": "oterm", "model": "provider:B.AI:gpt-5.5"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+
+    # exact command: mkdir (the redirect needs the dir), single-quoted heredoc
+    # writing the openaiCompatible block, then the TUI via OTERM_DATA_DIR.
+    assert body["run_command"] == (
+        "mkdir -p .oterm-aigate\n"
+        "cat > .oterm-aigate/config.json <<'AIGATE_EOF'\n"
+        "{\n"
+        '  "openaiCompatible": {\n'
+        '    "aigate": {\n'
+        '      "base_url": "http://localhost:8080/v1",\n'
+        '      "api_key": "${OPENAI_API_KEY}"\n'
+        "    }\n"
+        "  }\n"
+        "}\n"
+        "AIGATE_EOF\n"
+        "OTERM_DATA_DIR=.oterm-aigate oterm"
+    )
+    cfg = _oterm_cfg(body["run_command"])
+    ep = cfg["openaiCompatible"]["aigate"]
+    assert ep["base_url"] == "http://localhost:8080/v1"
+    # the plaintext key is NOT in the command or the config — it travels
+    # through the exported OPENAI_API_KEY, which oterm expands ${VAR} against
+    assert "plain-key-xyz" not in body["run_command"]
+    assert ep["api_key"] == "${OPENAI_API_KEY}"
+    # interactive TUI (no subcommand, no one-shot), never a leaked provider: ref
+    assert body["run_command"].split(_HEREDOC_CLOSE)[-1] == OTERM_TAIL
+    assert "provider:" not in body["run_command"]
+    assert body["env"]["OPENAI_API_BASE"] == "http://localhost:8080/v1"
+    assert body["env"]["OPENAI_API_KEY"] == "plain-key-xyz"
+    assert body["model"] == "provider:B.AI:gpt-5.5"
+
+
+def test_resolve_oterm_never_writes_a_user_config_path(monkeypatch) -> None:
+    """The namespaced dir is ours; oterm's default data dir is never touched."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    client = _client(monkeypatch, sf)
+
+    rc = client.post(
+        "/api/cli-tools/resolve", json={"tool": "oterm", "model": "m1"}
+    ).json()["run_command"]
+    for owned in (
+        "cat > config.json",
+        ".local/share/oterm",
+        "XDG_DATA_HOME",
+    ):
+        assert owned not in rc
+
+
+def test_resolve_oterm_command_is_ref_invariant_and_invents_nothing(monkeypatch) -> None:
+    """No model/base CLI flag exists for oterm, so provider / combo / no-model
+    refs all yield the SAME command (nothing is guessed onto the command line)."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    with sf() as s:
+        s.add(Combo(name="Test", strategy="fallback", enabled=True))
+        s.commit()
+    client = _client(monkeypatch, sf)
+
+    cmds = {}
+    for ref in ("provider:B.AI:gpt-5.5", "combo:Test", "gpt-5.5", None):
+        r = client.post(
+            "/api/cli-tools/resolve",
+            json={"tool": "oterm", "model": ref},
+        )
+        assert r.status_code == 200
+        cmds[ref] = r.json()["run_command"]
+
+    assert len(set(cmds.values())) == 1
+    rc = cmds[None]
+    # nothing about the model leaks into the command (it is chosen in the TUI)
+    assert "--model" not in rc
+    assert "gpt-5.5" not in rc
+    assert "combo" not in rc
+
+
+def test_resolve_oterm_json_encodes_a_base_url_with_metacharacters(monkeypatch) -> None:
+    """DB-sourced base url is JSON-encoded inside the single-quoted heredoc, so
+    shell metacharacters are inert (never interpolated bare into the command)."""
+    sf = _make_sf()
+    _seed_all(sf)
+    with sf() as s:
+        s.add(Setting(key="gateway_base_url", value="http://host/v1;rm -rf"))
+        s.commit()
+    client = _client(monkeypatch, sf)
+
+    rc = client.post(
+        "/api/cli-tools/resolve", json={"tool": "oterm", "model": "m1"}
+    ).json()["run_command"]
+    cfg = _oterm_cfg(rc)
+    assert cfg["openaiCompatible"]["aigate"]["base_url"] == "http://host/v1;rm -rf"
+    # the dangerous value only ever appears INSIDE the quoted heredoc body
+    block = _heredoc_block(rc, OTERM_CFG)
+    assert "http://host/v1;rm -rf" in block
+    tail = rc.split(_HEREDOC_CLOSE)[-1]
+    assert "rm -rf" not in tail
