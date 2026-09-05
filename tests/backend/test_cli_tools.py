@@ -214,6 +214,7 @@ def test_list_cli_tools(monkeypatch) -> None:
     assert modes["codex"] == ("unsupported", "responses_only")
     # pending: real CLI, launch form not written yet -> struck, reason empty
     assert modes["cline"] == ("pending", "")
+    assert modes["llm"] == ("verified", "")
 
 
 # =========================================================================== #
@@ -247,7 +248,6 @@ def test_resolve_tool_by_name(monkeypatch) -> None:
 @pytest.mark.parametrize(
     "tool,mode,reason",
     [
-        ("llm", "pending", ""),  # real CLI, launch form not written yet
         ("claude", "unsupported", "anthropic_only"),  # needs /v1/messages
         ("codex", "unsupported", "responses_only"),  # needs /v1/responses
         ("antigravity", "unsupported", "not_a_cli"),  # GUI IDE, no binary
@@ -458,17 +458,17 @@ def test_resolve_non_aider_generic_form_preserved(monkeypatch) -> None:
     # Temporarily verify a builder-less tool to exercise the fallback route.
     monkeypatch.setitem(
         cli_presets.LAUNCH_SUPPORT,
-        "llm",
+        "gptme",
         cli_presets.LaunchSupport(cli_presets.LAUNCH_VERIFIED),
     )
 
     r = client.post(
         "/api/cli-tools/resolve",
-        json={"tool": "llm", "model": "provider:B.AI:gpt-5.5"},
+        json={"tool": "gptme", "model": "provider:B.AI:gpt-5.5"},
     )
     assert r.status_code == 200
     body = r.json()
-    assert body["run_command"] == "llm --model provider:B.AI:gpt-5.5"
+    assert body["run_command"] == "gptme --model provider:B.AI:gpt-5.5"
     # generic tools do NOT get aider's custom-endpoint flags.
     assert "--openai-api-base" not in body["run_command"]
     assert body["env"]["OPENAI_API_BASE"] == "http://localhost:8080/v1"
@@ -1100,3 +1100,58 @@ def test_resolve_qwen_no_model_launches_for_interactive_auth(monkeypatch) -> Non
     assert "model" not in cfg
     assert cfg["env"]["OPENAI_API_KEY"] == "plain-key-xyz"
     assert rc.split(_HEREDOC_CLOSE)[-1] == "qwen"
+
+
+# =========================================================================== #
+# 11. llm launch builder — documented endpoint form, no config file needed.
+#
+# docs/other-models.md ("Run against an endpoint without configuring it"):
+#   llm openai endpoint <base_url> -m <model> --key <key> --chat
+# The command registers nothing and deliberately does NOT send the user's
+# configured OpenAI key, so the gateway key is passed explicitly.
+# =========================================================================== #
+def test_resolve_llm_uses_documented_endpoint_chat(monkeypatch) -> None:
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)  # key = plain-key-xyz
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve",
+        json={"tool": "llm", "model": "provider:B.AI:gpt-5.5"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["run_command"] == (
+        "llm openai endpoint http://localhost:8080/v1 "
+        "-m gpt-5.5 --key plain-key-xyz --chat"
+    )
+    # no config file is written for llm (nothing in the user's llm home changes)
+    assert "AIGATE_EOF" not in body["run_command"]
+    assert "provider:" not in body["run_command"]
+
+
+def test_resolve_llm_combo_ref_passed_verbatim(monkeypatch) -> None:
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    with sf() as s:
+        s.add(Combo(name="Test", strategy="fallback", enabled=True))
+        s.commit()
+    client = _client(monkeypatch, sf)
+
+    r = client.post("/api/cli-tools/resolve", json={"tool": "llm", "model": "combo:Test"})
+    assert "-m combo:Test" in r.json()["run_command"]
+
+
+def test_resolve_llm_no_model_lists_gateway_models(monkeypatch) -> None:
+    """No model chosen -> discovery flag, never an invented model id."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    client = _client(monkeypatch, sf)
+
+    r = client.post("/api/cli-tools/resolve", json={"tool": "llm"})
+    rc = r.json()["run_command"]
+    assert rc == "llm openai endpoint http://localhost:8080/v1 --models"
+    assert " -m " not in rc  # never invent a model id

@@ -185,7 +185,7 @@ LAUNCH_SUPPORT: Dict[str, LaunchSupport] = {
     "swe-agent": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_INSTALL_UNVERIFIED),
     "autogpt": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_INSTALL_UNVERIFIED),
     # --- Group C: chat & shell ---
-    "llm": LaunchSupport(LAUNCH_PENDING),
+    "llm": LaunchSupport(LAUNCH_VERIFIED),
     "oterm": LaunchSupport(LAUNCH_PENDING),
     "gptme": LaunchSupport(LAUNCH_PENDING),
     "sgpt": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_INSTALL_UNVERIFIED),

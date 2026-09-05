@@ -566,12 +566,38 @@ def _qwen_builder(ctx: _LaunchCtx) -> str:
     return cmd
 
 
+def _llm_builder(ctx: _LaunchCtx) -> str:
+    """llm's documented one-shot form for ANY OpenAI-compatible endpoint.
+
+    ``llm openai endpoint <base_url> -m <model> --key <key> --chat``
+    (docs/other-models.md, "Run against an endpoint without configuring it").
+    Chosen over ``extra-openai-models.yaml`` because it needs no config file at
+    all — nothing in the user's llm home is written or registered, and the
+    gateway base url is passed per invocation. ``--chat`` gives the interactive
+    session a terminal tab wants; the docs note the command does NOT send the
+    user's configured OpenAI key, so the gateway key is passed explicitly
+    (ADR-007: local app, plaintext key is the documented injection route).
+
+    No model chosen -> ``--models`` lists what the gateway advertises (the
+    documented discovery flag) instead of inventing a model id.
+    """
+    parts: List[str] = [ctx.binary_name, "openai", "endpoint", ctx.base]
+    if ctx.default_flags:
+        parts.append(ctx.default_flags)
+    if ctx.raw_model:
+        parts += ["-m", ctx.raw_model, "--key", ctx.key, "--chat"]
+    else:
+        parts.append("--models")
+    return " ".join(parts)
+
+
 # binary_name -> builder. Anything absent uses ``_generic_builder``.
 _LAUNCH_BUILDERS: Dict[str, Callable[[_LaunchCtx], str]] = {
     "aider": _aider_builder,
     "opencode": _opencode_builder,
     "aichat": _aichat_builder,
     "qwen": _qwen_builder,
+    "llm": _llm_builder,
 }
 
 

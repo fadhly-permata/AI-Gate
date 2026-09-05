@@ -48,7 +48,7 @@ groups:
   - id: chat_shell            # Grup C
     label: "Chat & Shell Assistants"
     tools:
-      - { name: llm,    binary: llm,    install: "pip install llm",   launch: pending }
+      - { name: llm,    binary: llm,    install: "pip install llm",   launch: verified }
       - { name: sgpt,   binary: sgpt,   install: null,                launch: unsupported }
       - { name: mods,   binary: mods,   install: null,                launch: unsupported }
       - { name: oterm,  binary: oterm,  install: "pip install oterm", launch: pending }
@@ -121,6 +121,9 @@ ini berubah mengikuti builder, bukan data user), diekspos lewat `ToolDTO`
   `security.auth.selectedType = "openai"`, `model.name = <id>`, `env`
   berisi key. Auth type `openai` = protokol OpenAI-compatible (docs:
   `docs/users/configuration/auth.md`).
+- **llm** — tidak perlu file config sama sekali: `llm openai endpoint <base>
+  -m <model> --key <key> --chat` (docs: "Run against an endpoint without
+  configuring it"). Tanpa model -> `--models` (daftar model dari gateway).
 - **gemini** — dokumen resminya (docs/cli/model.md + settings.md) TIDAK
   mengenal provider OpenAI-compatible; hanya API Gemini → `unsupported`
   (`gemini_only`), bukan sekadar belum dikerjain.
