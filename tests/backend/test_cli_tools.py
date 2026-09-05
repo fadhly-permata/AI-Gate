@@ -224,6 +224,10 @@ def test_list_cli_tools(monkeypatch) -> None:
     # tool is a library + web app, its documented "CLI" is a repo-checkout
     # one-shot script (python cli.py "<query>"), not a launchable binary
     assert modes["gpt-researcher"] == ("unsupported", "not_a_cli")
+    # unsupported: the `crewai` binary is a framework project scaffolder/runner
+    # (`crewai run`/`crewai chat` need a generated crew project in the CWD and
+    # take no model/base-url at launch) — not a launchable assistant
+    assert modes["crewai"] == ("unsupported", "not_a_cli")
 
 
 # =========================================================================== #
@@ -262,6 +266,9 @@ def test_resolve_tool_by_name(monkeypatch) -> None:
         ("antigravity", "unsupported", "not_a_cli"),  # GUI IDE, no binary
         # library + web app only: pip installs NO `gpt-researcher` binary
         ("gpt-researcher", "unsupported", "not_a_cli"),
+        # framework project-runner: `crewai run`/`chat` need a generated crew
+        # project in the CWD; no model/base-url at launch
+        ("crewai", "unsupported", "not_a_cli"),
     ],
 )
 def test_resolve_unverified_tool_is_refused(monkeypatch, tool, mode, reason) -> None:

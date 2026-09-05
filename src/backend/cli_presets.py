@@ -193,7 +193,17 @@ LAUNCH_SUPPORT: Dict[str, LaunchSupport] = {
     # requires a query and exits after writing a report file — no binary to
     # spawn and no interactive chat. See CLI_CONFIG_SCHEMA.md bullet (2026-09-05).
     "gpt-researcher": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NOT_A_CLI),
-    "crewai": LaunchSupport(LAUNCH_PENDING),
+    # NOT A LAUNCHABLE ASSISTANT: the `crewai` console script exists
+    # (lib/crewai/pyproject.toml [project.scripts]), but it is a framework
+    # project scaffolder/runner: `crewai run` runs the Crew/Flow DEFINED BY THE
+    # PROJECT in the CWD (docs: "Make sure to run these commands from the
+    # directory where your CrewAI project is set up"), and `crewai chat` is an
+    # interactive session with THAT crew (crew_chat.run_chat -> read_toml() +
+    # load_crew_and_name()). Neither takes a model/base-url/prompt at launch —
+    # the OpenAI-compatible route (LLM(model="openai/<id>", base_url=...)) is
+    # Python code inside the generated project, not a CLI surface. In an empty
+    # directory both error out. See CLI_CONFIG_SCHEMA.md bullet (2026-09-06).
+    "crewai": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NOT_A_CLI),
     "swe-agent": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_INSTALL_UNVERIFIED),
     "autogpt": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_INSTALL_UNVERIFIED),
     # --- Group C: chat & shell ---

@@ -44,7 +44,7 @@ groups:
       - { name: open-interpreter, binary: interpreter,      install: "pip install open-interpreter", launch: verified }
       - { name: autogpt,          binary: autogpt,          install: null,                          launch: unsupported }
       - { name: gpt-researcher,   binary: gpt-researcher,   install: "pip install gpt-researcher",  launch: unsupported }
-      - { name: crewai,           binary: crewai,           install: "pip install crewai",          launch: pending }
+      - { name: crewai,           binary: crewai,           install: "pip install crewai",          launch: unsupported }
   - id: chat_shell            # Grup C
     label: "Chat & Shell Assistants"
     tools:
@@ -211,6 +211,20 @@ ini berubah mengikuti builder, bukan data user), diekspos lewat `ToolDTO`
   `OPENAI_API_KEY` + `FAST_LLM=openai:<id>` — catatan: namanya `OPENAI_BASE_URL`,
   bukan `OPENAI_API_BASE` yang di-export launcher), tapi tidak ada binary yang
   bisa di-launch → `unsupported` (`not_a_cli`), bukan sekadar belum dikerjain.
+- **crewai** — binary-nya ADA (`[project.scripts] crewai =
+  "crewai_cli.cli:crewai"`), tapi ini CLI framework project-runner, BUKAN
+  asisten chat yang bisa di-launch: `crewai run` = "Run the Crew or Flow" —
+  menjalankan crew/flow YANG DEFINED DI PROJECT hasil `crewai create` (docs
+  CLI: "Make sure to run these commands from the directory where your CrewAI
+  project is set up"; flag-nya cuma `-f/--filename`, `--definition`,
+  `--inputs` — tidak ada model/base-url/prompt), dan `crewai chat` = "an
+  interactive session with YOUR CREW" (source `crew_chat.py`: `read_toml()` +
+  `load_crew_and_name()` — wajib project generated). Di direktori kosong dua
+  command itu error. Rute OpenAI-compatible-nya (`LLM(model="openai/<id>",
+  base_url=...)`, docs concepts/llms + learn/custom-llm) adalah KODE PYTHON di
+  dalam project — bukan permukaan CLI, jadi tidak ada yang bisa disuntik saat
+  launch → `unsupported` (`not_a_cli`). DOCS-verified (docs.crewai.com
+  v1.15.20 + source repo, dibaca 2026-09-06).
 - **gemini** — dokumen resminya (docs/cli/model.md + settings.md) TIDAK
   mengenal provider OpenAI-compatible; hanya API Gemini → `unsupported`
   (`gemini_only`), bukan sekadar belum dikerjain.
