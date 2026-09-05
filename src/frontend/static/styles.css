@@ -1,0 +1,1490 @@
+/* ===== aigate UI shell — vanilla CSS (AdminLTE-like, no framework) ===== */
+
+:root {
+  /* Light theme (default) */
+  --bg: #f4f6f9;
+  --fg: #343a40;
+  --panel: #ffffff;
+  --panel-border: #e3e6ea;
+  --sidebar-bg: #343a40;
+  --sidebar-fg: #c2c7d0;
+  --sidebar-fg-hover: #ffffff;
+  --sidebar-active: #007bff;
+  --accent: #007bff;
+  --accent-contrast: #ffffff;
+  --muted: #6c757d;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+
+  --header-h: 56px;
+  --sidebar-w: 230px;
+  --sidebar-w-collapsed: 56px;
+  --radius: 8px;
+  --transition: 0.22s ease;
+  /* Uniform workspace padding (overridden per breakpoint). Kept as a token so
+     the Log Window reservation below can add to the correct base value. */
+  --ws-pad: 18px;
+  /* Height reserved at the bottom of the workspace for the docked Log Window.
+     0 when hidden; JS measures the panel and sets this via ResizeObserver so
+     the fixed panel never overlaps the terminal / view content. */
+  --log-h: 0px;
+
+  /* ---- Terminal panel tokens (redesign) ----
+     ONE inset token (--term-pad) drives BOTH the tab strip padding and the
+     terminal surface inset, so the xterm glyph column and the tab strip can
+     never drift apart: the strip pads all four sides with it, the surface pads
+     left (glyph column flush with the first tab) and top/bottom on the .xterm
+     box (the only padding FitAddon subtracts from its row budget). The xterm
+     viewport scrollbar is sized to the same token and lives in the right
+     gutter, so the panel reads symmetric on both sides.
+     The terminal surface is always dark (xterm theme bg #1e1e1e); only the
+     frame + the active-tab tint follow the app theme. */
+  --term-pad: 8px;
+  --term-gap: 6px;
+  --term-ctl: 30px;          /* one height: tabs, + button, floating controls */
+  --term-tab-radius: 6px;
+  --term-surface: #1e1e1e;   /* == xterm theme.background (do not diverge) */
+  --term-chrome: #26292f;    /* tab strip */
+  --term-chrome-fg: #b9bfc9;
+  --term-chrome-fg-strong: #f4f6f9;
+  --term-divider: #14161a;   /* 1px seam between tab strip and surface */
+  --term-frame: #e3e6ea;
+  --term-tab-bg: rgba(255, 255, 255, 0.05);
+  --term-tab-bg-hover: rgba(255, 255, 255, 0.11);
+  --term-tab-border: rgba(255, 255, 255, 0.10);
+  --term-tab-active-bg: rgba(0, 123, 255, 0.22);
+  --term-empty-fg: #8b929c;
+}
+
+[data-theme="dark"] {
+  --bg: #1a1d21;
+  --fg: #e4e6eb;
+  --panel: #252a30;
+  --panel-border: #343a40;
+  --sidebar-bg: #1f2329;
+  --sidebar-fg: #aeb6c2;
+  --sidebar-fg-hover: #ffffff;
+  --sidebar-active: #375a7f;
+  --accent: #4a9eff;
+  --accent-contrast: #ffffff;
+  --muted: #8b929c;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  /* Terminal: frame blends into the dark shell; active tab tint follows the
+     brighter dark accent. Surface/chrome stay identical (always-dark pane). */
+  --term-frame: #343a40;
+  --term-tab-active-bg: rgba(74, 158, 255, 0.22);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+/* ===== Layout grid ===== */
+.layout {
+  display: grid;
+  grid-template-rows: var(--header-h) 1fr;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  /* MOBILE FIX: 100vh is TALLER than the visible viewport on Android Chrome
+     (it ignores the URL bar), so the app bottom — the terminal — was pushed
+     below the fold and its last rows were unreachable. 100dvh tracks the
+     DYNAMIC (visible) viewport, shrinking the whole app to fit so the terminal
+     bottom is always on screen with no page scroll. 100vh stays as the
+     fallback for engines that do not support dvh (declared first so dvh wins
+     where supported). Mirrors the fullscreen rule below. */
+  height: 100vh;   /* fallback */
+  height: 100dvh;  /* dynamic viewport — excludes mobile URL/keyboard bars */
+  transition: grid-template-columns var(--transition);
+}
+
+body.sidebar-collapsed .layout {
+  grid-template-columns: var(--sidebar-w-collapsed) 1fr;
+}
+
+/* ===== Top bar ===== */
+.topbar {
+  grid-row: 1;
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--panel-border);
+  box-shadow: var(--shadow);
+  z-index: 10;
+}
+
+.topbar-left,
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-title {
+  font-weight: 700;
+  font-size: 17px;
+  color: var(--accent);
+  letter-spacing: 0.3px;
+}
+
+.app-subtitle {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  font-size: 16px;
+  transition: background var(--transition), color var(--transition);
+}
+
+.icon-btn:hover {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lang-btn {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: color var(--transition), background var(--transition);
+}
+
+.lang-btn:hover { color: var(--fg); }
+
+.lang-btn.active {
+  color: var(--accent-contrast);
+  background: var(--accent);
+}
+
+.lang-sep { color: var(--muted); }
+
+/* ===== Sidebar ===== */
+.sidebar {
+  grid-row: 2;
+  grid-column: 1;
+  background: var(--sidebar-bg);
+  color: var(--sidebar-fg);
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-top: 10px;
+  transition: width var(--transition);
+}
+
+.nav { display: flex; flex-direction: column; }
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  color: var(--sidebar-fg);
+  text-decoration: none;
+  white-space: nowrap;
+  border-left: 3px solid transparent;
+  transition: background var(--transition), color var(--transition),
+              border-color var(--transition);
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--sidebar-fg-hover);
+}
+
+.nav-item.active {
+  background: rgba(255, 255, 255, 0.05);
+  border-left-color: var(--sidebar-active);
+  color: var(--sidebar-fg-hover);
+}
+
+.nav-icon {
+  flex: 0 0 auto;
+  width: 22px;
+  text-align: center;
+  font-size: 16px;
+}
+
+.nav-label {
+  transition: opacity var(--transition);
+}
+
+/* Collapsed: icons only */
+body.sidebar-collapsed .nav-label {
+  display: none;
+}
+
+body.sidebar-collapsed .nav-item {
+  justify-content: center;
+  padding: 12px 0;
+}
+
+/* ===== Workspace ===== */
+.workspace {
+  grid-row: 2;
+  grid-column: 2;
+  padding: var(--ws-pad);
+  overflow-y: auto;
+}
+
+/* Views: only the active one is shown (nav switches between them). */
+.view { display: none; }
+.view.is-active { display: block; }
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 22px;
+}
+
+.welcome-card {
+  max-width: 640px;
+  margin: 8vh auto 0;
+  text-align: center;
+}
+
+.welcome-title {
+  margin: 0 0 10px;
+  color: var(--accent);
+  font-size: 24px;
+}
+
+.welcome-text {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* ===== Settings panel (B1.3) ===== */
+.settings-card { max-width: 540px; }
+
+.settings-title {
+  margin: 0 0 18px;
+  color: var(--accent);
+  font-size: 20px;
+}
+
+.settings-form { display: block; }
+
+.form-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.form-label {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.form-input {
+  width: 240px;
+  max-width: 60%;
+  padding: 8px 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 14px;
+  transition: border-color var(--transition);
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Toggle switch (developer mode) */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.switch input { opacity: 0; width: 0; height: 0; }
+
+.switch-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: var(--muted);
+  border-radius: 24px;
+  transition: background var(--transition);
+}
+
+.switch-slider:before {
+  content: "";
+  position: absolute;
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  top: 3px;
+  background: #ffffff;
+  border-radius: 50%;
+  transition: transform var(--transition);
+}
+
+.switch input:checked + .switch-slider { background: var(--accent); }
+.switch input:checked + .switch-slider:before { transform: translateX(20px); }
+
+.form-actions { margin-top: 6px; }
+
+.btn {
+  padding: 9px 18px;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: filter var(--transition);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.btn-primary:hover { filter: brightness(1.05); }
+
+.settings-msg {
+  margin: 14px 0 0;
+  min-height: 18px;
+  font-size: 13px;
+}
+
+.settings-msg-ok { color: #28a745; }
+.settings-msg-error { color: #dc3545; }
+.settings-msg-warn { color: #b8860b; }
+
+[data-theme="dark"] .settings-msg-ok { color: #5dd879; }
+[data-theme="dark"] .settings-msg-error { color: #ff6b6b; }
+[data-theme="dark"] .settings-msg-warn { color: #e0b64b; }
+
+/* Small screens: force collapse-friendly base */
+@media (max-width: 600px) {
+  .app-subtitle { display: none; }
+}
+
+/* ===== Device simulation (B4.2) + responsiveness ===== */
+
+/* Mobile bottom navigation — hidden unless phone simulation or narrow viewport. */
+.bottom-nav {
+  display: none;
+  align-items: center;
+  justify-content: space-around;
+  background: var(--sidebar-bg);
+  color: var(--sidebar-fg);
+  border-top: 1px solid var(--panel-border);
+  z-index: 20;
+}
+
+.bn-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 0;
+  height: 100%;
+  color: var(--sidebar-fg);
+  text-decoration: none;
+  font-size: 18px;
+  transition: color var(--transition), background var(--transition);
+}
+
+.bn-item:hover { color: var(--sidebar-fg-hover); }
+.bn-item.active { color: var(--accent-contrast); background: var(--sidebar-active); }
+
+.settings-dev-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ===== Backup & Restore (B5.7) ===== */
+.backup-card { margin-top: 18px; }
+.backup-card .form-row { flex-wrap: wrap; }
+/* File inputs ignore the fixed .form-input width; let them size naturally. */
+input.form-input[type="file"] {
+  width: auto;
+  max-width: 100%;
+  padding: 6px;
+  border: 1px dashed var(--panel-border);
+  background: var(--bg);
+}
+a.btn { text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+
+/* Tablet: keep the AdminLTE-like layout, just tighten spacing/widths. */
+@media (max-width: 960px) {
+  :root { --sidebar-w: 200px; --ws-pad: 14px; }
+  .card { padding: 18px; }
+  .form-input { width: 200px; max-width: 100%; }
+  .welcome-card { margin-top: 4vh; }
+}
+
+/* Phone — real narrow viewport OR device simulation = phone: NON-AdminLTE shell.
+   Sidebar hidden, content single full-width column, bottom nav (icons only). */
+@media (max-width: 600px) {
+  :root { --ws-pad: 12px; }
+  .layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: var(--header-h) 1fr 56px;
+  }
+  .sidebar { display: none; }
+  .topbar { padding: 0 10px; }
+  .app-subtitle { display: none; }
+  .workspace {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .bottom-nav {
+    display: flex;
+    grid-column: 1;
+    grid-row: 3;
+    height: 56px;
+  }
+  .settings-card, .welcome-card { max-width: 100%; }
+  .cli-tools { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+  .data-table { display: block; overflow-x: auto; white-space: nowrap; }
+  .modal { width: 100%; }
+}
+
+body[data-device="phone"] { --ws-pad: 12px; }
+body[data-device="phone"] .layout {
+  grid-template-columns: 1fr;
+  grid-template-rows: var(--header-h) 1fr 56px;
+}
+body[data-device="phone"] .sidebar { display: none; }
+body[data-device="phone"] .topbar { padding: 0 10px; }
+body[data-device="phone"] .app-subtitle { display: none; }
+body[data-device="phone"] .workspace {
+  grid-column: 1;
+  grid-row: 2;
+}
+body[data-device="phone"] .bottom-nav {
+  display: flex;
+  grid-column: 1;
+  grid-row: 3;
+  height: 56px;
+}
+body[data-device="phone"] .settings-card,
+body[data-device="phone"] .welcome-card { max-width: 100%; }
+body[data-device="phone"] .cli-tools { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+body[data-device="phone"] .data-table { display: block; overflow-x: auto; white-space: nowrap; }
+body[data-device="phone"] .modal { width: 100%; }
+
+
+/* ===== Providers management (B2.2) ===== */
+.providers-card { margin-bottom: 18px; }
+
+.providers-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.providers-title {
+  margin: 0;
+  color: var(--accent);
+  font-size: 20px;
+}
+
+.providers-detail { margin-bottom: 18px; }
+
+.detail-actions { display: flex; align-items: center; gap: 8px; }
+
+/* Data table */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.data-table th {
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.4px;
+}
+
+.data-table tbody tr:hover { background: var(--bg); }
+
+.row-edit {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+.row-edit:hover { text-decoration: underline; }
+
+.row-actions { white-space: nowrap; }
+.row-actions .icon-btn-small { margin-left: 4px; }
+
+.empty-cell {
+  text-align: center;
+  color: var(--muted);
+  padding: 18px 12px;
+}
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.badge-ok { background: rgba(40,167,69,0.15); color: #28a745; }
+.badge-off { background: rgba(108,117,125,0.18); color: var(--muted); }
+[data-theme="dark"] .badge-ok { color: #5dd879; }
+[data-theme="dark"] .badge-off { color: #aeb6c2; }
+
+/* Small icon buttons (table row actions) */
+.icon-btn-small {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  font-size: 13px;
+  transition: background var(--transition), color var(--transition);
+}
+.icon-btn-small:hover { background: var(--accent); color: var(--accent-contrast); }
+
+/* Danger variant */
+.btn-danger { background: #dc3545; color: #fff; }
+.btn-danger:hover { filter: brightness(1.05); }
+[data-theme="dark"] .btn-danger { background: #c0392b; }
+
+/* Custom headers editor */
+.form-row-stack {
+  flex-direction: column;
+  align-items: stretch;
+}
+.form-row-stack .form-label { margin-bottom: 8px; }
+
+.headers-editor { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+
+.header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.header-row .hdr-key,
+.header-row .hdr-val { width: 100%; flex: 1; max-width: none; }
+
+/* Combo members editor (B5.x) — inline add/edit/remove. The sub-form is a
+   responsive labeled grid: 4 fields in 2 columns (Provider|Model over
+   Priority|Weight) so no field is orphaned by mid-row wrapping, with the
+   Add/Cancel buttons on their own aligned row. Stacks to a single column on
+   narrow screens. Reuses .form-label/.form-input; theme-safe (custom props). */
+.combo-members-row { display: block; }
+.combo-members-row > .form-label { display: block; margin-bottom: 8px; }
+
+.combo-member-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+.combo-member-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.combo-member-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.combo-member-field .form-label {
+  display: block;
+  margin: 0;
+  font-size: 13px;
+}
+.combo-member-field .form-input {
+  width: 100%;
+  max-width: none;
+}
+/* Model field: a searchable combobox (text input + custom <ul> panel that
+   filters as you type). Works on Android (unlike <datalist>) and supports
+   type-to-search (unlike a <select>). The spinner overlays the input row. */
+.combo-model-control { display: flex; flex-direction: column; gap: 6px; }
+.combo-model-control [hidden] { display: none; }
+.combo-model-select-row { position: relative; display: flex; align-items: center; }
+.combo-model-select-row .form-input { flex: 1 1 auto; min-width: 0; }
+.combo-model-spinner {
+  position: absolute;
+  right: 10px; /* clear the text cursor; combobox has no native arrow */
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  color: var(--muted, #888);
+  font-size: 14px;
+  pointer-events: none;
+}
+.combo-model-spinner[hidden] { display: none; }
+
+/* ===== Searchable combobox (combobox.js) =====
+   The wrapper (.aigate-combo) is position:relative; the panel
+   (.aigate-combo-list) is absolutely positioned under the input, scrollable,
+   with >=40px touch rows. It flips above the input (.aigate-combo-up) when it
+   would overflow the viewport bottom (short screens / mobile keyboard).
+   Theme-safe: uses the same custom properties as the rest of the UI. */
+.aigate-combo { position: relative; }
+.aigate-combo-list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 40;
+  max-height: 220px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 4px 0 0;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.aigate-combo-list[hidden] { display: none; }
+.aigate-combo-list.aigate-combo-up {
+  top: auto;
+  bottom: 100%;
+  margin: 0 0 4px;
+}
+.aigate-combo-list .aigate-combo-opt {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: var(--fg);
+  cursor: pointer;
+  line-height: 1.2;
+}
+.aigate-combo-list .aigate-combo-opt:hover,
+.aigate-combo-list .aigate-combo-opt.aigate-combo-active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+.aigate-combo-list .aigate-combo-msg {
+  padding: 10px 12px;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--muted);
+}
+
+.combo-member-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* Narrow viewports / phone shell: stack the labeled fields in order. */
+@media (max-width: 480px) {
+  .combo-member-fields { grid-template-columns: 1fr; }
+}
+body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
+
+.hdr-add { align-self: flex-start; }
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+}
+.modal-overlay[hidden] { display: none; }
+
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 22px;
+  width: 100%;
+  max-width: 540px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-title {
+  margin: 0 0 18px;
+  color: var(--accent);
+  font-size: 20px;
+}
+
+/* ===== Terminal view (B3.1) — ONE COHESIVE PANEL =====
+   The tab strip and the terminal surface are two rows of a single framed panel
+   (.terminal-body): shared dark surface colour, one 1px seam between them, and
+   ONE horizontal inset token (--term-pad) used by both, so the glyph column and
+   the tab strip are flush-left and the panel is left/right symmetric.
+
+   Height chain (hard-won, do not regress): the active view is an exact-fit flex
+   column filling the workspace content box (height:100% + overflow:hidden); the
+   body and the stage flex-fill with min-height:0 and NO vh/px floor, so the
+   stage takes exactly the leftover height and the page never scrolls. When the
+   Log Window is visible its --log-h padding shrinks the workspace content box
+   and the whole chain re-fills the smaller box automatically. */
+.view[data-view="terminal"].is-active,
+.terminal-view.is-active {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden; /* exact fit: scrollHeight == clientHeight, never scrolls */
+}
+
+.terminal-body {
+  /* The panel itself: one frame, one radius, one clip. No padding — the inset
+     lives in the toolbar and the terminal container so both share --term-pad. */
+  padding: 0;
+  background: var(--term-surface);
+  border: 1px solid var(--term-frame);
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  /* Exact-fit flex child: grows to fill the view, floor is 0 (NOT a vh/px
+     minimum — a floor taller than the leftover space was the scroll bug). */
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* ---- Tab strip: row 1 of the panel ---- */
+.term-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--term-gap);
+  padding: var(--term-pad);
+  background: var(--term-chrome);
+  border-bottom: 1px solid var(--term-divider); /* the only seam in the panel */
+  flex: 0 0 auto; /* natural height; the stage below grows to fill */
+}
+
+.term-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--term-gap);
+  /* Shrink-to-content: the "+" sits right after the last tab, and when the tabs
+     overflow the strip it shrinks to the available room and scrolls instead of
+     pushing the "+" / controls out of reach. */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-x: auto;      /* many tabs -> scroll the strip, never wrap */
+  overflow-y: hidden;
+  /* The strip scrollbar is hidden on purpose: a classic scrollbar would take
+     layout space and change the toolbar height (and thus the stage height)
+     when many tabs are open. Tabs stay reachable by wheel/trackpad and the
+     active tab is scrolled into view by terminal.js. */
+  scrollbar-width: none;
+}
+.term-tabs::-webkit-scrollbar { display: none; }
+
+.term-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  height: var(--term-ctl);
+  padding: 0 10px;
+  border: 1px solid var(--term-tab-border);
+  border-radius: var(--term-tab-radius);
+  background: var(--term-tab-bg);
+  color: var(--term-chrome-fg);
+  cursor: pointer;
+  font-size: 12px;
+  max-width: 160px;
+  white-space: nowrap;
+  transition: background var(--transition), color var(--transition),
+              border-color var(--transition);
+}
+.term-tab:hover {
+  background: var(--term-tab-bg-hover);
+  color: var(--term-chrome-fg-strong);
+}
+.term-tab.active {
+  background: var(--term-tab-active-bg);
+  border-color: var(--accent);
+  color: var(--term-chrome-fg-strong);
+}
+.term-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.term-tab-label {
+  font-family: "Menlo", "Consolas", monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.term-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--term-chrome-fg);
+  cursor: pointer;
+}
+.term-tab-close:hover { background: var(--term-tab-bg-hover); color: #fff; }
+
+/* "+" new-tab button: same box as a tab, reads as an affordance not a tab. */
+.term-toolbar .term-newtab {
+  flex: 0 0 auto;
+  width: var(--term-ctl);
+  height: var(--term-ctl);
+  border: 1px dashed var(--term-tab-border);
+  border-radius: var(--term-tab-radius);
+  background: transparent;
+  color: var(--term-chrome-fg);
+  font-size: 14px;
+}
+.term-toolbar .term-newtab:hover {
+  background: var(--term-tab-bg-hover);
+  border-style: solid;
+  border-color: var(--accent);
+  color: var(--term-chrome-fg-strong);
+}
+
+/* ---- Terminal surface: row 2 of the panel ---- */
+.term-stage {
+  position: relative;
+  flex: 1 1 auto;
+  background: var(--term-surface);
+  /* Exact-fit: flex-fills whatever the toolbar leaves. NO min-height floor
+     (the old 28vh pinned the stage taller than the leftover space on short
+     viewports / when the Log Window reserved room -> page scroll). min-height:0
+     lets it shrink below content so the view never overflows the workspace. */
+  min-height: 0;
+  touch-action: none; /* we own swipe gestures; mouse wheel still scrolls xterm */
+}
+
+/* MOBILE SWIPE FIX: `touch-action: none` is NOT inherited, so the xterm layers
+   mounted INSIDE the stage kept their default touch-action. A touch landing on
+   the terminal therefore triggered the browser's NATIVE pan on `.xterm-viewport`
+   (overflow-y:scroll) / selection on `.xterm-screen`, and the moment the browser
+   claimed the gesture it fired `pointercancel` — which killed our `pointermove`
+   stream, so the swipe handler never drove a scroll. Disabling touch-action on
+   the interactive xterm layers stops the native pan/selection takeover so the
+   pointer gesture reaches our swipe handler (terminal.js setupSwipe). Mouse
+   wheel is unaffected: it is a `wheel` event, not governed by touch-action, and
+   mouse text-selection uses `mousedown`, not touch. */
+.term-stage .xterm,
+.term-stage .xterm-viewport,
+.term-stage .xterm-screen,
+.term-stage .xterm-helper-textarea {
+  touch-action: none;
+}
+
+.term-containers {
+  position: absolute;
+  inset: 0;
+}
+
+/* The single horizontal inset, shared with the toolbar: it lives on the LEFT of
+   the terminal surface so the glyph column starts exactly where the tab strip
+   starts. FitAddon measures THIS element's border-box width and subtracts the
+   viewport scrollbar from it, so the left pad is absorbed into the scrollbar
+   gutter -> the glyph column ends up ~equidistant from both frame edges.
+   NO vertical padding here: FitAddon does NOT subtract a parent's padding-top/
+   bottom, so vertical padding on this box made it render more rows than fit and
+   the last row was clipped by the panel edge (worse in fullscreen). */
+.term-tab-container {
+  width: 100%;
+  height: 100%;
+  padding: 0 0 0 var(--term-pad);
+}
+/* The vertical inset lives on the .xterm element itself, which FitAddon DOES
+   subtract from the row budget -> the grid always fits inside the panel and the
+   first/last row are never clipped. */
+.term-tab-container .xterm {
+  height: 100%;
+  padding-top: var(--term-pad);
+  padding-bottom: var(--term-pad);
+}
+.term-tab-container .xterm-viewport { height: 100%; }
+
+/* xterm's viewport is black by default and reserves a 15px classic scrollbar;
+   retint it to the panel surface and slim it to the shared inset so FitAddon
+   (which reads the real measured scrollbar width) keeps the columns symmetric. */
+.term-tab-container .xterm .xterm-viewport { background-color: var(--term-surface); }
+.term-tab-container .xterm .xterm-viewport::-webkit-scrollbar { width: var(--term-pad); }
+.term-tab-container .xterm .xterm-viewport::-webkit-scrollbar-track { background: transparent; }
+.term-tab-container .xterm .xterm-viewport::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: calc(var(--term-pad) / 2);
+}
+.term-tab-container .xterm .xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+/* ---- Empty state: no tabs yet (before the first session opens) ---- */
+.term-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: var(--term-pad);
+  text-align: center;
+  background: var(--term-surface);
+  color: var(--term-empty-fg);
+  font-size: 13px;
+}
+.term-empty[hidden] { display: none; }
+.term-empty-icon { font-size: 26px; opacity: 0.55; }
+.term-empty-text { margin: 0; max-width: 34ch; line-height: 1.5; }
+.term-empty .btn { font-size: 13px; padding: 8px 16px; }
+
+/* ---- Control cluster: right end of the tab strip ----
+   It used to float over the top-right of the terminal surface, where it covered
+   the first line of output. Docked into the strip it is top-right of the panel,
+   the same height as the tabs, and it can never overlap text or a tab. */
+.term-floating {
+  position: relative;
+  flex: 0 0 auto;
+  margin-left: auto;            /* always pinned to the right edge of the strip */
+  display: flex;
+  align-items: center;
+  gap: var(--term-gap);
+  padding-left: var(--term-gap);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  pointer-events: none; /* only the buttons capture events */
+}
+.term-floating .term-ctl {
+  pointer-events: auto;
+  width: var(--term-ctl);
+  height: var(--term-ctl);
+  border-radius: var(--term-tab-radius);
+  background: var(--term-tab-bg);
+  color: var(--term-chrome-fg);
+  font-size: 14px;
+}
+.term-floating .term-ctl:hover {
+  background: var(--term-tab-bg-hover);
+  color: var(--term-chrome-fg-strong);
+}
+.term-floating .term-ctl[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+/* Disabled control (e.g. Keep Screen On without a secure context): visibly off
+   and NOT hoverable, so it never looks like a broken button. */
+.term-floating .term-ctl[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.term-floating .term-ctl[aria-disabled="true"]:hover {
+  background: var(--term-tab-bg);
+  color: var(--term-chrome-fg);
+}
+
+/* ---- Split buttons + dropdown menus (terminal controls) ----
+   A main .term-ctl (its default action) glued to a narrow caret that opens a
+   popover. Touch-first: the menu opens on TAP only (no :hover reveal), items are
+   real <button>s sized for a finger, and only one menu is ever open (terminal.js
+   enforces it). The cluster keeps pointer-events:none, so the popover has to
+   opt back in explicitly or taps would fall through to the terminal. */
+.term-split {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+}
+.term-split .term-ctl {
+  border-radius: 0;
+}
+.term-split .term-ctl:first-child {
+  border-radius: var(--term-tab-radius) 0 0 var(--term-tab-radius);
+}
+/* The caret is a separate tap target, so it keeps a visible seam against the
+   main button instead of being glued invisibly. */
+.term-split .term-caret {
+  border-radius: 0 var(--term-tab-radius) var(--term-tab-radius) 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  width: auto;
+  min-width: 18px;
+  padding: 0 4px;
+  font-size: 12px;
+}
+.term-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 220;                 /* above the stage AND the fullscreen cluster */
+  min-width: 190px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--term-chrome);
+  border: 1px solid var(--term-frame);
+  border-radius: var(--term-tab-radius);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+  pointer-events: auto;
+}
+.term-menu[hidden] { display: none; }
+.term-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;             /* Android touch target */
+  padding: 0 10px;
+  border: none;
+  border-radius: calc(var(--term-tab-radius) - 2px);
+  background: transparent;
+  color: var(--term-chrome-fg-strong);
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.term-menu-item:hover { background: var(--term-tab-bg-hover); }
+.term-menu-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+/* The active choice of a toggle-style menu (fullscreen mode currently on). */
+.term-menu-item[aria-checked="true"] {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+.term-menu-item[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.term-menu-item[aria-disabled="true"]:hover { background: transparent; }
+/* Caret hook: true browser fullscreen is currently held (terminal.js sets
+   data-fs from the fullscreenchange event). aria-pressed is deliberately NOT
+   used here — the caret is a menu button (aria-haspopup), not a toggle. */
+.term-split .term-caret[data-fs="on"] {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+/* Fullscreen toggle: expand the whole terminal body over the viewport.
+   BUG2: was `height: calc(100vh - 43px)` on the stage — 100vh is TALLER than
+   the visible viewport on Android/mobile (URL/keyboard bars), so the last rows
+   were clipped, and the hardcoded 43px toolbar height was fragile. Now the body
+   is a fixed flex column sized to the DYNAMIC viewport (100dvh, with a 100vh
+   fallback for engines that lack it); the toolbar keeps its natural height and
+   the stage flex-fills exactly whatever space is visible. */
+.terminal-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  padding: 0 !important;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;   /* fallback */
+  height: 100dvh;  /* dynamic viewport — excludes mobile URL/keyboard bars */
+  /* Edge-to-edge: drop the panel frame so nothing is rounded off-screen. */
+  border: none;
+  border-radius: 0;
+}
+.terminal-fullscreen .term-toolbar { flex: 0 0 auto; }
+.terminal-fullscreen .term-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+/* Keep the controls (fullscreen/paste/TUI) stacked above the stage in
+   fullscreen so they stay tappable. */
+.terminal-fullscreen .term-floating { z-index: 210; }
+
+/* Phone / narrow: bigger tap targets, same shared inset. */
+@media (max-width: 600px) {
+  .terminal-body { --term-ctl: 34px; --term-gap: 5px; }
+}
+body[data-device="phone"] .terminal-body { --term-ctl: 34px; --term-gap: 5px; }
+
+/* ===== Log Window (B3.1) — GLOBAL, fixed bottom-docked, show/hide ===== */
+.logwindow {
+  position: fixed;
+  left: var(--sidebar-w);
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  padding: 10px 22px 14px;
+  background: var(--panel);
+  border-top: 1px solid var(--panel-border);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.08);
+  margin: 0;
+}
+
+/* Hidden via the topbar toggle: fully removed from view (no expand/collapse). */
+.logwindow[hidden] { display: none; }
+
+/* Collapsed sidebar shifts the docked panel in. */
+body.sidebar-collapsed .logwindow { left: var(--sidebar-w-collapsed); }
+
+/* Phone simulation / real narrow viewport: sit above the bottom nav (56px). */
+@media (max-width: 600px) {
+  body .logwindow,
+  body[data-device="phone"] .logwindow {
+    left: 0;
+    bottom: 56px;
+  }
+}
+
+/* Reserve space so the fixed panel never covers the terminal / view content.
+   The workspace's content box shrinks by --log-h (0 when hidden), so the
+   height-filling terminal view sits ABOVE the docked panel. Placed after the
+   phone rules so it wins the equal-specificity tie. */
+body.log-visible .workspace {
+  padding-bottom: calc(var(--ws-pad) + var(--log-h));
+}
+
+.logwindow-body {
+  max-height: 240px;
+  overflow: auto;
+  margin-top: 10px;
+}
+
+.muted { color: var(--muted); }
+
+.logwindow-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.logwindow-title {
+  margin: 0;
+  color: var(--accent);
+  font-size: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logwindow-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logwindow-controls .form-label { margin: 0; }
+.logwindow-controls .form-input { width: auto; max-width: none; }
+
+/* Topbar Log Window toggle: dim the icon when the panel is hidden. */
+#logWindowToggle[aria-pressed="false"] { opacity: 0.45; }
+
+/* Severity badges (info=blue, warning=amber, error=red) */
+.badge.sev-info { background: rgba(0,123,255,0.15); color: #007bff; }
+.badge.sev-warning { background: rgba(255,193,7,0.18); color: #b8860b; }
+.badge.sev-error { background: rgba(220,53,69,0.16); color: #dc3545; }
+.badge.sev-unknown { background: rgba(108,117,125,0.18); color: var(--muted); }
+
+[data-theme="dark"] .badge.sev-info { color: #4a9eff; }
+[data-theme="dark"] .badge.sev-warning { color: #ffc107; }
+[data-theme="dark"] .badge.sev-error { color: #ff6b6b; }
+[data-theme="dark"] .badge.sev-unknown { color: #aeb6c2; }
+
+.log-time { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.log-stack { margin-top: 4px; }
+.log-stack pre {
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+
+/* ===== CLI Tools view (B3.4) ===== */
+.cli-card { padding: 18px 20px; }
+.cli-title { margin: 0 0 12px; font-size: 20px; }
+
+/* ===== Self-Heal card (B4.1) ===== */
+.selfheal-card { margin-top: 16px; }
+.selfheal-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+.selfheal-actions .btn[disabled] { opacity: .5; cursor: not-allowed; }
+.selfheal-result {
+  margin-top: 12px;
+  min-height: 18px;
+  white-space: pre-wrap;
+  font-size: 14px;
+}
+.selfheal-result-ok { color: #28a745; }
+.selfheal-result-warn { color: #b8860b; }
+.selfheal-result-error { color: #dc3545; }
+.selfheal-result-info { color: #4285f4; }
+[data-theme="dark"] .selfheal-result-ok { color: #5dd879; }
+[data-theme="dark"] .selfheal-result-warn { color: #e3b341; }
+[data-theme="dark"] .selfheal-result-error { color: #ff6b6b; }
+[data-theme="dark"] .selfheal-result-info { color: #7ab7ff; }
+.cli-groups { display: flex; flex-direction: column; gap: 22px; }
+.cli-group-title {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent, #3b82f6);
+  border-left: 3px solid var(--accent, #3b82f6);
+  padding-left: 8px;
+}
+.cli-tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+.cli-tool {
+  justify-content: center;
+  text-align: center;
+  padding: 10px 12px;
+  font-weight: 500;
+}
+.cli-tool-disabled { opacity: 0.5; }
+/* Struck-through name = not launchable at the gateway yet (no verified launch
+   command, or a wire format aigate does not serve). Kept visible on purpose:
+   the strike is the operator's to-do marker, and the tooltip says why. */
+.cli-tool-unsupported {
+  text-decoration: line-through;
+  opacity: 0.55;
+  cursor: help;
+}
+.cli-hint {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--warn-bg, #fff7e6);
+  color: var(--warn-fg, #8a6d3b);
+  font-size: 13px;
+}
+[data-theme="dark"] .cli-hint {
+  background: rgba(255,193,7,0.12);
+  color: #ffc107;
+}
+
+/* ===== Usage & Quota (B5.5) ===== */
+.usage-range-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.usage-range-controls .form-input { width: auto; }
+
+/* Totals stat cards */
+.usage-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 12px 0 18px;
+}
+.usage-stat {
+  flex: 1 1 140px;
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  text-align: center;
+}
+.usage-stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.usage-stat-label {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* Quota progress bar */
+.usage-progress {
+  display: inline-block;
+  vertical-align: middle;
+  width: 120px;
+  height: 10px;
+  border-radius: 6px;
+  background: var(--panel-border);
+  overflow: hidden;
+}
+.usage-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: 6px;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+.usage-progress-high { background: #dc3545; }
+[data-theme="dark"] .usage-progress-high { background: #ff6b6b; }
+.usage-progress-pct {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.usage-subtitle {
+  margin: 18px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.usage-section { margin-top: 18px; }
+.quota-used { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.quota-reset { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.usage-ts { white-space: nowrap; color: var(--muted); font-size: 13px; }
+
+/* ===== Usage Analytics + Request Log (B5.6) ===== */
+.analytics-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.analytics-controls .form-input { width: auto; }
+
+/* Trend chart: plain CSS vertical bars (R13 — no chart library). */
+.trend-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 190px;
+  padding: 8px 4px 0;
+  margin: 6px 0 14px;
+  border-bottom: 1px solid var(--panel-border);
+  overflow-x: auto;
+}
+.trend-col {
+  flex: 1 1 0;
+  min-width: 16px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+}
+.trend-bar {
+  width: 70%;
+  max-width: 30px;
+  min-width: 6px;
+  background: var(--accent);
+  border-radius: 3px 3px 0 0;
+  opacity: 0.85;
+  transition: height 0.3s ease;
+}
+.trend-bar:hover { opacity: 1; }
+/* Zero buckets: a flat baseline tick so the continuous axis stays honest. */
+.trend-bar-zero { height: 2px; background: var(--panel-border); }
+.trend-label {
+  height: 16px;
+  margin-top: 4px;
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+/* Request Log viewer (debug) */
+.reqlog-card { margin-top: 16px; }
+.reqlog-duration { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.reqlog-details { max-width: 460px; }
+.reqlog-details summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 12px;
+  user-select: none;
+}
+.reqlog-block-title {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.reqlog-details pre {
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 12px;
+  max-height: 260px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.reqlog-truncated {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #b8860b;
+}
+[data-theme="dark"] .reqlog-truncated { color: #ffc107; }
+
+/* Phone: keep the chart scrollable and the payload blocks compact. */
+body[data-device="phone"] .trend-chart { height: 150px; }
+body[data-device="phone"] .reqlog-details { max-width: 240px; }
