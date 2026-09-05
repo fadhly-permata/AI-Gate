@@ -218,6 +218,7 @@ def test_list_cli_tools(monkeypatch) -> None:
     assert modes["llm"] == ("verified", "")
     assert modes["gptme"] == ("verified", "")
     assert modes["kilo"] == ("verified", "")
+    assert modes["open-interpreter"] == ("verified", "")
 
 
 # =========================================================================== #
@@ -1442,3 +1443,101 @@ def test_resolve_kilo_quotes_the_model_flag(monkeypatch) -> None:
     assert rc.endswith(f"{KILO_TAIL} kilo -m 'aigate/m 1;echo pwned'")
     # the same value is JSON-encoded (never bare) inside the config
     assert '"aigate/m 1;echo pwned"' in rc
+
+
+# =========================================================================== #
+# 15. open-interpreter launch builder — documented OpenAI-compatible flags for
+# the PYTHON package that ``pip install open-interpreter`` installs (PyPI
+# open-interpreter 0.4.3, 2024-10-26). The GitHub repo now hosts a DIFFERENT
+# (Rust/Codex-fork) agent with no such flags, so the form is verified against
+# the community fork's docs + the PyPI README (docs-only, read 2026-09-05):
+#   docs/settings/all-settings.mdx  -> --api_base / --api_key / --model
+#   docs/language-models/local-models/lm-studio.mdx -> any OpenAI-compatible
+#     server via --api_base; llm.model = "openai/x" = "send messages in OpenAI's
+#     format"
+#   README "Interactive Chat" -> bare ``interpreter`` opens the interactive chat
+# The model is sent as ``openai/<raw>`` (LiteLLM strips the prefix before the
+# request, so the gateway gets the raw id / verbatim combo ref).
+# =========================================================================== #
+def test_resolve_open_interpreter_documented_flag_form(monkeypatch) -> None:
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)  # key = plain-key-xyz
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve",
+        json={"tool": "open-interpreter", "model": "provider:B.AI:gpt-5.5"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    # exact command: binary + the three documented flags, model in openai/ form
+    assert body["run_command"] == (
+        "interpreter --api_base http://localhost:8080/v1 "
+        "--api_key plain-key-xyz --model openai/gpt-5.5"
+    )
+    # the provider: ref must NOT leak; the gateway receives the raw id
+    assert "provider:" not in body["run_command"]
+    # interactive chat: no positional prompt, no one-shot subcommand
+    assert "interpreter exec" not in body["run_command"]
+    # env is still injected for the generic path
+    assert body["env"]["OPENAI_API_BASE"] == "http://localhost:8080/v1"
+    assert body["env"]["OPENAI_API_KEY"] == "plain-key-xyz"
+    assert body["model"] == "provider:B.AI:gpt-5.5"
+
+
+def test_resolve_open_interpreter_combo_ref_verbatim(monkeypatch) -> None:
+    """combo:<name> stays verbatim after the openai/ prefix (gateway routes it)."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    with sf() as s:
+        s.add(Combo(name="Test", strategy="fallback", enabled=True))
+        s.commit()
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve",
+        json={"tool": "open-interpreter", "model": "combo:Test"},
+    )
+    rc = r.json()["run_command"]
+    assert "--model openai/combo:Test" in rc
+
+
+def test_resolve_open_interpreter_no_model_omits_flag(monkeypatch) -> None:
+    """provider:<name> (no model) -> documented LM-Studio form, no --model,
+    no invented id; the endpoint flags stay."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve",
+        json={"tool": "open-interpreter", "model": "provider:B.AI"},
+    )
+    rc = r.json()["run_command"]
+    assert rc == (
+        "interpreter --api_base http://localhost:8080/v1 --api_key plain-key-xyz"
+    )
+    assert "--model" not in rc
+
+
+def test_resolve_open_interpreter_quotes_shell_metacharacters(monkeypatch) -> None:
+    """Every interpolated value (base/key/model) is shlex-quoted."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf, key="k;echo pwned")
+    with sf() as s:
+        s.add(Setting(key="gateway_base_url", value="http://host/v1;rm -rf"))
+        s.commit()
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve",
+        json={"tool": "open-interpreter", "model": "m 1"},
+    )
+    rc = r.json()["run_command"]
+    assert "'http://host/v1;rm -rf'" in rc
+    assert "'k;echo pwned'" in rc
+    assert "'openai/m 1'" in rc

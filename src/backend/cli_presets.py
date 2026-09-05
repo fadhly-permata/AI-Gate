@@ -179,7 +179,12 @@ LAUNCH_SUPPORT: Dict[str, LaunchSupport] = {
     "kilo": LaunchSupport(LAUNCH_VERIFIED),
     # --- Group B: autonomous agents ---
     "openhands": LaunchSupport(LAUNCH_PENDING),
-    "open-interpreter": LaunchSupport(LAUNCH_PENDING),
+    # pip artifact = Python open-interpreter 0.4.3 (PyPI, 2024-10-26); its
+    # --api_base/--api_key/--model form is documented (see _interpreter_builder).
+    # NOT the new Rust agent that now occupies the GitHub repo (curl-installed,
+    # no such flags) — the preset installs via pip, so the Python docs are the
+    # contract here.
+    "open-interpreter": LaunchSupport(LAUNCH_VERIFIED),
     "gpt-researcher": LaunchSupport(LAUNCH_PENDING),
     "crewai": LaunchSupport(LAUNCH_PENDING),
     "swe-agent": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_INSTALL_UNVERIFIED),

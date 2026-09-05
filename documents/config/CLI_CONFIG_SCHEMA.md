@@ -41,7 +41,7 @@ groups:
     tools:
       - { name: openhands,        binary: openhands,        install: "pip install openhands-ai",    launch: pending }
       - { name: swe-agent,        binary: swe-agent,        install: null,                          launch: unsupported }
-      - { name: open-interpreter, binary: interpreter,      install: "pip install open-interpreter", launch: pending }
+      - { name: open-interpreter, binary: interpreter,      install: "pip install open-interpreter", launch: verified }
       - { name: autogpt,          binary: autogpt,          install: null,                          launch: unsupported }
       - { name: gpt-researcher,   binary: gpt-researcher,   install: "pip install gpt-researcher",  launch: pending }
       - { name: crewai,           binary: crewai,           install: "pip install crewai",          launch: pending }
@@ -161,6 +161,21 @@ ini berubah mengikuti builder, bukan data user), diekspos lewat `ToolDTO`
   key `model` dan TANPA `-m` -> TUI `kilo` biasa, user pilih lewat `/models`.
   DOCS-VERIFIED only (binary per-platform, gak ada build Termux — sama kayak
   cline).
+- **open-interpreter** — flag resmi untuk paket PYTHON yang dipasang
+  `pip install open-interpreter` (PyPI `open-interpreter` 0.4.3, rilis 2024-10-26):
+  `interpreter --api_base <base> --api_key <key> --model openai/<model>` (docs
+  fork komunitas `endolith/open-interpreter`: `docs/settings/all-settings.mdx`
+  bagian "API Base"/"API Key"/"Model Selection" +
+  `docs/language-models/local-models/lm-studio.mdx` — server OpenAI-compatible
+  via `--api_base`, `llm.model = "openai/x"` = kirim format OpenAI; LiteLLM
+  melepas prefix sebelum request jadi gateway terima id mentah / combo verbatim).
+  `interpreter` tanpa prompt = chat interaktif (README "Interactive Chat").
+  Tanpa model: bentuk LM-Studio TANPA `--model` (model default OI sendiri, gak
+  ngarang id). **Catatan:** repo GitHub `OpenInterpreter/open-interpreter` sekarang
+  berisi agen Rust BARU (fork Codex, install via curl) yang CLI-nya TIDAK punya
+  `--api_base`/`--api_key` — preset ini menarget artefak pip (Python), jadi dasar
+  verifikasinya dokumen Python + README PyPI, BUKAN dokumen Rust. DOCS-VERIFIED
+  only (gak menjalankan installer / binary).
 - **gemini** — dokumen resminya (docs/cli/model.md + settings.md) TIDAK
   mengenal provider OpenAI-compatible; hanya API Gemini → `unsupported`
   (`gemini_only`), bukan sekadar belum dikerjain.

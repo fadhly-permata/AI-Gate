@@ -764,6 +764,51 @@ def _cline_builder(ctx: _LaunchCtx) -> str:
     return f"{setup} && {ctx.binary_name}{tail}"
 
 
+# --------------------------------------------------------------------------- #
+# open-interpreter — the PYTHON package that ``pip install open-interpreter``
+# actually installs (PyPI ``open-interpreter`` 0.4.3, released 2024-10-26, the
+# last Python release). IMPORTANT: the GitHub repo OpenInterpreter/open-interpreter
+# now hosts a DIFFERENT product — a new Rust agent (a Codex fork, installed via
+# curl, whose CLI reference lists no --api_base/--api_key). The Python project
+# lives on as the community fork endolith/open-interpreter. Verified against the
+# docs of THAT project + the PyPI 0.4.3 README (docs-only, read 2026-09-05):
+#   docs/settings/all-settings.mdx  -> "API Base"   : interpreter --api_base <url>
+#                                    -> "API Key"    : interpreter --api_key <key>
+#                                    -> "Model Selection": interpreter --model <litellm-id>
+#   docs/language-models/local-models/lm-studio.mdx  -> any OpenAI-compatible
+#       server: interpreter --api_base "http://localhost:1234/v1" --api_key "fake_key";
+#       llm.model = "openai/x" "tells OI to send messages in OpenAI's format"
+#   README "Interactive Chat" -> bare ``interpreter`` (no positional prompt)
+#       opens the interactive chat — exactly what the PTY tab needs.
+# The model is sent as ``openai/<raw>``: --model sets the same llm.model
+# attribute the docs configure with "openai/x", and the explicit prefix also
+# sidesteps the auto-prefix heuristic in start_terminal_interface.py (verified
+# present at tags v0.4.0/v0.4.2 + main): a bare id starting with "local",
+# "ollama" or "jan" would NOT get the openai/ prefix and would be routed to a
+# local provider instead of the gateway. LiteLLM strips the prefix before the
+# request, so the gateway receives the raw id (combo refs stay verbatim) and
+# resolves it as usual.
+# No model chosen -> the documented LM-Studio form WITHOUT --model: OI keeps its
+# own default model and still points at the gateway; nothing is invented.
+# OI has no documented way to enumerate/select several models per session (the
+# model is fixed at launch), so provider_models is deliberately unused here.
+# --------------------------------------------------------------------------- #
+def _interpreter_builder(ctx: _LaunchCtx) -> str:
+    """open-interpreter's documented OpenAI-compatible flag form + chat."""
+    parts: List[str] = [ctx.binary_name]
+    if ctx.default_flags:
+        parts.append(ctx.default_flags)
+    parts += [
+        "--api_base",
+        shlex.quote(ctx.base),
+        "--api_key",
+        shlex.quote(ctx.key),
+    ]
+    if ctx.raw_model:
+        parts += ["--model", shlex.quote(f"openai/{ctx.raw_model}")]
+    return " ".join(parts)
+
+
 # binary_name -> builder. Anything absent uses ``_generic_builder``.
 _LAUNCH_BUILDERS: Dict[str, Callable[[_LaunchCtx], str]] = {
     "aider": _aider_builder,
@@ -774,6 +819,7 @@ _LAUNCH_BUILDERS: Dict[str, Callable[[_LaunchCtx], str]] = {
     "gptme": _gptme_builder,
     "cline": _cline_builder,
     "kilo": _kilo_builder,
+    "interpreter": _interpreter_builder,
 }
 
 
