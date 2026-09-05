@@ -832,3 +832,20 @@
 - Traceability PRD->BRD->FSD/ERD->TSD dijaga (US-2.1.4 s.d US-2.4.8).
 - Laporan: .opencode/reports/20260903/revise/2127_revise_docs_9router.md
 - Catatan: sebagian referensi path di doc masih `docs/` (sisa cleanup R5).
+
+## R21 + delegasi CLI tools 2026-09-05
+- Trigger: user nanya "kenapa agent PM yang ngerjain dari tadi". PM ngoding
+  sendiri (terminal swipe + builder cli-tool) padahal be-dev/fe-dev sudah ada.
+- Rule baru: **R21** (PM = pecah/handover/integrasi/verifikasi/commit; KODE =
+  spesialis). Riset dokumen boleh PM lakukan, begitu keluar perubahan kode →
+  delegasi.
+- Status kerja CLI tool hari ini (sudah ter-commit, test hijau):
+  - `07e2811` infra: preset upsert + registry LAUNCH_SUPPORT + strikethrough UI + 409
+  - `170cae4` codex -> unsupported (butuh /v1/responses; diverifikasi live)
+  - `99b8fb9` aichat verified (device-verified) + Termux install route
+  - `6ee74cf` qwen verified (docs) — `.qwen/settings.json` project-scope
+  - `56d4718` llm verified (docs) — `llm openai endpoint ... --chat`
+  - `c4bf03f` gptme verified (docs) — `OPENAI_BASE_URL` + `-m local/<model>`
+  - (cline docs-verified, belum ke-commit saat catatan ini dibuat)
+- Sisa (DELEGASI ke `be-dev`, 1 tool = 1 commit): kilo, oterm, open-interpreter,
+  gpt-researcher, crewai, openhands.

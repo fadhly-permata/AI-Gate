@@ -34,7 +34,7 @@ groups:
       - { name: goose,       binary: goose,       install: null,                                        launch: unsupported }
       - { name: amp,         binary: amp,         install: null,                                        launch: unsupported }
       - { name: qwen,        binary: qwen,        install: "npm install -g @qwen-code/qwen-code",      launch: verified }
-      - { name: cline,       binary: cline,       install: "npm install -g cline",                      launch: pending }
+      - { name: cline,       binary: cline,       install: "npm install -g cline",                      launch: verified }
       - { name: kilo,        binary: kilo,        install: "npm install -g @kilocode/cli",             launch: pending }
   - id: autonomous_agents     # Grup B
     label: "Autonomous Software Agents"
@@ -72,6 +72,13 @@ ini berubah mengikuti builder, bukan data user), diekspos lewat `ToolDTO`
 | mode | arti | UI | `POST /resolve` |
 |---|---|---|---|
 | `verified` | builder launch ada + tool bicara format OpenAI gateway | normal | 200 + run_command |
+
+> **Dasar verifikasi `verified`** (dicatat per tool, biar gak ketuker):
+> - **dijalankan langsung di perangkat**: `aider`, `opencode`, `aichat`
+>   (request-nya beneran nyampe gateway -> upstream -> jawaban).
+> - **dokumen resmi upstream** (tool-nya gak bisa dipasang di Termux):
+>   `qwen` (docs/users/configuration/auth.md), `llm` (docs/other-models.md),
+>   `gptme` (gptme.org/docs/providers.html), `cline` (apps/cli/README.md).
 | `pending` | tool bisa, bentuk launch belum ditulis/diverifikasi | dicoret | 409 `tool_unsupported` |
 | `unsupported` | butuh format yang tidak di-serve gateway (Anthropic `/v1/messages`, Google `generateContent`), atau bukan CLI, atau tidak ada binary platform ini | dicoret | 409 `tool_unsupported` |
 
@@ -128,6 +135,9 @@ ini berubah mengikuti builder, bukan data user), diekspos lewat `ToolDTO`
   (docs/providers.html bagian "Local"). Prefix `local/` WAJIB — model `openai/*`
   kelas GPT-5 otomatis dilewatin ke `/v1/responses` yang gak di-serve gateway;
   key lewat env `OPENAI_API_KEY` (bukan flag, jadi gak nongol di `ps`).
+- **cline** — `cline auth --provider openai-native --apikey <key> --modelid
+  <model> --baseurl <base> && cline` (apps/cli/README.md, "Quick provider
+  setup"). Tanpa model: langkah setup dilewatin, `cline` doang (gak ngarang id).
 - **gemini** — dokumen resminya (docs/cli/model.md + settings.md) TIDAK
   mengenal provider OpenAI-compatible; hanya API Gemini → `unsupported`
   (`gemini_only`), bukan sekadar belum dikerjain.

@@ -612,6 +612,41 @@ def _gptme_builder(ctx: _LaunchCtx) -> str:
     return f"OPENAI_BASE_URL={shlex.quote(ctx.base)} " + " ".join(parts)
 
 
+def _cline_builder(ctx: _LaunchCtx) -> str:
+    """cline CLI's documented "quick provider setup", then the interactive TUI.
+
+    apps/cli/README.md:
+    ``cline auth --provider openai-native --apikey sk-... --modelid gpt-5
+    --baseurl https://api.example.com/v1``
+
+    ``openai-native`` is cline's OpenAI-compatible provider id, so the gateway
+    is registered as a plain OpenAI endpoint. The setup is chained with ``&&``
+    to a bare ``cline`` (interactive mode — cline's documented default when no
+    prompt is given).
+
+    DOCS-VERIFIED, not device-verified: cline ships per-platform binaries
+    (macOS/Linux/Windows on arm64/x64) and cannot be installed on Termux, so
+    the flag form comes from the upstream README rather than a live run.
+
+    No model chosen -> the setup step is skipped entirely (inventing a model id
+    would just make cline fail later); plain ``cline`` lets the user configure
+    inside the CLI.
+    """
+    if not ctx.raw_model:
+        return ctx.binary_name
+    setup = " ".join(
+        [
+            ctx.binary_name, "auth",
+            "--provider", "openai-native",
+            "--apikey", shlex.quote(ctx.key),
+            "--modelid", shlex.quote(ctx.raw_model),
+            "--baseurl", shlex.quote(ctx.base),
+        ]
+    )
+    tail = f" {ctx.default_flags}" if ctx.default_flags else ""
+    return f"{setup} && {ctx.binary_name}{tail}"
+
+
 # binary_name -> builder. Anything absent uses ``_generic_builder``.
 _LAUNCH_BUILDERS: Dict[str, Callable[[_LaunchCtx], str]] = {
     "aider": _aider_builder,
@@ -620,6 +655,7 @@ _LAUNCH_BUILDERS: Dict[str, Callable[[_LaunchCtx], str]] = {
     "qwen": _qwen_builder,
     "llm": _llm_builder,
     "gptme": _gptme_builder,
+    "cline": _cline_builder,
 }
 
 

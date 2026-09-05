@@ -214,7 +214,7 @@ def test_list_cli_tools(monkeypatch) -> None:
     # /v1/responses, which the gateway does not serve
     assert modes["codex"] == ("unsupported", "responses_only")
     # pending: real CLI, launch form not written yet -> struck, reason empty
-    assert modes["cline"] == ("pending", "")
+    assert modes["cline"] == ("verified", "")
     assert modes["llm"] == ("verified", "")
     assert modes["gptme"] == ("verified", "")
 
@@ -1214,3 +1214,51 @@ def test_resolve_gptme_quotes_a_base_url_with_shell_metacharacters(monkeypatch) 
     assert rc.startswith("'http://host/v1;rm -rf' gptme") or rc.startswith(
         "OPENAI_BASE_URL='http://host/v1;rm -rf'"
     )
+
+
+# =========================================================================== #
+# 13. cline launch builder — documented CLI "quick provider setup"
+# (apps/cli/README.md): cline auth --provider openai-native --apikey ...
+# --modelid ... --baseurl ...  then the interactive TUI.
+# DOCS-VERIFIED only: cline ships per-platform binaries with no Termux build.
+# =========================================================================== #
+def test_resolve_cline_registers_gateway_then_opens_tui(monkeypatch) -> None:
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)  # key = plain-key-xyz
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve",
+        json={"tool": "cline", "model": "provider:B.AI:gpt-5.5"},
+    )
+    assert r.status_code == 200
+    rc = r.json()["run_command"]
+    assert rc == (
+        "cline auth --provider openai-native --apikey plain-key-xyz "
+        "--modelid gpt-5.5 --baseurl http://localhost:8080/v1 && cline"
+    )
+    assert "provider:" not in rc
+
+
+def test_resolve_cline_no_model_skips_setup(monkeypatch) -> None:
+    """Nothing is invented: without a model the setup step is dropped entirely."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    client = _client(monkeypatch, sf)
+
+    r = client.post("/api/cli-tools/resolve", json={"tool": "cline"})
+    assert r.json()["run_command"] == "cline"
+
+
+def test_resolve_cline_quotes_shell_metacharacters(monkeypatch) -> None:
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf, key='k;echo pwned')
+    client = _client(monkeypatch, sf)
+
+    r = client.post("/api/cli-tools/resolve", json={"tool": "cline", "model": "m 1"})
+    rc = r.json()["run_command"]
+    assert "'k;echo pwned'" in rc
+    assert "'m 1'" in rc

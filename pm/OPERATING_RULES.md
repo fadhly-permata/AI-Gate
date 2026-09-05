@@ -190,3 +190,26 @@ Aturan wajib:
    bukan cuma shell UI. Fitur yang gak ke-cover e2e = gap — catat, JANGAN tandai selesai.
 5. "Test hijau" ≠ "aplikasi kepake". Unit test bisa lolos padahal asset/dep/integrasi
    rusak. Selalu cek level integrasi juga.
+
+## R21 — PM TIDAK implementasi sendiri; delegasi ke spesialis yang cocok
+Pelajaran (2026-09-05, user: "kenapa agent PM ya yang ngerjain dari tadi? kenapa
+gak buat sub-agent yang cocok"): PM nulis sendiri perbaikan terminal swipe
+(frontend) dan builder CLI tool (backend) — padahal `be-dev` dan `fe-dev` SUDAH
+terdaftar. Akibatnya: tidak ada boundary file, tidak ada receipt, dan PM jadi
+single point of failure + boros konteks sesi PM.
+
+Aturan wajib:
+1. Begitu sebuah task butuh **menulis/mengubah kode**, PM WAJIB spawn spesialis
+   yang cocok (`be-dev`, `fe-dev`, `fullstack-dev`, `qa-engineer`, ...) dengan
+   handover (goal, konteks `pm/`, batasan file yang boleh ditulis, definition of
+   done) — BUKAN ngoding sendiri.
+2. Yang BOLEH PM kerjakan sendiri: file milik PM (`pm/**`), dokumen
+   (`documents/**`), dan **verifikasi** (baca kode/dokumen, jalanin test, cek
+   registry, exercise fitur). Verifikasi bukan implementasi.
+3. Riset yang menghasilkan perubahan kode = batas delegasi. Contoh: PM boleh
+   simpulkan "bentuk launch qwen = `.qwen/settings.json`" dari dokumen, TAPI
+   penulisan builder + test-nya milik `be-dev`.
+4. Setelah sub-agent balik dengan receipt: PM yang integrasi, jalanin test,
+   commit, dan update Memory Bank — bukan sub-agent-nya.
+5. Kalau spesialis belum ada → generate on-demand (R1/R2) + minta restart
+   (R4), baru delegasi. Jangan diam-diam ambil alih kerja spesialis.
