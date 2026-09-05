@@ -35,7 +35,7 @@ groups:
       - { name: amp,         binary: amp,         install: null,                                        launch: unsupported }
       - { name: qwen,        binary: qwen,        install: "npm install -g @qwen-code/qwen-code",      launch: verified }
       - { name: cline,       binary: cline,       install: "npm install -g cline",                      launch: verified }
-      - { name: kilo,        binary: kilo,        install: "npm install -g @kilocode/cli",             launch: pending }
+      - { name: kilo,        binary: kilo,        install: "npm install -g @kilocode/cli",             launch: verified }
   - id: autonomous_agents     # Grup B
     label: "Autonomous Software Agents"
     tools:
@@ -138,6 +138,29 @@ ini berubah mengikuti builder, bukan data user), diekspos lewat `ToolDTO`
 - **cline** — `cline auth --provider openai-native --apikey <key> --modelid
   <model> --baseurl <base> && cline` (apps/cli/README.md, "Quick provider
   setup"). Tanpa model: langkah setup dilewatin, `cline` doang (gak ngarang id).
+- **kilo** (Kilo Code CLI, npm `@kilocode/cli`) — tulis file config MILIK kita
+  sendiri, `.kilo/aigate-kilo.json`, lalu tunjukin lewat env yang dipercaya:
+  `KILO_CONFIG=.kilo/aigate-kilo.json kilo -m aigate/<id>`. Isinya
+  `provider.aigate = { npm: "@ai-sdk/openai-compatible", options: { baseURL,
+  apiKey: "{env:OPENAI_API_KEY}" }, models: { <id>: { name } } }` +
+  `model: "aigate/<id>"` (docs/ai-providers/openai-compatible.md tab "CLI" dan
+  docs/code-with-ai/agents/custom-models.md — format `provider-id/model-id`).
+  Kenapa BUKAN `.kilo/kilo.json` / `./kilo.json`: (1) itu path config user —
+  nulis di situ = nimpa punya dia (docs/getting-started: "Project config:
+  `kilo.jsonc` di root project, atau `.kilo/kilo.jsonc`"); (2) config project
+  TIDAK dipercaya, jadi `{env:VAR}` ditolak dan key harus ditulis polos di disk
+  (custom-models.md: reference cuma resolve di "trusted location: global config,
+  a config passed via `KILO_CONFIG` / `KILO_CONFIG_CONTENT`, or managed config").
+  `KILO_CONFIG` itu layer TAMBAHAN (tabel precedence di
+  docs/contributing/architecture/cli-runtime.md: global dulu, baru explicit
+  file) — config + auth user tetap jalan, key gak pernah nyentuh disk. Flag `-m`
+  punya prioritas 1 di atas key `model` config (custom-models.md, "Model Loading
+  Priority"), jadi pilihan aigate gak bisa kalah sama config user. `limit`
+  sengaja gak ditulis: opsional per dokumen, ngarang context window = nebak.
+  Tanpa model: config tetap nulis provider + semua model hasil discovery, TANPA
+  key `model` dan TANPA `-m` -> TUI `kilo` biasa, user pilih lewat `/models`.
+  DOCS-VERIFIED only (binary per-platform, gak ada build Termux — sama kayak
+  cline).
 - **gemini** — dokumen resminya (docs/cli/model.md + settings.md) TIDAK
   mengenal provider OpenAI-compatible; hanya API Gemini → `unsupported`
   (`gemini_only`), bukan sekadar belum dikerjain.

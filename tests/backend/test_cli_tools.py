@@ -217,6 +217,7 @@ def test_list_cli_tools(monkeypatch) -> None:
     assert modes["cline"] == ("verified", "")
     assert modes["llm"] == ("verified", "")
     assert modes["gptme"] == ("verified", "")
+    assert modes["kilo"] == ("verified", "")
 
 
 # =========================================================================== #
@@ -1262,3 +1263,182 @@ def test_resolve_cline_quotes_shell_metacharacters(monkeypatch) -> None:
     rc = r.json()["run_command"]
     assert "'k;echo pwned'" in rc
     assert "'m 1'" in rc
+
+
+
+# =========================================================================== #
+# 14. kilo (Kilo Code CLI) launch builder — documented custom-provider form.
+#
+# docs/ai-providers/openai-compatible.md ("CLI" tab) + docs/code-with-ai/agents/
+# custom-models.md: a provider key of our choosing with
+# ``npm: "@ai-sdk/openai-compatible"`` + ``options.baseURL`` + a ``models`` map,
+# default model as ``provider-id/model-id``.
+#
+# The file is OURS (``.kilo/aigate-kilo.json`` — not one of the filenames kilo
+# auto-discovers) and is handed to the CLI through the trusted ``KILO_CONFIG``
+# env var, for two documented reasons: writing ``.kilo/kilo.json`` /
+# ``./kilo.json`` would clobber a user-owned project config, and a project
+# config cannot resolve ``{env:VAR}`` (custom-models.md: references resolve "only
+# when the config lives in a trusted location: your global config
+# (~/.config/kilo), a config passed via KILO_CONFIG / KILO_CONFIG_CONTENT, or
+# organization/MDM-managed config") — which would force the plaintext key onto
+# disk. KILO_CONFIG is additive (cli-runtime.md precedence table loads global
+# first, then the explicit file), so user config/auth survives and the key never
+# lands on disk. DOCS-VERIFIED only: per-platform binaries, no Termux build
+# (same case as cline).
+# =========================================================================== #
+KILO_CFG = ".kilo/aigate-kilo.json"
+KILO_TAIL = "KILO_CONFIG=.kilo/aigate-kilo.json"
+
+
+def _kilo_cfg(run_command: str) -> dict:
+    return json.loads(_heredoc_block(run_command, KILO_CFG))
+
+
+def test_resolve_kilo_writes_trusted_config_and_opens_tui(monkeypatch) -> None:
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)  # key = plain-key-xyz
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve",
+        json={"tool": "kilo", "model": "provider:B.AI:gpt-5.5"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+
+    # exact command: mkdir (the redirect needs the dir), single-quoted heredoc,
+    # then the TUI through KILO_CONFIG with the model flag (priority 1 per docs).
+    assert body["run_command"] == (
+        "mkdir -p .kilo\n"
+        "cat > .kilo/aigate-kilo.json <<'AIGATE_EOF'\n"
+        "{\n"
+        '  "$schema": "https://app.kilo.ai/config.json",\n'
+        '  "model": "aigate/gpt-5.5",\n'
+        '  "provider": {\n'
+        '    "aigate": {\n'
+        '      "npm": "@ai-sdk/openai-compatible",\n'
+        '      "options": {\n'
+        '        "baseURL": "http://localhost:8080/v1",\n'
+        '        "apiKey": "{env:OPENAI_API_KEY}"\n'
+        "      },\n"
+        '      "models": {\n'
+        '        "gpt-5.5": {\n'
+        '          "name": "gpt-5.5"\n'
+        "        }\n"
+        "      }\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+        "AIGATE_EOF\n"
+        "KILO_CONFIG=.kilo/aigate-kilo.json kilo -m aigate/gpt-5.5"
+    )
+    # the provider: ref must NOT leak into the command or the config
+    assert "provider:" not in body["run_command"]
+    # the plaintext key is NOT in the command at all — it travels through the
+    # exported OPENAI_API_KEY and kilo resolves {env:...} in the trusted file
+    assert "plain-key-xyz" not in body["run_command"]
+    assert "{env:OPENAI_API_KEY}" in body["run_command"]
+    assert body["env"]["OPENAI_API_KEY"] == "plain-key-xyz"
+    assert body["env"]["OPENAI_API_BASE"] == "http://localhost:8080/v1"
+    assert body["model"] == "provider:B.AI:gpt-5.5"
+
+
+def test_resolve_kilo_never_writes_a_user_config_path(monkeypatch) -> None:
+    """`.kilo/kilo.json` + `./kilo.json[c]` belong to the user — never touch them."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    client = _client(monkeypatch, sf)
+
+    rc = client.post(
+        "/api/cli-tools/resolve", json={"tool": "kilo", "model": "m1"}
+    ).json()["run_command"]
+    for owned in ("cat > .kilo/kilo.json", "cat > kilo.json", "cat > kilo.jsonc"):
+        assert owned not in rc
+
+
+def test_resolve_kilo_enumerates_discovered_models(monkeypatch) -> None:
+    """Whole provider is declared so kilo's /models can switch without relaunch."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    with sf() as s:
+        p = Provider(name="B.AI", type="openai", base_url="https://x", api_key="k")
+        s.add(p)
+        s.commit()
+        s.add_all(
+            [
+                ProviderModel(provider_id=p.id, model_id="gpt-5.5", model_name="GPT 5.5"),
+                ProviderModel(provider_id=p.id, model_id="glm-5.2", model_name="GLM 5.2"),
+            ]
+        )
+        s.commit()
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve", json={"tool": "kilo", "model": "provider:B.AI:glm-5.2"}
+    )
+    rc = r.json()["run_command"]
+    cfg = _kilo_cfg(rc)
+    prov = cfg["provider"]["aigate"]
+    assert list(prov["models"]) == ["gpt-5.5", "glm-5.2"]
+    assert prov["models"]["glm-5.2"]["name"] == "glm-5.2"
+    # the requested model — not the first discovered one — is the default
+    assert cfg["model"] == "aigate/glm-5.2"
+    assert rc.endswith(f"{KILO_TAIL} kilo -m aigate/glm-5.2")
+
+
+def test_resolve_kilo_combo_ref_passed_verbatim(monkeypatch) -> None:
+    """combo:<name> stays verbatim in both the models map and the model ref."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    with sf() as s:
+        s.add(Combo(name="Test", strategy="fallback", enabled=True))
+        s.commit()
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve", json={"tool": "kilo", "model": "combo:Test"}
+    )
+    rc = r.json()["run_command"]
+    cfg = _kilo_cfg(rc)
+    assert "combo:Test" in cfg["provider"]["aigate"]["models"]
+    assert cfg["model"] == "aigate/combo:Test"
+    assert rc.endswith(f"{KILO_TAIL} kilo -m aigate/combo:Test")
+
+
+def test_resolve_kilo_no_model_opens_tui_without_inventing(monkeypatch) -> None:
+    """No model chosen -> gateway still configured, but no model key and no -m."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    client = _client(monkeypatch, sf)
+
+    r = client.post("/api/cli-tools/resolve", json={"tool": "kilo"})
+    rc = r.json()["run_command"]
+    cfg = _kilo_cfg(rc)
+    assert "model" not in cfg
+    assert cfg["provider"]["aigate"]["models"] == {}
+    assert cfg["provider"]["aigate"]["options"]["baseURL"] == "http://localhost:8080/v1"
+    # bare interactive TUI through our config, never a dangling -m / invented id
+    assert rc.split(_HEREDOC_CLOSE)[-1] == f"{KILO_TAIL} kilo"
+    assert " -m" not in rc
+
+
+def test_resolve_kilo_quotes_the_model_flag(monkeypatch) -> None:
+    """The one value interpolated into the command line is shell-quoted."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve", json={"tool": "kilo", "model": "m 1;echo pwned"}
+    )
+    rc = r.json()["run_command"]
+    assert rc.endswith(f"{KILO_TAIL} kilo -m 'aigate/m 1;echo pwned'")
+    # the same value is JSON-encoded (never bare) inside the config
+    assert '"aigate/m 1;echo pwned"' in rc

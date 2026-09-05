@@ -612,6 +612,123 @@ def _gptme_builder(ctx: _LaunchCtx) -> str:
     return f"OPENAI_BASE_URL={shlex.quote(ctx.base)} " + " ".join(parts)
 
 
+# --------------------------------------------------------------------------- #
+# kilo (Kilo Code CLI, npm @kilocode/cli — bins `kilo` + `kilocode`).
+#
+# Documented custom-provider form (kilocode.ai/docs/ai-providers/openai-compatible,
+# "CLI" tab): a provider key of our choosing + ``npm: "@ai-sdk/openai-compatible"``
+# (the OpenAI Chat Completions protocol package) + ``options.baseURL`` /
+# ``options.apiKey`` + a ``models`` map ("You must define at least one model"),
+# with the default model as ``provider-id/model-id``. The same shape is repeated
+# in docs/code-with-ai/agents/custom-models.md ("OpenAI-compatible provider with
+# a custom endpoint"), and that page also fixes the resolution order: 1) the
+# ``-m/--model`` flag, 2) the config ``model`` key, 3) last used, 4) first
+# available — so the flag is what wins over anything the user already has.
+#
+# Config location: NOT a project ``kilo.json``. Two documented reasons:
+#   1. ``.kilo/kilo.json`` and ``./kilo.json[c]`` ARE user-owned project config
+#      paths (docs/getting-started/settings.md: "Project config: ``kilo.jsonc``
+#      in your project root, or ``.kilo/kilo.jsonc``"), so writing one would
+#      clobber whatever the user already has there.
+#   2. a project config is UNTRUSTED, so ``{env:VAR}`` is rejected outright:
+#      docs/code-with-ai/agents/custom-models.md — "`apiKey` (or any option)
+#      references are resolved only when the config lives in a trusted location:
+#      your global config (``~/.config/kilo``), a config passed via
+#      ``KILO_CONFIG`` / ``KILO_CONFIG_CONTENT``, or organization/MDM-managed
+#      config. A project-level ``kilo.json`` / ``opencode.json`` committed to a
+#      repository cannot resolve ``{env:VAR}``". Writing the project file would
+#      therefore force the plaintext gateway key onto disk.
+# ``KILO_CONFIG`` is that trusted location and is an ADDITIVE layer: the runtime
+# precedence table (docs/contributing/architecture/cli-runtime.md) loads global
+# config first, then "Explicit ``KILO_CONFIG`` file" (5), then project files (6)
+# — so the user's global config and auth records keep working and our provider
+# is just merged in. Our file gets a namespaced name (``aigate-kilo.json``) that
+# is not one of kilo's implicit config filenames, so it can never overwrite a
+# user config. The ``model`` key can still lose to a user project file, which is
+# exactly why the preselect is ALSO passed as ``-m`` (priority 1).
+# --------------------------------------------------------------------------- #
+_KILO_PROVIDER_ID = "aigate"  # arbitrary key, docs: "it can be any name you like"
+# Our own config file (never a filename kilo auto-discovers) + the env var that
+# points the CLI at it (docs/contributing/architecture/cli-runtime.md).
+_KILO_CONFIG_PATH = ".kilo/aigate-kilo.json"
+_KILO_CONFIG_ENV = "KILO_CONFIG"
+# The key is NOT written to disk: the launcher exports OPENAI_API_KEY for every
+# tool, and {env:...} resolves because a KILO_CONFIG file is trusted.
+_KILO_ENV_KEY = "OPENAI_API_KEY"
+
+
+def _kilo_builder(ctx: _LaunchCtx) -> str:
+    """kilo's documented OpenAI-compatible form (trusted config + TUI).
+
+    Every discovered model of the chosen provider is declared so kilo's
+    ``/models`` picker can switch without relaunching (the docs warn a custom
+    provider with no ``models`` entry exposes nothing). The requested model is
+    preselected twice: through the config ``model`` key (for a later manual
+    ``kilo`` in the same project) and through ``-m``, which per the docs has the
+    highest priority ("Model Loading Priority": 1 flag, 2 config key, 3 last
+    used, 4 first available) and therefore beats any ``model`` key the user's own
+    config files carry. Model ids keep the ``provider:<name>:<id>`` reduction and
+    combo refs stay verbatim, exactly like the other builders.
+
+    ``limit`` (context/output tokens) is deliberately NOT written: the docs call
+    it recommended but every model field is optional, and inventing a context
+    window for a gateway model is a guess — omitting only disables automatic
+    compaction, while a wrong value would truncate real windows.
+
+    No model chosen -> the config still registers the gateway (plus every model
+    that was discovered) but no ``model`` key and no ``-m`` flag: the TUI opens
+    and the user picks with ``/models``. Nothing is invented.
+
+    ``ctx.key`` is deliberately unused here: the gateway key reaches kilo as the
+    exported ``OPENAI_API_KEY`` (the launcher injects it for every tool) and is
+    resolved by kilo inside the trusted file — so the secret appears in neither
+    the command line (``ps``) nor the generated config.
+
+    DOCS-VERIFIED, not device-verified: like cline, ``@kilocode/cli`` ships
+    per-platform binaries and npm on Termux (``process.platform == "android"``)
+    never installs the linux-arm64 one, so the form comes from the upstream docs.
+    """
+    model_ids: List[str] = list(ctx.provider_models)
+    if ctx.raw_model and ctx.raw_model not in model_ids:
+        model_ids.insert(0, ctx.raw_model)
+
+    config: Dict[str, object] = {
+        "$schema": "https://app.kilo.ai/config.json",
+    }
+    if ctx.raw_model:
+        # `provider_id/model_id` (docs: custom-models.md, "model" key format).
+        config["model"] = f"{_KILO_PROVIDER_ID}/{ctx.raw_model}"
+    config["provider"] = {
+        _KILO_PROVIDER_ID: {
+            "npm": "@ai-sdk/openai-compatible",
+            "options": {
+                "baseURL": ctx.base,
+                # Env reference, not the secret itself — legal here because a
+                # KILO_CONFIG file is a trusted location (see the block above).
+                "apiKey": f"{{env:{_KILO_ENV_KEY}}}",
+            },
+            "models": {mid: {"name": mid} for mid in model_ids},
+        }
+    }
+    cfg_json = json.dumps(config, indent=2)
+
+    # mkdir -p first: the redirect would otherwise fail on a fresh directory.
+    cmd = (
+        f"mkdir -p {os.path.dirname(_KILO_CONFIG_PATH)}\n"
+        f"cat > {_KILO_CONFIG_PATH} <<'AIGATE_EOF'\n" + cfg_json + "\nAIGATE_EOF\n"
+    )
+    parts: List[str] = [ctx.binary_name]
+    if ctx.default_flags:
+        parts.append(ctx.default_flags)
+    if ctx.raw_model:
+        parts += ["-m", shlex.quote(f"{_KILO_PROVIDER_ID}/{ctx.raw_model}")]
+    # Env prefix scopes the config override to this one command (same route as
+    # aichat's AICHAT_CONFIG_FILE); the path is relative to the PTY's CWD, which
+    # is the directory the heredoc above just wrote.
+    prefix = f"{_KILO_CONFIG_ENV}={shlex.quote(_KILO_CONFIG_PATH)} "
+    return cmd + prefix + " ".join(parts)
+
+
 def _cline_builder(ctx: _LaunchCtx) -> str:
     """cline CLI's documented "quick provider setup", then the interactive TUI.
 
@@ -656,6 +773,7 @@ _LAUNCH_BUILDERS: Dict[str, Callable[[_LaunchCtx], str]] = {
     "llm": _llm_builder,
     "gptme": _gptme_builder,
     "cline": _cline_builder,
+    "kilo": _kilo_builder,
 }
 
 
