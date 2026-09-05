@@ -25,13 +25,20 @@
   lokal) SUDAH di PRD tapi BELUM di BACKLOG & BELUM diimplementasi. Perlu backlog
   baru + /run-impl.
 
-- 2026-09-05: CLI tool launcher — audit preset per-tool, diverifikasi DI
-  PERANGKAT (bukan ingatan). Status launch sekarang: `aider` ✓, `opencode` ✓,
-  `aichat` ✓ (builder baru + e2e ke gateway), sisanya `pending`/`unsupported`
-  (dicoret di UI, `resolve` balas 409). Codex: `unsupported` — 0.122.0 menolak
-  `wire_api="chat"`, butuh /v1/responses (belum ada di gateway).
-  Cara kerja: 1 tool = 1 commit, cek `pkg`/npm/PyPI + jalankan beneran sebelum
-  flip ke verified.
+- 2026-09-05/06: CLI tool launcher — audit SEMUA 24 preset, satu per satu,
+  1 tool = 1 commit, delegasi ke `be-dev` (R21). Hasil: **11 verified**
+  (aider, opencode, aichat, qwen, cline, kilo, llm, gptme, open-interpreter,
+  oterm, openhands), **13 unsupported** beralasan (claude/gemini = format
+  bukan-OpenAI; codex = butuh /v1/responses; antigravity/gpt-researcher/crewai
+  = bukan CLI launchable; goose/amp/mods/aichat-ish/sgpt = gak ada paket
+  platform ini; phi/swe-agent/autogpt = nama paket gak ketemu), **0 pending**.
+  Bug ikutan ketemu & dibenerin: install string salah paket (`openhands-ai`
+  gak punya console script -> `openhands`; `aider` -> `aider-chat`; npm vs pip),
+  preset gak pernah nyampe DB (seed skip) -> jadi upsert, UI nyoret tool yang
+  belum verified + `resolve` balas 409 daripada ngarang command.
+  Dasar verifikasi dicatat per tool di CLI_CONFIG_SCHEMA: dijalankan langsung
+  di perangkat (aider, opencode, aichat) vs dokumen resmi (sisanya — npm/pip
+  gak bisa dipasang di Termux, user larang install).
 
 ## Decisions
 - 2026-09-03: Terminal UX — swipe diubah jadi scroll (bukan navigasi TUI) karena

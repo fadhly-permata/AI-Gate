@@ -849,3 +849,21 @@
   - (cline docs-verified, belum ke-commit saat catatan ini dibuat)
 - Sisa (DELEGASI ke `be-dev`, 1 tool = 1 commit): kilo, oterm, open-interpreter,
   gpt-researcher, crewai, openhands.
+
+## Batch CLI tool kelar 2026-09-06 (delegasi be-dev, R21 dipatuhi)
+- 1 tool = 1 spawn `be-dev` = 1 commit PM (review diff + cek ulang klaim dokumen + jalanin test).
+- Commit: 07e2811 infra, 170cae4 codex, 99b8fb9 aichat, 6ee74cf qwen, 56d4718 llm,
+  c4bf03f gptme, 10f8551 cline, 78aa310 kilo, bfe4c53 open-interpreter, a83cfcb oterm,
+  ec7f9a6 gpt-researcher, 83c94f7 crewai, 9e670a0 openhands.
+- Status akhir: 11 verified / 13 unsupported beralasan / 0 pending. Suite: 400 passed, 1 skipped.
+- Peristiwa operasional: 3 spawn `be-dev` baliknya kosong/kepotong (network) TAPI diff-nya
+  tetap mendarat di working tree -> PM baca diff + verifikasi mandiri + commit.
+  Receipt kosong BUKAN berarti kerjaan gagal; selalu cek `git status`.
+- Temuan perangkat yang ngubah keputusan (dicatat di CLI_CONFIG_SCHEMA):
+  npm di Termux gak pernah ambil `*-linux-arm64` (process.platform=android),
+  shebang `#!/usr/bin/env` rusak, pip butuh toolchain Rust/Fortran -> karena itu
+  verifikasi launch form sisanya pakai dokumen, bukan eksekusi.
+- Belum dikerjain (kandidat, bukan bug baru): `QWEN_HOME` buat `_qwen_builder`
+  (relokasi layer GLOBAL -> user's ~/.qwen gak kebaca, butuh keputusan),
+  `_interpreter_builder` versi Rust baru (`-c` + wire_api=chat) kalau install
+  string dipindah ke curl, `--api_key` open-interpreter nongol di `ps`.
