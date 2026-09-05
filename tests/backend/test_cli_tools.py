@@ -833,3 +833,166 @@ def test_resolve_opencode_combo_ref(monkeypatch) -> None:
     assert rc.split(_HEREDOC_CLOSE)[-1] == "opencode"
     assert "opencode run" not in rc
     assert r.json()["model"] == "combo:Test"
+
+
+# =========================================================================== #
+# 8. aichat launch builder — verified against aichat 0.30.0 ON THE DEVICE.
+#
+# aichat's config field is `clients:` (a list of internally-tagged client
+# configs). `custom_providers:` / `providers:` do not exist (both fail to load),
+# and `models:` entries must be mappings (`- name: x`), not bare strings.
+# The generated file is scoped with AICHAT_CONFIG_FILE so the user's own
+# ~/.config/aichat/config.yaml is never overwritten.
+# =========================================================================== #
+AICHAT_CFG_FILE = "aichat-aigate.yaml"
+
+
+def _heredoc_block(run_command: str, filename: str) -> str:
+    """Body of ``cat > <filename> <<'AIGATE_EOF' ... AIGATE_EOF``."""
+    open_tag = f"cat > {filename} <<'AIGATE_EOF'\n"
+    assert open_tag in run_command, f"no heredoc for {filename}"
+    start = run_command.index(open_tag) + len(open_tag)
+    end = run_command.index(_HEREDOC_CLOSE, start)
+    return run_command[start:end]
+
+
+def test_resolve_aichat_writes_client_config_and_launches(monkeypatch) -> None:
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)  # key = plain-key-xyz
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve",
+        json={"tool": "aichat", "model": "provider:B.AI:gpt-5.5"},
+    )
+    assert r.status_code == 200
+    rc = r.json()["run_command"]
+
+    block = _heredoc_block(rc, AICHAT_CFG_FILE)
+    assert 'model: "aigate:gpt-5.5"' in block  # client-name:MODEL (colon, not /)
+    assert "clients:" in block
+    assert "  - type: openai-compatible" in block
+    assert '    name: "aigate"' in block
+    assert '    api_base: "http://localhost:8080/v1"' in block
+    assert '    api_key: "plain-key-xyz"' in block
+    assert '      - name: "gpt-5.5"' in block  # ModelData mapping, not a string
+    # the provider: ref must never leak into the config
+    assert "provider:" not in block
+
+    # scoped config + interactive aichat (no subcommand, no guessed flags)
+    assert rc.split(_HEREDOC_CLOSE)[-1] == f"AICHAT_CONFIG_FILE={AICHAT_CFG_FILE} aichat"
+    # env is still injected for the generic path
+    assert r.json()["env"]["OPENAI_API_BASE"] == "http://localhost:8080/v1"
+
+
+def test_resolve_aichat_enumerates_discovered_models(monkeypatch) -> None:
+    """Whole provider is declared so aichat's /model can switch without relaunch."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    with sf() as s:
+        p = Provider(name="B.AI", type="openai", base_url="https://x", api_key="k")
+        s.add(p)
+        s.commit()
+        s.add_all(
+            [
+                ProviderModel(provider_id=p.id, model_id="gpt-5.5", model_name="GPT 5.5"),
+                ProviderModel(provider_id=p.id, model_id="glm-5.2", model_name="GLM 5.2"),
+            ]
+        )
+        s.commit()
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve",
+        json={"tool": "aichat", "model": "provider:B.AI:glm-5.2"},
+    )
+    block = _heredoc_block(r.json()["run_command"], AICHAT_CFG_FILE)
+    assert 'model: "aigate:glm-5.2"' in block
+    assert '      - name: "gpt-5.5"' in block
+    assert '      - name: "glm-5.2"' in block
+
+
+def test_resolve_aichat_combo_ref(monkeypatch) -> None:
+    """combo:<name> stays intact as the model part of aigate:combo:<name>."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    with sf() as s:
+        s.add(Combo(name="Test", strategy="fallback", enabled=True))
+        s.commit()
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve", json={"tool": "aichat", "model": "combo:Test"}
+    )
+    block = _heredoc_block(r.json()["run_command"], AICHAT_CFG_FILE)
+    assert 'model: "aigate:combo:Test"' in block
+    assert '      - name: "combo:Test"' in block
+
+
+def test_resolve_aichat_escapes_yaml_scalars(monkeypatch) -> None:
+    """DB-sourced values are quoted+escaped, never interpolated bare."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf, key='we"ird\\key')
+    client = _client(monkeypatch, sf)
+
+    r = client.post("/api/cli-tools/resolve", json={"tool": "aichat", "model": "m1"})
+    block = _heredoc_block(r.json()["run_command"], AICHAT_CFG_FILE)
+    assert '    api_key: "we\\"ird\\\\key"' in block
+
+
+def test_resolve_aichat_no_model_still_configures(monkeypatch) -> None:
+    """No model chosen -> no top-level model key, client still declared."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    client = _client(monkeypatch, sf)
+
+    r = client.post("/api/cli-tools/resolve", json={"tool": "aichat"})
+    rc = r.json()["run_command"]
+    block = _heredoc_block(rc, AICHAT_CFG_FILE)
+    assert "model:" not in block
+    assert "clients:" in block
+    assert rc.split(_HEREDOC_CLOSE)[-1] == f"AICHAT_CONFIG_FILE={AICHAT_CFG_FILE} aichat"
+
+
+# =========================================================================== #
+# 9. Termux install route.
+#
+# WHY: on Termux, npm reports process.platform == "android" and therefore never
+# installs the *-linux-arm64 binary an npm-shipped CLI needs at run time, while
+# the Termux repo ships a working bionic build of the same tool. The portable
+# string stays in the DB; the platform route is chosen per request.
+# =========================================================================== #
+def test_install_command_for_picks_the_termux_route() -> None:
+    assert cli_presets.install_command_for(
+        "aichat", "cargo install aichat", termux=True
+    ) == "pkg install aichat"
+    # non-Termux keeps the portable command
+    assert cli_presets.install_command_for(
+        "aichat", "cargo install aichat", termux=False
+    ) == "cargo install aichat"
+    # tools without a Termux package fall through to the portable string
+    assert cli_presets.install_command_for(
+        "aider", "pip install aider-chat", termux=True
+    ) == "pip install aider-chat"
+
+
+def test_resolve_uses_termux_install_on_termux(monkeypatch) -> None:
+    sf = _make_sf()
+    _seed_all(sf)
+    client = _client(monkeypatch, sf)
+    monkeypatch.setattr(cli_tools_router, "is_termux", lambda: True)
+
+    body = client.post("/api/cli-tools/resolve", json={"tool": "aichat"}).json()
+    assert body["install_command"] == "pkg install aichat"
+
+    # ...and the list endpoint agrees with it
+    listed = client.get("/api/cli-tools").json()
+    aichat = [
+        t for g in listed["data"] for t in g["tools"] if t["name"] == "aichat"
+    ][0]
+    assert aichat["install_command"] == "pkg install aichat"

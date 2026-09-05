@@ -102,7 +102,7 @@ CLI_PRESETS: list[dict] = [
             {"name": "mods", "binary": "mods", "install": NO_INSTALL},
             {"name": "oterm", "binary": "oterm", "install": _pip("oterm")},
             {"name": "gptme", "binary": "gptme", "install": _pip("gptme")},
-            {"name": "aichat", "binary": "aichat", "install": NO_INSTALL},
+            {"name": "aichat", "binary": "aichat", "install": "cargo install aichat"},
         ],
     },
 ]
@@ -190,13 +190,39 @@ LAUNCH_SUPPORT: Dict[str, LaunchSupport] = {
     "gptme": LaunchSupport(LAUNCH_PENDING),
     "sgpt": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_INSTALL_UNVERIFIED),
     "mods": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NO_BINARY),
-    "aichat": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NO_BINARY),
+    "aichat": LaunchSupport(LAUNCH_VERIFIED),
 }
 
 
 def launch_support_for(name: str) -> LaunchSupport:
     """Support entry for a tool name (unknown/user-added -> ``pending``)."""
     return LAUNCH_SUPPORT.get(name, LaunchSupport(LAUNCH_PENDING))
+
+
+# Termux-only install routes, verified against the device's package lists
+# (``apt-cache search``) rather than guessed. WHY: the portable string is often
+# unusable on Android — npm reports ``process.platform == "android"`` so it
+# never installs the ``*-linux-arm64`` binary a CLI needs, while Termux ships a
+# working bionic build of the same tool. Only tools actually present in the
+# Termux/tur repos belong here.
+TERMUX_INSTALL: Dict[str, str] = {
+    "aichat": "pkg install aichat",  # termux-main, verified 0.30.0 runs
+    "codex": "pkg install codex",  # tur-repo, verified 0.122.0 runs
+}
+
+
+def install_command_for(name: str, default: str = "", termux: bool = False) -> str:
+    """Install string for a tool, honouring the Termux override when on Termux.
+
+    ``termux`` is a parameter (not an internal ``is_termux()`` call) so the
+    choice stays deterministic + testable, and the caller decides once per
+    request.
+    """
+    if termux:
+        override = TERMUX_INSTALL.get(name)
+        if override:
+            return override
+    return default
 
 
 def _tool_defaults(tool: dict) -> dict:

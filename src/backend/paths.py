@@ -72,4 +72,23 @@ def extra_path_dirs() -> List[str]:
     return out
 
 
-__all__ = ["EXTRA_PATH_DIRS", "extra_path_dirs"]
+def is_termux() -> bool:
+    """True when this process runs under Termux (Android).
+
+    WHY: package routing differs there. Several CLIs are packaged for Termux
+    (``pkg install aichat``) while their npm form cannot work: Node reports
+    ``process.platform == "android"``, so npm never fetches the
+    ``*-linux-arm64`` optional dependency the CLI needs at run time. CLI-tool
+    presets use this to pick the install string that actually works (see
+    ``backend.cli_presets.install_command_for``).
+
+    Detection order: explicit ``$PREFIX`` pointing at the com.termux data dir
+    (the normal case), then the absolute Termux prefix as a fallback.
+    """
+    prefix = os.environ.get("PREFIX", "")
+    if "com.termux" in prefix:
+        return True
+    return os.path.isdir("/data/data/com.termux/files/usr")
+
+
+__all__ = ["EXTRA_PATH_DIRS", "extra_path_dirs", "is_termux"]

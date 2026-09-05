@@ -171,3 +171,29 @@ def test_cli_router_shares_paths_helper() -> None:
     assert cli_tools_router._extra_search_paths is not ssot  # wrapper kept
     # behavior identity: same result under the same env
     assert cli_tools_router._extra_search_paths() == paths_mod.extra_path_dirs()
+
+
+# --------------------------------------------------------------------------- #
+# is_termux(): platform fact used to pick a WORKING install route per tool
+# (see cli_presets.TERMUX_INSTALL).
+# --------------------------------------------------------------------------- #
+def test_is_termux_true_for_termux_prefix(monkeypatch) -> None:
+    monkeypatch.setenv("PREFIX", "/data/data/com.termux/files/usr")
+    assert paths_mod.is_termux() is True
+
+
+def test_is_termux_false_off_termux(monkeypatch) -> None:
+    monkeypatch.setenv("PREFIX", "/usr/local")
+    # the absolute-prefix fallback must not fire either
+    monkeypatch.setattr(paths_mod.os.path, "isdir", lambda p: False)
+    assert paths_mod.is_termux() is False
+
+
+def test_is_termux_true_via_absolute_fallback(monkeypatch) -> None:
+    monkeypatch.setenv("PREFIX", "")
+    monkeypatch.setattr(
+        paths_mod.os.path,
+        "isdir",
+        lambda p: p == "/data/data/com.termux/files/usr",
+    )
+    assert paths_mod.is_termux() is True

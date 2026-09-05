@@ -33,10 +33,15 @@ from sqlalchemy.orm import Session
 
 from backend.config.db import SessionLocal
 from backend.config.settings import get as get_setting
-from backend.cli_presets import LAUNCH_VERIFIED, launch_support_for
+from backend.cli_presets import (
+    LAUNCH_VERIFIED,
+    install_command_for,
+    launch_support_for,
+)
 from backend.log import log_info
 from backend.models import CLITool, CLIToolGroup, Endpoint, Provider, ProviderModel
 from backend.paths import extra_path_dirs as _extra_path_dirs_impl
+from backend.paths import is_termux
 
 LOG_SOURCE = "backend.cli_tools.router"
 
@@ -154,13 +159,17 @@ def _which_with_extra_paths(binary: str) -> Optional[str]:
     return shutil.which(binary, path=extended)
 
 
-def _tool_to_dto(tool: CLITool) -> ToolDTO:
+def _tool_to_dto(tool: CLITool, termux: Optional[bool] = None) -> ToolDTO:
     support = launch_support_for(tool.name)
+    if termux is None:
+        termux = is_termux()
     return ToolDTO(
         id=tool.id,
         name=tool.name,
         binary_name=tool.binary_name,
-        install_command=tool.install_command,
+        install_command=install_command_for(
+            tool.name, tool.install_command or "", termux=termux
+        ),
         default_flags=tool.default_flags,
         enabled=bool(tool.enabled),
         launch_mode=support.mode,
@@ -428,10 +437,84 @@ def _opencode_builder(ctx: _LaunchCtx) -> str:
     return cmd
 
 
+# Fixed client name aichat registers for the aigate gateway; model ids then look
+# like ``aigate:<modelID>``. aichat splits the id on the FIRST separator, so a
+# combo ref stays intact as the model part (``aigate:combo:Test``).
+_AICHAT_CLIENT_NAME = "aigate"
+# Generated config lives in the working dir and is pointed at via
+# ``AICHAT_CONFIG_FILE`` (honoured by aichat's config loader) — the user's own
+# ``~/.config/aichat/config.yaml`` is never touched.
+_AICHAT_CONFIG_FILE = "aichat-aigate.yaml"
+
+
+def _yaml_str(value: Optional[str]) -> str:
+    """Quote one scalar for the generated YAML (double-quoted + escaped).
+
+    Values come from the DB (base url, api key, model ids), so they are never
+    interpolated bare: backslash, quote and control chars are escaped and the
+    result is always a quoted string.
+    """
+    text = "" if value is None else str(value)
+    escaped = (
+        text.replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("\n", "\\n")
+        .replace("\r", "\\r")
+        .replace("\t", "\\t")
+    )
+    return f'"{escaped}"'
+
+
+def _aichat_builder(ctx: _LaunchCtx) -> str:
+    """aichat's openai-compatible client form (verified against aichat 0.30.0).
+
+    aichat has no ``custom_providers``/``providers`` key (both fail to load);
+    the config field is ``clients:`` — a list of internally-tagged client
+    configs. A client declares ``type: openai-compatible``, a ``name``, the
+    ``api_base`` / ``api_key`` of the gateway, and the ``models`` it exposes
+    (each a ``ModelData`` mapping — a bare string is rejected). Verified on the
+    device: ``aichat --dry-run`` resolves ``aigate:<model>`` and a real call
+    reached the gateway (the only error came from the upstream provider).
+
+    The whole provider is enumerated when the models were discovered, so the
+    user can switch inside aichat (``/model``) without relaunching. The
+    requested model is preselected through the top-level ``model`` key.
+    """
+    model_ids: List[str] = list(ctx.provider_models)
+    if ctx.raw_model and ctx.raw_model not in model_ids:
+        model_ids.insert(0, ctx.raw_model)
+
+    lines: List[str] = []
+    if ctx.raw_model:
+        # aichat model ids are `<client-name>:<model>` (it splits on the FIRST
+        # colon, so a `combo:<name>` ref survives intact as the model part).
+        lines.append(
+            f"model: {_yaml_str(f'{_AICHAT_CLIENT_NAME}:{ctx.raw_model}')}"
+        )
+    lines += [
+        "clients:",
+        "  - type: openai-compatible",
+        f"    name: {_yaml_str(_AICHAT_CLIENT_NAME)}",
+        f"    api_base: {_yaml_str(ctx.base)}",
+        f"    api_key: {_yaml_str(ctx.key)}",
+    ]
+    if model_ids:
+        lines.append("    models:")
+        lines += [f"      - name: {_yaml_str(mid)}" for mid in model_ids]
+    cfg_yaml = "\n".join(lines)
+
+    # Single-quoted heredoc -> the shell writes the YAML verbatim; the env
+    # prefix scopes the config override to this one command.
+    cmd = f"cat > {_AICHAT_CONFIG_FILE} <<'AIGATE_EOF'\n" + cfg_yaml + "\nAIGATE_EOF\n"
+    cmd += f"AICHAT_CONFIG_FILE={_AICHAT_CONFIG_FILE} {ctx.binary_name}"
+    return cmd
+
+
 # binary_name -> builder. Anything absent uses ``_generic_builder``.
 _LAUNCH_BUILDERS: Dict[str, Callable[[_LaunchCtx], str]] = {
     "aider": _aider_builder,
     "opencode": _opencode_builder,
+    "aichat": _aichat_builder,
 }
 
 
@@ -516,8 +599,12 @@ def resolve_cli_tool(req: ResolveRequest) -> dict:
         binary_found = binary_path is not None
         # Always expose the install command: the frontend's PTY-side
         # ``command -v`` check is authoritative, so it needs the string even when
-        # the server-side hint says the binary is present.
-        install_command = tool.install_command or ""
+        # the server-side hint says the binary is present. On Termux the
+        # platform route wins where one exists (``pkg install``), because the
+        # portable npm/pip form cannot work there (see cli_presets.TERMUX_INSTALL).
+        install_command = install_command_for(
+            tool.name, tool.install_command or "", termux=is_termux()
+        )
 
         base = _resolve_gateway_base(session)
         key = _resolve_internal_key(session)

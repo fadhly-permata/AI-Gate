@@ -25,6 +25,14 @@
   lokal) SUDAH di PRD tapi BELUM di BACKLOG & BELUM diimplementasi. Perlu backlog
   baru + /run-impl.
 
+- 2026-09-05: CLI tool launcher — audit preset per-tool, diverifikasi DI
+  PERANGKAT (bukan ingatan). Status launch sekarang: `aider` ✓, `opencode` ✓,
+  `aichat` ✓ (builder baru + e2e ke gateway), sisanya `pending`/`unsupported`
+  (dicoret di UI, `resolve` balas 409). Codex: `unsupported` — 0.122.0 menolak
+  `wire_api="chat"`, butuh /v1/responses (belum ada di gateway).
+  Cara kerja: 1 tool = 1 commit, cek `pkg`/npm/PyPI + jalankan beneran sebelum
+  flip ke verified.
+
 ## Decisions
 - 2026-09-03: Terminal UX — swipe diubah jadi scroll (bukan navigasi TUI) karena
   TUI sering salah tangani swipe. Scroll velocity-based + damping agar natural.

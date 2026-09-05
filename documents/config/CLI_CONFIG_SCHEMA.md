@@ -53,7 +53,7 @@ groups:
       - { name: mods,   binary: mods,   install: null,                launch: unsupported }
       - { name: oterm,  binary: oterm,  install: "pip install oterm", launch: pending }
       - { name: gptme,  binary: gptme,  install: "pip install gptme", launch: pending }
-      - { name: aichat, binary: aichat, install: null,                launch: unsupported }
+      - { name: aichat, binary: aichat, install: "cargo install aichat",          launch: verified }
 ```
 
 ## Field
@@ -91,8 +91,15 @@ ini berubah mengikuti builder, bukan data user), diekspos lewat `ToolDTO`
   contoh pola yang dipakai opencode di perangkat ini:
   `exec grun .../opencode-linux-arm64/bin/opencode`.
 - Repo Termux (`pkg`) punya beberapa CLI asli: `codex` (tur-repo, 0.122.0),
-  `aichat` (0.30.0). `goose` di repo Termux = tool migrasi DB, BUKAN agen
-  Block — jangan tertipu nama.
+  `aichat` (0.30.0 — sudah diverifikasi jalan end-to-end ke gateway).
+  `goose` di repo Termux = tool migrasi DB, BUKAN agen Block — jangan tertipu nama.
+- Bentuk launch aichat (dites langsung di 0.30.0): field confignya `clients:`
+  (bukan `custom_providers:` / `providers:` — dua-duanya gagal load), tiap
+  entri `type: openai-compatible` + `name` + `api_base` + `api_key` +
+  `models: [{name: ...}]` (string polos ditolak serde: "expected struct
+  ModelData"). Model dipanggil `aigate:<model>` dan file config-nya di-scope
+  lewat env `AICHAT_CONFIG_FILE` biar `~/.config/aichat/config.yaml` user gak
+  ketimpa.
 - Codex diverifikasi live: 0.122.0 menolak `wire_api = "chat"`
   ("no longer supported", openai/codex discussion #7782) dan hanya menerima
   `responses` → butuh `/v1/responses` di gateway. Selama gateway belum
