@@ -64,9 +64,9 @@
 
 ### 2.5.1 Scroll & Swipe (Trackpad / Mouse)
 - **Scroll Mouse & Trackpad:** Mendukung scroll vertikal (dan horizontal bila tersedia) melalui roda mouse atau gesture trackpad.
-- **Swipe → Scroll (bukan navigasi TUI):** Pada banyak aplikasi TUI, gesture swipe sering salah ditangani (memicu navigasi/escape yang merusak tampilan). aigate mengubah event swipe menjadi proses scroll pada buffer terminal.
-- **Respons Natural & Berbasis Kecepatan (Velocity-based):** Kecepatan swipe menentukan kecepatan scroll — swipe cepat menghasilkan scroll layar cepat (bisa melompat beberapa layar), swipe lambat menghasilkan scroll halus baris-per-baris. Diberikan efek easing agar terasa natural, tidak *abrupt*.
-- **Damping & Batas:** Scroll diberi peredaman (*damping*) agar berhenti halus di ujung buffer. Aplikasi TUI yang memang membutuhkan input swipe khusus dapat dikecualikan per-aplikasi bila diperlukan.
+- **Swipe = Wheel (konsisten dengan mouse):** gesture swipe diperlakukan sama dengan roda mouse — dikirim ke terminal sebagai event `wheel` sintetis, sehingga xterm yang menerjemahkannya sesuai aplikasi yang berjalan: buffer biasa di-scroll 1:1 mengikuti jari, sedangkan aplikasi full-screen (TUI) menerima input scroll-nya sendiri (tombol Up/Down atau mouse-wheel report). Ini memperbaiki swipe di dalam TUI yang sebelumnya tidak bereaksi (buffer TUI tidak punya scrollback untuk di-scroll).
+- **Respons Natural & Berbasis Kecepatan (Velocity-based):** drag mengikuti jari secara langsung (tidak dilompat-lompatkan oleh kurva velocity), lalu lepas jari menghasilkan *momentum* yang melambat secara bertahap — swipe cepat melompat jauh, swipe lambat bergerak halus seperti scroll native.
+- **Damping & Batas:** momentum berhenti halus di ujung buffer (dan sisanya di-*bubble* ke halaman). Tab yang memang butuh gesture mentah untuk aplikasinya dapat ditandai sebagai *passthrough* (tombol TUI) atau dikecualikan per-aplikasi.
 
 ### 2.6 CLI Tools Auto-Launcher & Auto-Configuration *(inti adopsi dari 9router, diperkaya aigate)*
 - **Sambungkan Alat ke Pintu API:** intinya, alat CLI (Claude Code, Codex, Cursor, Cline, OpenCode, dsb) cukup diarahkan ke endpoint aigate (`http://localhost:8080/v1`) + API key aigate, lalu jalan lewat provider/combo pilihan. Ini cara kerja yang diadopsi dari 9router.

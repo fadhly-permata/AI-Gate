@@ -75,34 +75,46 @@
     return d;
   }
 
-  /* Map a swipe velocity (px/ms, vertical; negative = upward) to a terminal
-     scroll delta in lines.
-       - sign is preserved (up swipe -> negative lines -> scroll toward top)
-       - small swipes still move >= minLines (line-by-line feel)
-       - large swipes get a soft-saturating (tanh) gain so extra speed yields
-         diminishing extra lines -> natural easing / damping
-       - atEdge multiplies magnitude down (extra damping near buffer ends)
-     Pure: no DOM, no xterm. */
-  function swipeToScrollDelta(velocityY, opts) {
+  /* Map a touch-drag delta (CSS px, finger DOWN is positive) to the `deltaY`
+     of the wheel event we synthesise for xterm.
+       - sign is INVERTED: dragging a finger up reveals newer content, the same
+         convention xterm's own touch/wheel handling uses (native mobile scroll)
+       - 1:1 pixel tracking (no velocity curve) so the buffer sticks to the
+         finger; velocity only matters for the release momentum
+       - clamped per event: a stalled frame (huge dt) must not launch the buffer
+      Pure: no DOM, no xterm. */
+  function swipeWheelDelta(dy, opts) {
     opts = opts || {};
-    var gain = opts.gain != null ? opts.gain : 1.4;          // lines per (px/ms)
-    var minLines = opts.minLines != null ? opts.minLines : 1;
-    var maxLines = opts.maxLines != null ? opts.maxLines : 60;
-    var knee = opts.knee != null ? opts.knee : 4;            // soft-saturation knee
-    var edgeDamp = opts.edgeDamp != null ? opts.edgeDamp : 0.35;
-    var atEdge = !!opts.atEdge;
+    var sens = Number(opts.sensitivity) || 1;
+    var cap = opts.maxStep != null ? opts.maxStep : 120;
+    var v = -(Number(dy) || 0) * sens;
+    if (!isFinite(v)) return 0;
+    if (v > cap) v = cap;
+    else if (v < -cap) v = -cap;
+    return Math.round(v) || 0; // `|| 0` also normalises -0
+  }
 
-    var v = Number(velocityY) || 0;
-    if (v === 0) return 0;
+  /* Exponential moving average of the finger velocity (px/ms). Raw per-frame
+     velocity is noisy on mobile (jittery dt), so blend: new = prev*(1-w)+raw*w.
+     Pure + testable. */
+  function blendVelocity(prev, raw, weight) {
+    var w = weight != null ? Number(weight) : 0.35;
+    return (Number(prev) || 0) * (1 - w) + (Number(raw) || 0) * w;
+  }
 
-    var av = Math.abs(v);
-    // Soft-saturating magnitude: grows linearly then compresses (easing).
-    var mag = gain * (knee * Math.tanh(av / knee));
-    if (mag < minLines) mag = minLines;
-    if (mag > maxLines) mag = maxLines;
-    if (atEdge) mag *= edgeDamp;
-
-    return Math.round((v < 0 ? -1 : 1) * mag);
+  /* One inertia frame: friction-decay a velocity (px/ms). `friction` is the
+     retention factor per 16ms, so the decay is frame-rate independent. Returns
+     0 once the gesture is slow enough to stop. Pure + testable. */
+  function decayVelocity(vy, dt, opts) {
+    opts = opts || {};
+    var friction = opts.friction != null ? Number(opts.friction) : 0.9;
+    var min = opts.min != null ? Number(opts.min) : 0.03;
+    var v = Number(vy) || 0;
+    if (Math.abs(v) < min) return 0;
+    var frames = (Number(dt) || 0) / 16;
+    if (frames <= 0) return v;
+    v *= Math.pow(friction, frames);
+    return Math.abs(v) < min ? 0 : v;
   }
 
   /* ---------------------------------------------------------------
@@ -158,7 +170,7 @@
     emptyEl.hidden = tabs.size > 0;
   }
 
-  // Is the active terminal scroll position at a buffer edge? (for damping)
+  // Is the active terminal scroll position at a buffer edge? (inertia damping)
   function atEdge(term) {
     try {
       var buf = term.buffer.active;
@@ -169,6 +181,22 @@
       if (vY + rows >= len) return true;
     } catch (e) { /* ignore */ }
     return false;
+  }
+
+  // Monotonic-ish clock for gesture timing (performance.now when available).
+  function nowMs() {
+    return (typeof performance !== "undefined" && performance.now)
+      ? performance.now() : Date.now();
+  }
+
+  /* Alternate buffer == a full-screen app is running (TUI: vim, htop, less,
+     opencode...). That buffer has NO scrollback, so term.scrollLines() is a
+     no-op there — the gesture has to be translated instead (see emitWheel). */
+  function isAltScreen(tab) {
+    try {
+      return !!(tab && tab.term && tab.term.buffer && tab.term.buffer.active &&
+        tab.term.buffer.active.type === "alternate");
+    } catch (e) { return false; }
   }
 
   function sendResize(tab) {
@@ -432,6 +460,7 @@
 
   function activate(id) {
     if (!tabs.has(id)) return;
+    stopInertia(); // a fling must not carry over onto the tab being switched to
     activeId = id;
     tabs.forEach(function (tab) {
       var show = tab.id === id;
@@ -482,6 +511,7 @@
     // DELIBERATE close: stop reconnecting, tell the backend to KILL the PTY,
     // then drop the socket. This is the ONLY path that sends {"type":"close"}.
     tab.userClosed = true;
+    if (inertia.tab === tab) stopInertia();
     if (tab.reconnectTimer) { clearTimeout(tab.reconnectTimer); tab.reconnectTimer = null; }
     if (tab.livenessTimer) { clearTimeout(tab.livenessTimer); tab.livenessTimer = null; }
     try {
@@ -539,6 +569,7 @@
     var tab = activeTab();
     if (!tab) return;
     tab.tuiMode = !tab.tuiMode;
+    stopInertia(); // a fling must not keep scrolling into a just-enabled passthrough
     var btn = document.getElementById("termTui");
     if (btn) {
       btn.setAttribute("aria-pressed", tab.tuiMode ? "true" : "false");
@@ -547,15 +578,87 @@
     }
   }
 
-  /* ---- Scroll & swipe (FSD §2.5.1) ---- */
-  var SWIPE_THRESHOLD = 10; // px before a gesture is treated as a swipe
-  var ptr = { active: false, type: "", lastX: 0, lastY: 0, lastT: 0, vy: 0, moved: 0, isSwipe: false };
+  /* ---- Scroll & swipe (FSD §2.5.1) ----
+   * A touch swipe is turned into the SAME signal a mouse wheel produces: we
+   * dispatch a synthetic `wheel` event on xterm's root element and let xterm
+   * decide what the gesture means for whatever is running in the tab:
+   *   - normal buffer (shell / logs / man): viewport pixel scroll -> 1:1 finger
+   *     tracking, and xterm's own edge bubbling gives the soft stop at the ends.
+   *   - alternate buffer (TUI): there is no scrollback to move, so xterm emits
+   *     the app's own scroll input — Up/Down cursor keys, or mouse-wheel
+   *     reports when the app asked for wheel tracking. THIS is the TUI fix:
+   *     calling term.scrollLines() there silently did nothing, so swiping a TUI
+   *     felt dead.
+   * Release momentum (rAF + friction) is layered on top of the 1:1 drag.
+   * The manual TUI toggle stays as an explicit PASSTHROUGH for apps that want
+   * the raw touch (drag-select, tap-and-hold) — see swipeIsOurs().
+   */
+  var SWIPE_THRESHOLD = 10;        // px before a gesture is treated as a swipe
+  var VELOCITY_WEIGHT = 0.35;      // EMA factor for the release velocity
+  var INERTIA_MIN_VY = 0.05;       // px/ms below which we skip the momentum
+  var ptr = {
+    active: false, type: "", lastX: 0, lastY: 0, lastT: 0, x: 0, y: 0,
+    vy: 0, moved: 0, isSwipe: false
+  };
+  var inertia = { raf: 0, vy: 0, lastT: 0, tab: null };
 
   /* A swipe is "ours" to own only when: a non-mouse gesture is in flight, it has
      crossed the movement threshold, and the active tab is NOT in TUI passthrough.
      Shared by the pointermove scroller and the touchmove suppression guard. */
   function swipeIsOurs(tab) {
     return ptr.active && ptr.type !== "mouse" && ptr.isSwipe && !!tab && !tab.tuiMode;
+  }
+
+  /* Feed a pixel delta to xterm as a wheel gesture at the finger position.
+     No-op when the terminal is not attached (no element) or the platform has no
+     WheelEvent — a swipe must never fall back to a bogus scrollLines(). */
+  function emitWheel(tab, deltaY, clientX, clientY) {
+    if (!deltaY || !tab || !tab.term || !tab.term.element) return;
+    if (typeof WheelEvent !== "function") return;
+    var ev = new WheelEvent("wheel", {
+      deltaY: deltaY,
+      deltaMode: 0, // DOM_DELTA_PIXEL -> 1:1 with the finger
+      clientX: clientX || 0,
+      clientY: clientY || 0,
+      bubbles: true,
+      cancelable: true
+    });
+    tab.term.element.dispatchEvent(ev);
+  }
+
+  function stopInertia() {
+    if (inertia.raf && typeof cancelAnimationFrame === "function") {
+      cancelAnimationFrame(inertia.raf);
+    }
+    inertia.raf = 0; inertia.vy = 0; inertia.tab = null;
+  }
+
+  function inertiaFrame() {
+    var tab = inertia.tab;
+    if (!tab || !inertia.vy) { stopInertia(); return; }
+    var t = nowMs();
+    var dt = t - inertia.lastT;
+    inertia.lastT = t;
+    if (!(dt > 0) || dt > 100) dt = 16; // stalled / backgrounded frame
+    // Momentum dies at a buffer edge (soft stop). Not applicable to a TUI: its
+    // "scroll" is the app's own state, so let the app decide when to stop.
+    if (!isAltScreen(tab) && atEdge(tab.term)) { stopInertia(); return; }
+    emitWheel(tab, swipeWheelDelta(inertia.vy * dt), ptr.x, ptr.y);
+    inertia.vy = decayVelocity(inertia.vy, dt);
+    if (!inertia.vy) { stopInertia(); return; }
+    if (typeof requestAnimationFrame === "function") {
+      inertia.raf = requestAnimationFrame(inertiaFrame);
+    } else {
+      stopInertia();
+    }
+  }
+
+  function startInertia(tab, vy) {
+    stopInertia();
+    inertia.tab = tab; inertia.vy = vy; inertia.lastT = nowMs();
+    if (typeof requestAnimationFrame === "function") {
+      inertia.raf = requestAnimationFrame(inertiaFrame);
+    }
   }
 
   function setupSwipe() {
@@ -569,10 +672,12 @@
     // and mouse wheel is a separate `wheel` event — neither should be hijacked.
     target.addEventListener("pointerdown", function (e) {
       if (e.pointerType === "mouse") { ptr.active = false; return; }
+      stopInertia();                   // a new touch interrupts a running fling
       ptr.active = true;
       ptr.type = e.pointerType || "touch";
       ptr.lastX = e.clientX; ptr.lastY = e.clientY;
-      ptr.lastT = (typeof performance !== "undefined" ? performance.now() : Date.now());
+      ptr.x = e.clientX; ptr.y = e.clientY;
+      ptr.lastT = nowMs();
       ptr.vy = 0; ptr.moved = 0; ptr.isSwipe = false;
     }, { capture: true, passive: false });
 
@@ -581,32 +686,32 @@
       if (!ptr.active) return;
       var tab = activeTab();
       if (!tab) return;
-      var now = (typeof performance !== "undefined" ? performance.now() : Date.now());
-      var dt = now - ptr.lastT;
+      var t = nowMs();
+      var dt = t - ptr.lastT;
       if (dt <= 0) return;
       var dy = e.clientY - ptr.lastY;
       ptr.moved += Math.abs(dy) + Math.abs(e.clientX - ptr.lastX);
-      ptr.vy = dy / dt;
+      ptr.vy = blendVelocity(ptr.vy, dy / dt, VELOCITY_WEIGHT);
+      ptr.lastX = e.clientX; ptr.lastY = e.clientY; ptr.lastT = t;
+      ptr.x = e.clientX; ptr.y = e.clientY;
 
       if (!ptr.isSwipe && ptr.moved > SWIPE_THRESHOLD) ptr.isSwipe = true;
 
-      // TUI mode ON => let the app handle its own gestures (whitelist stand-in).
+      // Passthrough (TUI toggle ON) => the app keeps its own raw gesture.
       if (swipeIsOurs(tab)) {
         e.preventDefault();
         e.stopPropagation();
-        var delta = swipeToScrollDelta(ptr.vy, { atEdge: atEdge(tab.term) });
-        if (delta) tab.term.scrollLines(delta);
+        emitWheel(tab, swipeWheelDelta(dy), e.clientX, e.clientY);
       }
-      ptr.lastX = e.clientX; ptr.lastY = e.clientY; ptr.lastT = now;
     }, { passive: false });
 
     // xterm binds its OWN non-passive `touchmove` on `.xterm-screen` that scrolls
     // the viewport via scrollTop. With touch-action:none the browser no longer
     // steals the gesture, so BOTH that handler and our pointermove would fire —
     // double-scrolling. In CAPTURE on the stage we stop the touchmove from ever
-    // reaching xterm, but ONLY while we own the swipe (and never in TUI mode, so
-    // passthrough is preserved). preventDefault here also blocks the compat
-    // mouse events xterm would otherwise derive from the touch.
+    // reaching xterm, but ONLY while we own the swipe (and never in passthrough
+    // mode, so the app keeps its raw touch). preventDefault here also blocks the
+    // compat mouse events xterm would otherwise derive from the touch.
     target.addEventListener("touchmove", function (e) {
       if (swipeIsOurs(activeTab())) {
         e.preventDefault();
@@ -617,21 +722,20 @@
     // If the browser ever reclaims the gesture (pointercancel), drop the arm so
     // a stale pointermove can't scroll after the finger is gone.
     window.addEventListener("pointercancel", function () {
-      ptr.active = false; ptr.isSwipe = false;
+      ptr.active = false; ptr.isSwipe = false; ptr.vy = 0;
+      stopInertia();
     });
 
-    window.addEventListener("pointerup", function () {
+    window.addEventListener("pointerup", function (e) {
       if (!ptr.active) return;
       var tab = activeTab();
       // Decide ownership BEFORE clearing ptr.active (swipeIsOurs depends on it).
       var ours = swipeIsOurs(tab);
       ptr.active = false;
-      if (ours && Math.abs(ptr.vy) > 0.05) {
-        // Momentum: one last scroll from the release velocity.
-        var delta = swipeToScrollDelta(ptr.vy, { atEdge: atEdge(tab.term) });
-        if (delta) tab.term.scrollLines(delta);
-      }
+      ptr.x = e.clientX || ptr.x; ptr.y = e.clientY || ptr.y;
+      if (ours && Math.abs(ptr.vy) > INERTIA_MIN_VY) startInertia(tab, ptr.vy);
       ptr.isSwipe = false;
+      ptr.vy = 0;
     });
   }
 
@@ -704,7 +808,9 @@
   /* Expose pure helpers + a manager hook for app.js / tests. */
   window.aigate = window.aigate || {};
   window.aigate.terminal = {
-    swipeToScrollDelta: swipeToScrollDelta,
+    swipeWheelDelta: swipeWheelDelta,
+    blendVelocity: blendVelocity,
+    decayVelocity: decayVelocity,
     buildTerminalWsUrl: buildTerminalWsUrl,
     tabTitle: tabTitle,
     buildResizeFrame: buildResizeFrame,

@@ -208,22 +208,31 @@ Ikon mengambang di area terminal memberikan akses cepat tanpa menu.
 #### 2.5.1 Scroll & Swipe (Trackpad / Mouse)
 
 **Deskripsi**
-Scroll vertikal (dan horizontal bila tersedia) via roda mouse/trackpad. Gesture *swipe* diubah menjadi scroll buffer (bukan navigasi/escape TUI). Kecepatan swipe menentukan kecepatan scroll (velocity-based) dengan easing & damping di ujung buffer. Aplikasi TUI yang butuh swipe khusus dapat dikecualikan per-aplikasi.
+Scroll vertikal (dan horizontal bila tersedia) via roda mouse/trackpad. Gesture *swipe* diperlakukan sama dengan roda mouse (event `wheel` sintetis), sehingga buffer terminal di-scroll 1:1 dengan jari dan aplikasi full-screen (TUI, alt-buffer) tetap bisa di-scroll lewat input scroll-nya sendiri. Drag 1:1 + momentum saat lepas jari (velocity-based) dengan damping di ujung buffer. Aplikasi yang butuh gesture mentah dapat dikecualikan per-tab (passthrough).
 
 **Input**
 - Event roda mouse (delta vertikal/horizontal).
-- Event swipe (gesture trackpad/touch) → diterjemahi jadi velocity vector.
+- Event swipe (gesture trackpad/touch) → delta px (1:1) + velocity vector (px/ms) untuk momentum.
 
 **Output**
-- Scroll buffer terminal (baris atau lompat layar).
-- Efek easing/damping halus di ujung buffer.
+- Scroll buffer terminal (baris atau lompat layar) pada buffer normal.
+- Input scroll aplikasi (Up/Down cursor key / mouse-wheel report) pada alt-buffer.
+- Efek easing/damping halus di ujung buffer + momentum pasca-lepas jari.
 
 **Process flow (swipe → scroll)**
-1. Capture gesture swipe → hitung velocity (px/ms).
-2. Map velocity → kecepatan scroll (cepat = lompat layar, lambat = halus baris-per-baris).
-3. Terapkan easing curve + damping saat mendekati ujung buffer.
-4. Render scroll pada buffer xterm; jangan emit escape/navigasi TUI.
-5. Pengecualian: bila tab menjalankan aplikasi TUI terdaftar butuh swipe khusus → bypass map.
+1. Capture gesture swipe → hitung delta (px) + velocity (px/ms) untuk pelepasan.
+2. Ubah delta swipe menjadi event `wheel` sintetis pada elemen terminal (swipe
+   diperlakukan sama dengan roda mouse).
+3. Buffer normal: xterm scroll viewport 1:1 dengan jari (pixel delta), easing/
+   damping otomatis saat mendekati ujung buffer.
+4. Buffer alternate (TUI, tanpa scrollback): xterm menerjemahkan wheel menjadi
+   input scroll aplikasi — Up/Down cursor key, atau mouse-wheel report bila
+   aplikasi meminta mouse tracking. (Catatan: `scrollLines()` tidak berpengaruh
+   di alt-buffer, jadi swipe di TUI harus lewat jalur ini.)
+5. Setelah jari dilepas: jalankan momentum (loop rAF + friction) sampai velocity
+   habis atau posisi buffer mentok ujung.
+6. Pengecualian: tab dengan *passthrough* aktif (`tui_mode`, atau aplikasi
+   terdaftar di registry) tidak di-hijack → gesture mentah sampai ke aplikasi.
 
 **Traceability**
 - US-2.5.1 (Web/UI Terminal Multi-Tab) — M

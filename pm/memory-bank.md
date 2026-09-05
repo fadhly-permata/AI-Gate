@@ -28,6 +28,13 @@
 ## Decisions
 - 2026-09-03: Terminal UX — swipe diubah jadi scroll (bukan navigasi TUI) karena
   TUI sering salah tangani swipe. Scroll velocity-based + damping agar natural.
+  KOREKSI 2026-09-05: keputusan lama bikin swipe MATI di TUI (alt-buffer tidak
+  punya scrollback, `term.scrollLines()` no-op di sana) dan terasa tidak natural
+  di shell (arah dibalik + lompat per velocity). Sekarang swipe = event `wheel`
+  sintetis ke elemen xterm -> xterm yang mapping: buffer normal scroll 1:1,
+  alt-buffer kirim cursor key / mouse-wheel report ke aplikasi. Momentum rAF +
+  friction. Tombol TUI jadi passthrough eksplisit (gesture mentah ke app).
+  Doc diselaraskan: PRD §2.5.1, FSD §2.5.1, ux/TERMINAL_UX §2.
 - 2026-09-03: CLI tool presets dikelompokkan; prioritas agentic CLI (claude,
   opencode, codex, gemini, antigravity, phi, aider, goose, amp, qwen, cline,
   kilo, dst). Dapat diperluas via YAML/JSON.
