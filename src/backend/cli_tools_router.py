@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import shutil
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Tuple
@@ -591,6 +592,26 @@ def _llm_builder(ctx: _LaunchCtx) -> str:
     return " ".join(parts)
 
 
+def _gptme_builder(ctx: _LaunchCtx) -> str:
+    """gptme's documented route for any OpenAI-compatible server.
+
+    docs/providers.html ("Local"):
+    ``OPENAI_BASE_URL="http://127.0.0.1:11434/v1" gptme 'hello' -m local/<model>``
+
+    The ``local/`` provider prefix is what keeps gptme on the chat-completions
+    path — the docs note that direct ``openai/*`` GPT-5-class models are routed
+    to ``/v1/responses`` instead, which the gateway does not serve. The key
+    needs no flag: gptme reads ``OPENAI_API_KEY``, already exported by the
+    launcher. No prompt is passed, so gptme opens its interactive chat.
+    """
+    parts: List[str] = [ctx.binary_name]
+    if ctx.default_flags:
+        parts.append(ctx.default_flags)
+    if ctx.raw_model:
+        parts += ["-m", f"local/{ctx.raw_model}"]
+    return f"OPENAI_BASE_URL={shlex.quote(ctx.base)} " + " ".join(parts)
+
+
 # binary_name -> builder. Anything absent uses ``_generic_builder``.
 _LAUNCH_BUILDERS: Dict[str, Callable[[_LaunchCtx], str]] = {
     "aider": _aider_builder,
@@ -598,6 +619,7 @@ _LAUNCH_BUILDERS: Dict[str, Callable[[_LaunchCtx], str]] = {
     "aichat": _aichat_builder,
     "qwen": _qwen_builder,
     "llm": _llm_builder,
+    "gptme": _gptme_builder,
 }
 
 

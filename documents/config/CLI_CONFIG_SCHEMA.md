@@ -52,7 +52,7 @@ groups:
       - { name: sgpt,   binary: sgpt,   install: null,                launch: unsupported }
       - { name: mods,   binary: mods,   install: null,                launch: unsupported }
       - { name: oterm,  binary: oterm,  install: "pip install oterm", launch: pending }
-      - { name: gptme,  binary: gptme,  install: "pip install gptme", launch: pending }
+      - { name: gptme,  binary: gptme,  install: "pip install gptme", launch: verified }
       - { name: aichat, binary: aichat, install: "cargo install aichat",          launch: verified }
 ```
 
@@ -124,6 +124,10 @@ ini berubah mengikuti builder, bukan data user), diekspos lewat `ToolDTO`
 - **llm** — tidak perlu file config sama sekali: `llm openai endpoint <base>
   -m <model> --key <key> --chat` (docs: "Run against an endpoint without
   configuring it"). Tanpa model -> `--models` (daftar model dari gateway).
+- **gptme** — tanpa file config: `OPENAI_BASE_URL=<base> gptme -m local/<model>`
+  (docs/providers.html bagian "Local"). Prefix `local/` WAJIB — model `openai/*`
+  kelas GPT-5 otomatis dilewatin ke `/v1/responses` yang gak di-serve gateway;
+  key lewat env `OPENAI_API_KEY` (bukan flag, jadi gak nongol di `ps`).
 - **gemini** — dokumen resminya (docs/cli/model.md + settings.md) TIDAK
   mengenal provider OpenAI-compatible; hanya API Gemini → `unsupported`
   (`gemini_only`), bukan sekadar belum dikerjain.

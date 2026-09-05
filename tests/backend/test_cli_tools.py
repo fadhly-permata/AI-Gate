@@ -26,6 +26,7 @@ import backend.config.db as db_mod
 from backend.config.db import Base
 from backend.models import (
     CLITool,
+    Setting,
     CLIToolGroup,
     Combo,
     Endpoint,
@@ -215,6 +216,7 @@ def test_list_cli_tools(monkeypatch) -> None:
     # pending: real CLI, launch form not written yet -> struck, reason empty
     assert modes["cline"] == ("pending", "")
     assert modes["llm"] == ("verified", "")
+    assert modes["gptme"] == ("verified", "")
 
 
 # =========================================================================== #
@@ -458,17 +460,17 @@ def test_resolve_non_aider_generic_form_preserved(monkeypatch) -> None:
     # Temporarily verify a builder-less tool to exercise the fallback route.
     monkeypatch.setitem(
         cli_presets.LAUNCH_SUPPORT,
-        "gptme",
+        "oterm",
         cli_presets.LaunchSupport(cli_presets.LAUNCH_VERIFIED),
     )
 
     r = client.post(
         "/api/cli-tools/resolve",
-        json={"tool": "gptme", "model": "provider:B.AI:gpt-5.5"},
+        json={"tool": "oterm", "model": "provider:B.AI:gpt-5.5"},
     )
     assert r.status_code == 200
     body = r.json()
-    assert body["run_command"] == "gptme --model provider:B.AI:gpt-5.5"
+    assert body["run_command"] == "oterm --model provider:B.AI:gpt-5.5"
     # generic tools do NOT get aider's custom-endpoint flags.
     assert "--openai-api-base" not in body["run_command"]
     assert body["env"]["OPENAI_API_BASE"] == "http://localhost:8080/v1"
@@ -1155,3 +1157,60 @@ def test_resolve_llm_no_model_lists_gateway_models(monkeypatch) -> None:
     rc = r.json()["run_command"]
     assert rc == "llm openai endpoint http://localhost:8080/v1 --models"
     assert " -m " not in rc  # never invent a model id
+
+
+# =========================================================================== #
+# 12. gptme launch builder — documented "Local" route for OpenAI-compatible
+# servers (docs/providers.html):
+#   OPENAI_BASE_URL="http://127.0.0.1:11434/v1" gptme 'hello' -m local/<model>
+# The local/ prefix is required: direct openai/* GPT-5-class models are routed
+# to /v1/responses, which the gateway does not serve.
+# =========================================================================== #
+def test_resolve_gptme_uses_base_url_env_and_local_prefix(monkeypatch) -> None:
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)  # key = plain-key-xyz
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve",
+        json={"tool": "gptme", "model": "provider:B.AI:gpt-5.5"},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["run_command"] == (
+        "OPENAI_BASE_URL=http://localhost:8080/v1 gptme -m local/gpt-5.5"
+    )
+    # key travels through the exported OPENAI_API_KEY, never a gptme flag
+    assert "plain-key-xyz" not in body["run_command"]
+    assert body["env"]["OPENAI_API_KEY"] == "plain-key-xyz"
+    # no prompt -> interactive chat; never the responses-api prefix
+    assert "openai/" not in body["run_command"]
+
+
+def test_resolve_gptme_combo_ref_keeps_local_prefix(monkeypatch) -> None:
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    with sf() as s:
+        s.add(Combo(name="Test", strategy="fallback", enabled=True))
+        s.commit()
+    client = _client(monkeypatch, sf)
+
+    r = client.post("/api/cli-tools/resolve", json={"tool": "gptme", "model": "combo:Test"})
+    assert "-m local/combo:Test" in r.json()["run_command"]
+
+
+def test_resolve_gptme_quotes_a_base_url_with_shell_metacharacters(monkeypatch) -> None:
+    sf = _make_sf()
+    _seed_all(sf)
+    with sf() as s:
+        s.add(Setting(key="gateway_base_url", value="http://host/v1;rm -rf"))
+        s.commit()
+    client = _client(monkeypatch, sf)
+
+    r = client.post("/api/cli-tools/resolve", json={"tool": "gptme", "model": "m1"})
+    rc = r.json()["run_command"]
+    assert rc.startswith("'http://host/v1;rm -rf' gptme") or rc.startswith(
+        "OPENAI_BASE_URL='http://host/v1;rm -rf'"
+    )

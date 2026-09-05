@@ -187,7 +187,7 @@ LAUNCH_SUPPORT: Dict[str, LaunchSupport] = {
     # --- Group C: chat & shell ---
     "llm": LaunchSupport(LAUNCH_VERIFIED),
     "oterm": LaunchSupport(LAUNCH_PENDING),
-    "gptme": LaunchSupport(LAUNCH_PENDING),
+    "gptme": LaunchSupport(LAUNCH_VERIFIED),
     "sgpt": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_INSTALL_UNVERIFIED),
     "mods": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NO_BINARY),
     "aichat": LaunchSupport(LAUNCH_VERIFIED),
