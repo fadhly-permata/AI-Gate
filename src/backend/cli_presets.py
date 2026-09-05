@@ -174,7 +174,7 @@ LAUNCH_SUPPORT: Dict[str, LaunchSupport] = {
     "goose": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NO_BINARY),
     "amp": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NO_BINARY),
     "codex": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_RESPONSES_ONLY),
-    "qwen": LaunchSupport(LAUNCH_PENDING),
+    "qwen": LaunchSupport(LAUNCH_VERIFIED),
     "cline": LaunchSupport(LAUNCH_PENDING),
     "kilo": LaunchSupport(LAUNCH_PENDING),
     # --- Group B: autonomous agents ---

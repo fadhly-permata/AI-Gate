@@ -510,11 +510,68 @@ def _aichat_builder(ctx: _LaunchCtx) -> str:
     return cmd
 
 
+# --------------------------------------------------------------------------- #
+# qwen (Qwen Code) — documented multi-protocol auth (docs/users/configuration/
+# auth.md + settings.md). The OpenAI-compatible protocol is auth type ``openai``
+# and its models are declared under ``modelProviders.openai`` (each entry:
+# id/name/baseUrl/envKey). Settings resolve in layers and the PROJECT file
+# ``<cwd>/.qwen/settings.json`` overrides the user's ``~/.qwen/settings.json``,
+# so aigate writes a project-scoped file instead of touching user config.
+# --------------------------------------------------------------------------- #
+_QWEN_SETTINGS_PATH = ".qwen/settings.json"
+_QWEN_ENV_KEY = "OPENAI_API_KEY"  # default key env for auth type ``openai``
+
+
+def _qwen_builder(ctx: _LaunchCtx) -> str:
+    """qwen's documented OpenAI-compatible form (project settings + TUI).
+
+    Every discovered model of the provider is declared so qwen's ``/model``
+    picker can switch without relaunching; the requested model is preselected
+    through ``model.name``. ``security.auth.selectedType = "openai"`` skips the
+    interactive ``/auth`` flow, and ``env.OPENAI_API_KEY`` carries the gateway
+    key (the caller also exports it, so both routes work).
+
+    No model chosen -> no ``modelProviders``/``model`` keys: the CLI still
+    launches and the user can authenticate/choose inside it.
+    """
+    model_ids: List[str] = list(ctx.provider_models)
+    if ctx.raw_model and ctx.raw_model not in model_ids:
+        model_ids.insert(0, ctx.raw_model)
+
+    config: Dict[str, object] = {}
+    if model_ids:
+        config["modelProviders"] = {
+            "openai": [
+                {
+                    "id": mid,
+                    "name": mid,
+                    "baseUrl": ctx.base,
+                    "envKey": _QWEN_ENV_KEY,
+                }
+                for mid in model_ids
+            ]
+        }
+        config["security"] = {"auth": {"selectedType": "openai"}}
+    if ctx.raw_model:
+        config["model"] = {"name": ctx.raw_model}
+    config["env"] = {_QWEN_ENV_KEY: ctx.key}
+
+    cfg_json = json.dumps(config, indent=2)
+    # mkdir -p first: the redirect would otherwise fail on a fresh directory.
+    cmd = (
+        f"mkdir -p {os.path.dirname(_QWEN_SETTINGS_PATH)}\n"
+        f"cat > {_QWEN_SETTINGS_PATH} <<'AIGATE_EOF'\n" + cfg_json + "\nAIGATE_EOF\n"
+    )
+    cmd += ctx.binary_name
+    return cmd
+
+
 # binary_name -> builder. Anything absent uses ``_generic_builder``.
 _LAUNCH_BUILDERS: Dict[str, Callable[[_LaunchCtx], str]] = {
     "aider": _aider_builder,
     "opencode": _opencode_builder,
     "aichat": _aichat_builder,
+    "qwen": _qwen_builder,
 }
 
 

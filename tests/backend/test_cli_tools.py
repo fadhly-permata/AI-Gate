@@ -213,7 +213,7 @@ def test_list_cli_tools(monkeypatch) -> None:
     # /v1/responses, which the gateway does not serve
     assert modes["codex"] == ("unsupported", "responses_only")
     # pending: real CLI, launch form not written yet -> struck, reason empty
-    assert modes["qwen"] == ("pending", "")
+    assert modes["cline"] == ("pending", "")
 
 
 # =========================================================================== #
@@ -996,3 +996,107 @@ def test_resolve_uses_termux_install_on_termux(monkeypatch) -> None:
         t for g in listed["data"] for t in g["tools"] if t["name"] == "aichat"
     ][0]
     assert aichat["install_command"] == "pkg install aichat"
+
+
+# =========================================================================== #
+# 10. qwen (Qwen Code) launch builder.
+#
+# Documented form (docs/users/configuration/auth.md): auth type ``openai`` +
+# models declared under ``modelProviders.openai`` (id/name/baseUrl/envKey).
+# Settings are layered and the PROJECT file <cwd>/.qwen/settings.json overrides
+# the user's ~/.qwen/settings.json (docs/.../settings.md precedence table), so
+# the generated file is project-scoped and never touches user config.
+# =========================================================================== #
+QWEN_CFG = ".qwen/settings.json"
+
+
+def _qwen_cfg(run_command: str) -> dict:
+    return json.loads(_heredoc_block(run_command, QWEN_CFG))
+
+
+def test_resolve_qwen_writes_project_settings_and_opens_tui(monkeypatch) -> None:
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)  # key = plain-key-xyz
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve",
+        json={"tool": "qwen", "model": "provider:B.AI:gpt-5.5"},
+    )
+    assert r.status_code == 200
+    rc = r.json()["run_command"]
+
+    # the dir is created before the redirect, or `cat >` would fail
+    assert "mkdir -p .qwen" in rc
+    cfg = _qwen_cfg(rc)
+    prov = cfg["modelProviders"]["openai"]
+    assert prov[0]["id"] == "gpt-5.5"
+    assert prov[0]["baseUrl"] == "http://localhost:8080/v1"
+    assert prov[0]["envKey"] == "OPENAI_API_KEY"
+    # non-interactive auth + preselected model
+    assert cfg["security"]["auth"]["selectedType"] == "openai"
+    assert cfg["model"]["name"] == "gpt-5.5"
+    assert cfg["env"]["OPENAI_API_KEY"] == "plain-key-xyz"
+    assert "provider:" not in json.dumps(cfg)
+
+    # interactive TUI (no subcommand, no guessed flags)
+    assert rc.split(_HEREDOC_CLOSE)[-1] == "qwen"
+
+
+def test_resolve_qwen_enumerates_discovered_models(monkeypatch) -> None:
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    with sf() as s:
+        p = Provider(name="B.AI", type="openai", base_url="https://x", api_key="k")
+        s.add(p)
+        s.commit()
+        s.add_all(
+            [
+                ProviderModel(provider_id=p.id, model_id="gpt-5.5", model_name="GPT 5.5"),
+                ProviderModel(provider_id=p.id, model_id="glm-5.2", model_name="GLM 5.2"),
+            ]
+        )
+        s.commit()
+    client = _client(monkeypatch, sf)
+
+    r = client.post(
+        "/api/cli-tools/resolve", json={"tool": "qwen", "model": "provider:B.AI:glm-5.2"}
+    )
+    cfg = _qwen_cfg(r.json()["run_command"])
+    assert [m["id"] for m in cfg["modelProviders"]["openai"]] == ["gpt-5.5", "glm-5.2"]
+    assert cfg["model"]["name"] == "glm-5.2"
+
+
+def test_resolve_qwen_combo_ref(monkeypatch) -> None:
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    with sf() as s:
+        s.add(Combo(name="Test", strategy="fallback", enabled=True))
+        s.commit()
+    client = _client(monkeypatch, sf)
+
+    r = client.post("/api/cli-tools/resolve", json={"tool": "qwen", "model": "combo:Test"})
+    cfg = _qwen_cfg(r.json()["run_command"])
+    assert cfg["modelProviders"]["openai"][0]["id"] == "combo:Test"
+    assert cfg["model"]["name"] == "combo:Test"
+
+
+def test_resolve_qwen_no_model_launches_for_interactive_auth(monkeypatch) -> None:
+    """No model chosen -> no provider/model keys (nothing invented), env kept,
+    and the auth-type pin is dropped so the user can pick inside the TUI."""
+    sf = _make_sf()
+    _seed_all(sf)
+    _seed_endpoint(sf)
+    client = _client(monkeypatch, sf)
+
+    r = client.post("/api/cli-tools/resolve", json={"tool": "qwen"})
+    rc = r.json()["run_command"]
+    cfg = _qwen_cfg(rc)
+    assert "modelProviders" not in cfg
+    assert "security" not in cfg
+    assert "model" not in cfg
+    assert cfg["env"]["OPENAI_API_KEY"] == "plain-key-xyz"
+    assert rc.split(_HEREDOC_CLOSE)[-1] == "qwen"

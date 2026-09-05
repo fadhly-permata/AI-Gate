@@ -33,7 +33,7 @@ groups:
       - { name: aider,       binary: aider,       install: "pip install aider-chat",                    launch: verified }
       - { name: goose,       binary: goose,       install: null,                                        launch: unsupported }
       - { name: amp,         binary: amp,         install: null,                                        launch: unsupported }
-      - { name: qwen,        binary: qwen,        install: "npm install -g @qwen-code/qwen-code",      launch: pending }
+      - { name: qwen,        binary: qwen,        install: "npm install -g @qwen-code/qwen-code",      launch: verified }
       - { name: cline,       binary: cline,       install: "npm install -g cline",                      launch: pending }
       - { name: kilo,        binary: kilo,        install: "npm install -g @kilocode/cli",             launch: pending }
   - id: autonomous_agents     # Grup B
@@ -104,6 +104,26 @@ ini berubah mengikuti builder, bukan data user), diekspos lewat `ToolDTO`
   ("no longer supported", openai/codex discussion #7782) dan hanya menerima
   `responses` → butuh `/v1/responses` di gateway. Selama gateway belum
   meng-expose Responses API, codex = `unsupported`.
+
+### Bentuk launch per tool (sumber: dokumen resmi upstream)
+- **aider** — flag eksplisit: `--openai-api-base <base> --openai-api-key <key>
+  --model openai/<model>`.
+- **opencode** — tulis `opencode.json` (provider custom
+  `@ai-sdk/openai-compatible`, `options.baseURL` + `apiKey`, `models` hasil
+  discovery) + `model` default `aigate/<id>`, lalu buka TUI `opencode`
+  (BUKAN `opencode run`, yang one-shot dan nunggu stdin).
+- **aichat** — tulis YAML dengan field `clients:` (`type: openai-compatible`,
+  `name: aigate`, `api_base`, `api_key`, `models: [{name: ...}]`), model
+  `aigate:<id>`, di-scope pakai env `AICHAT_CONFIG_FILE`.
+- **qwen** (Qwen Code) — tulis `.qwen/settings.json` PROJECT-scope (override
+  `~/.qwen/settings.json` user, jadi config user gak disentuh):
+  `modelProviders.openai[] = {id, name, baseUrl, envKey: OPENAI_API_KEY}`,
+  `security.auth.selectedType = "openai"`, `model.name = <id>`, `env`
+  berisi key. Auth type `openai` = protokol OpenAI-compatible (docs:
+  `docs/users/configuration/auth.md`).
+- **gemini** — dokumen resminya (docs/cli/model.md + settings.md) TIDAK
+  mengenal provider OpenAI-compatible; hanya API Gemini → `unsupported`
+  (`gemini_only`), bukan sekadar belum dikerjain.
 
 ## Plugin
 File tambahan (YAML/JSON) bisa di-drop di folder `config/cli-plugins/` dan di-merge
