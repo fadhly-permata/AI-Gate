@@ -201,6 +201,27 @@ body.sidebar-collapsed .layout {
 
 .nav { display: flex; flex-direction: column; }
 
+.nav-group {
+  margin: 0;
+  padding: 0 0 8px;
+}
+
+.nav-group + .nav-group {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 8px;
+}
+
+.nav-group-label {
+  margin: 0;
+  padding: 8px 16px 6px;
+  color: var(--sidebar-fg);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
 .nav-item {
   display: flex;
   align-items: center;
@@ -237,8 +258,18 @@ body.sidebar-collapsed .layout {
 }
 
 /* Collapsed: icons only */
-body.sidebar-collapsed .nav-label {
+body.sidebar-collapsed .nav-label,
+body.sidebar-collapsed .nav-group-label {
   display: none;
+}
+
+body.sidebar-collapsed .nav-group {
+  padding-bottom: 0;
+}
+
+body.sidebar-collapsed .nav-group + .nav-group {
+  border-top: none;
+  padding-top: 0;
 }
 
 body.sidebar-collapsed .nav-item {

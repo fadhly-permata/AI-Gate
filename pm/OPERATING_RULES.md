@@ -227,5 +227,13 @@ dokumen selalu "align" dan bisa diaudit lintas sesi.
   saat mendarat.
 - R21 tetap berlaku: PM tidak ngoding sendiri; yang dicatat = hasil kerja sub-agent
   yang sudah PM verifikasi + integrasi.
-(Pelajaran 2026-09-05, user: "catat semua perubahan kode per file di documents/
- biar kode & dokumen align; buat rule biar selalu begitu ke depannya".)
+(Pelajaran 2026-09-05, user: "catat semua perubahan kode per file di documents/ biar kode & dokumen align; buat rule biar selalu begitu ke depannya".)
+
+## R23 — Semua input user lewat `@ProjectManager`
+Setiap command, pertanyaan, request, feedback, koreksi, status check, atau
+interaksi user lainnya WAJIB diroute/di-handoff lebih dulu ke agent
+`@ProjectManager` sebagai pintu masuk tunggal. PM menangani dekomposisi,
+pemilihan eksekusi, delegasi spesialis, integrasi, verifikasi, dan respons.
+Jangan bypass PM untuk implementasi langsung atau handoff ke spesialis.
+Instruksi system/developer/tool tetap lebih tinggi dan bukan input user.
+(Permintaan user 2026-09-05: jadikan routing ini aturan durable.)
