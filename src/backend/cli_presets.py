@@ -132,6 +132,7 @@ LAUNCH_UNSUPPORTED = "unsupported"
 REASON_PENDING = "pending"
 REASON_ANTHROPIC_ONLY = "anthropic_only"
 REASON_GEMINI_ONLY = "gemini_only"
+REASON_RESPONSES_ONLY = "responses_only"
 REASON_NOT_A_CLI = "not_a_cli"
 REASON_NO_BINARY = "no_binary"
 REASON_INSTALL_UNVERIFIED = "install_unverified"
@@ -147,6 +148,21 @@ class LaunchSupport:
 
 # tool name -> support. Anything absent is treated as ``pending`` (fail-closed:
 # a newly added preset can never be launched until someone looks at it).
+#
+# Every entry below was checked ON THE DEVICE (Termux/aarch64), not from memory:
+#   claude / gemini  -> the gateway serves OpenAI /v1/chat/completions only;
+#                       these two speak Anthropic Messages / Google generateContent.
+#   codex            -> verified live: codex 0.122.0 (Termux tur build) refuses to
+#                       start with `wire_api = "chat"` ("no longer supported",
+#                       openai/codex discussion #7782) — it needs /v1/responses.
+#   goose / amp / mods / sgpt / swe-agent / autogpt / phi ->
+#                       no installable package for this platform under that name
+#                       (PyPI names belong to unrelated projects; npm ships no
+#                       android build, and Termux's `goose` is a DB migration
+#                       tool, not Block's agent).
+#                       Tools the Termux repo DOES package (e.g. `pkg install
+#                       aichat`) get their own entry + install string once their
+#                       launch form is verified.
 LAUNCH_SUPPORT: Dict[str, LaunchSupport] = {
     # --- Group A: agentic coding ---
     "aider": LaunchSupport(LAUNCH_VERIFIED),
@@ -157,7 +173,7 @@ LAUNCH_SUPPORT: Dict[str, LaunchSupport] = {
     "phi": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_INSTALL_UNVERIFIED),
     "goose": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NO_BINARY),
     "amp": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NO_BINARY),
-    "codex": LaunchSupport(LAUNCH_PENDING),
+    "codex": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_RESPONSES_ONLY),
     "qwen": LaunchSupport(LAUNCH_PENDING),
     "cline": LaunchSupport(LAUNCH_PENDING),
     "kilo": LaunchSupport(LAUNCH_PENDING),

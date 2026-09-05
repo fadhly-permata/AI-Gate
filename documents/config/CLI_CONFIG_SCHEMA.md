@@ -26,7 +26,7 @@ groups:
     tools:
       - { name: claude,      binary: claude,      install: "npm install -g @anthropic-ai/claude-code", launch: unsupported }
       - { name: opencode,    binary: opencode,    install: "npm install -g opencode-ai",               launch: verified }
-      - { name: codex,       binary: codex,       install: "npm install -g @openai/codex",             launch: pending }
+      - { name: codex,       binary: codex,       install: "npm install -g @openai/codex",             launch: unsupported }
       - { name: gemini,      binary: gemini,      install: "npm install -g @google/gemini-cli",        launch: unsupported }
       - { name: antigravity, binary: antigravity, install: null,                                        launch: unsupported }
       - { name: phi,         binary: phi,         install: null,                                        launch: unsupported }
@@ -75,9 +75,28 @@ ini berubah mengikuti builder, bukan data user), diekspos lewat `ToolDTO`
 | `pending` | tool bisa, bentuk launch belum ditulis/diverifikasi | dicoret | 409 `tool_unsupported` |
 | `unsupported` | butuh format yang tidak di-serve gateway (Anthropic `/v1/messages`, Google `generateContent`), atau bukan CLI, atau tidak ada binary platform ini | dicoret | 409 `tool_unsupported` |
 
-`launch_reason` = kode stabil (`anthropic_only`, `gemini_only`, `not_a_cli`,
-`no_binary`, `install_unverified`) yang diterjemahkan UI lewat `cli.reason.*`.
-Tool tanpa entri registry dianggap `pending` (fail-closed).
+`launch_reason` = kode stabil (`anthropic_only`, `gemini_only`, `responses_only`,
+`not_a_cli`, `no_binary`, `install_unverified`) yang diterjemahkan UI lewat
+`cli.reason.*`. Tool tanpa entri registry dianggap `pending` (fail-closed).
+
+### Catatan platform (Termux/aarch64) — hasil cek langsung di perangkat
+- `process.platform` Node di Termux = **`android`**, jadi npm TIDAK pernah
+  memasang optionalDependency `*-linux-arm64`. CLI Node yang binary-nya
+  per-platform (claude, codex, cline, kilo, amp) lolos install tapi mati saat
+  jalan (`Missing optional dependency ...`).
+- Shebang `#!/usr/bin/env X` juga rusak di perangkat ini: `/usr/bin` tidak ada
+  dan `libtermux-exec-*-ld-preload.so` versi terpasang tidak menulis ulang path
+  itu (diuji: tetap `bad interpreter`). Semua script npm (`vitest`, `eslint`,
+  dst.) kena — yang bisa jalan cuma yang punya shim bash bershebang absolut,
+  contoh pola yang dipakai opencode di perangkat ini:
+  `exec grun .../opencode-linux-arm64/bin/opencode`.
+- Repo Termux (`pkg`) punya beberapa CLI asli: `codex` (tur-repo, 0.122.0),
+  `aichat` (0.30.0). `goose` di repo Termux = tool migrasi DB, BUKAN agen
+  Block — jangan tertipu nama.
+- Codex diverifikasi live: 0.122.0 menolak `wire_api = "chat"`
+  ("no longer supported", openai/codex discussion #7782) dan hanya menerima
+  `responses` → butuh `/v1/responses` di gateway. Selama gateway belum
+  meng-expose Responses API, codex = `unsupported`.
 
 ## Plugin
 File tambahan (YAML/JSON) bisa di-drop di folder `config/cli-plugins/` dan di-merge

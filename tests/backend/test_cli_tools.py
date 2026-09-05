@@ -209,8 +209,11 @@ def test_list_cli_tools(monkeypatch) -> None:
     # unsupported: needs a wire format the gateway does not expose -> struck
     assert modes["claude"] == ("unsupported", "anthropic_only")
     assert modes["antigravity"] == ("unsupported", "not_a_cli")
+    # verified live on Termux: codex 0.122 dropped wire_api="chat" -> needs
+    # /v1/responses, which the gateway does not serve
+    assert modes["codex"] == ("unsupported", "responses_only")
     # pending: real CLI, launch form not written yet -> struck, reason empty
-    assert modes["codex"] == ("pending", "")
+    assert modes["qwen"] == ("pending", "")
 
 
 # =========================================================================== #
@@ -246,6 +249,7 @@ def test_resolve_tool_by_name(monkeypatch) -> None:
     [
         ("llm", "pending", ""),  # real CLI, launch form not written yet
         ("claude", "unsupported", "anthropic_only"),  # needs /v1/messages
+        ("codex", "unsupported", "responses_only"),  # needs /v1/responses
         ("antigravity", "unsupported", "not_a_cli"),  # GUI IDE, no binary
     ],
 )
