@@ -11,6 +11,14 @@ Exposes:
   (pass-through) upstreams incl. combos; translated formats (anthropic/gemini)
   return a ``streaming_unsupported_format`` 400 (per-chunk SSE translation is a
   known, documented limitation).
+* ``POST /v1/responses`` — OpenAI **Responses API** surface (codex ≥ 0.122
+  dropped ``wire_api = "chat"``). The body is translated to a chat-completions
+  payload by :mod:`backend.gateway.responses` and run through the SAME
+  resolution/adapter/usage/logging pipeline as ``/v1/chat/completions``; the
+  chat response is translated back into the Responses envelope. NON-STREAMING
+  ONLY: ``stream:true`` returns a ``responses_streaming_unsupported`` 400, and
+  non-representable fields (tools, function calls, reasoning, server-side
+  state, structured outputs) return ``responses_unsupported_field`` 400s.
 * ``GET /v1/models`` — list available models derived from ``ProviderModel``
   rows (id ``provider:<provider>:<model_id>``) plus ENABLED ``Combo`` rows
   (id ``combo:<name>``), in OpenAI ``{"object":"list","data":[...]}`` shape.
@@ -52,6 +60,7 @@ from backend.config.db import SessionLocal
 from backend.combo_routing import execute_combo, resolve_combo_stream_target
 from backend.gateway import provider_adapter
 from backend.gateway.errors import GatewayError
+from backend.gateway import responses as _responses
 from backend.gateway.resolver import ResolvedTarget, TargetNotFound, resolve_target
 from backend.log import log_error_exc, log_info, log_warning, log_warning_exc
 from backend.models import (
@@ -152,11 +161,12 @@ async def chat_completions(request: Request) -> Response:
     return result
 
 
-async def _handle_chat_completion(request: Request, ctx: dict) -> Union[dict, Response]:
-    """Validate + route + forward one chat completion (raises GatewayError).
+async def _parse_object_body(request: Request) -> dict:
+    """Parse + basic-shape-validate a JSON object request body.
 
-    Returns a JSON dict (non-streaming) or a ``StreamingResponse`` (SSE) when the
-    client requested ``stream:true`` against an OpenAI-format target/combo.
+    Shared by ``/v1/chat/completions`` and ``/v1/responses`` so both surfaces
+    answer malformed bodies with the SAME OpenAI envelope (invalid_json /
+    invalid_body). Raises GatewayError(400).
     """
     try:
         payload = await request.json()
@@ -180,6 +190,16 @@ async def _handle_chat_completion(request: Request, ctx: dict) -> Union[dict, Re
             "invalid_request_error",
             "invalid_body",
         )
+    return payload
+
+
+async def _handle_chat_completion(request: Request, ctx: dict) -> Union[dict, Response]:
+    """Validate + route + forward one chat completion (raises GatewayError).
+
+    Returns a JSON dict (non-streaming) or a ``StreamingResponse`` (SSE) when the
+    client requested ``stream:true`` against an OpenAI-format target/combo.
+    """
+    payload = await _parse_object_body(request)
 
     # `model` must be a non-empty string in the RAW payload (the validated
     # model coerces types, but we forward the raw dict, so enforce str here).
@@ -302,6 +322,147 @@ async def _handle_chat_completion(request: Request, ctx: dict) -> Union[dict, Re
         context={"model": model},
     )
     return result
+
+
+@router.post("/v1/responses")
+async def responses_completions(request: Request) -> Response:
+    """OpenAI **Responses API** proxy (non-streaming) → chat pipeline.
+
+    codex ≥ 0.122 removed ``wire_api = "chat"`` (openai/codex discussion
+    #7782) and only speaks ``POST /v1/responses``
+    (https://platform.openai.com/docs/api-reference/responses/create). This
+    route translates the request via :mod:`backend.gateway.responses` and then
+    runs the EXACT same pipeline as ``/v1/chat/completions`` — token saver,
+    Endpoint header routing, resolver, combos, adapter, usage recording — so
+    quota/savings/logging keep working. The chat response is translated back
+    into the Responses envelope (request ``model`` ref echoed).
+
+    B5.6 wrapper: same timing + ``RequestLog`` behavior as ``chat_completions``.
+    """
+    ctx: dict = {
+        "endpoint_id": None,
+        "model": None,
+        "payload": None,
+        "saved_bytes": None,
+    }
+    t0 = time.monotonic()
+    try:
+        result = await _handle_responses(request, ctx)
+    except GatewayError as exc:
+        _record_request_log_safe(
+            ctx, request, t0, error_envelope=exc.envelope, http_status=exc.status_code
+        )
+        raise
+    except Exception as exc:  # noqa: BLE001 - record debug row, then re-raise
+        _record_request_log_safe(
+            ctx, request, t0, error_envelope=None, http_status=500, exc=exc
+        )
+        raise
+    _record_request_log_safe(ctx, request, t0, result=result, http_status=200)
+    return result
+
+
+async def _handle_responses(request: Request, ctx: dict) -> dict:
+    """Validate + translate + route one Responses request (raises GatewayError).
+
+    ``stream:true`` and every non-representable field (tools, function calls,
+    reasoning, server-side state, structured outputs) are refused with a
+    STABLE machine code by :func:`backend.gateway.responses.responses_request_to_chat`
+    — a silently-dropped tool item would corrupt an agent loop instead of
+    failing loudly.
+    """
+    payload = await _parse_object_body(request)
+
+    # `model` must be a non-empty string in the RAW payload (same rule as the
+    # chat path: the resolver + adapter consume the raw dict, not coerced types).
+    model = payload.get("model")
+    if not isinstance(model, str) or not model:
+        log_warning(
+            "field 'model' is required and must be a string",
+            source=_responses.LOG_SOURCE,
+        )
+        raise GatewayError(
+            400, "field 'model' is required", "invalid_request_error", "missing_model"
+        )
+
+    ctx["payload"] = payload
+    ctx["model"] = model
+
+    # Pydantic v1 shape check (semantic validation happens in the mapper).
+    try:
+        _responses.ResponsesRequest.parse_obj(payload)
+    except ValidationError as exc:
+        log_warning(
+            f"invalid responses request: {exc}",
+            source=_responses.LOG_SOURCE,
+        )
+        raise GatewayError(
+            400,
+            "invalid responses request: 'model' must be a string",
+            "invalid_request_error",
+            "invalid_responses_request",
+        )
+
+    # Responses → chat translation; refuses stream:true / unsupported fields.
+    chat_payload = _responses.responses_request_to_chat(payload)
+
+    # ADR-008: named Endpoint via X-Aigate-Endpoint header (same path as chat;
+    # chat_payload never carries stream, so the endpoint path cannot return an
+    # SSE Response here).
+    endpoint_name = request.headers.get("x-aigate-endpoint")
+    if endpoint_name:
+        chat_payload, saved_bytes = _apply_token_saver_for_endpoint(
+            endpoint_name, chat_payload
+        )
+        ctx["saved_bytes"] = saved_bytes
+        chat_result = await _route_via_endpoint(
+            endpoint_name, model, chat_payload, request, ctx
+        )
+        if not isinstance(chat_result, dict):
+            # Defensive: unreachable while stream is refused; fail loudly (R12)
+            # rather than translate a stream we cannot represent.
+            raise GatewayError(
+                500,
+                "endpoint path returned a stream for a non-streaming request",
+                "server_error",
+                "responses_internal_error",
+            )
+        log_info(
+            f"responses completion success via endpoint '{endpoint_name}' "
+            f"for model '{model}'",
+            source=_responses.LOG_SOURCE,
+            context={"endpoint": endpoint_name, "model": model},
+        )
+        return _responses.chat_response_to_responses(chat_result, model)
+
+    try:
+        target = resolve_target(model)
+    except TargetNotFound as exc:
+        log_warning(
+            f"model reference not found: {model}",
+            source=_responses.LOG_SOURCE,
+        )
+        raise GatewayError(
+            400, str(exc), "invalid_request_error", "model_not_found"
+        )
+
+    ctx["model"] = target.upstream_model
+
+    # Combo strategy routing / plain provider — identical to the chat path so
+    # usage recording (B5.5) and savings attribution stay shared.
+    if target.combo_used:
+        combo_name = model[len("combo:"):]
+        chat_result = await execute_combo(combo_name, chat_payload)
+    else:
+        chat_result = await provider_adapter.chat_completion(target, chat_payload)
+        _record_usage_safe(chat_result, target, endpoint_id=None)
+
+    log_info(
+        f"responses completion success for model '{model}'",
+        source=_responses.LOG_SOURCE,
+        context={"model": model},
+    )
+    return _responses.chat_response_to_responses(chat_result, model)
 
 
 @router.get("/v1/models")
