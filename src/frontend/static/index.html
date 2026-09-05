@@ -54,43 +54,55 @@
 
     <!-- ===== Sidebar ===== -->
     <aside class="sidebar">
-      <nav class="nav">
-        <a class="nav-item" href="#" data-view="providers">
-          <i class="nav-icon fa fa-server"></i>
-          <span class="nav-label" data-i18n="nav.providers">Providers</span>
-        </a>
-        <a class="nav-item" href="#" data-view="combos">
-          <i class="nav-icon fa fa-layer-group"></i>
-          <span class="nav-label" data-i18n="nav.combos">Combos</span>
-        </a>
-        <a class="nav-item" href="#" data-view="proxies">
-          <i class="nav-icon fa fa-network-wired"></i>
-          <span class="nav-label" data-i18n="nav.proxies">Proxy Pools</span>
-        </a>
-        <a class="nav-item" href="#" data-view="endpoints">
-          <i class="nav-icon fa fa-plug"></i>
-          <span class="nav-label" data-i18n="nav.endpoints">Endpoints</span>
-        </a>
-        <a class="nav-item" href="#" data-view="usage">
-          <i class="nav-icon fa fa-chart-line"></i>
-          <span class="nav-label" data-i18n="nav.usage">Usage &amp; Quota</span>
-        </a>
-        <a class="nav-item" href="#" data-view="analytics">
-          <i class="nav-icon fa fa-chart-column"></i>
-          <span class="nav-label" data-i18n="nav.analytics">Analytics</span>
-        </a>
-        <a class="nav-item" href="#" data-view="terminal">
-          <i class="nav-icon fa fa-terminal"></i>
-          <span class="nav-label" data-i18n="nav.terminal">Terminal</span>
-        </a>
-        <a class="nav-item" href="#" data-view="cli">
-          <i class="nav-icon fa fa-screwdriver-wrench"></i>
-          <span class="nav-label" data-i18n="nav.cli">CLI Tools</span>
-        </a>
-        <a class="nav-item" href="#" data-view="settings">
-          <i class="nav-icon fa fa-gear"></i>
-          <span class="nav-label" data-i18n="nav.settings">Settings</span>
-        </a>
+      <nav class="nav" aria-label="Sidebar navigation">
+        <section class="nav-group" aria-labelledby="nav-group-gateway">
+          <h2 id="nav-group-gateway" class="nav-group-label" data-i18n="nav.group_gateway">Gateway / Configuration</h2>
+          <a class="nav-item" href="#" data-view="providers">
+            <i class="nav-icon fa fa-server"></i>
+            <span class="nav-label" data-i18n="nav.providers">Providers</span>
+          </a>
+          <a class="nav-item" href="#" data-view="combos">
+            <i class="nav-icon fa fa-layer-group"></i>
+            <span class="nav-label" data-i18n="nav.combos">Combos</span>
+          </a>
+          <a class="nav-item" href="#" data-view="proxies">
+            <i class="nav-icon fa fa-network-wired"></i>
+            <span class="nav-label" data-i18n="nav.proxies">Proxy Pools</span>
+          </a>
+          <a class="nav-item" href="#" data-view="endpoints">
+            <i class="nav-icon fa fa-plug"></i>
+            <span class="nav-label" data-i18n="nav.endpoints">Endpoints</span>
+          </a>
+        </section>
+        <section class="nav-group" aria-labelledby="nav-group-monitoring">
+          <h2 id="nav-group-monitoring" class="nav-group-label" data-i18n="nav.group_monitoring">Monitoring</h2>
+          <a class="nav-item" href="#" data-view="usage">
+            <i class="nav-icon fa fa-chart-line"></i>
+            <span class="nav-label" data-i18n="nav.usage">Usage &amp; Quota</span>
+          </a>
+          <a class="nav-item" href="#" data-view="analytics">
+            <i class="nav-icon fa fa-chart-column"></i>
+            <span class="nav-label" data-i18n="nav.analytics">Analytics</span>
+          </a>
+        </section>
+        <section class="nav-group" aria-labelledby="nav-group-tools">
+          <h2 id="nav-group-tools" class="nav-group-label" data-i18n="nav.group_tools">Tools</h2>
+          <a class="nav-item" href="#" data-view="terminal">
+            <i class="nav-icon fa fa-terminal"></i>
+            <span class="nav-label" data-i18n="nav.terminal">Terminal</span>
+          </a>
+          <a class="nav-item" href="#" data-view="cli">
+            <i class="nav-icon fa fa-screwdriver-wrench"></i>
+            <span class="nav-label" data-i18n="nav.cli">CLI Tools</span>
+          </a>
+        </section>
+        <section class="nav-group" aria-labelledby="nav-group-system">
+          <h2 id="nav-group-system" class="nav-group-label" data-i18n="nav.group_system">System</h2>
+          <a class="nav-item" href="#" data-view="settings">
+            <i class="nav-icon fa fa-gear"></i>
+            <span class="nav-label" data-i18n="nav.settings">Settings</span>
+          </a>
+        </section>
       </nav>
     </aside>
 
