@@ -549,18 +549,32 @@
 
   /* ---- Scroll & swipe (FSD §2.5.1) ---- */
   var SWIPE_THRESHOLD = 10; // px before a gesture is treated as a swipe
-  var ptr = { active: false, lastX: 0, lastY: 0, lastT: 0, vy: 0, moved: 0, isSwipe: false };
+  var ptr = { active: false, type: "", lastX: 0, lastY: 0, lastT: 0, vy: 0, moved: 0, isSwipe: false };
+
+  /* A swipe is "ours" to own only when: a non-mouse gesture is in flight, it has
+     crossed the movement threshold, and the active tab is NOT in TUI passthrough.
+     Shared by the pointermove scroller and the touchmove suppression guard. */
+  function swipeIsOurs(tab) {
+    return ptr.active && ptr.type !== "mouse" && ptr.isSwipe && !!tab && !tab.tuiMode;
+  }
 
   function setupSwipe() {
     var target = stageEl || bodyEl;
     if (!target) return;
 
+    // CAPTURE + non-passive so the arm reliably fires even for touches that land
+    // on the xterm layers mounted inside the stage (the stage is their ancestor,
+    // so capture sees the pointerdown before any child can consume it). We skip
+    // the `mouse` pointerType: mouse text-selection is xterm's job (mousedown),
+    // and mouse wheel is a separate `wheel` event — neither should be hijacked.
     target.addEventListener("pointerdown", function (e) {
+      if (e.pointerType === "mouse") { ptr.active = false; return; }
       ptr.active = true;
+      ptr.type = e.pointerType || "touch";
       ptr.lastX = e.clientX; ptr.lastY = e.clientY;
       ptr.lastT = (typeof performance !== "undefined" ? performance.now() : Date.now());
       ptr.vy = 0; ptr.moved = 0; ptr.isSwipe = false;
-    });
+    }, { capture: true, passive: false });
 
     // Listen on window so we keep tracking outside the element bounds.
     window.addEventListener("pointermove", function (e) {
@@ -577,20 +591,42 @@
       if (!ptr.isSwipe && ptr.moved > SWIPE_THRESHOLD) ptr.isSwipe = true;
 
       // TUI mode ON => let the app handle its own gestures (whitelist stand-in).
-      if (ptr.isSwipe && !tab.tuiMode) {
+      if (swipeIsOurs(tab)) {
         e.preventDefault();
         e.stopPropagation();
         var delta = swipeToScrollDelta(ptr.vy, { atEdge: atEdge(tab.term) });
         if (delta) tab.term.scrollLines(delta);
       }
       ptr.lastX = e.clientX; ptr.lastY = e.clientY; ptr.lastT = now;
+    }, { passive: false });
+
+    // xterm binds its OWN non-passive `touchmove` on `.xterm-screen` that scrolls
+    // the viewport via scrollTop. With touch-action:none the browser no longer
+    // steals the gesture, so BOTH that handler and our pointermove would fire —
+    // double-scrolling. In CAPTURE on the stage we stop the touchmove from ever
+    // reaching xterm, but ONLY while we own the swipe (and never in TUI mode, so
+    // passthrough is preserved). preventDefault here also blocks the compat
+    // mouse events xterm would otherwise derive from the touch.
+    target.addEventListener("touchmove", function (e) {
+      if (swipeIsOurs(activeTab())) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, { capture: true, passive: false });
+
+    // If the browser ever reclaims the gesture (pointercancel), drop the arm so
+    // a stale pointermove can't scroll after the finger is gone.
+    window.addEventListener("pointercancel", function () {
+      ptr.active = false; ptr.isSwipe = false;
     });
 
     window.addEventListener("pointerup", function () {
       if (!ptr.active) return;
       var tab = activeTab();
+      // Decide ownership BEFORE clearing ptr.active (swipeIsOurs depends on it).
+      var ours = swipeIsOurs(tab);
       ptr.active = false;
-      if (ptr.isSwipe && tab && !tab.tuiMode && Math.abs(ptr.vy) > 0.05) {
+      if (ours && Math.abs(ptr.vy) > 0.05) {
         // Momentum: one last scroll from the release velocity.
         var delta = swipeToScrollDelta(ptr.vy, { atEdge: atEdge(tab.term) });
         if (delta) tab.term.scrollLines(delta);

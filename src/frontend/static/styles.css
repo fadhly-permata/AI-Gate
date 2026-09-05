@@ -91,7 +91,15 @@ html, body {
   display: grid;
   grid-template-rows: var(--header-h) 1fr;
   grid-template-columns: var(--sidebar-w) 1fr;
-  height: 100vh;
+  /* MOBILE FIX: 100vh is TALLER than the visible viewport on Android Chrome
+     (it ignores the URL bar), so the app bottom — the terminal — was pushed
+     below the fold and its last rows were unreachable. 100dvh tracks the
+     DYNAMIC (visible) viewport, shrinking the whole app to fit so the terminal
+     bottom is always on screen with no page scroll. 100vh stays as the
+     fallback for engines that do not support dvh (declared first so dvh wins
+     where supported). Mirrors the fullscreen rule below. */
+  height: 100vh;   /* fallback */
+  height: 100dvh;  /* dynamic viewport — excludes mobile URL/keyboard bars */
   transition: grid-template-columns var(--transition);
 }
 
@@ -906,6 +914,23 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
      lets it shrink below content so the view never overflows the workspace. */
   min-height: 0;
   touch-action: none; /* we own swipe gestures; mouse wheel still scrolls xterm */
+}
+
+/* MOBILE SWIPE FIX: `touch-action: none` is NOT inherited, so the xterm layers
+   mounted INSIDE the stage kept their default touch-action. A touch landing on
+   the terminal therefore triggered the browser's NATIVE pan on `.xterm-viewport`
+   (overflow-y:scroll) / selection on `.xterm-screen`, and the moment the browser
+   claimed the gesture it fired `pointercancel` — which killed our `pointermove`
+   stream, so the swipe handler never drove a scroll. Disabling touch-action on
+   the interactive xterm layers stops the native pan/selection takeover so the
+   pointer gesture reaches our swipe handler (terminal.js setupSwipe). Mouse
+   wheel is unaffected: it is a `wheel` event, not governed by touch-action, and
+   mouse text-selection uses `mousedown`, not touch. */
+.term-stage .xterm,
+.term-stage .xterm-viewport,
+.term-stage .xterm-screen,
+.term-stage .xterm-helper-textarea {
+  touch-action: none;
 }
 
 .term-containers {
