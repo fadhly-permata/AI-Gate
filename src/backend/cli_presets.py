@@ -185,7 +185,14 @@ LAUNCH_SUPPORT: Dict[str, LaunchSupport] = {
     # no such flags) — the preset installs via pip, so the Python docs are the
     # contract here.
     "open-interpreter": LaunchSupport(LAUNCH_VERIFIED),
-    "gpt-researcher": LaunchSupport(LAUNCH_PENDING),
+    # NOT A CLI: `pip install gpt-researcher` ships a library + web-app backend
+    # only — no console script (pyproject [project] has no [project.scripts],
+    # setup.py has no entry_points; README's pip section shows `import
+    # GPTResearcher` usage only). The docs' "Run with CLI" page is a
+    # repo-checkout script (`python cli.py "<query>" --report_type ...`),
+    # requires a query and exits after writing a report file — no binary to
+    # spawn and no interactive chat. See CLI_CONFIG_SCHEMA.md bullet (2026-09-05).
+    "gpt-researcher": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NOT_A_CLI),
     "crewai": LaunchSupport(LAUNCH_PENDING),
     "swe-agent": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_INSTALL_UNVERIFIED),
     "autogpt": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_INSTALL_UNVERIFIED),

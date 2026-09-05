@@ -43,7 +43,7 @@ groups:
       - { name: swe-agent,        binary: swe-agent,        install: null,                          launch: unsupported }
       - { name: open-interpreter, binary: interpreter,      install: "pip install open-interpreter", launch: verified }
       - { name: autogpt,          binary: autogpt,          install: null,                          launch: unsupported }
-      - { name: gpt-researcher,   binary: gpt-researcher,   install: "pip install gpt-researcher",  launch: pending }
+      - { name: gpt-researcher,   binary: gpt-researcher,   install: "pip install gpt-researcher",  launch: unsupported }
       - { name: crewai,           binary: crewai,           install: "pip install crewai",          launch: pending }
   - id: chat_shell            # Grup C
     label: "Chat & Shell Assistants"
@@ -198,6 +198,19 @@ ini berubah mengikuti builder, bukan data user), diekspos lewat `ToolDTO`
   IDENTIK untuk semua bentuk ref dan gak ada yang diarang. `oterm` tanpa
   argumen = TUI interaktif. DOCS-VERIFIED only (docs & source dibaca
   2026-09-05; gak install/jalankan).
+- **gpt-researcher** — BUKAN CLI: `pip install gpt-researcher` (PyPI 0.16.0)
+  memasang LIBRARY + backend web app saja, TIDAK ada console script
+  `gpt-researcher` — `pyproject.toml` master tidak punya `[project.scripts]`
+  dan `setup.py` tidak punya `entry_points` (dibaca 2026-09-05), jadi
+  `command -v gpt-researcher` tidak akan pernah lolos dan branch install di
+  PTY cuma muter-muter. Halaman "Run with CLI" di docs.gptr.dev pun
+  mensyaratkan CLONE repo dulu: `python cli.py "<query>" --report_type <t>` —
+  query POSISIONAL WAJIB, tulis file report lalu exit (one-shot, bukan chat
+  interaktif — pelajaran `opencode run`). Route env gateway untuk library-nya
+  memang terdokumentasi (`docs/…/llms/llms.md`: `OPENAI_BASE_URL` +
+  `OPENAI_API_KEY` + `FAST_LLM=openai:<id>` — catatan: namanya `OPENAI_BASE_URL`,
+  bukan `OPENAI_API_BASE` yang di-export launcher), tapi tidak ada binary yang
+  bisa di-launch → `unsupported` (`not_a_cli`), bukan sekadar belum dikerjain.
 - **gemini** — dokumen resminya (docs/cli/model.md + settings.md) TIDAK
   mengenal provider OpenAI-compatible; hanya API Gemini → `unsupported`
   (`gemini_only`), bukan sekadar belum dikerjain.

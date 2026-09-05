@@ -220,6 +220,10 @@ def test_list_cli_tools(monkeypatch) -> None:
     assert modes["kilo"] == ("verified", "")
     assert modes["open-interpreter"] == ("verified", "")
     assert modes["oterm"] == ("verified", "")
+    # unsupported: `pip install gpt-researcher` ships NO console script — the
+    # tool is a library + web app, its documented "CLI" is a repo-checkout
+    # one-shot script (python cli.py "<query>"), not a launchable binary
+    assert modes["gpt-researcher"] == ("unsupported", "not_a_cli")
 
 
 # =========================================================================== #
@@ -256,6 +260,8 @@ def test_resolve_tool_by_name(monkeypatch) -> None:
         ("claude", "unsupported", "anthropic_only"),  # needs /v1/messages
         ("codex", "unsupported", "responses_only"),  # needs /v1/responses
         ("antigravity", "unsupported", "not_a_cli"),  # GUI IDE, no binary
+        # library + web app only: pip installs NO `gpt-researcher` binary
+        ("gpt-researcher", "unsupported", "not_a_cli"),
     ],
 )
 def test_resolve_unverified_tool_is_refused(monkeypatch, tool, mode, reason) -> None:
