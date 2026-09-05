@@ -1,0 +1,19 @@
+{
+  "name": "aigate-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:android": "node e2e/android.mjs",
+    "test:e2e:b5": "node e2e/b5_features.mjs"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.0",
+    "jsdom": "^25.0.0",
+    "@playwright/test": "^1.48.0",
+    "puppeteer-core": "^23.0.0"
+  }
+}
