@@ -212,4 +212,20 @@ Aturan wajib:
 4. Setelah sub-agent balik dengan receipt: PM yang integrasi, jalanin test,
    commit, dan update Memory Bank — bukan sub-agent-nya.
 5. Kalau spesialis belum ada → generate on-demand (R1/R2) + minta restart
-   (R4), baru delegasi. Jangan diam-diam ambil alih kerja spesialis.
+    (R4), baru delegasi. Jangan diam-diam ambil alih kerja spesialis.
+
+## R22 — Setiap perubahan kode WAJIB dicatat per-file di `documents/` (code↔doc align)
+Setiap kali PM mengintegrasikan perubahan KODE (hasil sub-agent yang sudah
+diverifikasi, atau fix yang PM temukan saat verifikasi), PM WAJIB mencatatnya ke
+`documents/dev/CODE_CHANGES.md`: tanggal + task/tujuan, lalu PER FILE apa yang
+berubah (fungsi/marker + ringkas + nomor baris bila relevan). Ini menjaga kode &
+dokumen selalu "align" dan bisa diaudit lintas sesi.
+- Catat SETELAH perubahan diverifikasi (test jalan), BUKAN sebelum klaim selesai.
+- Format: seksi bertanggal, newest-on-top, bullet per-file. Perubahan environment
+  di LUAR repo (mis. `~/.bashrc`) masuk subseksi "Environment (luar repo)".
+- Kerja yang belum kelar (mis. task ke-interupsi) ditandai **PENDING**, dilengkapi
+  saat mendarat.
+- R21 tetap berlaku: PM tidak ngoding sendiri; yang dicatat = hasil kerja sub-agent
+  yang sudah PM verifikasi + integrasi.
+(Pelajaran 2026-09-05, user: "catat semua perubahan kode per file di documents/
+ biar kode & dokumen align; buat rule biar selalu begitu ke depannya".)

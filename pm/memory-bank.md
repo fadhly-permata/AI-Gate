@@ -38,7 +38,17 @@
   belum verified + `resolve` balas 409 daripada ngarang command.
   Dasar verifikasi dicatat per tool di CLI_CONFIG_SCHEMA: dijalankan langsung
   di perangkat (aider, opencode, aichat) vs dokumen resmi (sisanya — npm/pip
-  gak bisa dipasang di Termux, user larang install).
+   gak bisa dipasang di Termux, user larang install).
+- 2026-09-05: Terminal stay-alive (sesi ini). Task1 env: `~/.bashrc` auto
+  `termux-wake-lock` (tanpa install) biar server aigate gak di-freeze Android saat
+  layar mati. Task2 (fe-dev, DONE+verif): persist `tab_id` via sessionStorage ->
+  terminal survive Chrome tab DISCARD (`terminal.js` +123/-18, test baru
+  `terminal_discard.test.js` 16; suite 330 passed). Task3 (fe-dev, DONE+verif):
+  toolbar Keep Screen On (wake lock) + dropdown Fullscreen (full page/true FS) +
+  dropdown Paste (normal/blok kode) -> 2 spawn ke-interupsi tapi diff mendarat; PM
+  review + sisa fe-dev benerin typo regex tes; suite 390 passed (330+60), 0 regresi.
+  RULE BARU **R22**: tiap perubahan kode dicatat per-file di
+  `documents/dev/CODE_CHANGES.md` (code↔doc align).
 
 ## Decisions
 - 2026-09-03: Terminal UX — swipe diubah jadi scroll (bukan navigasi TUI) karena

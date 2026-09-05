@@ -867,3 +867,29 @@
   (relokasi layer GLOBAL -> user's ~/.qwen gak kebaca, butuh keputusan),
   `_interpreter_builder` versi Rust baru (`-c` + wire_api=chat) kalau install
   string dipindah ke curl, `--api_key` open-interpreter nongol di `ps`.
+
+---
+## 2026-09-05 — Postmortem: rule R22 (code↔doc alignment) + terminal stay-alive
+- Trigger user: minta SEMUA perubahan kode dicatat per-file ke `documents/` biar
+  kode & dokumen selalu align + bikin rule biar konsisten ke depannya.
+- **Rule baru: R22** — `documents/dev/CODE_CHANGES.md` jadi register wajib per-file.
+- Artefak: `documents/dev/CODE_CHANGES.md` DIBUAT (register per-file, newest-on-top).
+- Task 1 (env, DONE): `~/.bashrc` auto `termux-wake-lock` (tanpa install) — server
+  aigate gak ikut di-freeze Android saat layar tablet mati.
+- Task 2 (fe-dev, DONE + diverifikasi PM): persist `tab_id` via sessionStorage biar
+  terminal survive Chrome tab DISCARD. `terminal.js` +123/-18 + test baru
+  `terminal_discard.test.js` (16). Suite frontend 330 passed (PM re-run mandiri).
+- Task 3 (fe-dev, PENDING): 3 fitur toolbar (Keep Screen On + dropdown Fullscreen
+  [full page / true fullscreen] + dropdown Paste [normal / paste-as-code-block]) —
+  spawn ke-INTERUPSI sebelum nulis file apa pun (diverifikasi: gak ada marker).
+  Di-RE-RUN sesi ini.
+- Boundary: WIP orang lain (`gateway/router.py`, `responses.py`, `a.out`) TIDAK
+  disentuh/di-commit (R19: jangan add di luar scope).
+- **Update (hari sama): Task 3 SELESAI.** 2 spawn `fe-dev` ke-interupsi TAPI diff
+  mendarat (`terminal.js` +589, `index.html` +61, `i18n.js` +22, `styles.css` +92,
+  test baru `terminal_toolbar.test.js`). PM review baris-per-baris. Sisa proses
+  `fe-dev` (masih hidup setelah receipt-nya kepotong) benerin typo regex (`[^}]*\}`
+  → `[^}]*\}/`) + balikin blok tes "Dropdown CSS contract". PM verifikasi ulang:
+  file stabil (md5 tak berubah, 0 penulis aktif). Suite: **21 file / 390 passed**
+  (330 + 60), 0 regresi. `CODE_CHANGES.md` di-flip PENDING->DONE (R22 dijalankan).
+  Belum di-commit.
