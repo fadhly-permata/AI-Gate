@@ -624,14 +624,61 @@
                  never covers the tabs or the first line of terminal output. -->
             <div class="term-floating" id="termFloating" role="group"
                  data-i18n-aria="term.controls" aria-label="Terminal controls">
-              <button class="icon-btn term-ctl" id="termFullscreen" type="button"
-                      data-i18n-aria="term.fullscreen" title="Fullscreen">
-                <i class="fa fa-expand"></i>
+              <!-- Keep Screen On (Screen Wake Lock): keeps the tablet awake so it
+                   never freezes the renderer and drops the session. Disabled by
+                   terminal.js when navigator.wakeLock is absent (insecure
+                   context: needs HTTPS or http://localhost). -->
+              <button class="icon-btn term-ctl" id="termKeepAwake" type="button"
+                      data-i18n-aria="term.keep_awake" title="Keep Screen On" aria-pressed="false">
+                <i class="fa fa-sun"></i>
               </button>
-              <button class="icon-btn term-ctl" id="termPaste" type="button"
-                      data-i18n-aria="term.paste" title="Paste">
-                <i class="fa fa-paste"></i>
-              </button>
+
+              <!-- Fullscreen SPLIT BUTTON: the main button keeps its default
+                   action (Full Page = the .terminal-fullscreen CSS class), the
+                   caret opens a menu with Full Page / true browser Fullscreen.
+                   Menu wiring + behaviour live in terminal.js (createTermMenu). -->
+              <span class="term-split" id="termFullscreenSplit">
+                <button class="icon-btn term-ctl" id="termFullscreen" type="button"
+                        data-i18n-aria="term.full_page" title="Full Page" aria-pressed="false">
+                  <i class="fa fa-expand"></i>
+                </button>
+                <button class="icon-btn term-ctl term-caret" id="termFullscreenCaret" type="button"
+                        aria-haspopup="true" aria-expanded="false" aria-controls="termFullscreenMenu"
+                        data-i18n-aria="term.fullscreen_menu" title="Fullscreen options">
+                  <i class="fa fa-caret-down" aria-hidden="true"></i>
+                </button>
+                <span class="term-menu" id="termFullscreenMenu" role="menu" hidden>
+                  <button class="term-menu-item" type="button" role="menuitemcheckbox"
+                          aria-checked="false" id="termMenuFullPage" data-action="full-page"
+                          data-i18n="term.full_page">Full Page</button>
+                  <button class="term-menu-item" type="button" role="menuitemcheckbox"
+                          aria-checked="false" id="termMenuFullscreen" data-action="fullscreen"
+                          data-i18n="term.fullscreen">Fullscreen</button>
+                </span>
+              </span>
+
+              <!-- Paste SPLIT BUTTON: main = normal paste (unchanged), caret =
+                   Paste / Paste as Code Block. -->
+              <span class="term-split" id="termPasteSplit">
+                <button class="icon-btn term-ctl" id="termPaste" type="button"
+                        data-i18n-aria="term.paste" title="Paste">
+                  <i class="fa fa-paste"></i>
+                </button>
+                <button class="icon-btn term-ctl term-caret" id="termPasteCaret" type="button"
+                        aria-haspopup="true" aria-expanded="false" aria-controls="termPasteMenu"
+                        data-i18n-aria="term.paste_menu" title="Paste options">
+                  <i class="fa fa-caret-down" aria-hidden="true"></i>
+                </button>
+                <span class="term-menu" id="termPasteMenu" role="menu" hidden>
+                  <button class="term-menu-item" type="button" role="menuitem"
+                          id="termMenuPaste" data-action="paste"
+                          data-i18n="term.paste">Paste</button>
+                  <button class="term-menu-item" type="button" role="menuitem"
+                          id="termMenuPasteCode" data-action="paste-code"
+                          data-i18n="term.paste_code">Paste as Code Block</button>
+                </span>
+              </span>
+
               <button class="icon-btn term-ctl" id="termTui" type="button"
                       data-i18n-aria="term.tui_mode" title="TUI Passthrough" aria-pressed="false">
                 <i class="fa fa-hand-pointer"></i>
