@@ -151,6 +151,17 @@
     });
   }
 
+  /* Human explanation for a struck-through tool. The server sends a stable
+     reason CODE (tool.launch_reason); the text is translated here so the same
+     payload serves both locales. Unknown/absent code -> the generic note. */
+  function unsupportedNote(tool) {
+    var mode = tool.launch_mode || "pending";
+    if (mode !== "unsupported") return getStr("cli.reason.pending");
+    var key = "cli.reason." + (tool.launch_reason || "");
+    var note = getStr(key);
+    return note === key ? getStr("cli.unsupported") : note;
+  }
+
   function renderGroups(groups) {
     var wrap = el("cliGroups");
     if (!wrap) return;
@@ -177,8 +188,24 @@
         card.className = "btn cli-tool";
         card.textContent = tool.name;
         if (tool.enabled === false) card.classList.add("cli-tool-disabled");
-        card.title = tool.binary_name || tool.name;
-        card.addEventListener("click", function () { openLaunchModal(g, tool); });
+        // Struck through = NOT launchable yet: either no verified launch command
+        // (pending) or a wire format the gateway does not serve (unsupported).
+        // The strike is deliberate — the tool stays visible as the to-do list —
+        // but the card never opens the modal, so no guessed command is run.
+        // Fail CLOSED on a missing mode (an old server that never sends the
+        // field must not be treated as "everything is verified").
+        var launchable = tool.launch_mode === "verified";
+        if (!launchable) {
+          card.classList.add("cli-tool-unsupported");
+          card.setAttribute("aria-disabled", "true");
+        }
+        card.title = launchable
+          ? (tool.binary_name || tool.name)
+          : unsupportedNote(tool);
+        card.addEventListener("click", function () {
+          if (!launchable) { setCliMsg(unsupportedNote(tool), "warn"); return; }
+          openLaunchModal(g, tool);
+        });
         grid.appendChild(card);
       });
 

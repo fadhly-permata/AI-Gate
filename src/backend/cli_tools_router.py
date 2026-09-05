@@ -9,7 +9,8 @@ injection values.
 Contracts:
 - ``GET /api/cli-tools`` -> ``{"object":"list","data":[GroupDTO,...]}``
 - ``POST /api/cli-tools/resolve`` -> ``ResolveDTO`` (or 404 envelope
-  ``code:"tool_not_found"``).
+  ``code:"tool_not_found"``, or 409 envelope ``code:"tool_unsupported"`` for a
+  tool without a verified launch form).
 
 ADR-007 / R11: ``internal_api_key`` returned **plaintext** (it is injected as
 ``OPENAI_API_KEY``). ADR-011 / R12: resolve is logged via ``backend.log`` with
@@ -32,6 +33,7 @@ from sqlalchemy.orm import Session
 
 from backend.config.db import SessionLocal
 from backend.config.settings import get as get_setting
+from backend.cli_presets import LAUNCH_VERIFIED, launch_support_for
 from backend.log import log_info
 from backend.models import CLITool, CLIToolGroup, Endpoint, Provider, ProviderModel
 from backend.paths import extra_path_dirs as _extra_path_dirs_impl
@@ -60,6 +62,12 @@ class ToolDTO(BaseModel):
     install_command: str
     default_flags: str
     enabled: bool
+    # Launch support (see ``cli_presets.LAUNCH_SUPPORT``): ``verified`` tools have
+    # a documented launch builder and speak the gateway's OpenAI format;
+    # ``pending`` / ``unsupported`` are struck through in the UI and refused by
+    # ``resolve``. ``launch_reason`` is a stable code the frontend translates.
+    launch_mode: str = "pending"
+    launch_reason: str = ""
 
     class Config:
         pass
@@ -147,6 +155,7 @@ def _which_with_extra_paths(binary: str) -> Optional[str]:
 
 
 def _tool_to_dto(tool: CLITool) -> ToolDTO:
+    support = launch_support_for(tool.name)
     return ToolDTO(
         id=tool.id,
         name=tool.name,
@@ -154,6 +163,8 @@ def _tool_to_dto(tool: CLITool) -> ToolDTO:
         install_command=tool.install_command,
         default_flags=tool.default_flags,
         enabled=bool(tool.enabled),
+        launch_mode=support.mode,
+        launch_reason=support.reason,
     )
 
 
@@ -203,16 +214,46 @@ def _not_found(message: str, code: str) -> JSONResponse:
     )
 
 
+def _unsupported(tool_name: str, mode: str, reason: str) -> JSONResponse:
+    """Refuse to build a launch command for a tool we cannot serve yet.
+
+    WHY 409 and not a silent generic command: the generic
+    ``<binary> --model <ref>`` form is a guess, and guessing is what made most
+    presets fail in the terminal (unknown flag / wrong wire format). The UI
+    strikes these names through, so a refusal here is only reachable through a
+    stale client or a direct API call.
+    """
+    return JSONResponse(
+        status_code=409,
+        content={
+            "error": {
+                "message": (
+                    f"tool '{tool_name}' has no verified launch form for the "
+                    f"aigate gateway yet (mode={mode}"
+                    + (f" reason={reason})" if reason else ")")
+                ),
+                "type": "invalid_request_error",
+                "code": "tool_unsupported",
+            }
+        },
+    )
+
+
 # --------------------------------------------------------------------------- #
 # Per-tool launch strategy
 #
 # Each CLI tool is launched with a command built by a strategy keyed on the
-# tool's ``binary_name``. ``aider`` is the currently-known tool that needs the
-# explicit custom-endpoint flags (``--openai-api-base`` / ``--openai-api-key`` /
-# ``--model openai/<model>``); every other tool falls back to the generic
-# ``<binary> <flags> --model <model>`` form and relies on the injected
-# ``OPENAI_API_BASE`` / ``OPENAI_API_KEY`` env. Add confirmed tools to
-# ``_LAUNCH_BUILDERS`` as their custom-endpoint form is verified.
+# tool's ``binary_name``. A tool is only RESOLVABLE when ``cli_presets`` marks
+# it ``verified`` — meaning a builder exists here (or the tool genuinely needs
+# nothing but the injected ``OPENAI_API_BASE``/``OPENAI_API_KEY`` env) and the
+# form is documented by the upstream project. ``_generic_builder`` is the
+# fallback for verified tools without a dedicated builder, NOT a licence to
+# launch unverified tools with guessed flags (that is what broke most presets:
+# e.g. ``claude openai-compatible`` is not a real flag).
+#
+# Confirmed so far: ``aider`` (custom-endpoint flags), ``opencode``
+# (``opencode.json`` custom provider + interactive TUI). Add builders to
+# ``_LAUNCH_BUILDERS`` one tool at a time and flip its preset to ``verified``.
 # --------------------------------------------------------------------------- #
 @dataclass(frozen=True)
 class _LaunchCtx:
@@ -438,6 +479,10 @@ def list_cli_tools() -> dict:
 def resolve_cli_tool(req: ResolveRequest) -> dict:
     """Resolve a tool for launch: check binary, build run/install + env.
 
+    Only a tool whose preset is marked ``verified`` is resolvable; anything else
+    gets a 409 ``tool_unsupported`` (see ``_unsupported`` for why we refuse
+    instead of guessing a command).
+
     ``binary_found`` = ``_which_with_extra_paths(tool.binary_name) is not None``
     — PATH plus common user install dirs. It is a HINT only: the server process
     may still not see a binary the interactive PTY can run, so the frontend
@@ -457,6 +502,15 @@ def resolve_cli_tool(req: ResolveRequest) -> dict:
             return _not_found(
                 f"tool '{req.tool}' not found", "tool_not_found"
             )
+
+        support = launch_support_for(tool.name)
+        if support.mode != LAUNCH_VERIFIED:
+            log_info(
+                f"resolve: tool '{tool.name}' not launchable "
+                f"(mode={support.mode} reason={support.reason or '-'})",
+                source=LOG_SOURCE,
+            )
+            return _unsupported(tool.name, support.mode, support.reason)
 
         binary_path = _which_with_extra_paths(tool.binary_name)
         binary_found = binary_path is not None

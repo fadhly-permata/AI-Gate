@@ -5,6 +5,18 @@ config (grup & tool preset) disimpan di **DB** (tabel `CLIToolGroup` / `CLITool`
 ERD) — lihat ADR-010 (config di DB, bukan file). File YAML/JSON di bawah hanya
 berlaku sebagai **format seed/import** (Roadmap §6), bukan sumber kebenaran.
 
+Sumber seed sebenarnya: `src/backend/cli_presets.py` (`CLI_PRESETS`), yang
+di-**upsert** ke DB setiap startup (baris preset disegarkan; `enabled` dan baris
+buatan user tidak pernah disentuh).
+
+> **Catatan verifikasi (2026-09-05):** string `install` di bawah sudah dicek ke
+> registry npm/PyPI. Versi lama memakai `pip install <nama>` untuk semuanya dan
+> sebagian besar menunjuk ke paket YANG BEDA: `pip install codex` = web server
+> arsip komik, `pip install gemini` = framework DB genetika, `pip install
+> claude-code` = stub "reserved", `pip install aichat` = proyek lain. Tool yang
+> tidak punya paket terpasang untuk platform ini diberi `install: null` (UI
+> menjalankan `echo` no-op, bukan memasang sampah).
+
 ## Schema (YAML)
 ```yaml
 version: 1
@@ -12,63 +24,60 @@ groups:
   - id: agentic_coding        # Grup A
     label: "Agentic Coding Assistants"
     tools:
-      - name: claude
-        binary: claude
-        install: "pip install claude-code"   # atau uv
-        presets: ["openai-compatible"]
-      - name: opencode
-        binary: opencode
-      - name: codex
-        binary: codex
-      - name: gemini
-        binary: gemini
-      - name: antigravity
-        binary: antigravity
-      - name: phi
-        binary: phi
-      - name: aider
-        binary: aider
-      - name: goose
-        binary: goose
-      - name: amp
-        binary: amp
-      - name: qwen
-        binary: qwen
-      - name: cline
-        binary: cline
-      - name: kilo
-        binary: kilo
+      - { name: claude,      binary: claude,      install: "npm install -g @anthropic-ai/claude-code", launch: unsupported }
+      - { name: opencode,    binary: opencode,    install: "npm install -g opencode-ai",               launch: verified }
+      - { name: codex,       binary: codex,       install: "npm install -g @openai/codex",             launch: pending }
+      - { name: gemini,      binary: gemini,      install: "npm install -g @google/gemini-cli",        launch: unsupported }
+      - { name: antigravity, binary: antigravity, install: null,                                        launch: unsupported }
+      - { name: phi,         binary: phi,         install: null,                                        launch: unsupported }
+      - { name: aider,       binary: aider,       install: "pip install aider-chat",                    launch: verified }
+      - { name: goose,       binary: goose,       install: null,                                        launch: unsupported }
+      - { name: amp,         binary: amp,         install: null,                                        launch: unsupported }
+      - { name: qwen,        binary: qwen,        install: "npm install -g @qwen-code/qwen-code",      launch: pending }
+      - { name: cline,       binary: cline,       install: "npm install -g cline",                      launch: pending }
+      - { name: kilo,        binary: kilo,        install: "npm install -g @kilocode/cli",             launch: pending }
   - id: autonomous_agents     # Grup B
     label: "Autonomous Software Agents"
     tools:
-      - name: openhands
-      - name: swe-agent
-      - name: open-interpreter   # CLI: interpreter
-        binary: interpreter
-      - name: autogpt
-      - name: gpt-researcher
-      - name: crewai
+      - { name: openhands,        binary: openhands,        install: "pip install openhands-ai",    launch: pending }
+      - { name: swe-agent,        binary: swe-agent,        install: null,                          launch: unsupported }
+      - { name: open-interpreter, binary: interpreter,      install: "pip install open-interpreter", launch: pending }
+      - { name: autogpt,          binary: autogpt,          install: null,                          launch: unsupported }
+      - { name: gpt-researcher,   binary: gpt-researcher,   install: "pip install gpt-researcher",  launch: pending }
+      - { name: crewai,           binary: crewai,           install: "pip install crewai",          launch: pending }
   - id: chat_shell            # Grup C
     label: "Chat & Shell Assistants"
     tools:
-      - name: llm
-        binary: llm
-      - name: sgpt
-        binary: sgpt
-      - name: mods
-        binary: mods
-      - name: oterm
-        binary: oterm
-      - name: gptme
-        binary: gptme
-      - name: aichat
-        binary: aichat
+      - { name: llm,    binary: llm,    install: "pip install llm",   launch: pending }
+      - { name: sgpt,   binary: sgpt,   install: null,                launch: unsupported }
+      - { name: mods,   binary: mods,   install: null,                launch: unsupported }
+      - { name: oterm,  binary: oterm,  install: "pip install oterm", launch: pending }
+      - { name: gptme,  binary: gptme,  install: "pip install gptme", launch: pending }
+      - { name: aichat, binary: aichat, install: null,                launch: unsupported }
 ```
 
 ## Field
 - `groups[].id` unik, `label` tampilan.
 - `tools[].name` id, `binary` perintah cek (`which`/`where`), `install` opsional.
 - Minimal 5 tool per grup.
+- `presets`/`default_flags` sengaja kosong: flag adalah bagian dari bentuk
+  launch tool, dan bentuk launch hidup di builder yang terverifikasi — menaruh
+  tebakan flag di preset itulah yang menghasilkan `claude openai-compatible`.
+
+## Status launch (`launch:`)
+Registry-nya di `cli_presets.LAUNCH_SUPPORT` (level kode, BUKAN kolom DB — status
+ini berubah mengikuti builder, bukan data user), diekspos lewat `ToolDTO`
+(`launch_mode` + `launch_reason`) dan dipakai UI + API:
+
+| mode | arti | UI | `POST /resolve` |
+|---|---|---|---|
+| `verified` | builder launch ada + tool bicara format OpenAI gateway | normal | 200 + run_command |
+| `pending` | tool bisa, bentuk launch belum ditulis/diverifikasi | dicoret | 409 `tool_unsupported` |
+| `unsupported` | butuh format yang tidak di-serve gateway (Anthropic `/v1/messages`, Google `generateContent`), atau bukan CLI, atau tidak ada binary platform ini | dicoret | 409 `tool_unsupported` |
+
+`launch_reason` = kode stabil (`anthropic_only`, `gemini_only`, `not_a_cli`,
+`no_binary`, `install_unverified`) yang diterjemahkan UI lewat `cli.reason.*`.
+Tool tanpa entri registry dianggap `pending` (fail-closed).
 
 ## Plugin
 File tambahan (YAML/JSON) bisa di-drop di folder `config/cli-plugins/` dan di-merge

@@ -9,11 +9,13 @@ also covers the logger. We additionally patch ``backend.cli_tools_router``.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import shutil
 import stat
 
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -65,13 +67,14 @@ def _seed_all(sf: sessionmaker) -> None:
 
 
 # =========================================================================== #
-# 1. Seeding: 3 groups + tool counts (12 / 6 / 6)
+# 1. Seed/upsert: 3 groups + tool counts (12 / 6 / 6)
 # =========================================================================== #
 def test_seed_cli_tools(monkeypatch) -> None:
     sf = _make_sf()
     with sf() as s:
-        inserted = cli_presets.seed_cli_tools(s)
-        assert inserted == 3
+        # 3 groups + 24 tools created on an empty DB.
+        changed = cli_presets.seed_cli_tools(s)
+        assert changed == 27
 
         groups = (
             s.query(CLIToolGroup)
@@ -92,12 +95,20 @@ def test_seed_cli_tools(monkeypatch) -> None:
         assert len(by_code["chat_shell"].tools) == 6
         assert s.query(CLITool).count() == 24
 
-        # specific mappings
+        # specific mappings — install strings are registry-verified: the old
+        # ``pip install claude-code`` / ``pip install codex`` pulled UNRELATED
+        # PyPI packages (a reserved stub / a comic-archive web server).
         claude = s.query(CLITool).filter_by(name="claude").first()
         assert claude.binary_name == "claude"
-        assert claude.install_command == "pip install claude-code"
-        assert claude.default_flags == "openai-compatible"
+        assert claude.install_command == "npm install -g @anthropic-ai/claude-code"
+        assert claude.default_flags == ""  # no guessed flags in the preset
         assert claude.enabled is True
+
+        aider = s.query(CLITool).filter_by(name="aider").first()
+        assert aider.install_command == "pip install aider-chat"
+
+        codex = s.query(CLITool).filter_by(name="codex").first()
+        assert codex.install_command == "npm install -g @openai/codex"
 
         interp = s.query(CLITool).filter_by(name="open-interpreter").first()
         assert interp.binary_name == "interpreter"
@@ -107,9 +118,47 @@ def test_seed_cli_tools(monkeypatch) -> None:
         assert ollama_style.binary_name == "llm"
         assert ollama_style.install_command == "pip install llm"
 
-    # idempotent: second call inserts nothing
+    # idempotent: second call changes nothing
     with sf() as s:
         assert cli_presets.seed_cli_tools(s) == 0
+
+
+def test_seed_upserts_stale_preset_and_keeps_user_state(monkeypatch) -> None:
+    """A preset fix must reach an ALREADY-SEEDED DB (the old skip-if-seeded
+    guard made every later fix dead code), while ``enabled`` and user-added
+    rows survive."""
+    sf = _make_sf()
+    with sf() as s:
+        cli_presets.seed_cli_tools(s)
+
+    # Simulate an old DB: stale install string + a user toggle + a custom row.
+    with sf() as s:
+        aider = s.query(CLITool).filter_by(name="aider").first()
+        aider.install_command = "pip install aider"  # the old, wrong string
+        aider.enabled = False                        # user turned it off
+        s.add(
+            CLITool(
+                group_id=aider.group_id,
+                name="my-own-cli",
+                binary_name="my-own-cli",
+                install_command="pip install whatever",
+                default_flags="--fast",
+                enabled=True,
+            )
+        )
+        s.commit()
+
+    with sf() as s:
+        changed = cli_presets.seed_cli_tools(s)
+        assert changed == 1  # only the stale aider row was refreshed
+
+        aider = s.query(CLITool).filter_by(name="aider").first()
+        assert aider.install_command == "pip install aider-chat"
+        assert aider.enabled is False  # user-owned column never touched
+
+        custom = s.query(CLITool).filter_by(name="my-own-cli").first()
+        assert custom is not None  # user rows are never deleted/rewritten
+        assert custom.default_flags == "--fast"
 
 
 # =========================================================================== #
@@ -136,7 +185,7 @@ def test_list_cli_tools(monkeypatch) -> None:
     # ordering: agentic_coding first (display_priority 1)
     assert data[0]["code"] == "agentic_coding"
 
-    # ToolDTO shape
+    # ToolDTO shape (+ launch support markers)
     tool = by_code["chat_shell"]["tools"][0]
     assert set(tool) == {
         "id",
@@ -145,32 +194,110 @@ def test_list_cli_tools(monkeypatch) -> None:
         "install_command",
         "default_flags",
         "enabled",
+        "launch_mode",
+        "launch_reason",
     }
+
+    modes = {
+        t["name"]: (t["launch_mode"], t["launch_reason"])
+        for g in data
+        for t in g["tools"]
+    }
+    # verified: a documented builder exists -> launchable
+    assert modes["aider"][0] == "verified"
+    assert modes["opencode"][0] == "verified"
+    # unsupported: needs a wire format the gateway does not expose -> struck
+    assert modes["claude"] == ("unsupported", "anthropic_only")
+    assert modes["antigravity"] == ("unsupported", "not_a_cli")
+    # pending: real CLI, launch form not written yet -> struck, reason empty
+    assert modes["codex"] == ("pending", "")
 
 
 # =========================================================================== #
-# 3. POST /api/cli-tools/resolve for a tool name -> ResolveDTO
+# 3. POST /api/cli-tools/resolve for a verified tool -> ResolveDTO
 # =========================================================================== #
 def test_resolve_tool_by_name(monkeypatch) -> None:
     sf = _make_sf()
     _seed_all(sf)
     client = _client(monkeypatch, sf)
 
-    r = client.post("/api/cli-tools/resolve", json={"tool": "llm"})
+    r = client.post("/api/cli-tools/resolve", json={"tool": "aider"})
     assert r.status_code == 200
     body = r.json()
 
-    assert body["run_command"].startswith("llm")
+    assert body["run_command"].startswith("aider")
     # gateway env injected
     assert body["env"]["OPENAI_API_BASE"] == "http://localhost:8080/v1"
     # no access-controlled endpoint seeded -> non-empty placeholder so CLIs like
     # aider accept the key (gateway ignores it while access control is off).
     assert body["env"]["OPENAI_API_KEY"] == cli_tools_router.PLACEHOLDER_API_KEY
     assert body["env"]["OPENAI_API_KEY"] != ""
-    # llm binary not on PATH in sandbox -> install command present
+    # aider binary not on PATH in sandbox -> install command present
     assert body["binary_found"] is False
-    assert body["install_command"] == "pip install llm"
+    assert body["install_command"] == "pip install aider-chat"
     assert body["model"] is None
+
+
+# --------------------------------------------------------------------------- #
+# 3b. A tool without a verified launch form is REFUSED, not guessed at.
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    "tool,mode,reason",
+    [
+        ("llm", "pending", ""),  # real CLI, launch form not written yet
+        ("claude", "unsupported", "anthropic_only"),  # needs /v1/messages
+        ("antigravity", "unsupported", "not_a_cli"),  # GUI IDE, no binary
+    ],
+)
+def test_resolve_unverified_tool_is_refused(monkeypatch, tool, mode, reason) -> None:
+    sf = _make_sf()
+    _seed_all(sf)
+    client = _client(monkeypatch, sf)
+
+    r = client.post("/api/cli-tools/resolve", json={"tool": tool, "model": "gpt-4o"})
+    assert r.status_code == 409
+    err = r.json()["error"]
+    assert err["code"] == "tool_unsupported"
+    assert tool in err["message"]
+    assert f"mode={mode}" in err["message"]
+    if reason:
+        assert f"reason={reason}" in err["message"]
+
+
+def test_generic_builder_is_the_verified_tool_fallback() -> None:
+    """``_generic_builder`` is the form used for a verified tool that needs
+    nothing but the injected env — it must never be reached by an unverified
+    tool (that path is blocked by ``resolve``)."""
+    ctx = cli_tools_router._LaunchCtx(
+        binary_name="demo",
+        default_flags="",
+        model="provider:B.AI:gpt-5.5",
+        raw_model="gpt-5.5",
+        base="http://localhost:8080/v1",
+        key="k",
+    )
+    assert cli_tools_router._build_run_command(ctx) == "demo --model provider:B.AI:gpt-5.5"
+
+    ctx_flags = dataclasses.replace(ctx, default_flags="--verbose")
+    assert cli_tools_router._build_run_command(ctx_flags) == (
+        "demo --verbose --model provider:B.AI:gpt-5.5"
+    )
+
+
+def test_every_verified_preset_has_a_launch_path() -> None:
+    """Guard: ``verified`` means launchable. Either the tool has a dedicated
+    builder in ``_LAUNCH_BUILDERS`` (keyed by binary) or it is deliberately
+    generic — so a preset can never be flipped to verified without code."""
+    builders = set(cli_tools_router._LAUNCH_BUILDERS)
+    for group in cli_presets.CLI_PRESETS:
+        for tool in group["tools"]:
+            support = cli_presets.launch_support_for(tool["name"])
+            if support.mode != cli_presets.LAUNCH_VERIFIED:
+                continue
+            binary = tool.get("binary", tool["name"])
+            assert binary in builders, (
+                f"{tool['name']} is marked verified but has no builder"
+            )
 
 
 def test_resolve_tool_with_model_and_key(monkeypatch) -> None:
@@ -189,11 +316,10 @@ def test_resolve_tool_with_model_and_key(monkeypatch) -> None:
 
     client = _client(monkeypatch, sf)
     r = client.post(
-        "/api/cli-tools/resolve", json={"tool": "claude", "model": "gpt-4o"}
+        "/api/cli-tools/resolve", json={"tool": "aider", "model": "gpt-4o"}
     )
     assert r.status_code == 200
     body = r.json()
-    assert body["run_command"] == "claude openai-compatible --model gpt-4o"
     assert body["model"] == "gpt-4o"
     assert body["env"]["OPENAI_API_KEY"] == "plain-key-xyz"  # ADR-007 plaintext
 
@@ -318,20 +444,27 @@ def test_resolve_aider_no_endpoint_uses_placeholder_key(monkeypatch) -> None:
 
 
 def test_resolve_non_aider_generic_form_preserved(monkeypatch) -> None:
-    """Non-aider tools keep the generic <binary> <flags> --model <ref> form."""
+    """A verified tool WITHOUT a dedicated builder falls back to the generic
+    ``<binary> <flags> --model <ref>`` form + env injection (no custom flags)."""
     sf = _make_sf()
     _seed_all(sf)
     _seed_endpoint(sf)
     client = _client(monkeypatch, sf)
 
+    # Temporarily verify a builder-less tool to exercise the fallback route.
+    monkeypatch.setitem(
+        cli_presets.LAUNCH_SUPPORT,
+        "llm",
+        cli_presets.LaunchSupport(cli_presets.LAUNCH_VERIFIED),
+    )
+
     r = client.post(
         "/api/cli-tools/resolve",
-        json={"tool": "claude", "model": "provider:B.AI:gpt-5.5"},
+        json={"tool": "llm", "model": "provider:B.AI:gpt-5.5"},
     )
+    assert r.status_code == 200
     body = r.json()
-    assert body["run_command"] == (
-        "claude openai-compatible --model provider:B.AI:gpt-5.5"
-    )
+    assert body["run_command"] == "llm --model provider:B.AI:gpt-5.5"
     # generic tools do NOT get aider's custom-endpoint flags.
     assert "--openai-api-base" not in body["run_command"]
     assert body["env"]["OPENAI_API_BASE"] == "http://localhost:8080/v1"
@@ -449,7 +582,7 @@ def test_resolve_reports_binary_found_via_extra_paths(monkeypatch, tmp_path) -> 
     _seed_all(sf)
 
     fake_home = tmp_path / "home"
-    _make_fake_binary(str(fake_home / ".npm-global" / "bin"), "llm")
+    _make_fake_binary(str(fake_home / ".npm-global" / "bin"), "aider")
     monkeypatch.setenv("HOME", str(fake_home))
     monkeypatch.delenv("PREFIX", raising=False)
     empty = tmp_path / "emptybin"
@@ -457,20 +590,22 @@ def test_resolve_reports_binary_found_via_extra_paths(monkeypatch, tmp_path) -> 
     monkeypatch.setenv("PATH", str(empty))
 
     client = _client(monkeypatch, sf)
-    r = client.post("/api/cli-tools/resolve", json={"tool": "llm"})
+    r = client.post("/api/cli-tools/resolve", json={"tool": "aider"})
     assert r.status_code == 200
     body = r.json()
     assert body["binary_found"] is True
-    assert body["binary_name"] == "llm"
+    assert body["binary_name"] == "aider"
 
 
 def test_resolve_exposes_binary_name(monkeypatch) -> None:
-    """``binary_name`` is part of ResolveDTO (frontend needs it for command -v)."""
+    """``binary_name`` is part of ResolveDTO (frontend needs it for command -v).
+    The name!=binary case (open-interpreter -> interpreter) is covered by the
+    list endpoint, since only verified tools are resolvable."""
     sf = _make_sf()
     _seed_all(sf)
     client = _client(monkeypatch, sf)
 
-    r = client.post("/api/cli-tools/resolve", json={"tool": "open-interpreter"})
+    r = client.post("/api/cli-tools/resolve", json={"tool": "opencode"})
     assert r.status_code == 200
     body = r.json()
     assert set(body) == {
@@ -481,8 +616,16 @@ def test_resolve_exposes_binary_name(monkeypatch) -> None:
         "env",
         "model",
     }
-    # name != binary for this preset (open-interpreter -> interpreter)
-    assert body["binary_name"] == "interpreter"
+    assert body["binary_name"] == "opencode"
+
+    listed = client.get("/api/cli-tools").json()
+    interp = [
+        t
+        for g in listed["data"]
+        for t in g["tools"]
+        if t["name"] == "open-interpreter"
+    ][0]
+    assert interp["binary_name"] == "interpreter"
 
 
 def test_resolve_install_command_present_when_binary_found(monkeypatch) -> None:
@@ -500,16 +643,16 @@ def test_resolve_install_command_present_when_binary_found(monkeypatch) -> None:
         lambda binary: f"/fake/bin/{binary}",
     )
 
-    r = client.post("/api/cli-tools/resolve", json={"tool": "llm"})
+    r = client.post("/api/cli-tools/resolve", json={"tool": "aider"})
     assert r.status_code == 200
     body = r.json()
     assert body["binary_found"] is True
-    assert body["install_command"] == "pip install llm"
+    assert body["install_command"] == "pip install aider-chat"
     assert body["install_command"] is not None
 
     # and the PTY-side branch the frontend builds is fully populated
-    assert body["run_command"].startswith("llm")
-    assert body["binary_name"] == "llm"
+    assert body["run_command"].startswith("aider")
+    assert body["binary_name"] == "aider"
 
 
 def test_resolve_install_command_present_when_not_found(monkeypatch) -> None:

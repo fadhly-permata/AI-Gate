@@ -35,9 +35,18 @@
   alt-buffer kirim cursor key / mouse-wheel report ke aplikasi. Momentum rAF +
   friction. Tombol TUI jadi passthrough eksplisit (gesture mentah ke app).
   Doc diselaraskan: PRD §2.5.1, FSD §2.5.1, ux/TERMINAL_UX §2.
-- 2026-09-03: CLI tool presets dikelompokkan; prioritas agentic CLI (claude,
-  opencode, codex, gemini, antigravity, phi, aider, goose, amp, qwen, cline,
+- 2026-09-03: CLI tool presets dikelompokkan; prioritas agentic CLI (claude, opencode, codex, gemini, antigravity, phi, aider, goose, amp, qwen, cline,
   kilo, dst). Dapat diperluas via YAML/JSON.
+  KOREKSI 2026-09-05: (1) semua install pakai `pip install <nama>` padahal nama
+  PyPI-nya milik proyek lain (codex=web server komik, gemini=framework DB
+  genetika, claude-code=stub reserved, aichat=proyek lain) -> install string
+  sekarang diverifikasi ke registry npm/PyPI (npm untuk CLI Node). (2) guard
+  seed "skip kalau tabel sudah berisi" bikin semua fix preset jadi dead code ->
+  jadi UPSERT idempoten (kolom preset disegarkan, `enabled` + baris user utuh).
+  (3) flag tebakan (`claude openai-compatible`) dihapus: bentuk launch milik
+  builder. (4) registry `LAUNCH_SUPPORT` (verified/pending/unsupported + reason
+  code) = sumber kebenaran di kode, bukan kolom DB; UI mencoret nama yang belum
+  verified, `resolve` menolak 409. Builder per-tool: satu per satu, 1 commit/tool.
 - 2026-09-03 (TSD ADRs): GUI = web UI lokal (FastAPI static + xterm.js);
   PTY = ptyprocess/pywinpty + xterm.js via WebSocket; swipe exception =
   SwipeException registry + per-tab tui_mode.

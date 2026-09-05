@@ -44,4 +44,10 @@ describe("i18n.applyLocale", () => {
     const btn = document.querySelector("[data-i18n-aria]");
     expect(btn.getAttribute("aria-label")).toBe(window.I18N.id["btn.menu"]);
   });
+
+  it("every English key has an Indonesian translation (no drift)", () => {
+    const en = Object.keys(window.I18N.en).sort();
+    const id = Object.keys(window.I18N.id).sort();
+    expect(id).toEqual(en);
+  });
 });

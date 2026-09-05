@@ -95,8 +95,9 @@ def test_seed_cli_tools_inserts_all_groups(monkeypatch) -> None:
     sf = _memory_session_factory(monkeypatch)
 
     with sf() as s:
-        inserted = backend.cli_presets.seed_cli_tools(s)
-        assert inserted == 3
+        # Returns rows created/changed: 3 groups + 24 tools on an empty DB.
+        changed = backend.cli_presets.seed_cli_tools(s)
+        assert changed == 27
         assert s.query(CLIToolGroup).count() == 3  # A / B / C
         assert s.query(CLITool).count() == 24  # 12 + 6 + 6
 
@@ -105,8 +106,9 @@ def test_seed_cli_tools_is_idempotent(monkeypatch) -> None:
     sf = _memory_session_factory(monkeypatch)
 
     with sf() as s:
-        assert backend.cli_presets.seed_cli_tools(s) == 3
-        # Re-seeding a non-empty table must be a no-op (returns 0).
+        assert backend.cli_presets.seed_cli_tools(s) == 27
+        # Re-seeding an up-to-date table is a no-op (returns 0) — but it is an
+        # UPSERT, not a skip, so a preset fix still reaches an existing DB.
         assert backend.cli_presets.seed_cli_tools(s) == 0
 
 

@@ -247,24 +247,25 @@ Scroll vertikal (dan horizontal bila tersedia) via roda mouse/trackpad. Gesture 
 ### 2.6 CLI Tools Auto-Launcher & Auto-Configuration
 
 **Deskripsi fungsional**
-Launcher tool CLI populer: cek ketersediaan binary (`which`/`where`); bila tiada, install otomatis (`pip`/`uv`) di tab terminal; bila ada, tampilkan modal picker Provider/Combo & Model aktif; lalu suntikkan env (`OPENAI_API_BASE`, `OPENAI_API_KEY`) dan jalankan tool.
+Launcher tool CLI populer: cek ketersediaan binary (`which`/`where`); bila tiada, install otomatis (npm untuk CLI Node, pip untuk CLI Python — nama paket diverifikasi ke registry) di tab terminal; bila ada, tampilkan modal picker Provider/Combo & Model aktif; lalu suntikkan env (`OPENAI_API_BASE`, `OPENAI_API_KEY`) dan jalankan tool. Hanya tool dengan bentuk launch **verified** yang boleh di-resolve; sisanya ditolak (409) dan namanya dicoret di UI sebagai penanda kerja berikutnya.
 
 **Input**
 - Pilihan tool dari UI (referensi `CLITool` + `CLIToolGroup`).
 - Pilihan dari picker: `provider_id` / `combo_id` + `model_id`.
-- Config instalasi (pip/uv, argumen flag opsional).
+- Config instalasi (npm/pip, argumen flag opsional).
 
 **Output**
 - Tab terminal baru berisi: instalasi (bila perlu) / command tool dengan env ter-injeksi.
 - Tool berjalan terhadap gateway lokal aigate.
+- Tool tanpa builder terverifikasi: `409 tool_unsupported` (bukan command tebakan).
 
 **Process flow**
-1. User klik tool CLI dari grup (A/B/C).
-2. Backend cek binary via `which`/`where`.
-3. Bila **tiada** → buka tab terminal → jalankan `pip install`/`uv` tool.
+1. User klik tool CLI dari grup (A/B/C). Tool `pending`/`unsupported` dicoret di UI dan klik-nya tidak membuka modal.
+2. Backend cek binary via `which`/`where` (+ direktori install user).
+3. Bila **tiada** → buka tab terminal → jalankan `npm install -g ...`/`pip install ...` tool.
 4. Bila **ada** → tampilkan modal picker Provider/Combo & Model (hanya yg aktif).
 5. Buka tab terminal baru → set `OPENAI_API_BASE="http://localhost:8080/v1"`, `OPENAI_API_KEY="<internal>"`.
-6. Jalankan command tool dengan model terpilih.
+6. Jalankan command tool dengan model terpilih (command dibangun builder per-tool, lihat `cli_tools_router._LAUNCH_BUILDERS`).
 
 **Traceability**
 - US-2.6.1 (CLI Tool Presets & Auto-Install) — M
@@ -282,7 +283,10 @@ Tool CLI dikelompokkan minimal 3 grup (A/B/C), masing-masing ≥5 preset; Grup A
 | B | Autonomous Software Agents | `openhands`, `swe-agent`, `open-interpreter`, `autogpt`, `gpt-researcher`, `crewai` |
 | C | Chat & Shell Assistants | `llm`, `sgpt`, `mods`, `oterm`, `gptme`, `aichat` |
 
-**Input:** definisi grup & preset (default + YAML/JSON override).
+**Input:** definisi grup & preset (default + YAML/JSON override). Status launch
+per tool (`verified` / `pending` / `unsupported` + reason code) bukan kolom DB:
+ia registry level kode (`cli_presets.LAUNCH_SUPPORT`) karena berubah mengikuti
+builder, bukan data user. Lihat `documents/config/CLI_CONFIG_SCHEMA.md`.
 **Output:** UI terbagi per grup, Grup A ditonjolkan.
 
 **Traceability**

@@ -1208,6 +1208,14 @@ body.log-visible .workspace {
   font-weight: 500;
 }
 .cli-tool-disabled { opacity: 0.5; }
+/* Struck-through name = not launchable at the gateway yet (no verified launch
+   command, or a wire format aigate does not serve). Kept visible on purpose:
+   the strike is the operator's to-do marker, and the tooltip says why. */
+.cli-tool-unsupported {
+  text-decoration: line-through;
+  opacity: 0.55;
+  cursor: help;
+}
 .cli-hint {
   margin: 0 0 10px;
   padding: 8px 10px;

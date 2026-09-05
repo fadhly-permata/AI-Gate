@@ -132,3 +132,70 @@ describe("buildLaunchCommand (B3.4 CLI launcher, PTY-side self-deciding)", () =>
     expect(cmd).toContain("fi");
   });
 });
+
+/* =====================================================================
+ * renderGroups: a tool without a verified launch form is STRUCK THROUGH
+ * (the operator's to-do marker) and must never open the launch modal.
+ * ===================================================================== */
+import "../static/i18n.js";
+
+const renderGroups = window.aigate.cliTools._test.renderGroups;
+
+const GROUPS = [
+  {
+    code: "agentic_coding",
+    name: "Agentic Coding Assistants",
+    tools: [
+      { id: 1, name: "aider", binary_name: "aider", launch_mode: "verified", launch_reason: "" },
+      { id: 2, name: "codex", binary_name: "codex", launch_mode: "pending", launch_reason: "" },
+      { id: 3, name: "claude", binary_name: "claude", launch_mode: "unsupported", launch_reason: "anthropic_only" },
+      { id: 4, name: "legacy", binary_name: "legacy", enabled: false } // no launch_mode at all
+    ]
+  }
+];
+
+function mount() {
+  document.body.innerHTML =
+    '<div id="cliGroups"></div>' +
+    '<div id="cliLoadMsg" class="settings-msg"></div>' +
+    '<div id="cliLaunchModal" class="modal" hidden></div>';
+  renderGroups(GROUPS);
+  return Array.from(document.querySelectorAll("#cliGroups .cli-tool"));
+}
+
+describe("renderGroups — strike-through for unverified tools", () => {
+  it("a verified tool is NOT struck and keeps its binary tooltip", () => {
+    const [aider] = mount();
+    expect(aider.textContent).toBe("aider");
+    expect(aider.classList.contains("cli-tool-unsupported")).toBe(false);
+    expect(aider.getAttribute("aria-disabled")).toBe(null);
+    expect(aider.title).toBe("aider");
+  });
+
+  it("pending + unsupported tools are struck through with a reason tooltip", () => {
+    const [, codex, claude] = mount();
+    expect(codex.classList.contains("cli-tool-unsupported")).toBe(true);
+    expect(claude.classList.contains("cli-tool-unsupported")).toBe(true);
+    expect(codex.getAttribute("aria-disabled")).toBe("true");
+    // The tooltip explains WHY, translated from the server's reason code.
+    expect(codex.title).toBe(window.I18N.en["cli.reason.pending"]);
+    expect(claude.title).toBe(window.I18N.en["cli.reason.anthropic_only"]);
+    expect(claude.title).not.toBe(codex.title);
+  });
+
+  it("a missing launch_mode (stale server) fails closed: struck, not launchable", () => {
+    const [, , , legacy] = mount();
+    expect(legacy.classList.contains("cli-tool-unsupported")).toBe(true);
+    expect(legacy.classList.contains("cli-tool-disabled")).toBe(true); // enabled:false kept
+  });
+
+  it("clicking a struck tool shows the note and opens NO launch modal", () => {
+    const [, codex] = mount();
+    const modal = document.getElementById("cliLaunchModal");
+    const msg = document.getElementById("cliLoadMsg");
+    codex.click();
+    expect(modal.hidden, "launch modal must stay closed for an unverified tool").toBe(true);
+    expect(msg.textContent).toBe(window.I18N.en["cli.reason.pending"]);
+    expect(msg.className).toContain("settings-msg-warn");
+  });
+});
