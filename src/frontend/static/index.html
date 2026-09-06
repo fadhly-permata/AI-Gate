@@ -1094,7 +1094,9 @@
   <script src="clitools.js" defer></script>
   <!-- Self-Heal UI (B4.1) — needs i18n.js (window.I18N) + clitools.js -->
   <script src="selfheal.js" defer></script>
-  <!-- Terminal manager (B3.3) — after xterm CDN + app.js -->
-  <script src="terminal.js" defer></script>
+  <!-- Terminal manager (B3.3) — after xterm CDN + app.js. ?v= cache-buster:
+       a plain src lets the browser run a STALE cached copy after an update
+       (bump the value whenever terminal.js changes). -->
+  <script src="terminal.js?v=20260906" defer></script>
 </body>
 </html>

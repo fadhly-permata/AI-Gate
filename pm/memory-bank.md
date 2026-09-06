@@ -7,6 +7,8 @@
 - 2026-09-03: Arsitektur agen PM + sub-agent spesialis (on-demand, scoped).
 
 ## Decisions
+- 2026-09-07 (R30): Kata "terminal" = fitur terminal aigate (multi-tab xterm + PTY WS),
+  BUKAN terminal OS/emulator. Investigasi repo dulu sebelum jawab pertanyaan fitur.
 - 2026-09-06 (i18n label policy): Label UI TIDAK boleh berupa string gabungan bilingual
   ("Kombo/Combos"). Satu key = satu nilai per locale. **Locale baru** cukup 3 hal, tanpa
   ubah kode: (1) blok kamus `window.I18N.<code>`, (2) entri registry `window.LANGS`
@@ -19,6 +21,34 @@
   delegasi re-work ke pemilik scope, baru catat + commit.
 
 ## Progress
+- 2026-09-07: **Terminal tab auto-close on shell exit — SELESAI (uncommitted, mode
+  sekuensial BE→FE).** Kontrak exit (sumber kebenaran): server kirim TEXT frame
+  `{"type":"exit","code":<int>}` (code = exit status; -1 bila tak terbaca) ke view
+  attached, LALU tutup WS (1000). Frame TIDAK masuk ring-buffer replay. FE tangkep →
+  `closeTab(id,{exited:true})` (tanpa kill-frame, tanpa auto-open → empty state,
+  forget saved id). BE: `pty.py` +`exit_status`; `session.py` `PtyExit` sentinel +
+  `notify_exit()`/`resolved_exit_code()`/`read_exit_code()`/`close_view()` + reaper
+  reap exited-walau-attached; `router.py` `_pump` → `exit_frame()` (json.dumps) lalu
+  close 1000. TEST ASLI (PM re-run): backend terminal **64 passed, 1 skipped**
+  (skip=test_terminal.py:59 native PTY dep); FE terminal_exit **14 passed**; FE full
+  **436 passed (23 files)**, no regresi. Catatan env: `ruff` tak terpasang (lint gate
+  tak jalan); vitest harus dipanggil via `node node_modules/.bin/vitest` (shebang env
+  Termux rusak). AKAR MASALAH SESUNGGUHNYA (temuan akhir): tab gak nutup karena
+  **`terminal.js` ke-cache browser tanpa cache-buster** — kode FE beneran gak ke-load
+  versi baru. BE **terbukti benar via runtime** (frame exit + close 1000 terkirim).
+  RESOLUSI FINAL: FE hardened (exit frame + close(1000) → tutup tab) + **toast
+  `term.session_ended` (id+en)** + **cache-buster `?v=20260906` di index.html**.
+  ANGKA FINAL (PM re-run): FE **442 passed**, BE **65 passed / 1 skipped**. Belum
+  di-commit. RULE BARU **R32**: dilarang nyuruh sub-agent kill/restart proses aigate
+  (sesi opencode hidup DI DALAM aigate = bunuh diri); bukti kode lama aktif cukup
+  bandingkan start-time vs mtime + laporkan, user yang restart.
+- 2026-09-07: **Terminal tab auto-close on shell exit** — investigasi PM (read-only).
+  Temuan: fitur ini SUDAH di-spec TSD §3.2 (frame `{"type":"exit","code":N}` + langkah
+  "saat shell keluar, kirim kontrol exit, tutup WS") tapi BELUM diimplementasi.
+  Gap: (BE) `session.py:353-356` reader thread cuma set `exited=True` + log, TIDAK
+  notify client; `try_reap` skip session yang masih `attached` (`session.py:290-291`)
+  → shell exit = tab nyangkut (zombie view). (FE) `terminal.js:374-387` `handleWsMessage`
+  buang SEMUA control frame non-ping → gak ada jalur "exit". Perlu task be-dev + fe-dev.
 - 2026-09-06: Header grup "Kombo" di model picker CLI Tools kini terlokalisasi penuh
   (EN "Combos" / ID "Kombo") lewat key `combobox.group_combos`; literal bilingual
   dihapus dari kode produksi; `combobox.js` dapat `setGroupOrder()` supaya grup yang

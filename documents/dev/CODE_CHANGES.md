@@ -1,5 +1,58 @@
 # Code Changes Register (code ↔ docs alignment)
 
+## 2026-09-07 — Terminal tab auto-close on shell exit + session-ended toast — DONE
+
+Akar masalah "tab gak nutup": backend tidak pernah memberi tahu frontend saat shell
+mati → tab jadi zombie view. (Plus: `terminal.js` ter-cache browser tanpa cache-buster,
+sehingga perbaikan FE tidak ter-load.) BE terbukti benar via runtime (frame terkirim).
+
+**Kontrak exit (sumber kebenaran):** server kirim TEXT frame `{"type":"exit","code":<int>}`
+ke view yang sedang attached, LALU tutup WS (code 1000). Frame TIDAK masuk ring-buffer
+replay. FE tangkap frame → tutup tab (tanpa kill-frame balasan, tanpa auto-open).
+
+### `src/backend/terminal/pty.py`
+- `PtyProcess` +properti `exit_status` (best-effort baca exit status child; guard).
+
+### `src/backend/terminal/session.py`
+- Sentinel `PtyExit(code)` (bukan output terminal) + `notify_exit()` (dorong SATU
+  sentinel ke queue view aktif, at-most-once per view via `exit_view`), `resolved_exit_code()`
+  / `read_exit_code()`, `close_view()`. Reader thread memanggil `notify_exit()` saat PTY
+  mati. `try_reap`/`reap_idle` kini REAP sesi exited walau masih attached (tutup view);
+  sesi hidup yang cuma detached tetap tidak disentuh (regression guard).
+
+### `src/backend/terminal/router.py`
+- `_pump()` kenali item `PtyExit` → kirim `exit_frame(code)` = `json.dumps({"type":"exit","code":int(code)})`
+  lalu `websocket.close(1000)`. Handler reclaim sesi setelah exit.
+
+### `tests/backend/test_terminal_exit.py` (baru)
+- 17 test: exit → satu frame `{"type":"exit","code":N}` + close 1000; frame tidak
+  ke-replay; reaper reap exited-but-attached; live-but-detached tetap aman.
+
+### `src/frontend/static/terminal.js`
+- `handleWsMessage`: guard `tab.userClosed`; cabang `info.type==="exit"` →
+  `closeTab(tab.id,{exited:true})`. `closeTab(id,opts)`: `opts.exited` = TANPA kirim
+  kill-frame + TANPA auto-open tab baru (empty state); `removeSavedTabId` dipanggil.
+
+### `src/frontend/static/i18n.js`
+- Key `term.session_ended` (EN + ID) untuk toast penanda sesi selesai.
+
+### `src/frontend/static/styles.css`
+- Gaya toast `term.session_ended`.
+
+### `src/frontend/static/index.html`
+- Cache-buster `?v=20260906` pada aset statik (terminal.js dkk) supaya versi baru
+  selalu ter-load (akar bug: cache lama tanpa bust).
+
+### `src/frontend/tests/terminal_exit.test.js` (baru)
+- 14 test: exit frame → tab hilang, tanpa kill-frame, tanpa auto-open, forget id.
+
+**Verification.** PM re-ran: backend terminal **65 passed / 1 skipped** (skip =
+`test_terminal.py:59` native PTY dep); frontend **442 passed (24 files)**, no regresi.
+Kontrak BE↔FE dicocokkan di kode nyata (frame dulu → close 1000). Belum di-exercise
+end-to-end live di browser.
+
+---
+
 ## 2026-09-06 — CLI Tools combobox: two-level (provider → model-prefix) grouping — DONE
 
 ### `src/frontend/static/combobox.js`

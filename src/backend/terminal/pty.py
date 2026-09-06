@@ -71,6 +71,22 @@ class PtyProcess:
         except Exception:  # noqa: BLE001 - treat errors as dead
             return False
 
+    @property
+    def exit_status(self) -> Optional[int]:
+        """Shell exit status once the child has been reaped, else ``None``.
+
+        Best-effort by contract: ``ptyprocess`` only populates ``exitstatus``
+        after :meth:`is_alive` reaps the child, and leaves it ``None`` when the
+        process died from a signal; ``pywinpty`` may not expose it at all.
+        Callers map ``None`` to their own "unknown" sentinel (the terminal
+        session uses ``-1``) so the WebSocket exit frame always carries an int.
+        """
+        try:
+            code = getattr(self._impl, "exitstatus", None)
+        except Exception:  # noqa: BLE001 - introspection must never raise
+            return None
+        return code if isinstance(code, int) else None
+
     # ------------------------------------------------------------------ #
     # I/O
     # ------------------------------------------------------------------ #

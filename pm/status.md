@@ -1,5 +1,79 @@
 # PM Status
 
+## Terminal tab auto-close on shell exit — 2026-09-07 (sesi ini, PM-owned)
+**Koreksi user → RULE BARU R30:** PM salah tangkep "terminal" sebagai terminal OS
+(Termux) padahal maksud user fitur terminal DI DALAM aigate. R30 ditulis di
+`pm/OPERATING_RULES.md`: "terminal" default = fitur aigate; investigasi repo dulu;
+cek spec↔kode gap.
+
+**Investigasi (read-only, PM):** satu-satunya fitur terminal = multi-tab B3.2/B3.3
+(`clitools.js` cuma reuse manager yang sama → gak ada ambiguitas). Akar masalah
+tab gak nutup saat shell `exit`:
+- BE `session.py:353-356` reader thread deteksi PTY mati → cuma `exited=True`+log,
+  TIDAK kirim apa pun ke client.
+- BE `session.py:290-291` `try_reap` skip session yang masih `attached` → shell exit
+  + WS masih nyambung = tab nyangkut (zombie view), gak ke-reap.
+- FE `terminal.js:374-387` `handleWsMessage` buang SEMUA control frame non-ping →
+  gak ada jalur tangkap "exit".
+- SPESIFIKASI SUDAH ADA: TSD §3.2 baris 154 `{"type":"exit","code":0}` + baris 163
+  "saat shell keluar, kirim kontrol exit, tutup WS, tandai pty_pid bebas". → gap
+  spec↔implementasi.
+
+**Kontrak event (PM tetapkan, patokan kedua agent):**
+- Server→client control frame: `{"type":"exit","code":<int|null>}` dikirim SEKALI ke
+  view yang lagi attached pas PTY kelar, LALU server tutup WS (code 1000).
+- Frame exit TIDAK masuk ring buffer replay (bukan output terminal).
+- Client pas nangkep exit: suppress reconnect + teardown lokal (BUKAN kirim
+  `{"type":"close"}` — PTY udah mati), hapus tab, forget saved id.
+
+**Task list (PM):**
+- [x] T0 Investigasi read-only + tetapkan kontrak exit (PM, verifikasi R21 ayat 2).
+- [x] T1 **be-dev** (SELESAI, uncommitted): `pty.py` +`exit_status`; `session.py`
+      `PtyExit` sentinel + `notify_exit()`/`resolved_exit_code()`/`read_exit_code()`/
+      `close_view()` + reaper reap exited-walau-attached; `router.py` `_pump` →
+      `exit_frame()`=`json.dumps({"type":"exit","code":int(code)})` lalu close 1000.
+      Test baru `tests/backend/test_terminal_exit.py` 17 passed. BE mutation-tested
+      (A/B/C) → test terbukti punya gigi, state restore diverifikasi.
+- [x] T2 **fe-dev** (SELESAI, uncommitted): `terminal.js` `handleWsMessage` guard
+      `userClosed` + cabang `type==="exit"` → `closeTab(id,{exited:true})`; `closeTab`
+      opts.exited = tanpa kill-frame + tanpa auto-open (empty state) + `removeSavedTabId`.
+      Test baru `src/frontend/tests/terminal_exit.test.js` 14 passed.
+- [x] T3 PM verifikasi integrasi: kontrak BE↔FE COCOK (frame dulu → close 1000; FE
+      gak nunggu yang gak dikirim BE). Test ASLI PM re-run: backend terminal **64
+      passed, 1 skipped**; FE terminal_exit **14 passed**; FE full **436 passed
+      (23 files)** no regresi. Working tree bersih (cuman file scope + pm/).
+
+**Keputusan open question:**
+- Q1 `tests/frontend/terminal.test.js` (repo-root) orphaned (vitest config gak include
+  `tests/frontend/`, referensi `swipeToScrollDelta` sudah dihapus) → **PUTUSAN: hapus**
+  (dead + misleading, R8 no-junk). Wewenang fe-dev (scope `tests/frontend/**`) →
+  micro-task follow-up, TIDAK blokir milestone.
+- Q2 toast "session ended (code N)" → **preferensi UX, TUNGGU user.** Default sekarang:
+  tab langsung hilang tanpa toast (sesuai permintaan user "tab ditutup"). YAGNI: jangan
+  tambah toast kecuali user minta.
+
+**Sisa risiko / follow-up:**
+- `ruff` tak terpasang di env → lint gate tak jalan (verifikasi gaya kode manual saja).
+- Belum di-commit (user belum minta). Belum di-exercise end-to-end live di browser
+  (R20) — unit+mutation test hijau, tapi golden-path `exit`→tab hilang di UI nyata
+  belum dicoba manual; rekomendasikan user tes sebelum commit.
+- Restart SERVER tetap matiin child PTY (di luar scope; butuh daemonized PTY).
+
+**RESOLUSI AKHIR (2026-09-07):**
+- **Akar masalah "tab gak nutup" = cache:** `terminal.js` ke-cache browser tanpa
+  cache-buster → FE versi baru gak pernah ke-load. BE **terbukti benar via runtime**
+  (frame `{"type":"exit","code":N}` + close 1000 terkirim).
+- **Fix final:** FE hardened (exit frame + close(1000) → tutup tab) + **toast
+  `term.session_ended` (id+en)** + **cache-buster `?v=20260906` di index.html**.
+- **Angka final (PM re-run):** FE **442 passed**; BE **65 passed / 1 skipped**.
+- Q2 (toast) → **DIJAWAB: ditambahin** (`term.session_ended`). Q1 (hapus
+  `tests/frontend/terminal.test.js` orphaned) → tetap micro-task fe-dev, belum jalan.
+- **RULE BARU R32** ditulis: DILARANG nyuruh sub-agent kill/restart proses aigate
+  (sesi opencode hidup DI DALAM aigate = bunuh diri); bukti kode lama aktif = bandingkan
+  start-time vs mtime + laporkan, user yang restart.
+- **Status: SELESAI, BELUM di-commit.** Menunggu user: tes end-to-end live + keputusan
+  commit + keputusan Q1.
+
 ## PROCESS VIOLATION + i18n combo group header — 2026-09-06 (sesi ini, PM-owned)
 **Violation:** main thread mengerjakan perbaikan frontend (`combobox.group_combos`)
 sendiri tanpa lewat PM → tidak ada task list / handover / receipt / boundary check.

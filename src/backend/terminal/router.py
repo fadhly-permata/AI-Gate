@@ -30,6 +30,14 @@ Message protocol (for frontend B3.3)
   ``HEARTBEAT_INTERVAL_SECONDS`` so the client sees steady traffic and can spot
   a half-open/dead socket fast (uvicorn's protocol-level ws_ping is set in
   launcher.py; this is the app-level complement).
+* **Server → client (exit)**: when the shell dies — ``exit``, Ctrl-D, a crash,
+  or a kill — the server sends exactly ONE TEXT frame
+  ``{"type":"exit","code":<int>}`` (TSD §3.1) and then closes the socket with
+  code 1000, so the frontend can close the tab instead of leaving a zombie.
+  ``code`` is the shell's exit status when it can be read, otherwise ``-1`` —
+  ALWAYS an integer, never null. This frame is a control message, NOT terminal
+  output: it never enters the replay ring buffer, so a reattaching client can
+  not see its JSON text painted into the terminal.
 * **Client → server (keystrokes)**: raw TEXT frames are written verbatim to
   the PTY (keystrokes / pasted text). A frame is a keystroke ONLY if it is not
   a JSON control object (see below).
@@ -61,7 +69,11 @@ per-connection heartbeat task emits ``{"type":"ping"}`` frames while attached
 disconnect / send failure we **detach only**: the shell keeps running and
 buffering so a reattach (tab unfreeze, network recovery) sees everything.
 Only ``{"type":"close"}`` or the reaper (exited PTY / long-orphaned idle
-session) terminate the process. All teardown is logged (ADR-011).
+session) terminate the process. When the shell dies on its own the session
+pushes one :class:`~backend.terminal.session.PtyExit` sentinel onto the view
+queue: the pump turns it into the single ``{"type":"exit","code":N}`` frame,
+closes the socket (1000) and the handler reclaims the session immediately.
+All teardown is logged (ADR-011).
 """
 
 from __future__ import annotations
@@ -71,7 +83,7 @@ import json
 import logging
 import os
 import time
-from typing import Optional
+from typing import Optional, Union
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
@@ -83,7 +95,10 @@ from backend.terminal.pty import PtyError
 from backend.terminal.session import (
     HEARTBEAT_INTERVAL_SECONDS,
     PONG_TIMEOUT_SECONDS,
+    WS_CLOSE_NORMAL,
+    PtyExit,
     PtySession,
+    close_view,
     get_or_create,
 )
 
@@ -204,9 +219,18 @@ def _create_tab() -> int:
         return tab.id
 
 
+def exit_frame(code: int) -> str:
+    """The ONE server→client exit frame (frontend contract, TSD §3.1).
+
+    Shape: ``{"type": "exit", "code": <int>}`` — ``code`` is coerced to int so
+    it can never serialize as null. fe-dev parses this exact JSON object.
+    """
+    return json.dumps({"type": "exit", "code": int(code)})
+
+
 async def _pump(
     websocket: WebSocket,
-    queue: "asyncio.Queue[bytes]",
+    queue: "asyncio.Queue[Union[bytes, PtyExit]]",
     tab_key: str,
     send_lock: "Optional[asyncio.Lock]" = None,
 ) -> None:
@@ -217,6 +241,10 @@ async def _pump(
     PTY is NOT touched here — the handler's ``finally`` detaches the view
     while the session (shell + reader + buffer) keeps running.
 
+    A :class:`PtyExit` item is the death notice, not output: it becomes exactly
+    one ``{"type":"exit","code":N}`` frame followed by a normal (1000) close, so
+    the frontend drops the tab instead of hanging on a dead shell.
+
     ``send_lock`` serializes writes against the heartbeat task so a ping and a
     PTY chunk never interleave on the socket (starlette WebSockets are not safe
     for concurrent sends). It is held only for the duration of one send.
@@ -224,10 +252,28 @@ async def _pump(
     if send_lock is None:
         send_lock = asyncio.Lock()
     while True:
-        data = await queue.get()
+        item = await queue.get()
+        if isinstance(item, PtyExit):
+            async with send_lock:
+                try:
+                    await websocket.send_text(exit_frame(item.code))
+                except Exception as exc:  # noqa: BLE001 - classified below
+                    if _is_disconnect_error(exc, websocket):
+                        log_info(
+                            f"terminal ws client gone before exit frame tab={tab_key}",
+                            source=LOG_SOURCE,
+                        )
+                    else:
+                        log_error_exc(
+                            "terminal exit frame send error", source=LOG_SOURCE, exc=exc
+                        )
+                # Close even if the frame could not be sent: a socket whose
+                # shell is dead must not stay open (zombie tab).
+                await close_view(websocket, tab_key, code=WS_CLOSE_NORMAL)
+            return
         async with send_lock:
             try:
-                await websocket.send_text(data.decode("utf-8", "replace"))
+                await websocket.send_text(item.decode("utf-8", "replace"))
             except Exception as exc:  # noqa: BLE001 - classified below
                 if _is_disconnect_error(exc, websocket):
                     log_info(
@@ -285,10 +331,7 @@ async def _heartbeat_loop(
                 source=LOG_SOURCE,
             )
             session.detach(websocket)
-            try:
-                await websocket.close()
-            except Exception as exc:  # noqa: BLE001 - already tearing down
-                _log.debug("terminal heartbeat close note tab=%s: %r", tab_key, exc)
+            await close_view(websocket, tab_key)
             return
 
 
@@ -441,20 +484,28 @@ async def terminal_ws(websocket: WebSocket, tab_id: str) -> None:
                 f"terminal ws closed by client tab={tab_id}", source=LOG_SOURCE
             )
         else:
-            # SAFETY-CRITICAL: a dropped WS (tab freeze, network blip) must
-            # NOT kill the shell — detach the view only. The PTY keeps
-            # running + buffering; the reaper handles truly-dead/orphaned
-            # sessions later.
             session.detach(websocket)
-            log_info(
-                f"terminal ws detached tab={tab_id} pid={session.pty.pid} "
-                f"(pty kept alive)",
-                source=LOG_SOURCE,
-            )
-        try:
-            await websocket.close()
-        except Exception as exc:  # noqa: BLE001 - already closing
-            log_info(f"terminal ws close note: {exc}", source=LOG_SOURCE)
+            if session.exited:
+                # The shell died during this connection (the pump already sent
+                # the exit frame, or the client dropped first): reclaim the
+                # registry entry + DB pty_pid NOW instead of leaving a zombie
+                # until the next reaper sweep. Nothing to kill — the PTY is gone.
+                session.terminate(reason="pty exited")
+                log_info(
+                    f"terminal ws closed after pty exit tab={tab_id}",
+                    source=LOG_SOURCE,
+                )
+            else:
+                # SAFETY-CRITICAL: a dropped WS (tab freeze, network blip) must
+                # NOT kill the shell — detach the view only. The PTY keeps
+                # running + buffering; the reaper handles truly-dead/orphaned
+                # sessions later.
+                log_info(
+                    f"terminal ws detached tab={tab_id} pid={session.pty.pid} "
+                    f"(pty kept alive)",
+                    source=LOG_SOURCE,
+                )
+        await close_view(websocket, tab_id, code=WS_CLOSE_NORMAL)
 
 
-__all__ = ["router"]
+__all__ = ["exit_frame", "router"]

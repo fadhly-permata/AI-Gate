@@ -1201,6 +1201,23 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
 .term-empty-text { margin: 0; max-width: 34ch; line-height: 1.5; }
 .term-empty .btn { font-size: 13px; padding: 8px 16px; }
 
+/* ---- Session-ended toast (terminal.js) ----
+   Lives on <body> so it outlives the disposed tab; above the modals (1000). */
+.term-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 1200;
+  padding: 8px 16px;
+  border-radius: 6px;
+  background: #2b2f36;
+  color: #e4e6eb;
+  border: 1px solid #3a3f48;
+  font-size: 13px;
+  pointer-events: none; /* never blocks the terminal under it */
+}
+
 /* ---- Control cluster: right end of the tab strip ----
    It used to float over the top-right of the terminal surface, where it covered
    the first line of output. Docked into the strip it is top-right of the panel,

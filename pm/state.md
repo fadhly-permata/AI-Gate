@@ -1,6 +1,6 @@
 mode: running
 delay_seconds: 0
-checkpoint: "R29 ditegakkan + diperkuat. Task i18n combo group header ('Kombo/Combos' -> localized) ACCEPTED (opsi B, 422 tests green). Kekambuhan routing-violation ditutup permanen: routing rule dicerminkan ke AGENTS.md root project (auto-load main thread) + R29 addendum. Folllow-up opsional (belum jalan): fe-dev harden parity guard + setGroupOrder tests + fixture cleanup -> qa gate -> CODE_CHANGES.md + commit."
+checkpoint: "Terminal tab auto-close on shell exit SELESAI (uncommitted, sekuensial BE→FE). Kontrak exit: server kirim {\"type\":\"exit\",\"code\":int} lalu close 1000; FE closeTab(exited). Verifikasi PM: backend terminal 64 passed/1 skipped; FE terminal_exit 14; FE full 436 passed no regresi; kontrak BE↔FE cocok. R31 ditulis (jangan blokir panggilan panjang). PENDING: commit + documents/dev/CODE_CHANGES.md (R22) saat user approve; Q1 hapus tests/frontend/terminal.test.js (fe-dev); Q2 toast UX tunggu user; tes end-to-end live sebelum commit (R20)."
 updated: 2026-09-07
-rules_ref: OPERATING_RULES.md (R1–R29 + R29 addendum)
-multiagent_mode: sequential   # DIPAKSA: qa-engineer memverifikasi output fe-dev + scope tumpang tindih di src/frontend/tests/** (R16 ayat 'kalau overlap/dependen -> PM paksa sekuensial')
+rules_ref: OPERATING_RULES.md (R1–R31 + R29 addendum)
+multiagent_mode: sequential   # DIPILIH user 2026-09-07 sesi ini: BE dulu → verifikasi → FE. Berlaku se-sesi (R16).

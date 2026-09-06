@@ -316,3 +316,66 @@ project (auto-load tiap sesi) dan menunjuk balik ke R29 ini. Kalau `AGENTS.md`
 root hilang/terhapus → rule ini kehilangan gigi di sisi main thread; PM WAJIB
 re-create-nya. Verifikasi: setiap sesi baru, main thread harus memanggil PM dulu
 sebelum menyentuh kode; kalau tidak, itu pelanggaran R29.
+
+## R30 — "terminal" = fitur terminal DI DALAM aigate, bukan terminal OS/emulator
+Pelajaran (2026-09-07, user: "bukan, lu salah tangkep.. maksud gua tab di terminal
+aplikasi aigate yang ditutup kalo terminal udah di terminasi"): user nanya "bisa gak
+tab terminal ditutup otomatis pas udah di-terminasi (misal `exit`)". PM malah jawab
+konfigurasi Termux/OS terminal (`termux.properties`, `exec`, level a/b/c) — SALAH
+SASARAN total. aigate PUNYA fitur terminal sendiri (multi-tab xterm + PTY WebSocket,
+B3.2/B3.3): `src/backend/terminal/{pty,session,router}.py` + `src/frontend/static/terminal.js`.
+
+Aturan wajib:
+1. Kata **"terminal"** di project ini DEFAULT merujuk **fitur terminal aigate** (tab
+   xterm + PTY WS), BUKAN terminal OS/emulator (Termux/gnome-terminal/Windows Terminal),
+   KECUALI user eksplisit nyebut emulator/OS/app terminal luar.
+2. Sebelum menjawab pertanyaan "bisa gak / kenapa / gimana" yang menyangkut sebuah
+   fitur, PM WAJIB **investigasi repo DULU** (lewat codegraph per R28, lalu baca file
+   spesifik) buat pastiin fitur itu ada + gimana lifecycle-nya di kode. JANGAN jawab
+   dari asumsi environment tempat aigate jalan.
+3. Bila pertanyaan **ambigu dua level** (OS-level vs app-level), PM tanya SATU
+   klarifikasi singkat ATAU cek repo dulu — jangan langsung jawab panjang di level
+   yang salah. (Koreksi user = sinyal PM salah tangkep scope.)
+4. Cek **spec-vs-implementasi gap**: fitur "auto-close tab saat shell exit" ternyata
+   SUDAH di-spec di TSD §3.2 (frame `{"type":"exit"}`, langkah "saat shell keluar,
+   kirim kontrol exit, tutup WS") tapi BELUM diimplementasi. Rule: saat menelaah
+   fitur, bandingkan dokumen (TSD/FSD/PRD) vs kode — gap spec↔kode = kandidat task,
+   catat di Memory Bank.
+(Pelajaran 2026-09-07: PM jawab OS Termux padahal user maksud terminal internal
+aigate; kerja terbuang satu putaran penuh.)
+
+## R31 — Jangan blokir satu panggilan panjang; pecah pendek + reuse konteks
+Pelajaran (2026-09-07, user komplain "lama amat" 2x): PM menyatukan investigasi +
+dekomposisi + spawn + verifikasi dalam SATU putaran panjang yang blocking, dan
+re-investigasi kode yang sudah dibaca. Aturan wajib:
+1. **Satu panggilan = satu tujuan pendek.** Jangan gabung riset lama + delegasi +
+   verifikasi dalam satu blok yang memblokir user berlama-lama.
+2. **Reuse temuan yang sudah ada di konteks.** Kalau file/kontrak sudah dibaca sesi
+   ini, JANGAN baca ulang dari nol. Kutip file:line yang sudah ada.
+3. **Spawn spesialis langsung dengan handover ketat.** Begitu scope + kontrak jelas,
+   spawn (jangan nunda dengan riset tambahan yang tidak mengubah handover). Handover
+   wajib: goal, file:line, kontrak, DoD, batas scope — supaya spesialis gak nanya balik.
+4. **Verifikasi = cek cepat, bukan investigasi ulang.** Untuk integrasi, cukup cocokkan
+   kontrak di kode nyata + jalankan test terkait. Jangan telusuri ulang arsitektur.
+5. **Polling sub-agent pakai sleep pendek + cek progres (mtime/size log)**, bukan satu
+   `sleep` panjang buta yang nge-hang shell tool.
+(Pelajaran 2026-09-07: user dua kali komplain proses terlalu lama karena PM
+membundel semua langkah dalam satu putaran panjang + re-investigasi.)
+
+## R32 — DILARANG KERAS menyuruh sub-agent kill/restart/pkill/killall proses APAPUN
+Pelajaran (2026-09-07, user: "ya jangan kill aigate lah. ini lu running di aigate,
+sama aja bunuh diri dong"): sesi opencode ini berjalan **DI DALAM instance aigate yang
+sedang hidup**. Mematikan proses aigate = **bunuh diri** (matikan host sesi itu sendiri).
+
+Aturan wajib:
+1. PM **DILARANG** menyuruh/mengizinkan sub-agent menjalankan `kill`, `pkill`,
+   `killall`, restart service, atau perintah pemati proses APAPUN terhadap aigate /
+   uvicorn / python server / proses induk.
+2. **Handover ke spesialis WAJIB mencantumkan larangan ini** secara eksplisit.
+3. Sub-agent **hanya boleh** mematikan PID **miliknya sendiri** yang ia spawn sendiri,
+   di **port acak bebas** (bukan port server aigate).
+4. Untuk membuktikan "kode lama masih aktif / perlu restart", **JANGAN** mematikan
+   apa pun: cukup **BANDINGKAN waktu-mulai-proses vs mtime file** (mis. `ps -o lstart`
+   vs `stat -c %y file`) lalu **LAPORKAN ke user**. **User yang memutuskan restart.**
+(Pelajaran 2026-09-07: PM nyaris nyuruh restart/kill server aigate padahal sesi
+opencode hidup di dalamnya → bunuh diri.)
