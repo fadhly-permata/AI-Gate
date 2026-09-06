@@ -1,5 +1,24 @@
 # PM Status
 
+## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
+PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
+bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.
+- **`documents/pm/OPERATING_RULES.md`**: rename ke path baru DIPERTAHANKAN. `main` nambah
+  **R23 = "request routing via @ProjectManager"** → **TABRAKAN NOMOR** dgn R23 kita
+  (=laporan .opencode/reports). Routing `main` udah dicakup **R29** kita (lebih detail +
+  mirror AGENTS.md) → duplikat TIDAK dimasukkan (gak dobel nomor). **DILAPORKAN ke user.**
+- **`documents/pm/memory-bank.md`** (DU): 2 entri routing `main` di-fold ke path baru +
+  catatan divergensi R23↔R29; sisa `pm/memory-bank.md` di-`git rm`.
+- **`i18n.js` / `index.html` / `styles.css`**: KONFLIK FITUR — dua cabang sama-sama bikin
+  grouped-sidebar beda desain. **KEPUTUSAN: pertahankan desain refactor/ui** (`nav-section`,
+  Gateway Setup/Operations/Insights/System; lebih lengkap: aria + role=group + mobile
+  bottom-nav). Versi `main` (`nav-group`, Gateway/Monitoring/Tools/System) redundant →
+  dibuang, FITUR gak hilang (sidebar tetap ke-group). **DILAPORKAN ke user (bisa di-veto).**
+- **Verifikasi:** 0 conflict marker; `git diff --check` bersih; backend terminal **65
+  passed/1 skipped**; frontend **442 passed (23 files)**.
+- **PR #4 sekarang:** mergeable=**MERGEABLE**, mergeStateStatus=**CLEAN**, 13 commit.
+  BELUM di-merge (user yang putuskan).
+
 ## Relokasi Memory Bank `pm/` → `documents/pm/` — 2026-09-07 (PM-owned)
 **Teguran user → RULE BARU R30... R33:** "kenapa di root ada folder pm? jangan bikin
 berantakan". Root repo harus ramping; `documents/` = rumah mapan dokumen (R5).

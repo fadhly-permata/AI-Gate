@@ -7,6 +7,13 @@
 - 2026-09-03: Arsitektur agen PM + sub-agent spesialis (on-demand, scoped).
 
 ## Decisions
+- 2026-09-07 (merge origin/main → refactor/ui, PR #4): konflik 5 file diselesaiin
+  (merge commit `6000b2c`). (a) **Tabrakan rule nomor**: `main` nambah R23=routing, kita
+  udah punya R23=reports → routing `main` udah dicakup **R29** kita, duplikat gak
+  dimasukkan (no dobel nomor). (b) **Konflik fitur sidebar**: dua cabang bikin grouped-sidebar
+  beda desain → **keep desain refactor/ui** (`nav-section`, lebih lengkap), versi `main`
+  (`nav-group`) dibuang (redundan, fitur tetap ada). Dua-duanya DILAPORKAN ke user buat
+  veto. Verifikasi: 0 marker, backend terminal 65/1skip, frontend 442 pass. PR #4 CLEAN.
 - 2026-09-07 (R33 + relokasi Memory Bank): folder `pm/` DIHAPUS dari root → pindah ke
   **`documents/pm/`** (`git mv`, history ke-jejak). Alasan: root repo harus ramping;
   `documents/` = rumah mapan dokumen proyek (R5). 46 referensi `pm/` di 13 file
