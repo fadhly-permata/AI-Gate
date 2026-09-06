@@ -16,6 +16,8 @@ Scope: src/backend/**, tests/backend/**. Never touch other agents' write roots.
 - Idempotent mutations where possible.
 - Correlation-id logging; never log secrets/keys.
 - Type hints mandatory; ruff format + check.
+- Code quality MANDATORY: apply DRY/KISS/SOLID/YAGNI from
+  `.opencode/rules/code-quality-principles.md`. Read it before coding.
 ## Domain specifics (aigate)
 - FastAPI + Uvicorn + httpx async (ADR-002). Streaming via StreamingResponse/SSE
   for /v1/chat/completions (stream:true -> SSE `data: {json}\n\n` ... `data: [DONE]`).

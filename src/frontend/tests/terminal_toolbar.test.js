@@ -118,8 +118,22 @@ const TOOLBAR =
       '<div id="termTabBar" class="term-tabs"></div>' +
       '<button id="termNewTab"></button>' +
       '<div id="termFloating" class="term-floating" role="group">' +
-        '<button class="icon-btn term-ctl" id="termKeepAwake" type="button" aria-pressed="false">' +
-          '<i class="fa fa-sun"></i></button>' +
+        '<span class="term-split" id="termPasteSplit">' +
+                     '<button class="term-ctl term-main" id="termPaste" type="button" aria-label="Paste" title="Paste"><i class="fa fa-paste" aria-hidden="true"></i></button>' +
+          '<button class="term-ctl term-caret" id="termPasteCaret" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="termPasteMenu"></button>' +
+          '<span class="term-menu" id="termPasteMenu" role="menu" hidden>' +
+            '<button class="term-menu-item" id="termMenuPaste" data-action="paste">Paste normal</button>' +
+            '<button class="term-menu-item" id="termMenuPasteCode" data-action="paste-code">Paste as Code Block</button>' +
+          '</span>' +
+        '</span>' +
+        '<span class="term-split" id="termSettingsSplit">' +
+                     '<button class="term-ctl term-main" id="termSettings" type="button" aria-label="Settings" title="Settings"><i class="fa fa-gear" aria-hidden="true"></i></button>' +
+          '<button class="term-ctl term-caret" id="termSettingsCaret" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="termSettingsMenu"></button>' +
+          '<span class="term-menu" id="termSettingsMenu" role="menu" hidden>' +
+            '<button class="term-menu-item" id="termMenuTui" role="menuitemcheckbox" aria-checked="false" data-action="tui">TUI Passthrough</button>' +
+            '<button class="term-menu-item" id="termMenuKeepAwake" role="menuitemcheckbox" aria-checked="false" data-action="keep-awake">Keep Screen On</button>' +
+          '</span>' +
+        '</span>' +
         '<span class="term-split" id="termFullscreenSplit">' +
           '<button class="icon-btn term-ctl" id="termFullscreen" type="button" aria-pressed="false">' +
             '<i class="fa fa-expand"></i></button>' +
@@ -133,21 +147,7 @@ const TOOLBAR =
               ' aria-checked="false" id="termMenuFullscreen" data-action="fullscreen">Fullscreen</button>' +
           '</span>' +
         '</span>' +
-        '<span class="term-split" id="termPasteSplit">' +
-          '<button class="icon-btn term-ctl" id="termPaste" type="button">' +
-            '<i class="fa fa-paste"></i></button>' +
-          '<button class="icon-btn term-ctl term-caret" id="termPasteCaret" type="button"' +
-            ' aria-haspopup="true" aria-expanded="false" aria-controls="termPasteMenu">' +
-            '<i class="fa fa-caret-down"></i></button>' +
-          '<span class="term-menu" id="termPasteMenu" role="menu" hidden>' +
-            '<button class="term-menu-item" type="button" role="menuitem"' +
-              ' id="termMenuPaste" data-action="paste">Paste</button>' +
-            '<button class="term-menu-item" type="button" role="menuitem"' +
-              ' id="termMenuPasteCode" data-action="paste-code">Paste as Code Block</button>' +
-          '</span>' +
-        '</span>' +
-        '<button class="icon-btn term-ctl" id="termTui" type="button" aria-pressed="false">' +
-          '<i class="fa fa-hand-pointer"></i></button>' +
+
       '</div>' +
     '</div>' +
     '<div id="termStage" class="term-stage">' +
@@ -255,7 +255,7 @@ describe("F1 Keep Screen On — feature detection / insecure context", () => {
   it("wakeLock missing → button disabled with an explanatory title, no throw", () => {
     setWakeLock(null);
     expect(T()._setupKeepAwake()).toBeUndefined();       // must not throw
-    const btn = $("termKeepAwake");
+    const btn = $("termMenuKeepAwake");
     expect(btn.disabled).toBe(true);
     expect(btn.getAttribute("aria-disabled")).toBe("true");
     expect(btn.getAttribute("aria-pressed")).toBe("false");
@@ -266,14 +266,14 @@ describe("F1 Keep Screen On — feature detection / insecure context", () => {
   it("tapping the disabled button never requests a lock and never throws", () => {
     setWakeLock(null);
     T()._setupKeepAwake();
-    const btn = $("termKeepAwake");
+    const btn = $("termMenuKeepAwake");
     expect(() => btn.click()).not.toThrow();
     expect(T()._keepAwake.sentinel).toBeNull();
     expect(T()._keepAwake.desired).toBe(false);
   });
 
   it("wakeLock present → the button is enabled and labelled", () => {
-    const btn = $("termKeepAwake");
+    const btn = $("termMenuKeepAwake");
     expect(btn.disabled).toBe(false);
     expect(btn.hasAttribute("aria-disabled")).toBe(false);
     expect(btn.getAttribute("aria-pressed")).toBe("false");
@@ -282,17 +282,17 @@ describe("F1 Keep Screen On — feature detection / insecure context", () => {
 
 describe("F1 Keep Screen On — acquire / release", () => {
   it("toggle calls navigator.wakeLock.request('screen') and presses the button", async () => {
-    $("termKeepAwake").click();
+    $("termMenuKeepAwake").click();
     await flush();
     expect(wakeLock.calls).toEqual(["screen"]);          // exactly the SCREEN lock
-    const btn = $("termKeepAwake");
+    const btn = $("termMenuKeepAwake");
     expect(btn.getAttribute("aria-pressed")).toBe("true");
     expect(btn.title).toBe(window.I18N.en["term.keep_awake_on"]);
     expect(T()._keepAwake.sentinel).toBeTruthy();
   });
 
   it("second toggle releases the sentinel and un-presses the button", async () => {
-    const btn = $("termKeepAwake");
+    const btn = $("termMenuKeepAwake");
     btn.click();
     await flush();
     const s = wakeLock.sentinels[0];
@@ -304,7 +304,7 @@ describe("F1 Keep Screen On — acquire / release", () => {
   });
 
   it("persists the intent in sessionStorage as 1/0", async () => {
-    const btn = $("termKeepAwake");
+    const btn = $("termMenuKeepAwake");
     btn.click();
     await flush();
     expect(sessionStorage.getItem("aigate.term.keepAwake")).toBe("1");
@@ -316,7 +316,7 @@ describe("F1 Keep Screen On — acquire / release", () => {
   it("a rejected request() reverts to OFF + an error title (no silent swallow)", async () => {
     setWakeLock(makeWakeLock({ reject: true }));
     T()._setupKeepAwake();
-    const btn = $("termKeepAwake");
+    const btn = $("termMenuKeepAwake");
     btn.click();
     await flush();
     expect(btn.getAttribute("aria-pressed")).toBe("false");
@@ -328,15 +328,15 @@ describe("F1 Keep Screen On — acquire / release", () => {
   it("a request() that throws synchronously is caught, not propagated", async () => {
     setWakeLock(makeWakeLock({ throwSync: true }));
     T()._setupKeepAwake();
-    expect(() => $("termKeepAwake").click()).not.toThrow();
+    expect(() => $("termMenuKeepAwake").click()).not.toThrow();
     await flush();
-    expect($("termKeepAwake").getAttribute("aria-pressed")).toBe("false");
+    expect($("termMenuKeepAwake").getAttribute("aria-pressed")).toBe("false");
   });
 });
 
 describe("F1 Keep Screen On — auto-release + re-acquire", () => {
   it("the browser releasing the sentinel reflects OFF visually but KEEPS intent", async () => {
-    const btn = $("termKeepAwake");
+    const btn = $("termMenuKeepAwake");
     btn.click();
     await flush();
     wakeLock.sentinels[0]._drop();                       // tab hidden → auto-release
@@ -346,7 +346,7 @@ describe("F1 Keep Screen On — auto-release + re-acquire", () => {
   });
 
   it("visibilitychange re-acquires when intent is on and no sentinel is held", async () => {
-    const btn = $("termKeepAwake");
+    const btn = $("termMenuKeepAwake");
     btn.click();
     await flush();
     wakeLock.sentinels[0]._drop();
@@ -357,7 +357,7 @@ describe("F1 Keep Screen On — auto-release + re-acquire", () => {
   });
 
   it("visibilitychange does NOT re-acquire once the user turned it off", async () => {
-    const btn = $("termKeepAwake");
+    const btn = $("termMenuKeepAwake");
     btn.click();
     await flush();
     btn.click();                                          // explicit OFF
@@ -372,14 +372,14 @@ describe("F1 Keep Screen On — auto-release + re-acquire", () => {
     T()._setupKeepAwake();
     await flush();
     expect(wakeLock.calls).toEqual(["screen"]);
-    expect($("termKeepAwake").getAttribute("aria-pressed")).toBe("true");
+    expect($("termMenuKeepAwake").getAttribute("aria-pressed")).toBe("true");
   });
 
   it("a persisted intent is ignored when the context is not secure", () => {
     sessionStorage.setItem("aigate.term.keepAwake", "1");
     setWakeLock(null);
     T()._setupKeepAwake();
-    expect($("termKeepAwake").disabled).toBe(true);
+    expect($("termMenuKeepAwake").disabled).toBe(true);
     expect(T()._keepAwake.desired).toBe(false);
   });
 });
@@ -424,7 +424,9 @@ describe("F2 Fullscreen dropdown — defaults preserved", () => {
     $("termFullscreenCaret").click();
     $("termMenuFullscreen").click();
     expect(spy).toHaveBeenCalledTimes(1);
-    expect($("terminalBody").classList.contains("terminal-fullscreen")).toBe(true);
+    // Browser fullscreen is independent from Full Page CSS mode.
+    expect($("terminalBody").classList.contains("terminal-fullscreen")).toBe(false);
+    expect($("termMenuFullscreen").getAttribute("aria-checked")).toBe("true");
   });
 
   it("fullscreenchange syncs aria-checked / title, and exit goes through exitFullscreen", async () => {
@@ -433,7 +435,9 @@ describe("F2 Fullscreen dropdown — defaults preserved", () => {
     item.click();                                         // enter
     expect(item.getAttribute("aria-checked")).toBe("true");
     expect(item.title).toBe(window.I18N.en["term.exit_fullscreen"]);
-    expect(caret.getAttribute("data-fs")).toBe("on");
+    expect(caret.getAttribute("data-fs")).toBe("off");
+    expect($("termFullscreen").getAttribute("aria-pressed")).toBe("false");
+    expect($("termMenuFullPage").getAttribute("aria-checked")).toBe("false");
     const ex = vi.spyOn(document, "exitFullscreen");
     caret.click();
     item.click();                                         // same item is a TOGGLE
@@ -444,16 +448,17 @@ describe("F2 Fullscreen dropdown — defaults preserved", () => {
     expect(caret.getAttribute("data-fs")).toBe("off");
   });
 
-  it("true fullscreen carries the full-page class and drops it again on exit", () => {
+  it("true fullscreen stays independent from Full Page", () => {
     const body = $("terminalBody");
     expect(body.classList.contains("terminal-fullscreen")).toBe(false);
     $("termFullscreenCaret").click();
-    $("termMenuFullscreen").click();                      // enter (carries the class)
-    expect(body.classList.contains("terminal-fullscreen")).toBe(true);
-    expect(T()._fsCarriedFullPage()).toBe(true);
-    engineExitFullscreen();                                // engine left on its own
+    $("termMenuFullscreen").click();
     expect(body.classList.contains("terminal-fullscreen")).toBe(false);
-    expect(T()._fsCarriedFullPage()).toBe(false);
+    expect($("termFullscreen").getAttribute("aria-pressed")).toBe("false");
+    expect($("termMenuFullPage").getAttribute("aria-checked")).toBe("false");
+    expect($("termMenuFullscreen").getAttribute("aria-checked")).toBe("true");
+    engineExitFullscreen();
+    expect(body.classList.contains("terminal-fullscreen")).toBe(false);
   });
 
   it("a full-page choice the user made himself survives leaving true fullscreen", () => {
@@ -463,6 +468,43 @@ describe("F2 Fullscreen dropdown — defaults preserved", () => {
     $("termMenuFullscreen").click();                       // + true fullscreen
     engineExitFullscreen();
     expect(body.classList.contains("terminal-fullscreen")).toBe(true); // stays ON
+  });
+
+  it("keeps mode indicators independent while true fullscreen is active", () => {
+    const body = $("terminalBody");
+    const main = $("termFullscreen");
+    const fullPage = $("termMenuFullPage");
+    const fullscreen = $("termMenuFullscreen");
+    const fullscreenCaret = $("termFullscreenCaret");
+    const pasteCaret = $("termPasteCaret");
+
+    fullscreenCaret.click();
+    fullscreen.click();
+    expect(body.classList.contains("terminal-fullscreen")).toBe(false);
+    expect(main.getAttribute("aria-pressed")).toBe("false");
+    expect(fullPage.getAttribute("aria-checked")).toBe("false");
+    expect(fullscreen.getAttribute("aria-checked")).toBe("true");
+    expect(fullscreenCaret.getAttribute("data-fs")).toBe("off");
+    expect(pasteCaret.hasAttribute("aria-pressed")).toBe(false);
+    expect(pasteCaret.hasAttribute("data-fs")).toBe(false);
+  });
+
+  it("restores user Full Page state after true fullscreen request failure", async () => {
+    const body = $("terminalBody");
+    const request = body.requestFullscreen;
+    body.requestFullscreen = () => Promise.reject(new Error("denied"));
+    try {
+      $("termFullscreen").click();
+      $("termFullscreenCaret").click();
+      $("termMenuFullscreen").click();
+      await flush();
+      expect(body.classList.contains("terminal-fullscreen")).toBe(true);
+      expect($("termFullscreen").getAttribute("aria-pressed")).toBe("true");
+      expect($("termMenuFullPage").getAttribute("aria-checked")).toBe("true");
+      expect($("termMenuFullscreen").getAttribute("aria-checked")).toBe("false");
+    } finally {
+      body.requestFullscreen = request;
+    }
   });
 
   it("no requestFullscreen on the element → the item is disabled + explained", () => {
@@ -636,30 +678,46 @@ describe("Toolbar markup shipped in index.html", () => {
   const doc = new JSDOM(html).window.document;
   const floating = doc.getElementById("termFloating");
 
-  it("the cluster holds keep-awake + two split buttons + TUI", () => {
-    expect(floating.querySelector("#termKeepAwake")).not.toBeNull();
-    expect(floating.querySelector("#termFullscreenCaret")).not.toBeNull();
-    expect(floating.querySelector("#termPasteCaret")).not.toBeNull();
-    // The pre-existing hooks are all still there (no regression).
-    ["termFullscreen", "termPaste", "termTui"].forEach((id) => {
-      expect(floating.querySelector("#" + id)).not.toBeNull();
-    });
-  });
+it("the cluster holds Paste, Settings, Full in exact order", () => {
+     expect([...floating.children].map((el) => el.id)).toEqual([
+       "termPasteSplit", "termSettingsSplit", "termFullscreenSplit"
+     ]);
+     ["termMenuKeepAwake", "termMenuTui", "termPasteCaret", "termSettingsCaret", "termFullscreenCaret"].forEach((id) => {
+       expect(floating.querySelector("#" + id)).not.toBeNull();
+     });
+     expect(floating.querySelector("#termTui")).toBeNull();
+     expect(floating.querySelector("#termKeepAwake")).toBeNull();
+   });
 
-  it("every menu item is a real <button> with a data-action", () => {
-    const items = floating.querySelectorAll(".term-menu-item");
-    expect(items.length).toBe(4);
-    items.forEach((b) => {
-      expect(b.tagName.toLowerCase()).toBe("button");
-      expect(b.getAttribute("data-action")).toBeTruthy();
-    });
-  });
+   it("every menu item is a real <button> with a data-action", () => {
+     const items = floating.querySelectorAll(".term-menu-item");
+     expect(items.length).toBe(6);
+     items.forEach((b) => {
+       expect(b.tagName.toLowerCase()).toBe("button");
+       expect(b.getAttribute("data-action")).toBeTruthy();
+     });
+   });
 
-  it("no user-facing string is hardcoded without a data-i18n hook", () => {
+   it("main split buttons show icons only while retaining accessible labels", () => {
+     [
+       ["termPaste", "Paste", "fa-paste"],
+       ["termSettings", "Settings", "fa-gear"],
+       ["termFullscreen", "Full Page", "fa-expand"]
+     ].forEach(([id, label, icon]) => {
+       const button = doc.getElementById(id);
+       expect(button.textContent.trim()).toBe("");
+       expect(button.getAttribute("aria-label")).toBeNull();
+       expect(button.getAttribute("data-i18n-aria")).toBeTruthy();
+       expect(button.getAttribute("title")).toBe(label);
+       expect(button.querySelector("i").className).toContain(icon);
+     });
+   });
+
+   it("no user-facing string is hardcoded without a data-i18n hook", () => {
     floating.querySelectorAll(".term-menu-item").forEach((b) => {
       expect(b.hasAttribute("data-i18n")).toBe(true);
     });
-    ["termKeepAwake", "termFullscreenCaret", "termPasteCaret"].forEach((id) => {
+    ["termSettings", "termSettingsCaret", "termFullscreenCaret", "termPasteCaret"].forEach((id) => {
       expect(doc.getElementById(id).hasAttribute("data-i18n-aria")).toBe(true);
     });
   });

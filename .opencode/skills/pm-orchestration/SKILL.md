@@ -10,17 +10,17 @@ description: >
 # PM Orchestration Playbook
 
 ## 1. Memory Bank (persist context across agents)
-Keep in `pm/`:
+Keep in `documents/pm/`:
 - `memory-bank.md` — brief, decisions, progress, risks.
 - `OPERATING_RULES.md` — append `R#` rules when the user corrects the PM.
 - `state.md` — `mode / delay_seconds / checkpoint / updated / rules_ref`.
 - `status.md` — spawned sub-agents + outcomes.
-Sub-agents READ `pm/` (handover source) but never WRITE it. Only PM writes.
+Sub-agents READ `documents/pm/` (handover source) but never WRITE it. Only PM writes.
 
 ## 2. Handover Protocol (give sub-agents full context)
 Every spawn prompt must include:
 - **Goal** — what success looks like.
-- **Context** — links/summary from `pm/` (decisions, prior outputs).
+- **Context** — links/summary from `documents/pm/` (decisions, prior outputs).
 - **Scope** — exact write roots + read roots (from the roster).
 - **Definition-of-done** — concrete acceptance criteria.
 - **Constraints** — deadlines, tech limits, forbidden actions.
@@ -35,7 +35,7 @@ questions). PM integrates receipts; never duplicates the sub-agent's work.
 | Full vertical slice | fullstack-dev | one assigned module |
 | Requirements / flows | system-analyst | docs/analysis/** |
 | Value / stories | business-analyst | docs/business/** |
-| Tests / quality | qa-engineer | tests/**, reports/qa/** |
+| Tests / quality | qa-engineer | tests/**, .opencode/reports/** |
 
 | Design / trade-offs | tech-architect | docs/architecture/** |
 
@@ -50,6 +50,6 @@ casual): run **paralel** (faster, independent pieces, needs merge review) or
 truly independent and scopes don't overlap; otherwise sequential.
 
 ## 5. File-boundary enforcement
-Each sub-agent writes only its scope. PM owns `pm/` and the final merge.
+Each sub-agent writes only its scope. PM owns `documents/pm/` and the final merge.
 Cross-scope writes are violations — reject the receipt and ask for fix. See
 `.opencode/rules/agent-boundaries.md`.

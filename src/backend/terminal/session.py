@@ -25,11 +25,18 @@ New model (tmux/wetty-style)
   1. an explicit client control frame ``{"type":"close"}`` (user closed the
      tab deliberately), handled by the router via :meth:`PtySession.terminate`;
   2. the reaper (:func:`reap_idle` / :func:`reaper_loop`), which terminates
-     sessions whose PTY has **exited**, or that are detached AND idle (no
-     output) for longer than the grace period. A *running* job is never
-     reaped just because its WS dropped — only truly-dead or
-     extremely-long-orphaned sessions (default grace: 60 minutes, Setting
-     ``terminal_idle_reap_minutes``).
+     sessions whose PTY has **exited** (even while a view is still attached),
+     or that are detached AND idle (no output) for longer than the grace
+     period. A *running* job is never reaped just because its WS dropped —
+     only truly-dead or extremely-long-orphaned sessions (default grace:
+     60 minutes, Setting ``terminal_idle_reap_minutes``).
+
+When the shell dies (``exit`` / Ctrl-D / crash / killed) the reader thread
+calls :meth:`PtySession.notify_exit`, which pushes ONE :class:`PtyExit`
+sentinel onto the attached view's queue. The sentinel rides the live queue
+only — never the ring buffer — so the router can turn it into a single
+``{"type":"exit","code":<int>}`` control frame (TSD §3.1) without a
+reattaching client ever replaying it as terminal text.
 
 Threading
 ---------
@@ -46,7 +53,9 @@ import asyncio
 import threading
 import time
 from collections import deque
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Union
+
+from starlette.websockets import WebSocketState
 
 from backend.config import settings as settings_repo
 from backend.config.db import SessionLocal
@@ -55,6 +64,15 @@ from backend.models import TerminalTab
 from backend.terminal.pty import PtyError, PtyProcess, spawn_shell
 
 LOG_SOURCE = "backend.terminal.session"
+
+# Normal WebSocket close code used when the server ends a terminal connection
+# (TSD §3.1: shell exited → send the exit control frame → close the WS).
+WS_CLOSE_NORMAL = 1000
+
+# ``code`` value of the exit control frame when the shell's real exit status
+# cannot be read (killed by signal, backend does not expose it). The contract
+# with the frontend is that ``code`` is ALWAYS an integer, never null.
+EXIT_CODE_UNKNOWN = -1
 
 # Ring buffer cap: total bytes of recent PTY output kept per session so a
 # reattaching client can catch up without unbounded memory growth.
@@ -115,6 +133,62 @@ def _grace_seconds() -> float:
 
 
 # --------------------------------------------------------------------------- #
+# Exit control: sentinel + view teardown
+# --------------------------------------------------------------------------- #
+class PtyExit:
+    """Queue sentinel marking "the PTY is gone" — NOT terminal output.
+
+    Pushed onto the attached view's live queue (never the ring buffer) so the
+    router's pump can emit exactly one ``{"type":"exit","code":<int>}`` control
+    frame and close the socket. A distinct object type (instead of a magic byte
+    string) means real PTY output can never be mistaken for it.
+    """
+
+    __slots__ = ("code",)
+
+    def __init__(self, code: int) -> None:
+        self.code = code
+
+    def __repr__(self) -> str:  # pragma: no cover - diagnostics only
+        return f"PtyExit(code={self.code})"
+
+
+def read_exit_code(pty: Any) -> int:
+    """Best-effort shell exit status; :data:`EXIT_CODE_UNKNOWN` when unreadable.
+
+    The contract guarantees an ``int`` in the exit frame, so every failure mode
+    (backend without ``exit_status``, status not yet reaped, killed by signal)
+    collapses to ``-1`` instead of leaking ``None`` to the client.
+    """
+    try:
+        code = getattr(pty, "exit_status", None)
+    except Exception as exc:  # noqa: BLE001 - a raising property is still "unknown"
+        log_warning(
+            f"terminal: cannot read pty exit status ({exc!r}), reporting "
+            f"{EXIT_CODE_UNKNOWN}",
+            source=LOG_SOURCE,
+        )
+        return EXIT_CODE_UNKNOWN
+    return code if isinstance(code, int) else EXIT_CODE_UNKNOWN
+
+
+async def close_view(websocket: Any, tab_key: str, code: int = WS_CLOSE_NORMAL) -> None:
+    """Close one WS view, tolerating an already-closed socket.
+
+    Shared by the router (exit frame + handler teardown) and the kill path so
+    the "was it already closed?" dance lives in exactly one place. Closing is
+    how a dead shell stops being a zombie tab: the client sees the socket end
+    right after the exit frame.
+    """
+    try:
+        if getattr(websocket, "application_state", None) is WebSocketState.DISCONNECTED:
+            return
+        await websocket.close(code=code)
+    except Exception as exc:  # noqa: BLE001 - already tearing down
+        log_info(f"terminal ws close note tab={tab_key}: {exc}", source=LOG_SOURCE)
+
+
+# --------------------------------------------------------------------------- #
 # PtySession
 # --------------------------------------------------------------------------- #
 class PtySession:
@@ -141,12 +215,18 @@ class PtySession:
         # Attach state (guarded by ``lock``).
         self.lock = threading.Lock()
         self.attached: Any = None  # websocket or None
-        self.queue: Optional["asyncio.Queue[bytes]"] = None
+        self.queue: Optional["asyncio.Queue[Union[bytes, PtyExit]]"] = None
         self.loop: Optional[asyncio.AbstractEventLoop] = None
         # Lifecycle.
         self.stop_event = threading.Event()
         self.reader: Optional[threading.Thread] = None
         self.exited = False
+        # Shell exit status once the reader reaped it (None → unknown → -1).
+        self.exit_code: Optional[int] = None
+        # The view queue that already received the PtyExit sentinel: makes the
+        # "exactly one exit frame" contract per-VIEW (a reattach to a session
+        # that died while detached still gets told).
+        self.exit_view: Optional["asyncio.Queue[Union[bytes, PtyExit]]"] = None
         self.created_ts = time.monotonic()
         self.last_output_ts = self.created_ts
         # Heartbeat bookkeeping for the currently-attached view (guarded by
@@ -167,24 +247,23 @@ class PtySession:
         )
         self.reader.start()
 
-    def _publish(self, data: bytes) -> None:
-        """Record one PTY output chunk: ring buffer always, live queue if attached.
+    def _deliver(
+        self,
+        queue: "Optional[asyncio.Queue[Union[bytes, PtyExit]]]",
+        loop: Optional[asyncio.AbstractEventLoop],
+        item: "Union[bytes, PtyExit]",
+    ) -> None:
+        """Push one item onto a view's queue (reader thread → event loop).
 
-        Called from the reader thread. Live delivery crosses into the event
-        loop via ``run_coroutine_threadsafe``; a dead loop means the view is
-        gone → detach (never kill the PTY).
+        ``queue``/``loop`` are the view the caller captured UNDER the session
+        lock — that atomicity is what keeps a chunk from being both replayed
+        (it is already in the ring) and streamed live to a just-attached view.
+        A dead loop means the view is gone → detach it (never kill the PTY).
         """
-        with self.lock:
-            self.last_output_ts = time.monotonic()
-            self.ring.append(data)
-            self.ring_bytes += len(data)
-            while self.ring_bytes > RING_MAX_BYTES and len(self.ring) > 1:
-                self.ring_bytes -= len(self.ring.popleft())
-            queue, loop = self.queue, self.loop
         if queue is None or loop is None:
             return  # detached: buffered only, replayed on reattach
         try:
-            asyncio.run_coroutine_threadsafe(queue.put(data), loop)
+            asyncio.run_coroutine_threadsafe(queue.put(item), loop)
         except Exception as exc:  # noqa: BLE001 - loop closed → view gone, keep pty
             log_warning(
                 f"terminal live delivery failed tab={self.tab_key} (detaching): {exc!r}",
@@ -196,27 +275,79 @@ class PtySession:
                     self.queue = None
                     self.loop = None
 
+    def _publish(self, data: bytes) -> None:
+        """Record one PTY output chunk: ring buffer always, live queue if attached.
+
+        Called from the reader thread.
+        """
+        with self.lock:
+            self.last_output_ts = time.monotonic()
+            self.ring.append(data)
+            self.ring_bytes += len(data)
+            while self.ring_bytes > RING_MAX_BYTES and len(self.ring) > 1:
+                self.ring_bytes -= len(self.ring.popleft())
+            queue, loop = self.queue, self.loop
+        self._deliver(queue, loop, data)
+
+    def notify_exit(self) -> bool:
+        """Tell the attached view that the PTY died — at most once per view.
+
+        Called from the reader thread when the shell exits and from the kill
+        path. The :class:`PtyExit` sentinel goes on the LIVE queue only, so the
+        exit frame can never be replayed to a reattaching client as terminal
+        text. Returns True when a sentinel was actually queued.
+        """
+        sentinel: PtyExit = PtyExit(self.resolved_exit_code())
+        with self.lock:
+            self.exited = True
+            queue, loop = self.queue, self.loop
+            if queue is None or queue is self.exit_view:
+                return False  # detached, or this view was already told
+            self.exit_view = queue
+        self._deliver(queue, loop, sentinel)
+        return True
+
+    def resolved_exit_code(self) -> int:
+        """Exit status for the control frame (reader-captured, else best-effort).
+
+        Always an ``int``: the frontend contract forbids a null/string code.
+        """
+        code = self.exit_code
+        if code is None:
+            code = read_exit_code(self.pty)
+        return code if isinstance(code, int) else EXIT_CODE_UNKNOWN
+
     # ------------------------------------------------------------------ #
     # WS view attach / detach (never touches the PTY lifecycle)
     # ------------------------------------------------------------------ #
     def attach(
         self, websocket: Any, loop: asyncio.AbstractEventLoop
-    ) -> "tuple[list[bytes], asyncio.Queue[bytes]]":
+    ) -> "tuple[list[bytes], asyncio.Queue[Union[bytes, PtyExit]]]":
         """Attach a WS view. Returns (replay chunks, live queue).
 
         The caller must send the replay chunks, then drain the queue for
         live output. Attaching twice (e.g. double connect on one tab) steals
         the view: the old WS's queue simply stops receiving and its pump is
         cancelled by its own handler teardown.
+
+        A view attached to an ALREADY-dead session is seeded with the exit
+        sentinel, so it can never hang on a shell that will not produce the
+        "I'm gone" frame (the exit frame is per-view, hence not a duplicate).
         """
+        # Resolved before taking the lock: status lookup must not run under it.
+        code = self.resolved_exit_code()
         with self.lock:
             replay = list(self.ring)
-            queue: "asyncio.Queue[bytes]" = asyncio.Queue()
+            queue: "asyncio.Queue[Union[bytes, PtyExit]]" = asyncio.Queue()
             self.attached = websocket
             self.queue = queue
             self.loop = loop
-            # Fresh view: no pong seen yet on this connection.
+            # Fresh view: no pong seen yet on this connection, and this view
+            # has not been told about the exit yet.
             self.last_pong_ts = None
+            self.exit_view = queue if self.exited else None
+            if self.exited:
+                queue.put_nowait(PtyExit(code))
             return replay, queue
 
     def record_pong(self) -> None:
@@ -275,46 +406,74 @@ class PtySession:
     # ------------------------------------------------------------------ #
     # Termination (the ONLY PTY-kill paths)
     # ------------------------------------------------------------------ #
-    def terminate(self) -> None:
-        """Explicit user close: kill the PTY + unregister. Never raises."""
+    def terminate(self, reason: str = "client close") -> None:
+        """Kill the PTY + unregister (client close, or post-exit reclaim).
+
+        Never raises. The attached view (if any) is told the shell is gone via
+        the exit sentinel before its state is dropped.
+        """
         self.stop_event.set()
-        self._kill_and_unregister(reason="client close")
+        self._kill_and_unregister(reason=reason)
 
     def try_reap(self, now: float, grace_seconds: float) -> bool:
         """Reap-check under the session lock; kill + unregister if eligible.
 
-        Eligible when: not attached AND (PTY exited OR idle beyond grace).
+        Eligible when the PTY has **exited** (attached view or not — a dead
+        shell must never linger as a zombie tab) or when it is detached AND
+        idle beyond the grace period.
+
+        SAFETY (the reason this module exists): a session whose shell is still
+        RUNNING is never killed just because its WS dropped — that case stays
+        behind the ``attached is None`` + grace guard.
         Returns True if this session was terminated.
         """
         with self.lock:
-            if self.attached is not None:
-                return False
             exited = self.exited or not self.pty.is_alive()
-            if not exited and (now - self.last_output_ts) < grace_seconds:
-                return False
+            if not exited:
+                if self.attached is not None:
+                    return False  # someone is watching a live job
+                if (now - self.last_output_ts) < grace_seconds:
+                    return False  # running job, WS blip: keep it
             self.stop_event.set()
         self._kill_and_unregister(reason="pty exited" if exited else "idle orphan")
         return True
 
     def _kill_and_unregister(self, reason: str) -> None:
-        """Kill the PTY, mark exited, drop the registry entry + tab pid."""
-        try:
-            self.pty.kill()
-        except Exception as exc:  # noqa: BLE001 - kill failure must not strand registry
-            log_error_exc(
-                f"terminal kill error tab={self.tab_id} ({reason})",
-                source=LOG_SOURCE,
-                exc=exc,
-            )
+        """Kill the PTY, notify + drop the view, clear registry entry + tab pid."""
+        # Notify BEFORE the view state is cleared: the sentinel has to reach the
+        # live queue, or the client waits forever on a socket nobody serves.
+        self.notify_exit()
+        if self.pty.is_alive():
+            try:
+                self.pty.kill()
+            except Exception as exc:  # noqa: BLE001 - kill failure must not strand registry
+                log_error_exc(
+                    f"terminal kill error tab={self.tab_key} ({reason})",
+                    source=LOG_SOURCE,
+                    exc=exc,
+                )
         pid = self.pty.pid
         with self.lock:
             self.exited = True
+            websocket, loop = self.attached, self.loop
             self.attached = None
             self.queue = None
             self.loop = None
         unregister(self.tab_key, expected=self)
         if self.db_tab_id is not None:
             _update_tab_pid(self.db_tab_id, "")
+        if websocket is not None and loop is not None:
+            # Backstop for a view whose pump is gone (half-open socket, cancelled
+            # task): its WS must still close, or the tab stays a zombie.
+            try:
+                asyncio.run_coroutine_threadsafe(
+                    close_view(websocket, self.tab_key), loop
+                )
+            except Exception as exc:  # noqa: BLE001 - loop already dead: nothing to close
+                log_warning(
+                    f"terminal cannot close stale view tab={self.tab_key}: {exc!r}",
+                    source=LOG_SOURCE,
+                )
         log_info(
             f"terminal session terminated ({reason}) tab={self.tab_key} pid={pid}",
             source=LOG_SOURCE,
@@ -328,7 +487,10 @@ def _reader_loop(session: PtySession) -> None:
     shutdown (``stop_event`` set) or an EOF/OSError from the killed PTY is
     expected teardown → INFO, not ERROR. Only genuinely unexpected reads are
     logged as errors. When the PTY is no longer alive the session is marked
-    ``exited`` (the reaper removes it later; we never delete here).
+    ``exited`` and the attached view is told with one exit sentinel (TSD §3.1:
+    the client must close its tab instead of hanging on a dead shell). Reaping
+    the registry entry stays with the reaper / the handler teardown — the
+    reader never touches the registry or the DB.
     """
     pty = session.pty
     stop_event = session.stop_event
@@ -351,9 +513,18 @@ def _reader_loop(session: PtySession) -> None:
             continue  # transient empty read
         session._publish(data)
     if not pty.is_alive():
+        code = read_exit_code(pty)
         with session.lock:
             session.exited = True
-        log_info(f"terminal pty exited tab={session.tab_key}", source=LOG_SOURCE)
+            session.exit_code = code
+        log_info(
+            f"terminal pty exited tab={session.tab_key} code={code}",
+            source=LOG_SOURCE,
+        )
+        # Tell the attached view so its tab closes (TSD §3.1). Reclaiming the
+        # registry entry + tab pid is the reaper's / the handler's job: the
+        # reader thread never touches the registry or the DB.
+        session.notify_exit()
 
 
 # --------------------------------------------------------------------------- #
@@ -439,8 +610,10 @@ def snapshot_sessions() -> list[PtySession]:
 def reap_idle(now: Optional[float] = None) -> list[str]:
     """Sweep the registry; terminate exited / long-orphaned sessions.
 
-    Returns the tab keys reaped. Running-but-detached sessions are only
-    touched after the (generous) idle grace; attached sessions never.
+    Returns the tab keys reaped. An **exited** session is reclaimed even while
+    a view is still attached (its tab must not linger as a zombie). A *running*
+    session is only touched when detached AND idle beyond the (generous) grace
+    period — a dropped WS never kills a live job.
     """
     grace = _grace_seconds()
     if now is None:
@@ -474,15 +647,20 @@ async def reaper_loop(interval_seconds: float = REAPER_INTERVAL_SECONDS) -> None
 
 __all__ = [
     "DEFAULT_IDLE_REAP_MINUTES",
+    "EXIT_CODE_UNKNOWN",
     "HEARTBEAT_INTERVAL_SECONDS",
     "LOG_SOURCE",
     "PONG_TIMEOUT_SECONDS",
     "REAPER_INTERVAL_SECONDS",
     "RING_MAX_BYTES",
     "SETTING_IDLE_REAP_MINUTES",
+    "WS_CLOSE_NORMAL",
+    "PtyExit",
     "PtySession",
+    "close_view",
     "get_or_create",
     "get_session",
+    "read_exit_code",
     "reap_idle",
     "reaper_loop",
     "snapshot_sessions",

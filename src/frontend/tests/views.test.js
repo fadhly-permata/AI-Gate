@@ -14,6 +14,31 @@ const dom = new JSDOM(html);
 const doc = dom.window.document;
 
 describe("index.html structure — missing views + global Log Window", () => {
+  it("groups sidebar items by user need without changing data-view values", () => {
+    const groups = [
+      ["nav.group.gateway", ["providers", "combos", "proxies", "endpoints"]],
+      ["nav.group.operations", ["terminal", "cli"]],
+      ["nav.group.insights", ["usage", "analytics"]],
+      ["nav.group.system", ["settings"]]
+    ];
+    const sections = Array.from(doc.querySelectorAll(".nav-section"));
+    expect(sections).toHaveLength(groups.length);
+    groups.forEach(function (group, index) {
+      const section = sections[index];
+      expect(section.querySelector(".nav-section-heading").getAttribute("data-i18n")).toBe(group[0]);
+      expect(Array.from(section.querySelectorAll(".nav-item")).map(function (item) {
+        return item.getAttribute("data-view");
+      })).toEqual(group[1]);
+    });
+  });
+
+  it("keeps section headings localized in EN and ID", () => {
+    ["gateway", "operations", "insights", "system"].forEach(function (group) {
+      expect(window.I18N.en["nav.group." + group]).toBeTruthy();
+      expect(window.I18N.id["nav.group." + group]).toBeTruthy();
+    });
+  });
+
   it("has view sections for combos, proxies, endpoints", () => {
     expect(doc.querySelector('[data-view="combos"]')).not.toBeNull();
     expect(doc.querySelector('[data-view="proxies"]')).not.toBeNull();
@@ -101,7 +126,7 @@ describe("terminal container chrome removed — flattened view (regression guard
 
   it("JS-referenced terminal IDs survive the flattening", () => {
     ["terminalBody", "termStage", "termContainers", "termTabBar", "termNewTab",
-     "termFloating", "termFullscreen", "termPaste", "termTui"].forEach(function (id) {
+     "termFloating", "termFullscreen", "termPaste", "termSettings", "termMenuTui", "termMenuKeepAwake"].forEach(function (id) {
       expect(doc.getElementById(id), "#" + id + " present").not.toBeNull();
     });
   });

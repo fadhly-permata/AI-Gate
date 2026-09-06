@@ -29,16 +29,15 @@ describe("proxies (Proxy Pools) mapper + render (B2.3)", () => {
     expect(row.enabled).toBe(false);
   });
 
-  it("renderPools renders rows with edit/delete/health buttons", () => {
+  it("renderPools renders rows with a kebab action menu", () => {
     window.aigate.proxies.renderPools([
       { id: 9, name: "Pool A", rotation_strategy: "random", enabled: false, nodes: [] }
     ]);
     const html = document.getElementById("poolTableBody").innerHTML;
     expect(html).toContain('data-id="9"');
     expect(html).toContain("Pool A");
-    expect(html).toContain("js-edit");
-    expect(html).toContain("js-del");
-    expect(html).toContain("js-check");
+    expect(html).toContain("js-row-menu");
+    expect(html).toContain("row-actions");
   });
 
   it("renderPools shows the empty-state message when there are no items", () => {

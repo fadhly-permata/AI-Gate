@@ -1,14 +1,226 @@
 # Code Changes Register (code ↔ docs alignment)
 
+## 2026-09-07 — Terminal tab auto-close on shell exit + session-ended toast — DONE
+
+Akar masalah "tab gak nutup": backend tidak pernah memberi tahu frontend saat shell
+mati → tab jadi zombie view. (Plus: `terminal.js` ter-cache browser tanpa cache-buster,
+sehingga perbaikan FE tidak ter-load.) BE terbukti benar via runtime (frame terkirim).
+
+**Kontrak exit (sumber kebenaran):** server kirim TEXT frame `{"type":"exit","code":<int>}`
+ke view yang sedang attached, LALU tutup WS (code 1000). Frame TIDAK masuk ring-buffer
+replay. FE tangkap frame → tutup tab (tanpa kill-frame balasan, tanpa auto-open).
+
+### `src/backend/terminal/pty.py`
+- `PtyProcess` +properti `exit_status` (best-effort baca exit status child; guard).
+
+### `src/backend/terminal/session.py`
+- Sentinel `PtyExit(code)` (bukan output terminal) + `notify_exit()` (dorong SATU
+  sentinel ke queue view aktif, at-most-once per view via `exit_view`), `resolved_exit_code()`
+  / `read_exit_code()`, `close_view()`. Reader thread memanggil `notify_exit()` saat PTY
+  mati. `try_reap`/`reap_idle` kini REAP sesi exited walau masih attached (tutup view);
+  sesi hidup yang cuma detached tetap tidak disentuh (regression guard).
+
+### `src/backend/terminal/router.py`
+- `_pump()` kenali item `PtyExit` → kirim `exit_frame(code)` = `json.dumps({"type":"exit","code":int(code)})`
+  lalu `websocket.close(1000)`. Handler reclaim sesi setelah exit.
+
+### `tests/backend/test_terminal_exit.py` (baru)
+- 17 test: exit → satu frame `{"type":"exit","code":N}` + close 1000; frame tidak
+  ke-replay; reaper reap exited-but-attached; live-but-detached tetap aman.
+
+### `src/frontend/static/terminal.js`
+- `handleWsMessage`: guard `tab.userClosed`; cabang `info.type==="exit"` →
+  `closeTab(tab.id,{exited:true})`. `closeTab(id,opts)`: `opts.exited` = TANPA kirim
+  kill-frame + TANPA auto-open tab baru (empty state); `removeSavedTabId` dipanggil.
+
+### `src/frontend/static/i18n.js`
+- Key `term.session_ended` (EN + ID) untuk toast penanda sesi selesai.
+
+### `src/frontend/static/styles.css`
+- Gaya toast `term.session_ended`.
+
+### `src/frontend/static/index.html`
+- Cache-buster `?v=20260906` pada aset statik (terminal.js dkk) supaya versi baru
+  selalu ter-load (akar bug: cache lama tanpa bust).
+
+### `src/frontend/tests/terminal_exit.test.js` (baru)
+- 14 test: exit frame → tab hilang, tanpa kill-frame, tanpa auto-open, forget id.
+
+**Verification.** PM re-ran: backend terminal **65 passed / 1 skipped** (skip =
+`test_terminal.py:59` native PTY dep); frontend **442 passed (24 files)**, no regresi.
+Kontrak BE↔FE dicocokkan di kode nyata (frame dulu → close 1000). Belum di-exercise
+end-to-end live di browser.
+
+---
+
+## 2026-09-06 — CLI Tools combobox: two-level (provider → model-prefix) grouping — DONE
+
+### `src/frontend/static/combobox.js`
+- Added `subGroupBy` (`null|prefix|group`). Options carry `_sub`; `setOptions` derives it (prefix → `familyOf(label)` unless `subGroup:false`; group → `m.subGroup`). `subGroup:false` opt-out keeps an option flat.
+- Two-level render: main group header → flat items (`_sub==null`) directly under it → sub-group headers with nested items. New `collapsedSub`/`trackedSub` Sets (composite `group\u0001sub`) for per-sub collapse (default collapsed, persists across refresh, auto-expand while searching). `toggleSub(group,sub)`; click/Enter/Space on `.aigate-combo-subgroup` toggles.
+
+### `src/frontend/static/clitools.js`
+- `cliModelCtl()` adds `subGroupBy:"prefix"`. `fetchModels()` sets combo items `subGroup:false` (flat under `Kombo/Combos`); provider items auto sub-group by model-name prefix. Values stay full `provider:/combo:` ids.
+
+### `src/frontend/static/styles.css`
+- Added `.aigate-combo-subgroup` (indented header + caret) and `.aigate-combo-opt.aigate-combo-opt-sub` (44px indent).
+
+### `src/frontend/tests/combobox.test.js`
+- Added 6 tests: default-collapsed two-level, `Kombo/Combos` flat, provider→prefix sub-groups, expand-sub reveals items, keyboard toggle, search auto-expands.
+
+**Verification.** PM re-ran vitest: **415 passed (21 files)**. No backend changes.
+
+---
+
+## 2026-09-06 — Model dropdown: indent + collapsible groups + fixed flexible positioning — DONE
+
+### `src/frontend/static/combobox.js`
+- Group child options indented (render unchanged; CSS does indent).
+- Collapsible groups: `collapsed` Set, default all collapsed; click/Enter/Space on a `role="button"` group header toggles (keeps state across `setOptions` refreshes via a `tracked` Set). While a search query is active, all groups auto-expand so matches show. Headers always render (even when collapsed) so they stay expandable. `renderOptionsHtml()` iterates the full group list; `buildRenderGroups()` removed.
+- `position()` rewritten to `position: fixed`, viewport-anchored to the input rect; opens below when there is room, above otherwise; `maxHeight` capped to `min(320, availableSpace)` so it never overflows. Adds `scroll`(capture)+`resize` listeners on open, removed on close/destroy. Fixes the panel being clipped by `.modal { overflow-y:auto }`.
+
+### `src/frontend/static/styles.css`
+- `.aigate-combo-list` now `position: fixed` (geometry set inline by JS).
+- `.aigate-combo-opt` indented `padding-left: 28px`; `.aigate-combo-group` `cursor:pointer`, caret via `::before` (▾ expanded / ▸ collapsed).
+
+### `src/frontend/tests/combobox.test.js` / `combos.test.js`
+- Added tests: collapsed-by-default, click/keyboard toggle, auto-expand on search, persist across refresh, fixed positioning (above/below/cap/scroll-reposition/detach). `combos.test.js` updated for collapsed-default.
+
+**Verification.** PM re-ran vitest: **409 passed (21 files)**. No backend changes.
+
+---
+
+## 2026-09-06 — Model dropdown: in-panel search + grouping — DONE
+
+### `src/frontend/static/combobox.js`
+- Added `searchInside` (search `<input>` as the FIRST panel `<li>`; two-way mirrored with the top value input; focused + cleared on open; committed value restored on cancel).
+- Added `groupBy` (`none|prefix|group`) + `groupOrder` (pinned order, rest alpha). Prefix uses `familyOf()` (`deepseek-v1`+`deepseekv2`→`Deepseek`; `gpt-4o`→`Gpt`). Group headers are `role="presentation"`, skipped by keyboard nav.
+- No-match + custom: appends a synthetic "Use \"%s\" as custom model" option so free text survives (ADR-011).
+
+### `src/frontend/static/combos.js`
+- `#comboMemberModel` combobox now `searchInside:true, groupBy:"prefix"` (Kombo page groups by model prefix).
+
+### `src/frontend/static/clitools.js`
+- `#cliModel` converted from native `<select>` to the combobox (`searchInside:true, groupBy:"group", groupOrder:["Kombo/Combos"]`).
+- `fetchModels()` maps `/v1/models`: `combo:` → group `Kombo/Combos`; provider → group `owned_by`; value stays the full `provider:/combo:` id so `launch()` posts it verbatim.
+
+### `src/frontend/static/index.html`
+- Replaced `<select id="cliModel">` with combobox markup (`cliModel` input + `cliModelList` ul).
+
+### `src/frontend/static/styles.css`
+- Added `.aigate-combo-searchrow` (sticky top search row), `.aigate-combo-search`, `.aigate-combo-group` (non-selectable header).
+
+### `src/frontend/static/i18n.js`
+- Added `combobox.use_custom` + `combobox.group_combos` (en + id).
+
+### `src/frontend/tests/combobox.test.js`
+- Added 6 tests (prefix grouping, group+groupOrder pin, in-panel search filter+mirror, search focus/clear on open, no-match custom click, custom via Enter).
+
+**Verification.** PM re-ran vitest: **401 passed (21 files)**. No backend changes.
+
+---
+
+## 2026-09-06 — Terminal toolbar icon-only main buttons — DONE
+
+### `src/frontend/static/index.html`
+- Removed visible Paste, Settings, and Full text from main dropdown buttons; submenu labels remain.
+
+### `src/frontend/static/styles.css`
+- Sized and centered icon-only main split buttons.
+
+### `src/frontend/tests/terminal_toolbar.test.js`
+- Added assertions for icon-only controls, accessibility labels, titles, and icon classes.
+
+**Verification.** Vitest 395 passed (21 files); syntax and diff checks passed.
+
+---
+
+## 2026-09-06 — Terminal toolbar grouped dropdowns — DONE
+
+### `src/frontend/static/index.html`
+- Reordered terminal controls into three labeled dropdown groups: Paste, Settings, Full.
+- Moved TUI Passthrough and Keep Screen On into Settings menu; retained two paste choices and two fullscreen choices.
+
+### `src/frontend/static/terminal.js`
+- Generalized dropdown setup and actions for Settings menu.
+- Synchronized TUI, wake-lock, Full Page, and Fullscreen menu ARIA states.
+
+### `src/frontend/static/i18n.js`
+- Added labels for grouped toolbar controls and Paste normal action.
+
+### `src/frontend/tests/terminal_layout.test.js`
+- Verified exact three-group order and absence of standalone controls.
+
+### `src/frontend/tests/terminal_toolbar.test.js`, `src/frontend/tests/views.test.js`
+- Updated toolbar fixture IDs and behavior coverage.
+
+**Verification.** Vitest 394 passed (21 files); syntax checks, diff check, and HTML artifact scan passed.
+
+---
+
+## 2026-09-06 — Tooltip lifecycle and independent fullscreen states — DONE
+
+### `src/frontend/static/app.js`
+- Icon popovers now auto-close 2 seconds after tap/click; timer is cleared on replacement and close events.
+
+### `src/frontend/static/terminal.js`
+- Added explicit `fullPageSelected` state and preserved it across true browser fullscreen entry/exit/failure.
+- Synchronizes Full Page and true Fullscreen `aria-pressed`/`aria-checked` independently.
+
+### `src/frontend/static/styles.css`
+- Active blue styling applies only to controls with their own active ARIA state; caret has no active mode styling.
+
+### `src/frontend/tests/terminal_toolbar.test.js`
+- Added coverage for independent visual/accessibility states and request-failure restoration.
+
+**Verification.** Vitest 394 passed (21 files), terminal toolbar 62 passed; syntax and diff checks passed.
+
+---
+
 **Purpose.** Every source-code change is logged here **per file** so the code and
 the project documents never drift apart ("align"). This is the audit trail that
 ties a running change back to the spec it implements.
 
-**Rule.** Maintained per `pm/OPERATING_RULES.md` **R22** — PM records each
+**Rule.** Maintained per `documents/pm/OPERATING_RULES.md` **R22** — PM records each
 verified code change here (newest section on top). Changes are logged AFTER they
 are verified (tests run), not before. Environment tweaks outside the repo are
 noted under "Environment (outside repo)". Not-yet-done work is marked **PENDING**
 and completed when it lands.
+
+---
+
+## 2026-09-06 — Terminal toolbar markup repair — DONE ✅
+
+**Goal.** Remove accidental tool-call text rendered beside the fullscreen icon and restore valid terminal toolbar HTML.
+
+### `src/frontend/static/index.html`
+- Replaced corrupted fullscreen split-button opening tag with valid `<span class="term-split" id="termFullscreenSplit">` markup.
+- Preserved Keep Screen On control and `fa-mobile-screen-button` icon.
+
+**Verification.** Final HTML read directly; frontend scan found no tool-call artifacts; `git diff --check` and JS syntax checks passed.
+
+---
+
+## 2026-09-06 — Side menu grouped by user needs — DONE ✅
+
+**Goal.** Make sidebar navigation easier to scan by grouping items according to user needs without changing routes.
+
+### `src/frontend/static/index.html`
+- Grouped navigation into Gateway Setup, Operations, Insights, and System.
+- Preserved all existing `data-view` values.
+- Added accessible group labels and localized `aria-label` values for collapsed icon-only navigation.
+
+### `src/frontend/static/styles.css`
+- Added group headings and separators.
+- Collapsed sidebar hides group text while retaining icon navigation.
+
+### `src/frontend/static/i18n.js`
+- Added EN/ID translations for four group headings.
+
+### `src/frontend/tests/views.test.js`
+- Added assertions for grouping order, route preservation, and localization keys.
+
+**Verification.** Frontend Vitest: 21 files, 392 tests passed.
 
 ---
 
@@ -155,3 +367,33 @@ reload (fresh `tabs` Map + `activeId`). Covers:
   Termux-hosted aigate server (and its terminal PTYs) are not frozen by Android
   doze when the tablet screen is off. No package installed (binary already
   present). Wake lock also acquired live in the current session (exit 0).
+
+---
+
+## 2026-09-06 — codegraph bug patch (environment, outside repo) — DONE
+
+### Environment (outside repo)
+- **colbymchenry/codegraph v1.6.0** (npm global `@colbymchenry/codegraph`) — tool
+  semantic code-graph (Rust kernel + bundled Node glibc). Di Termux/Android tool ini
+  gagal out-of-the-box karena: (a) shim deteksi `process.platform='android'` → cari
+  bundle `codegraph-android-arm64` yg TIDAK ada (404); (b) binary glibc butuh loader
+  `/lib/ld-linux-aarch64.so.1` yg gak ada di Termux, padahal loader glibc WORKING ada
+  di `/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1` (libc.so.6 valid).
+  Tiga patch diterapkan biar jalan:
+  1. File global
+     `/data/data/com.termux/files/usr/lib/node_modules/@colbymchenry/codegraph/npm-shim.js`
+     — baris `var target = process.platform + '-' + process.arch;` diubah jadi
+     `var target = 'linux-arm64';` (paksa download bundle linux-arm64 yg valid).
+  2. Shebang shim `#!/usr/bin/env node` → `#!/data/data/com.termux/files/usr/bin/node`
+     (Termux tidak punya `/usr/bin/env`).
+  3. Launcher bundle `~/.codegraph/bundles/linux-arm64-1.6.0/bin/codegraph`: baris
+     `exec "$DIR/node" ...` diubah jadi
+     `exec /data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1 "$DIR/node" ...`
+     agar node glibc dieksekusi lewat loader glibc yang ada.
+  Tanpa patch ini `codegraph init` gagal total di Termux. Hasil: `codegraph init` di
+  project → `.codegraph/codegraph.db`, 121 files / 2,851 nodes / 9,151 edges, 2.0s.
+  CATATAN: (1)+(2) ada di global npm package — hilang kalau
+  `npm i -g @colbymchenry/codegraph` diulang; (3) ada di cache bundle
+  `~/.codegraph/bundles/linux-arm64-1.6.0` — hilang kalau dihapus. Bukan file repo;
+  tidak ikut commit. (Catatan lama soal xnuinside/codegraph sudah tidak berlaku — itu
+  tool salah yg sudah di-uninstall.)

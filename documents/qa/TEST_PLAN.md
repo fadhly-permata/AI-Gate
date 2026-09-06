@@ -50,4 +50,4 @@ Peta acceptance criteria dari BRD ke test case. Merujuk BRD
 - Coverage minimal 60% untuk modul `src/backend/**`.
 
 ## Bug tracking
-Bug dicatat via command `/log-bug <title>` ke `pm/bugs.md`.
+Bug dicatat via command `/log-bug <title>` ke `documents/pm/bugs.md`.

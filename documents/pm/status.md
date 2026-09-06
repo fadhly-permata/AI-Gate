@@ -1,5 +1,184 @@
 # PM Status
 
+## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
+PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
+bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.
+- **`documents/pm/OPERATING_RULES.md`**: rename ke path baru DIPERTAHANKAN. `main` nambah
+  **R23 = "request routing via @ProjectManager"** → **TABRAKAN NOMOR** dgn R23 kita
+  (=laporan .opencode/reports). Routing `main` udah dicakup **R29** kita (lebih detail +
+  mirror AGENTS.md) → duplikat TIDAK dimasukkan (gak dobel nomor). **DILAPORKAN ke user.**
+- **`documents/pm/memory-bank.md`** (DU): 2 entri routing `main` di-fold ke path baru +
+  catatan divergensi R23↔R29; sisa `pm/memory-bank.md` di-`git rm`.
+- **`i18n.js` / `index.html` / `styles.css`**: KONFLIK FITUR — dua cabang sama-sama bikin
+  grouped-sidebar beda desain. **KEPUTUSAN: pertahankan desain refactor/ui** (`nav-section`,
+  Gateway Setup/Operations/Insights/System; lebih lengkap: aria + role=group + mobile
+  bottom-nav). Versi `main` (`nav-group`, Gateway/Monitoring/Tools/System) redundant →
+  dibuang, FITUR gak hilang (sidebar tetap ke-group). **DILAPORKAN ke user (bisa di-veto).**
+- **Verifikasi:** 0 conflict marker; `git diff --check` bersih; backend terminal **65
+  passed/1 skipped**; frontend **442 passed (23 files)**.
+- **PR #4 sekarang:** mergeable=**MERGEABLE**, mergeStateStatus=**CLEAN**, 13 commit.
+  BELUM di-merge (user yang putuskan).
+
+## Relokasi Memory Bank `pm/` → `documents/pm/` — 2026-09-07 (PM-owned)
+**Teguran user → RULE BARU R30... R33:** "kenapa di root ada folder pm? jangan bikin
+berantakan". Root repo harus ramping; `documents/` = rumah mapan dokumen (R5).
+- `git mv pm documents/pm` (history ke-jejak; gak ada file untracked).
+- 46 referensi `pm/` di 13 file diselaraskan → `documents/pm/` (AGENTS.md, README.md,
+  ProjectManager.md, pm-orchestration/SKILL.md, dokumen BACKLOG/TEST_PLAN/SETUP/
+  CODE_CHANGES/BRD/TSD/FSD, + isi pm itu sendiri). src/** & tests/** = 0 referensi.
+- **Verifikasi:** grep `(?<![\w/.])pm/` → **0 referensi AKTIF**; 9 sisanya = penyebutan
+  HISTORIS path lama di dalam catatan migrasi ini sendiri (status/memory-bank/R33) —
+  pengecualian berlabel. Gak ada korup `documents/documents/` / `npm`; root `pm/` hilang.
+- **R33** ditulis: dilarang bikin file/folder baru di root; artefak baru masuk folder
+  per peruntukan; belum ada tempat → tanya user dulu.
+- **Status: BELUM di-commit** (PR #4 masih terbuka; user putuskan).
+
+## Terminal tab auto-close on shell exit — 2026-09-07 (sesi ini, PM-owned)
+**Koreksi user → RULE BARU R30:** PM salah tangkep "terminal" sebagai terminal OS
+(Termux) padahal maksud user fitur terminal DI DALAM aigate. R30 ditulis di
+`documents/pm/OPERATING_RULES.md`: "terminal" default = fitur aigate; investigasi repo dulu;
+cek spec↔kode gap.
+
+**Investigasi (read-only, PM):** satu-satunya fitur terminal = multi-tab B3.2/B3.3
+(`clitools.js` cuma reuse manager yang sama → gak ada ambiguitas). Akar masalah
+tab gak nutup saat shell `exit`:
+- BE `session.py:353-356` reader thread deteksi PTY mati → cuma `exited=True`+log,
+  TIDAK kirim apa pun ke client.
+- BE `session.py:290-291` `try_reap` skip session yang masih `attached` → shell exit
+  + WS masih nyambung = tab nyangkut (zombie view), gak ke-reap.
+- FE `terminal.js:374-387` `handleWsMessage` buang SEMUA control frame non-ping →
+  gak ada jalur tangkap "exit".
+- SPESIFIKASI SUDAH ADA: TSD §3.2 baris 154 `{"type":"exit","code":0}` + baris 163
+  "saat shell keluar, kirim kontrol exit, tutup WS, tandai pty_pid bebas". → gap
+  spec↔implementasi.
+
+**Kontrak event (PM tetapkan, patokan kedua agent):**
+- Server→client control frame: `{"type":"exit","code":<int|null>}` dikirim SEKALI ke
+  view yang lagi attached pas PTY kelar, LALU server tutup WS (code 1000).
+- Frame exit TIDAK masuk ring buffer replay (bukan output terminal).
+- Client pas nangkep exit: suppress reconnect + teardown lokal (BUKAN kirim
+  `{"type":"close"}` — PTY udah mati), hapus tab, forget saved id.
+
+**Task list (PM):**
+- [x] T0 Investigasi read-only + tetapkan kontrak exit (PM, verifikasi R21 ayat 2).
+- [x] T1 **be-dev** (SELESAI, uncommitted): `pty.py` +`exit_status`; `session.py`
+      `PtyExit` sentinel + `notify_exit()`/`resolved_exit_code()`/`read_exit_code()`/
+      `close_view()` + reaper reap exited-walau-attached; `router.py` `_pump` →
+      `exit_frame()`=`json.dumps({"type":"exit","code":int(code)})` lalu close 1000.
+      Test baru `tests/backend/test_terminal_exit.py` 17 passed. BE mutation-tested
+      (A/B/C) → test terbukti punya gigi, state restore diverifikasi.
+- [x] T2 **fe-dev** (SELESAI, uncommitted): `terminal.js` `handleWsMessage` guard
+      `userClosed` + cabang `type==="exit"` → `closeTab(id,{exited:true})`; `closeTab`
+      opts.exited = tanpa kill-frame + tanpa auto-open (empty state) + `removeSavedTabId`.
+      Test baru `src/frontend/tests/terminal_exit.test.js` 14 passed.
+- [x] T3 PM verifikasi integrasi: kontrak BE↔FE COCOK (frame dulu → close 1000; FE
+      gak nunggu yang gak dikirim BE). Test ASLI PM re-run: backend terminal **64
+      passed, 1 skipped**; FE terminal_exit **14 passed**; FE full **436 passed
+      (23 files)** no regresi. Working tree bersih (cuman file scope + documents/pm/).
+
+**Keputusan open question:**
+- Q1 `tests/frontend/terminal.test.js` (repo-root) orphaned (vitest config gak include
+  `tests/frontend/`, referensi `swipeToScrollDelta` sudah dihapus) → **PUTUSAN: hapus**
+  (dead + misleading, R8 no-junk). Wewenang fe-dev (scope `tests/frontend/**`) →
+  micro-task follow-up, TIDAK blokir milestone.
+- Q2 toast "session ended (code N)" → **preferensi UX, TUNGGU user.** Default sekarang:
+  tab langsung hilang tanpa toast (sesuai permintaan user "tab ditutup"). YAGNI: jangan
+  tambah toast kecuali user minta.
+
+**Sisa risiko / follow-up:**
+- `ruff` tak terpasang di env → lint gate tak jalan (verifikasi gaya kode manual saja).
+- Belum di-commit (user belum minta). Belum di-exercise end-to-end live di browser
+  (R20) — unit+mutation test hijau, tapi golden-path `exit`→tab hilang di UI nyata
+  belum dicoba manual; rekomendasikan user tes sebelum commit.
+- Restart SERVER tetap matiin child PTY (di luar scope; butuh daemonized PTY).
+
+**RESOLUSI AKHIR (2026-09-07):**
+- **Akar masalah "tab gak nutup" = cache:** `terminal.js` ke-cache browser tanpa
+  cache-buster → FE versi baru gak pernah ke-load. BE **terbukti benar via runtime**
+  (frame `{"type":"exit","code":N}` + close 1000 terkirim).
+- **Fix final:** FE hardened (exit frame + close(1000) → tutup tab) + **toast
+  `term.session_ended` (id+en)** + **cache-buster `?v=20260906` di index.html**.
+- **Angka final (PM re-run):** FE **442 passed**; BE **65 passed / 1 skipped**.
+- Q2 (toast) → **DIJAWAB: ditambahin** (`term.session_ended`). Q1 (hapus
+  `tests/frontend/terminal.test.js` orphaned) → tetap micro-task fe-dev, belum jalan.
+- **RULE BARU R32** ditulis: DILARANG nyuruh sub-agent kill/restart proses aigate
+  (sesi opencode hidup DI DALAM aigate = bunuh diri); bukti kode lama aktif = bandingkan
+  start-time vs mtime + laporkan, user yang restart.
+- **Status: SELESAI, di-commit (`a06ef9b`) + di-push (`origin/refactor/ui`).**
+- **PR #4 dibuka: `refactor/ui` → `main`** — https://github.com/fadhly-permata/AI-Gate/pull/4
+  (BELUM merge/approve). ⚠️ Scope PR LEBAR: 11 commit / 49 file / +4384−548 — terminal
+  auto-close (headline) + seluruh UI-refactor branch (combobox/sidebar/toolbar/kebab/
+  i18n) + dokumen PM. Sudah dicatat jelas di body PR.
+- Menunggu user: tes end-to-end live di browser + keputusan review/merge PR + Q1
+  (`tests/frontend/terminal.test.js` orphan).
+
+## PROCESS VIOLATION + i18n combo group header — 2026-09-06 (sesi ini, PM-owned)
+**Violation:** main thread mengerjakan perbaikan frontend (`combobox.group_combos`)
+sendiri tanpa lewat PM → tidak ada task list / handover / receipt / boundary check.
+**RULE BARU R29** ditulis: semua request user routing lewat PM dulu; PM hanya boleh
+menulis `documents/pm/**` + `documents/**` + verifikasi; kalau terlanjur dikerjakan di luar PM →
+audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
+
+**Task list (PM):**
+- [x] T1 Audit diff yang sudah mendarat (clitools.js, combobox.js, i18n.js,
+      clitools.test.js) — PM, verifikasi (R21 ayat 2).
+- [x] T2 Reproduce root cause + cek literal sisa di production — PM.
+- [x] T3 Jalankan ulang suite frontend (422 passed / 22 files) — PM.
+- [x] T4 Audit konsumen combobox lain (app.js:534, combos.js:237) — tidak ada bug
+      serupa; hanya clitools yang pakai `groupOrder`.
+- [~] T5 **fe-dev** (spawn `opencode run --agent fe-dev`, background): locale-parity
+      guard test + direct test `setGroupOrder` + re-pin saat nama grup terlokalisasi
+      ("Kombo" pinned first) + bersihkan fixture "Kombo/Combos" di combobox.test.js.
+      Scope tulis: `src/frontend/**` saja.
+- [ ] T6 **qa-engineer** (setelah T5, sekuensial — dependen): quality gate independen,
+      cek parity en/id, grep literal bug, jalanin suite, laporan ke
+      `.opencode/reports/**`, bug → `documents/pm/bugs.md`. Scope tulis: `tests/**` (di luar
+      frontend) + `.opencode/reports/**`.
+- [ ] T7 PM integrasi: update `documents/dev/CODE_CHANGES.md` (R22 — masih ada 4
+      rujukan `Kombo/Combos` yang jadi basi), commit, update Memory Bank.
+- [ ] T8 Follow-up (belum dieksekusi, dicatat): dokumentasi "cara nambah locale baru"
+      end-to-end + pertimbangkan `lang.<code>`/flag untuk zh/hi di `window.LANGS`.
+
+## CLI Tools combobox: two-level (provider → model-prefix) grouping — 2026-09-06
+- fe-dev added `subGroupBy` to combobox: CLI Tools model picker now groups provider → model-name-prefix sub-group (non-combo only); combo items stay flat under `Kombo/Combos` via `subGroup:false`. Both levels collapsible + default collapsed + auto-expand on search; state persists across refresh.
+- Verification: PM re-ran vitest — **415 passed (21 files)**; reviewed diff + new tests; backend untouched.
+
+## Model dropdown: indent + collapsible groups + fixed flexible positioning — 2026-09-06
+- fe-dev: group child options indented (28px vs 12px title); groups collapsible, default collapsed (click/Enter/Space on header toggles, state persists across refresh); while searching all groups auto-expand. Dropdown now `position: fixed`, viewport-anchored, opens up/down by available space, height capped to available space — fixes clipping by the modal's `overflow-y:auto`.
+- Verification: PM re-ran vitest — **409 passed (21 files)**; reviewed diff + new tests; backend untouched.
+
+## Model dropdown: in-panel search + grouping — 2026-09-06
+- fe-dev enhanced `src/frontend/static/combobox.js` with `searchInside` (search box as the FIRST panel item) + `groupBy` (`none|prefix|group`) + `groupOrder`. Prefix grouping via `familyOf()`; group headers `role="presentation"` (non-selectable). Custom free-text option preserved (ADR-011).
+- Kombo page (`#comboMemberModel`) wired to `groupBy:"prefix"` (e.g. `deepseek-v1`+`deepseekv2`→`Deepseek`).
+- CLI Tools page (`#cliModel`) converted from `<select>` to the combobox, `groupBy:"group"`; provider models grouped by `owned_by`, combo models grouped under `Kombo/Combos`; values stay full `provider:/combo:` ids so launch posts them verbatim.
+- Verification: PM re-ran vitest — **401 passed (21 files)**; reviewed diff + new tests; no backend touched.
+
+## Terminal toolbar icon-only labels — 2026-09-06
+- fe-dev removed visible text from main Paste, Settings, and Full dropdown buttons; kept icons, title/ARIA labels, and submenu text labels.
+- Added icon-only sizing and tests for accessibility metadata and icon classes.
+- Verification: Vitest **395 passed / 21 files**, syntax checks and `git diff --check` passed; final HTML scan clean.
+
+## Terminal toolbar grouped dropdowns — 2026-09-06
+- fe-dev changed toolbar order to `Paste → Settings → Full`.
+- Paste menu: Paste normal + Paste as Code Block. Settings menu: TUI Passthrough + Keep Screen On. Full menu: Full Page + Fullscreen.
+- Removed standalone TUI/Keep Screen On controls; generalized menu wiring and synchronized menu ARIA states.
+- Verification: frontend Vitest **394 passed / 21 files**, syntax checks and `git diff --check` passed; HTML scan confirmed exactly three groups and no artifacts.
+
+## Incident: corrupted frontend markup — 2026-09-06
+- User reported icons rendered as code. Root cause: literal tool-call artifact was inserted into `src/frontend/static/index.html` at the fullscreen split-button span.
+- fe-dev removed artifact and restored valid HTML. Verified final markup, searched frontend for tool artifacts (none), `git diff --check`, and JS syntax checks passed.
+- New durable rule: **R24** — inspect final HTML and scan for tool-call/code artifacts after every frontend change; tests alone are insufficient.
+
+## Fullscreen/tooltip state fix — 2026-09-06
+- fe-dev made icon popovers transient: tap auto-closes after 2 seconds; Escape/outside/scroll/resize close immediately.
+- Full Page and true browser Fullscreen now use explicit independent state; only selected mode gets blue active styling, caret stays neutral; ARIA states synchronized.
+- Verification: node checks + `git diff --check` passed; Vitest **394 passed / 21 files**, terminal toolbar **62 passed**; frontend artifact scan clean.
+
+## Recent UI polish — 2026-09-06
+- fe-dev restored terminal `#termKeepAwake`, changed icon from ambiguous sun to `fa-mobile-screen-button`, and kept wake-lock behavior intact.
+- fe-dev added delegated popover tooltips for icon-only buttons/links in `app.js` + `styles.css`; labels use `aria-label`/`title`; hover/focus/tap, Escape, outside click, resize, and scroll handled.
+- Verification: `node --check` passed for `app.js` and `terminal.js`; `git diff --check` passed; frontend Vitest **392 passed / 21 files**, terminal toolbar **60 passed**.
+
 ## Spawned sub-agents (generated on demand)
 - business-analyst (+skill) — dibuat saat doc creation (2026-09-03).
 - system-analyst (+skill) — dibuat saat doc creation (2026-09-03).
@@ -57,7 +236,7 @@
 ## Implementation runner
 - Command: `.opencode/commands/run-impl.md` -> `/run-impl [fresh|continue|status]`.
   `fresh` mulai B0.1; `continue` (default) lanjut task belum selesai; `status`
-  tampilkan progres. Progres tersimpan di BACKLOG.md + pm/status.md supaya bisa
+  tampilkan progres. Progres tersimpan di BACKLOG.md + documents/pm/status.md supaya bisa
   dilanjut bila sesi terputus (batre/restart). Sesuai R9 (tanpa konfirmasi).
 - **2026-09-03 (fresh):** aktif task = **B0.1** (Inisialisasi project). Mode fresh
   dijalankan setelah `/revise-docs` menambah desain UI AdminLTE (PRD §2.7, BRD §5.7,
@@ -222,7 +401,7 @@
 - 2026-09-03: **B4.3 SELESAI** (qa: pytest 101 passed/3 skipped, src coverage 79% (gate 60%);
   frontend vitest + playwright terblokir env sandbox — dilaporkan di
   `.opencode/reports/2026-09-03/qa/1350_b4_3_qa.md`. **SELURUH BACKLOG aigate SELESAI**
-  (B0.1 → B4.3). Progres tersimpan di BACKLOG.md + pm/status.md; sesi berikut cukup
+  (B0.1 → B4.3). Progres tersimpan di BACKLOG.md + documents/pm/status.md; sesi berikut cukup
   `/run-impl status` atau lanjut task baru tanpa ulang dari nol.
 - 2026-09-03: **B4.2 SELESAI** (fe-dev: i18n audit + responsif + device simulation phone
   non-AdminLTE bottom-nav + i18n EN/ID; helper deviceAttr). Lanjut otomatis **B4.3**
@@ -354,7 +533,7 @@
 - Mode `continue` arg. Active task pertama belum `[x]` = **B5.1** (Multi-akun per
   provider + OAuth login + token auto-refresh). Owner `be-dev`+`fe-dev`.
 - Pilihan mode multi-agent (R16): user pilih **SEKUENSIAL** ("sekuen").
-  `multiagent_mode: sequential` di `pm/state.md`. PM jalankan be-dev dulu, lalu
+  `multiagent_mode: sequential` di `documents/pm/state.md`. PM jalankan be-dev dulu, lalu
   fe-dev setelahnya.
 - B5.1 be-dev scope: model `ProviderAccount` (ERD) + router `/api/accounts` +
   `/api/oauth/<provider>/{start,callback}` + auto-refresh `get_valid_token` +
@@ -369,7 +548,7 @@
   re-spawn fe-dev (UI B5.1) untuk lanjut — scope sama: Accounts subsection di
   `#provDetail` + Add/Delete/Connect OAuth + i18n + tests/accounts.test.js.
 - Catatan R9: ambiguitas OAuth (endpoint per provider-type) → be-dev pakai registry
-  built-in + fallback 400 bila tak dikenal; log ke pm/status.md.
+  built-in + fallback 400 bila tak dikenal; log ke documents/pm/status.md.
 
 ## Run-impl session 2026-09-03 (continue) — B5.1 SELESAI
 - **B5.1 be-dev**: model `ProviderAccount` + `accounts_router.py` (CRUD + OAuth
@@ -411,7 +590,7 @@
   nyaris ilang (belum di-commit).
 - User minta rule: "setiap task baru jalan langsung buat checkpoint di git;
   setiap subtask selesai langsung commit."
-- Diabadikan: **R19** di `pm/OPERATING_RULES.md` (checkpoint awal task + commit
+- Diabadikan: **R19** di `documents/pm/OPERATING_RULES.md` (checkpoint awal task + commit
   tiap subtask beres; prefix `checkpoint:`/`wip:`; hormati .gitignore; cek
   `git status` sebelum commit). Ditanam juga ke prosedur
   `.opencode/commands/run-impl.md` (langkah 3 checkpoint, langkah 5 commit/subtask,
@@ -678,7 +857,7 @@
   `e876a6f` "fix: serve UI static + correct Playwright server path"); pytest
   smoke `test_health.py` PASS (1 passed). State repo konsisten dgn laporan status
   sebelumnya.
-- `pm/state.md` diupdate: mode `paused` -> `completed`, checkpoint = semua backlog
+- `documents/pm/state.md` diupdate: mode `paused` -> `completed`, checkpoint = semua backlog
   selesai.
 - Rekomendasi user (opsional, tdk otomatis): jalankan e2e nyata
   (`PW_EXECUTABLE=... PW_NO_SANDBOX=1 npm run test:e2e:android` atau Playwright
@@ -722,7 +901,7 @@
 - BUG-260903-2 (medium, open): CLI Tools view kosong — perlu diisi.
 - BUG-260903-3 (medium, open): User temukan error di log — perlu investigasi
   (PM akan cek /api/logs; naikkan ke high bila terbukti blocker).
-- Semua severity auto=medium (tak ada indikasi crash/data-loss). pm/bugs.md dibuat
+- Semua severity auto=medium (tak ada indikasi crash/data-loss). documents/pm/bugs.md dibuat
   (baru) dgn header + 3 entry.
 
 ## Backend fixes 2026-09-03 (dari log triage) — SELESAI (be-dev)
@@ -738,14 +917,24 @@
 ## Rule created 2026-09-03 (user request) — R16 + parallel-sequential.md
 - User: sebelum proses kompleks/multi-agent, PM WAJIB tanya paralel/sekuensial;
   pilihan berlaku se-sesi; sesi baru tanya lagi (gak semua skenario mendukung paralel).
-- Diabadikan: R16 di `pm/OPERATING_RULES.md` (pengecualian R9), update
+
+## Side menu grouping — 2026-09-06
+- fe-dev grouped sidebar items by user need: Gateway Setup, Operations, Insights,
+  System. Added EN/ID labels, accessibility attributes, collapsed-sidebar styling,
+  and frontend regression tests.
+- Verification: Vitest 392 passed.
+- Commit/push: `92c3cc9 feat(ui): group sidebar by user needs`; pushed to
+  `origin/refactor/ui`.
+- Pre-existing untracked files left untouched: `AGENTS.md`, `a.out`,
+  `aichat-aigate.yaml`.
+- Diabadikan: R16 di `documents/pm/OPERATING_RULES.md` (pengecualian R9), update
   `.opencode/rules/parallel-sequential.md` (trigger multi-agent + session persistence
-  + forced-sequential), dan `multiagent_mode: ask` di `pm/state.md`.
+  + forced-sequential), dan `multiagent_mode: ask` di `documents/pm/state.md`.
 - Berlaku mulai sekarang: untuk BUG-260903-1 (provider model + test) yang butuh
   be-dev+fe-dev, PM akan tanya dulu mode-nya.
 
 ## BUG-260903-1 fix 2026-09-03 (sekuensial, R16) — SELESAI (be-dev -> fe-dev)
-- Mode: SEKUENSIAL (user pilih). `multiagent_mode: sequential` di pm/state.md.
+- Mode: SEKUENSIAL (user pilih). `multiagent_mode: sequential` di documents/pm/state.md.
 - be-dev dulu: +kolom `default_model` di Provider + endpoint `POST /api/providers/test`
   (body {type,base_url,api_key,model?} -> 200 {ok,error?}). Backend **114 passed, 1 skipped**.
 - fe-dev: form provider + field Model (datalist dari hasil discover) + tombol
@@ -787,7 +976,7 @@
 - Insiden: user suruh referensi 9router pas bikin PRD (fitur yang diadopsi),
   tapi PRD ditulis tanpa sebutan 9router sama sekali (grep = 0 match di repo).
   Fitur adopsi diverge jauh dari 9router asli.
-- Aturan baru R17 di `pm/OPERATING_RULES.md`: bila user minta adopsi dari sumber
+- Aturan baru R17 di `documents/pm/OPERATING_RULES.md`: bila user minta adopsi dari sumber
   eksternal, PM wajib fetch + cite + align + verify (grep) sebelum klaim selesai.
 - Tindakan lanjut (belum dijalankan): selaraskan bagian fitur adopsi di PRD ke
   fitur asli 9router; pertahankan fitur khas aigate (terminal xterm, self-heal)
@@ -869,6 +1058,16 @@
   string dipindah ke curl, `--api_key` open-interpreter nongol di `ps`.
 
 ---
+## 2026-09-06 — Reports path cleanup
+- Root `reports/qa/2026-09-03_b4_3_qa.md` dipindahkan ke
+  `.opencode/reports/2026-09-03/qa/2026-09-03_b4_3_qa.md`; root `reports/` dihapus.
+- Scope QA diperbaiki di ProjectManager, qa-engineer, agent-boundaries,
+  pm-orchestration, dan qa-skill: hanya `.opencode/reports/**`.
+- Laporan lama diperbaiki agar tidak lagi menyebut `reports/qa/**`.
+- R23 ditambahkan: semua laporan wajib berada di `.opencode/reports/**`.
+- Audit penutup: tidak ada folder root `reports/`; laporan cleanup berada di
+  `.opencode/reports/20260906/maintenance/0000_reports-path-cleanup.md`.
+
 ## 2026-09-05 — Postmortem: rule R22 (code↔doc alignment) + terminal stay-alive
 - Trigger user: minta SEMUA perubahan kode dicatat per-file ke `documents/` biar
   kode & dokumen selalu align + bikin rule biar konsisten ke depannya.
@@ -893,3 +1092,52 @@
   file stabil (md5 tak berubah, 0 penulis aktif). Suite: **21 file / 390 passed**
   (330 + 60), 0 regresi. `CODE_CHANGES.md` di-flip PENDING->DONE (R22 dijalankan).
   Belum di-commit.
+
+## codegraph init (colbymchenry) — 2026-09-06 (PM, tooling/verify)
+- Request user: "install codegraph dan init codegraph pada project ini" + rujuk repo
+  https://github.com/colbymchenry/codegraph. Klarifikasi user: BUKAN daftarkan ke
+  project (R26) — tool di-install global, lalu `codegraph init` di project.
+- PM sempat SALAH: pakai xnuinside/codegraph (v1.2.0 pip, se-nama) → di-uninstall
+  (`pip uninstall codegraph`) & diganti @colbymchenry/codegraph (npm global v1.6.0).
+  R27 lahir dari insiden ini.
+- TERMUX HACK (env luar repo, lihat CODE_CHANGES.md): force `target='linux-arm64'` di
+  shim, ganti shebang shim ke node absolut, exec `node` bundle lewat loader glibc
+  `/usr/glibc/lib/ld-linux-aarch64.so.1` (Termux gak punya build android & loader glibc
+  standar). Bundle di-cache `~/.codegraph/bundles/linux-arm64-1.6.0`.
+- INIT SELESAI: `codegraph init` di project root → `.codegraph/codegraph.db` (11.3MB).
+  **121 files (80 py + 41 js), 2,851 nodes, 9,151 edges** in 2.0s. `codegraph status`
+  → "Index is up to date". `.codegraph/.gitignore` sudah abaikan db.
+- RULE BARU **R26** (jangan ubah config project utk "install X + init X") + **R27**
+  (user rujuk repo tool tertentu → PASTIKAN tool tepat sebelum install/jalanin; jangan
+  asumsi package se-nama yg sudah keinstall = yang dimaksud).
+- Dokumentasi: `documents/pm/memory-bank.md` (Tooling) + `documents/dev/CODE_CHANGES.md`
+  (Environment, luar repo). Perubahan project: NOL (cuma `.codegraph/` hasil init, sdh
+  di-gitignore oleh tool sendiri). `.gitignore` project TIDAK diubah.
+- BELUM di-commit (user belum minta).
+
+## Rule R28 — baca kode lewat codegraph dulu (hemat token) — 2026-09-06
+- User minta rule buat negantein: pembacaan kode HARUS lewat codegraph dulu utk dapet
+  path, baru lanjut baca file yg bersangkutan (hemat token, hindari broad grep/Explore).
+- **R28** ditambah di `documents/pm/OPERATING_RULES.md`. Berlaku utk PM + semua sub-agent.
+- User setuju `codegraph init` (reinit) boleh dipakai kalau index usang. PM re-init:
+  `codegraph init` → index rebuild (121 files / 2,851 nodes / 9,151 edges, ~2s, "up to
+  date"). Reinit dijalankan sesi ini.
+- BELUM di-commit (user belum minta).
+
+## R29 addendum — tutup celah enforce routing (anti-kekambuhan) — 2026-09-07
+- Kejadian: main thread (opencode) sekali lagi mengerjakan task i18n combo group
+  header ("Kombo/Combos" -> localized) LANGSUNG tanpa lewat PM. User: "pastiin ini
+  gak terulang, udah kesekian kalinya task gak pernah didelegasikan ke PM."
+- Akar: R29 udah ada tapi cuma di `documents/pm/OPERATING_RULES.md` yang TIDAK di-auto-load
+  main thread. Main thread hanya baca `AGENTS.md`. Project ini belum punya
+  `AGENTS.md` root -> rule gak pernah nyampe ke eksekutor -> diulang terus.
+- Perbaikan permanen:
+  - CREATE `AGENTS.md` (root project) — routing rule "semua request -> @ProjectManager
+    dulu; main thread DILARANG implementasi", nunjuk balik ke R29. Auto-load tiap sesi.
+  - `documents/pm/OPERATING_RULES.md` — R29 addendum: catat akar + kewajiban PM re-create
+    `AGENTS.md` kalau hilang.
+  - `documents/pm/state.md` — checkpoint di-update (opsi B: perubahan diterima, 422 tests green).
+- Verifikasi rule baru: tiap sesi, langkah pertama main thread HARUS panggil PM sebelum
+  sentuh kode. Kalau nggak = pelanggaran R29.
+- Status task i18n: ACCEPTED (opsi B). Follow-up opsional (fe-dev harden + qa gate +
+  CODE_CHANGES.md + commit) BELUM jalan. BELUM di-commit (user belum minta).

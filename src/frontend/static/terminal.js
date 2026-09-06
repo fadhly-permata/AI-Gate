@@ -84,8 +84,8 @@
     writeSavedTabIds(ids);
   }
 
-  // Only a DELIBERATE close (closeTab) calls this, so a tab the user closed is
-  // never resurrected by a later reload.
+  // Only closeTab calls this — deliberate close OR the backend exit sentinel —
+  // so a tab that is gone (killed or exited) is never resurrected by a reload.
   function removeSavedTabId(id) {
     var ids = readSavedTabIds();
     var i = ids.indexOf(id);
@@ -163,8 +163,7 @@
   }
 
   /* Can this browser take a screen wake lock? navigator.wakeLock only EXISTS
-     in a secure context (https, or http://localhost / 127.0.0.1), so this is
-     also the "are we on a plain-http LAN address" test. Pure + testable. */
+     in a secure context (https, or http://localhost / 127.0.0.1). */
   function wakeLockSupported(nav) {
     nav = nav || (typeof navigator !== "undefined" ? navigator : null);
     if (!nav) return false;
@@ -237,7 +236,7 @@
   var emptyNewTabBtn = null; // the hint's own "New Tab" affordance
   var stageResizeObs = null; // BUG2: ResizeObserver on the shared .term-stage
   var debouncedRefit = null;  // BUG2: debounced refitActive() for resize storms
-  var fsCarriedFullPage = false; // true fullscreen added the full-page class
+  var fullPageSelected = false; // user-selected Full Page mode
 
   function activeTab() { return activeId ? tabs.get(activeId) : null; }
 
@@ -300,6 +299,24 @@
   function writeStatus(tab, text) {
     if (!tab || !tab.term) return;
     try { tab.term.write("\r\n\x1b[2m" + text + "\x1b[0m\r\n"); } catch (e) {}
+  }
+
+  /* Minimal transient notice. aigate has NO global toast system (the existing
+     pattern is a view-scoped role="status" line like #settingsMsg), and the
+     terminal's own status line dies with the disposed tab — so this one lives
+     on <body> and self-removes. Same a11y contract as the other lines. */
+  var TOAST_MS = 4000;
+  function showToast(text) {
+    if (!document.body) return;
+    var el = document.createElement("div");
+    el.className = "term-toast";
+    el.setAttribute("role", "status");
+    el.setAttribute("aria-live", "polite");
+    el.textContent = text;
+    document.body.appendChild(el);
+    setTimeout(function () {
+      if (el.parentNode) el.parentNode.removeChild(el);
+    }, TOAST_MS);
   }
 
   // Schedule a reconnect for a tab (unless it was deliberately closed).
@@ -370,9 +387,15 @@
 
   /* Handle one incoming TEXT frame: PTY output → render; control frame → act.
      A ping is answered with a pong over the SAME ws and is NEVER written to the
-     terminal. Any other control frame is dropped (not rendered). Everything
+     terminal. An exit frame ({"type":"exit","code":N}, TSD §3.1) is the backend
+     sentinel that the shell died / was killed / typed exit: the tab is disposed
+     WITHOUT a kill frame or reconnect (the server closes the WS right after).
+     Any other control frame is dropped (not rendered). Everything
      else (including malformed JSON-ish chunks) is written as PTY output. */
   function handleWsMessage(tab, ws, data) {
+    // A tab already torn down (exit sentinel or deliberate close) must ignore
+    // every late frame — no writes to a disposed term, no pong, no second exit.
+    if (tab.userClosed) return;
     var info = classifyIncoming(data);
     if (info.kind === "control") {
       if (info.type === "ping") {
@@ -381,6 +404,15 @@
         try {
           if (ws && ws.readyState === WebSocket.OPEN) ws.send(buildPongFrame());
         } catch (e) { /* socket raced closed — the next ping/reconnect covers it */ }
+      } else if (info.type === "exit") {
+        // BE contract: code is always an int (-1 = unknown). Parse defensively —
+        // a malformed value must never stop the tab from closing.
+        var code = -1;
+        try {
+          var obj = JSON.parse(data);
+          if (obj && typeof obj.code === "number") code = obj.code;
+        } catch (e) { /* keep -1 */ }
+        closeTab(tab.id, { exited: true, exitCode: code });
       }
       return; // control frames must never appear in the terminal
     }
@@ -402,11 +434,21 @@
       sendResize(tab);
     };
     ws.onmessage = function (ev) { handleWsMessage(tab, ws, ev.data); };
-    ws.onclose = function () {
-      if (tab.userClosed) return;                    // deliberate close → final
+    ws.onclose = function (ev) {
+      if (tab.userClosed) return;   // deliberate close OR exit sentinel → final
       if (tab._forceReconnectNow) {                  // liveness-triggered close
         tab._forceReconnectNow = false;
         scheduleReconnect(tab, true);                // immediate, same tab_id
+        return;
+      }
+      // A CLEAN server close (1000) only ever follows the exit sentinel (BE
+      // contract). If the frame itself never landed (renderer frozen between the
+      // message and this event), close the tab HERE instead of reattaching —
+      // a reattach would spawn a brand-new shell behind a tab the user believes
+      // is dead. Anything else (1006 network drop, freeze) keeps the old
+      // backoff-reconnect behavior.
+      if (ev && ev.code === 1000) {
+        closeTab(tab.id, { exited: true });
         return;
       }
       scheduleReconnect(tab, false);                 // transient drop → backoff
@@ -582,6 +624,7 @@
     observeActiveStage();
     var tab = tabs.get(id);
     if (tab) { try { tab.term.focus(); } catch (e) {} }
+    syncTuiMenu();
   }
 
   function refitActive() {
@@ -608,19 +651,29 @@
     }
   }
 
-  function closeTab(id) {
+  /* Tear a tab down. `opts.exited` marks the backend exit-sentinel path (the
+     shell already died): NO {"type":"close"} kill frame is sent (the server is
+     closing the WS itself) and NO replacement tab is auto-opened when it was the
+     last one — the empty state shows instead. A deliberate closeTab (the X
+     button, opts omitted) keeps the old behavior: kill frame + always keep at
+     least one tab alive. */
+  function closeTab(id, opts) {
     var tab = tabs.get(id);
     if (!tab) return;
+    opts = opts || {};
 
-    // DELIBERATE close: stop reconnecting, tell the backend to KILL the PTY,
-    // then drop the socket. This is the ONLY path that sends {"type":"close"}.
+    // Stop reconnecting FIRST, so the ws.close() below (or the server's own
+    // close after the exit sentinel) can never schedule a reattach.
     tab.userClosed = true;
     if (inertia.tab === tab) stopInertia();
     if (tab.reconnectTimer) { clearTimeout(tab.reconnectTimer); tab.reconnectTimer = null; }
     if (tab.livenessTimer) { clearTimeout(tab.livenessTimer); tab.livenessTimer = null; }
-    try {
-      if (tab.ws && tab.ws.readyState === WebSocket.OPEN) tab.ws.send(buildCloseFrame());
-    } catch (e) {}
+    if (!opts.exited) {
+      // DELIBERATE close is the ONLY path that tells the backend to KILL the PTY.
+      try {
+        if (tab.ws && tab.ws.readyState === WebSocket.OPEN) tab.ws.send(buildCloseFrame());
+      } catch (e) {}
+    }
     try { tab.ws.close(); } catch (e) {}
     try { tab.term.dispose(); } catch (e) {}
     // BUG2: stop observing the closed tab's stage box (the observer only ever
@@ -632,16 +685,30 @@
     if (tab.button && tab.button.remove) tab.button.remove();
     if (tab.container && tab.container.remove) tab.container.remove();
     tabs.delete(id);
-    // Deliberate close → forget the id, so a later reload never resurrects this
-    // tab (and its already-killed PTY) as if it were still live.
+    // The tab is gone (deliberate OR exited) → forget the id, so a later reload
+    // never resurrects it as if it were still live.
     removeSavedTabId(id);
 
     if (activeId === id) {
       var it = tabs.keys().next();
-      if (!it.done) activate(it.value);
-      else { activeId = null; openTab(); } // keep at least one tab alive
+      if (!it.done) {
+        activate(it.value);
+      } else if (opts.exited) {
+        // Last tab exited: show the empty state, do NOT spawn a new shell.
+        activeId = null;
+      } else {
+        activeId = null;
+        openTab(); // deliberate close of the last tab: keep at least one alive
+      }
     }
     updateEmptyState();
+
+    // The tab (and its status line) is gone, so the "why" goes into a toast
+    // that outlives it. code -1 (unknown / missed frame) shows as "code -1".
+    if (opts.exited) {
+      var code = typeof opts.exitCode === "number" ? opts.exitCode : -1;
+      showToast(t("term.session_ended").replace("{n}", String(code)));
+    }
   }
 
   /* ---- Floating control ----
@@ -652,15 +719,8 @@
    * exactly what it always was — the caret only ADDS choices. */
   function toggleFullscreen() {
     if (!bodyEl) return;
-    var on = bodyEl.classList.toggle("terminal-fullscreen");
-    var btn = document.getElementById("termFullscreen");
-    if (btn) {
-      var icon = btn.querySelector("i");
-      if (icon) icon.className = on ? "fa fa-compress" : "fa fa-expand";
-      btn.title = t(on ? "term.exit_full_page" : "term.full_page");
-      btn.setAttribute("aria-label", btn.title);
-      btn.setAttribute("aria-pressed", on ? "true" : "false");
-    }
+    fullPageSelected = !fullPageSelected;
+    bodyEl.classList.toggle("terminal-fullscreen", fullPageSelected);
     syncFullscreenMenu();
     // Refit after the layout change settles.
     requestAnimationFrame(function () { refitActive(); });
@@ -700,30 +760,11 @@
       fsCall(document, ["exitFullscreen", "webkitExitFullscreen"]);
       return;
     }
-    // Carry the full-page layout with us; remember whether it was our doing.
-    if (!bodyEl.classList.contains("terminal-fullscreen")) {
-      bodyEl.classList.add("terminal-fullscreen");
-      fsCarriedFullPage = true;
-    }
     var p = fsCall(bodyEl, ["requestFullscreen", "webkitRequestFullscreen"]);
     if (p && typeof p.catch === "function") {
-      p.catch(function () { fsRollbackCarried(); syncFullscreenMenu(); });
-    }
-  }
-
-  // Undo ONLY the full-page class we added on the way in, so exiting true
-  // fullscreen never leaves the panel in a state the user did not ask for.
-  function fsRollbackCarried() {
-    if (!fsCarriedFullPage) return;
-    fsCarriedFullPage = false;
-    if (bodyEl) bodyEl.classList.remove("terminal-fullscreen");
-    var btn = document.getElementById("termFullscreen");
-    if (btn) {
-      var icon = btn.querySelector("i");
-      if (icon) icon.className = "fa fa-expand";
-      btn.title = t("term.full_page");
-      btn.setAttribute("aria-label", btn.title);
-      btn.setAttribute("aria-pressed", "false");
+      p.catch(function () { syncFullscreenMenu(); });
+    } else if (!p) {
+      syncFullscreenMenu();
     }
   }
 
@@ -746,25 +787,23 @@
       }
       item.setAttribute("aria-checked", on ? "true" : "false");
     }
-    var fp = document.getElementById("termMenuFullPage");
-    if (fp && bodyEl) {
-      fp.setAttribute("aria-checked",
-        bodyEl.classList.contains("terminal-fullscreen") ? "true" : "false");
+    var userFullPage = fullPageSelected;
+    var main = document.getElementById("termFullscreen");
+    if (main) {
+      var icon = main.querySelector("i");
+      if (icon) icon.className = userFullPage ? "fa fa-compress" : "fa fa-expand";
+      main.title = t(userFullPage ? "term.exit_full_page" : "term.full_page");
+      main.setAttribute("aria-label", main.title);
+      main.setAttribute("aria-pressed", userFullPage ? "true" : "false");
     }
-    // The caret is a menu button, not a toggle, so it gets a styling hook rather
-    // than aria-pressed (which would fight its aria-haspopup role).
+    var fp = document.getElementById("termMenuFullPage");
+    if (fp) fp.setAttribute("aria-checked", userFullPage ? "true" : "false");
+    // The caret is a menu button, not a toggle, so it gets no active styling.
     var caret = document.getElementById("termFullscreenCaret");
-    if (caret) caret.setAttribute("data-fs", on ? "on" : "off");
+    if (caret) caret.setAttribute("data-fs", "off");
   }
 
   function onFullscreenChange() {
-    if (!fsElement()) fsRollbackCarried();
-    else if (bodyEl && !bodyEl.classList.contains("terminal-fullscreen")) {
-      // The engine went full-screen without us (e.g. a gesture on the element):
-      // still carry the layout class so the flex chain fills the screen.
-      bodyEl.classList.add("terminal-fullscreen");
-      fsCarriedFullPage = true;
-    }
     syncFullscreenMenu();
     refitActive(); // the box changed size; ResizeObserver helps, refit anyway
   }
@@ -826,7 +865,9 @@
     catch (e) { /* storage unavailable → the toggle still works for this page */ }
   }
 
-  function keepAwakeBtn() { return document.getElementById("termKeepAwake"); }
+  function keepAwakeBtn() { return document.getElementById("termMenuKeepAwake"); }
+
+  function tuiMenuItem() { return document.getElementById("termMenuTui"); }
 
   /* Paint the button from the state triple (supported / held / error). */
   function renderKeepAwake(errTitle) {
@@ -836,6 +877,7 @@
       btn.setAttribute("aria-disabled", "true");
       btn.disabled = true;
       btn.setAttribute("aria-pressed", "false");
+      btn.setAttribute("aria-checked", "false");
       var why = t("term.keep_awake_unsupported");
       btn.title = why;
       btn.setAttribute("aria-label", why);
@@ -845,6 +887,7 @@
     btn.disabled = false;
     var held = !!keepAwake.sentinel;
     btn.setAttribute("aria-pressed", held ? "true" : "false");
+    btn.setAttribute("aria-checked", held ? "true" : "false");
     var label = errTitle || t(held ? "term.keep_awake_on" : "term.keep_awake_off");
     btn.title = label;
     btn.setAttribute("aria-label", label);
@@ -913,9 +956,11 @@
   }
 
   function setupKeepAwake() {
+    var btn = keepAwakeBtn();
+    // Keep legacy callers harmless when toolbar no longer includes this control.
+    if (!btn) return;
     keepAwake.supported = wakeLockSupported();
     keepAwake.desired = keepAwake.supported ? readKeepAwakeIntent() : false;
-    var btn = keepAwakeBtn();
     // Marker lives ON the element, so a rebuilt DOM re-wires but a re-run of
     // setup against the same node never stacks a second listener (which would
     // toggle the lock twice per tap).
@@ -1064,11 +1109,25 @@
       document.getElementById("termPasteCaret"),
       document.getElementById("termPasteMenu")
     );
+    var settingsMenu = createTermMenu(
+      document.getElementById("termSettingsCaret"),
+      document.getElementById("termSettingsMenu")
+    );
+
+    // Settings main button is intentionally a menu opener, matching its caret.
+    var settingsMain = document.getElementById("termSettings");
+    if (settingsMain && !settingsMain._termSettingsWired) {
+      settingsMain._termSettingsWired = true;
+      settingsMain.addEventListener("click", function () {
+        if (settingsMenu) settingsMenu.open(true);
+      });
+    }
 
     bindOnce(document.getElementById("termMenuFullPage"), "_tmWired", toggleFullscreen);
     bindOnce(document.getElementById("termMenuFullscreen"), "_tmWired", toggleTrueFullscreen);
     bindOnce(document.getElementById("termMenuPaste"), "_tmWired", pasteActive);
     bindOnce(document.getElementById("termMenuPasteCode"), "_tmWired", pasteAsCodeBlock);
+    bindOnce(document.getElementById("termMenuTui"), "_tmWired", toggleTui);
 
     if (!controlMenusWired) {
       controlMenusWired = true;
@@ -1080,7 +1139,18 @@
     }
 
     syncFullscreenMenu();
-    return { fullscreen: fsMenu, paste: pasteMenu };
+    renderKeepAwake();
+    syncTuiMenu();
+    return { fullscreen: fsMenu, paste: pasteMenu, settings: settingsMenu };
+  }
+
+  function syncTuiMenu() {
+    var tab = activeTab();
+    var item = tuiMenuItem();
+    if (!item) return;
+    var on = !!(tab && tab.tuiMode);
+    item.setAttribute("aria-checked", on ? "true" : "false");
+    item.setAttribute("aria-pressed", on ? "true" : "false");
   }
 
   function toggleTui() {
@@ -1088,9 +1158,10 @@
     if (!tab) return;
     tab.tuiMode = !tab.tuiMode;
     stopInertia(); // a fling must not keep scrolling into a just-enabled passthrough
-    var btn = document.getElementById("termTui");
+    var btn = tuiMenuItem();
     if (btn) {
       btn.setAttribute("aria-pressed", tab.tuiMode ? "true" : "false");
+      btn.setAttribute("aria-checked", tab.tuiMode ? "true" : "false");
       btn.title = t(tab.tuiMode ? "term.tui_on" : "term.tui_off");
       btn.setAttribute("aria-label", btn.title);
     }
@@ -1274,9 +1345,6 @@
     if (fs) fs.addEventListener("click", toggleFullscreen);
     var pst = document.getElementById("termPaste");
     if (pst) pst.addEventListener("click", pasteActive);
-    var tui = document.getElementById("termTui");
-    if (tui) tui.addEventListener("click", toggleTui);
-
     setupControlMenus();
     setupKeepAwake();
 
@@ -1385,7 +1453,6 @@
     _toggleTrueFullscreen: toggleTrueFullscreen,
     _onFullscreenChange: onFullscreenChange,
     _fsSupported: fsSupported,
-    _fsCarriedFullPage: function () { return fsCarriedFullPage; },
     _pasteActive: pasteActive,
     _pasteAsCodeBlock: pasteAsCodeBlock,
     _createTermMenu: createTermMenu,

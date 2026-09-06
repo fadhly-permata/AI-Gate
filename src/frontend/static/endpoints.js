@@ -43,13 +43,20 @@
   var EP_API = "/api/endpoints";
   var selectedId = null;
 
+  /* Human label for a bind type ("provider"/"combo"); unknown -> raw. */
+  function bindLabel(value) {
+    var key = "endpoints.bind." + value;
+    var s = getStr(key);
+    return s === key ? String(value == null ? "" : value) : s;
+  }
+
   /* ---- Pure mapping (testable) ---- */
   function mapEndpointToRow(e) {
     e = e || {};
     var binding = e.binding || null;
     var bindText = "—";
     if (binding && binding.bind_type && binding.bind_id != null) {
-      bindText = binding.bind_type + ":" + binding.bind_id;
+      bindText = bindLabel(binding.bind_type) + ": " + binding.bind_id;
     }
     return {
       id: e.id,
@@ -89,6 +96,7 @@
         escapeHtml(getStr("endpoints.no_items")) + "</td></tr>";
       return;
     }
+    var a = app();
     body.innerHTML = list.map(function (e) {
       var row = mapEndpointToRow(e);
       var ac = row.enabled
@@ -106,24 +114,19 @@
         "<td>" + ac + "</td>" +
         "<td>" + pool + "</td>" +
         "<td>" + bind + "</td>" +
-        '<td class="row-actions">' +
-          '<button type="button" class="icon-btn-small js-edit" title="' + escapeHtml(getStr("endpoints.edit")) + '">' +
-            '<i class="fa fa-pen"></i></button>' +
-          '<button type="button" class="icon-btn-small js-del" title="' + escapeHtml(getStr("endpoints.delete")) + '">' +
-            '<i class="fa fa-trash"></i></button>' +
-        "</td>" +
+        (a.rowMenuCellHtml ? a.rowMenuCellHtml() : "") +
       "</tr>";
     }).join("");
 
-    Array.prototype.forEach.call(body.querySelectorAll(".endpoint-row"), function (tr) {
-      var id = tr.getAttribute("data-id");
-      tr.querySelector(".js-edit").addEventListener("click", function (e) {
-        e.stopPropagation(); openEditModal(id);
+    if (a.wireRowMenu) {
+      a.wireRowMenu(body, function (tr) {
+        var id = tr ? tr.getAttribute("data-id") : null;
+        return [
+          { action: "edit", label: getStr("common.edit"), icon: "fa-pen", onClick: function () { openEditModal(id); } },
+          { action: "delete", label: getStr("common.delete"), icon: "fa-trash", danger: true, onClick: function () { deleteEndpoint(id); } }
+        ];
       });
-      tr.querySelector(".js-del").addEventListener("click", function (e) {
-        e.stopPropagation(); deleteEndpoint(id);
-      });
-    });
+    }
   }
 
   /* ---- Modal (add / edit) ---- */

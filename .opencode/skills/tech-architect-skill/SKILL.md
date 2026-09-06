@@ -10,6 +10,8 @@ Scope: documents/architecture/**. Never touch other agents' write roots.
 - Favor evolvable design.
 - ADRs for decisions.
 - No implementation, only design.
+- Designs MUST enable DRY/KISS/SOLID: module boundaries & contracts follow
+  `.opencode/rules/code-quality-principles.md`.
 ## Workflow
 1. Read the PM handover (goal, context, definition-of-done).
 2. Do the work strictly inside your write scope.

@@ -3,7 +3,7 @@
 **Versi:** 1.0
 **Tanggal:** 2026-09-03
 **Penulis:** Business Analyst (stand-in)
-**Sumber rujukan utama:** `documents/PRD.md` (PRD aigate), `pm/memory-bank.md`, `pm/status.md`
+**Sumber rujukan utama:** `documents/PRD.md` (PRD aigate), `documents/pm/memory-bank.md`, `documents/pm/status.md`
 
 ---
 

@@ -64,6 +64,13 @@
     m.className = "settings-msg" + (kind ? " settings-msg-" + kind : "");
   }
 
+  /* Human label for a rotation strategy; unknown values fall back to raw. */
+  function strategyLabel(value) {
+    var key = "proxies.strategy." + value;
+    var s = getStr(key);
+    return s === key ? String(value == null ? "" : value) : s;
+  }
+
   /* ---- List + render ---- */
   function loadPools() {
     setMsg("");
@@ -83,6 +90,7 @@
         escapeHtml(getStr("proxies.no_items")) + "</td></tr>";
       return;
     }
+    var a = app();
     body.innerHTML = list.map(function (p) {
       var row = mapPoolToRow(p);
       var badge = row.enabled
@@ -90,32 +98,23 @@
         : '<span class="badge badge-off">' + escapeHtml(getStr("providers.disabled")) + "</span>";
       return '<tr class="pool-row" data-id="' + escapeHtml(row.id) + '">' +
         '<td class="pool-name">' + escapeHtml(row.name) + "</td>" +
-        "<td>" + escapeHtml(row.strategy) + "</td>" +
+        "<td>" + escapeHtml(strategyLabel(row.strategy)) + "</td>" +
         "<td>" + badge + "</td>" +
         "<td>" + row.nodeCount + "</td>" +
-        '<td class="row-actions">' +
-          '<button type="button" class="icon-btn-small js-check" title="' + escapeHtml(getStr("proxies.health")) + '">' +
-            '<i class="fa fa-stethoscope"></i></button>' +
-          '<button type="button" class="icon-btn-small js-edit" title="' + escapeHtml(getStr("proxies.edit")) + '">' +
-            '<i class="fa fa-pen"></i></button>' +
-          '<button type="button" class="icon-btn-small js-del" title="' + escapeHtml(getStr("proxies.delete")) + '">' +
-            '<i class="fa fa-trash"></i></button>' +
-        "</td>" +
+        (a.rowMenuCellHtml ? a.rowMenuCellHtml() : "") +
       "</tr>";
     }).join("");
 
-    Array.prototype.forEach.call(body.querySelectorAll(".pool-row"), function (tr) {
-      var id = tr.getAttribute("data-id");
-      tr.querySelector(".js-edit").addEventListener("click", function (e) {
-        e.stopPropagation(); openEditModal(id);
+    if (a.wireRowMenu) {
+      a.wireRowMenu(body, function (tr) {
+        var id = tr ? tr.getAttribute("data-id") : null;
+        return [
+          { action: "edit", label: getStr("common.edit"), icon: "fa-pen", onClick: function () { openEditModal(id); } },
+          { action: "health", label: getStr("proxies.health"), icon: "fa-stethoscope", onClick: function () { healthCheck(id); } },
+          { action: "delete", label: getStr("common.delete"), icon: "fa-trash", danger: true, onClick: function () { deletePool(id); } }
+        ];
       });
-      tr.querySelector(".js-del").addEventListener("click", function (e) {
-        e.stopPropagation(); deletePool(id);
-      });
-      tr.querySelector(".js-check").addEventListener("click", function (e) {
-        e.stopPropagation(); healthCheck(id);
-      });
-    });
+    }
   }
 
   /* ---- Modal (add / edit) ---- */

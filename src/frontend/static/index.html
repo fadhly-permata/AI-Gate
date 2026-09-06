@@ -39,70 +39,75 @@
 
         <!-- Theme toggle -->
         <button id="themeToggle" class="icon-btn" type="button"
-                aria-label="Toggle theme" title="Theme">
+                data-i18n-aria="btn.theme" aria-label="Theme" title="Theme">
           <i class="fa fa-moon"></i>
         </button>
 
-        <!-- Language switcher -->
+        <!-- Language switcher (dropdown with flags) -->
         <div class="lang-switch" role="group" aria-label="Language">
-          <button class="lang-btn" type="button" data-lang="en">EN</button>
-          <span class="lang-sep">|</span>
-          <button class="lang-btn" type="button" data-lang="id">ID</button>
+          <button id="langMenuBtn" class="lang-menu-btn" type="button"
+                  aria-haspopup="true" aria-expanded="false" aria-controls="langMenu"
+                  data-i18n-aria="btn.lang" title="Language">
+            <span class="lang-flag" id="langTriggerFlag">🇺🇸</span>
+            <span class="lang-name" id="langTriggerName">English</span>
+            <i class="fa fa-caret-down" aria-hidden="true"></i>
+          </button>
+          <div class="lang-menu" id="langMenu" role="menu" hidden></div>
         </div>
       </div>
     </header>
 
     <!-- ===== Sidebar ===== -->
     <aside class="sidebar">
-      <nav class="nav" aria-label="Sidebar navigation">
-        <section class="nav-group" aria-labelledby="nav-group-gateway">
-          <h2 id="nav-group-gateway" class="nav-group-label" data-i18n="nav.group_gateway">Gateway / Configuration</h2>
-          <a class="nav-item" href="#" data-view="providers">
+      <nav class="nav" aria-label="Main navigation">
+        <div class="nav-section" role="group" aria-labelledby="nav-section-gateway">
+          <h2 class="nav-section-heading" id="nav-section-gateway" data-i18n="nav.group.gateway">Gateway Setup</h2>
+          <a class="nav-item" href="#" data-view="providers" aria-label="Providers" data-i18n-aria="nav.providers">
             <i class="nav-icon fa fa-server"></i>
             <span class="nav-label" data-i18n="nav.providers">Providers</span>
           </a>
-          <a class="nav-item" href="#" data-view="combos">
+          <a class="nav-item" href="#" data-view="combos" aria-label="Combos" data-i18n-aria="nav.combos">
             <i class="nav-icon fa fa-layer-group"></i>
             <span class="nav-label" data-i18n="nav.combos">Combos</span>
           </a>
-          <a class="nav-item" href="#" data-view="proxies">
+          <a class="nav-item" href="#" data-view="proxies" aria-label="Proxy Pools" data-i18n-aria="nav.proxies">
             <i class="nav-icon fa fa-network-wired"></i>
             <span class="nav-label" data-i18n="nav.proxies">Proxy Pools</span>
           </a>
-          <a class="nav-item" href="#" data-view="endpoints">
+          <a class="nav-item" href="#" data-view="endpoints" aria-label="Endpoints" data-i18n-aria="nav.endpoints">
             <i class="nav-icon fa fa-plug"></i>
             <span class="nav-label" data-i18n="nav.endpoints">Endpoints</span>
           </a>
-        </section>
-        <section class="nav-group" aria-labelledby="nav-group-monitoring">
-          <h2 id="nav-group-monitoring" class="nav-group-label" data-i18n="nav.group_monitoring">Monitoring</h2>
-          <a class="nav-item" href="#" data-view="usage">
-            <i class="nav-icon fa fa-chart-line"></i>
-            <span class="nav-label" data-i18n="nav.usage">Usage &amp; Quota</span>
-          </a>
-          <a class="nav-item" href="#" data-view="analytics">
-            <i class="nav-icon fa fa-chart-column"></i>
-            <span class="nav-label" data-i18n="nav.analytics">Analytics</span>
-          </a>
-        </section>
-        <section class="nav-group" aria-labelledby="nav-group-tools">
-          <h2 id="nav-group-tools" class="nav-group-label" data-i18n="nav.group_tools">Tools</h2>
-          <a class="nav-item" href="#" data-view="terminal">
+        </div>
+        <div class="nav-section" role="group" aria-labelledby="nav-section-operations">
+          <h2 class="nav-section-heading" id="nav-section-operations" data-i18n="nav.group.operations">Operations</h2>
+          <a class="nav-item" href="#" data-view="terminal" aria-label="Terminal" data-i18n-aria="nav.terminal">
             <i class="nav-icon fa fa-terminal"></i>
             <span class="nav-label" data-i18n="nav.terminal">Terminal</span>
           </a>
-          <a class="nav-item" href="#" data-view="cli">
+          <a class="nav-item" href="#" data-view="cli" aria-label="CLI Tools" data-i18n-aria="nav.cli">
             <i class="nav-icon fa fa-screwdriver-wrench"></i>
             <span class="nav-label" data-i18n="nav.cli">CLI Tools</span>
           </a>
-        </section>
-        <section class="nav-group" aria-labelledby="nav-group-system">
-          <h2 id="nav-group-system" class="nav-group-label" data-i18n="nav.group_system">System</h2>
-          <a class="nav-item" href="#" data-view="settings">
+        </div>
+        <div class="nav-section" role="group" aria-labelledby="nav-section-insights">
+          <h2 class="nav-section-heading" id="nav-section-insights" data-i18n="nav.group.insights">Insights</h2>
+          <a class="nav-item" href="#" data-view="usage" aria-label="Usage &amp; Quota" data-i18n-aria="nav.usage">
+            <i class="nav-icon fa fa-chart-line"></i>
+            <span class="nav-label" data-i18n="nav.usage">Usage &amp; Quota</span>
+          </a>
+          <a class="nav-item" href="#" data-view="analytics" aria-label="Analytics" data-i18n-aria="nav.analytics">
+            <i class="nav-icon fa fa-chart-column"></i>
+            <span class="nav-label" data-i18n="nav.analytics">Analytics</span>
+          </a>
+        </div>
+        <div class="nav-section" role="group" aria-labelledby="nav-section-system">
+          <h2 class="nav-section-heading" id="nav-section-system" data-i18n="nav.group.system">System</h2>
+          <a class="nav-item" href="#" data-view="settings" aria-label="Settings" data-i18n-aria="nav.settings">
             <i class="nav-icon fa fa-gear"></i>
             <span class="nav-label" data-i18n="nav.settings">Settings</span>
           </a>
-        </section>
+        </div>
       </nav>
     </aside>
 
@@ -236,7 +241,7 @@
                 <th data-i18n="providers.base_url">Base URL</th>
                 <th data-i18n="providers.enabled">Enabled</th>
                 <th data-i18n="providers.models">Models</th>
-                <th></th>
+                <th data-i18n="common.actions">Actions</th>
               </tr>
             </thead>
             <tbody id="provTableBody"></tbody>
@@ -252,10 +257,10 @@
                 <i class="fa fa-magnifying-glass"></i>
                 <span data-i18n="providers.discover">Discover Models</span>
               </button>
-              <button class="btn" id="provEditBtn" type="button" title="Edit">
+              <button class="btn" id="provEditBtn" type="button" title="Edit" data-i18n-aria="common.edit">
                 <i class="fa fa-pen"></i>
               </button>
-              <button class="btn btn-danger" id="provDeleteBtn" type="button" title="Delete">
+              <button class="btn btn-danger" id="provDeleteBtn" type="button" title="Delete" data-i18n-aria="common.delete">
                 <i class="fa fa-trash"></i>
               </button>
             </div>
@@ -266,8 +271,8 @@
           <table class="data-table" id="provModelsTable">
             <thead>
               <tr>
-                <th>model_id</th>
-                <th>model_name</th>
+                <th data-i18n="providers.model_id">Model ID</th>
+                <th data-i18n="providers.model_name">Model Name</th>
               </tr>
             </thead>
             <tbody id="provModelsBody"></tbody>
@@ -366,7 +371,7 @@
                 <th data-i18n="combos.strategy">Strategy</th>
                 <th data-i18n="combos.enabled">Enabled</th>
                 <th data-i18n="combos.members">Members</th>
-                <th></th>
+                <th data-i18n="common.actions">Actions</th>
               </tr>
             </thead>
             <tbody id="comboTableBody"></tbody>
@@ -393,7 +398,7 @@
                 <th data-i18n="proxies.strategy">Rotation</th>
                 <th data-i18n="proxies.enabled">Enabled</th>
                 <th data-i18n="proxies.nodes">Nodes</th>
-                <th></th>
+                <th data-i18n="common.actions">Actions</th>
               </tr>
             </thead>
             <tbody id="poolTableBody"></tbody>
@@ -421,7 +426,7 @@
                 <th data-i18n="endpoints.access_control">Access Control</th>
                 <th data-i18n="endpoints.proxy_pool">Proxy Pool</th>
                 <th data-i18n="endpoints.binding">Binding</th>
-                <th></th>
+                <th data-i18n="common.actions">Actions</th>
               </tr>
             </thead>
             <tbody id="endpointTableBody"></tbody>
@@ -636,65 +641,49 @@
                  never covers the tabs or the first line of terminal output. -->
             <div class="term-floating" id="termFloating" role="group"
                  data-i18n-aria="term.controls" aria-label="Terminal controls">
-              <!-- Keep Screen On (Screen Wake Lock): keeps the tablet awake so it
-                   never freezes the renderer and drops the session. Disabled by
-                   terminal.js when navigator.wakeLock is absent (insecure
-                   context: needs HTTPS or http://localhost). -->
-              <button class="icon-btn term-ctl" id="termKeepAwake" type="button"
-                      data-i18n-aria="term.keep_awake" title="Keep Screen On" aria-pressed="false">
-                <i class="fa fa-sun"></i>
-              </button>
-
-              <!-- Fullscreen SPLIT BUTTON: the main button keeps its default
-                   action (Full Page = the .terminal-fullscreen CSS class), the
-                   caret opens a menu with Full Page / true browser Fullscreen.
-                   Menu wiring + behaviour live in terminal.js (createTermMenu). -->
-              <span class="term-split" id="termFullscreenSplit">
-                <button class="icon-btn term-ctl" id="termFullscreen" type="button"
-                        data-i18n-aria="term.full_page" title="Full Page" aria-pressed="false">
-                  <i class="fa fa-expand"></i>
-                </button>
-                <button class="icon-btn term-ctl term-caret" id="termFullscreenCaret" type="button"
-                        aria-haspopup="true" aria-expanded="false" aria-controls="termFullscreenMenu"
-                        data-i18n-aria="term.fullscreen_menu" title="Fullscreen options">
-                  <i class="fa fa-caret-down" aria-hidden="true"></i>
-                </button>
-                <span class="term-menu" id="termFullscreenMenu" role="menu" hidden>
-                  <button class="term-menu-item" type="button" role="menuitemcheckbox"
-                          aria-checked="false" id="termMenuFullPage" data-action="full-page"
-                          data-i18n="term.full_page">Full Page</button>
-                  <button class="term-menu-item" type="button" role="menuitemcheckbox"
-                          aria-checked="false" id="termMenuFullscreen" data-action="fullscreen"
-                          data-i18n="term.fullscreen">Fullscreen</button>
-                </span>
-              </span>
-
-              <!-- Paste SPLIT BUTTON: main = normal paste (unchanged), caret =
-                   Paste / Paste as Code Block. -->
+              <!-- Exact toolbar order: Paste, Settings, Full. Main buttons use
+                   icons only; stateful choices live inside their menus. -->
               <span class="term-split" id="termPasteSplit">
-                <button class="icon-btn term-ctl" id="termPaste" type="button"
+                <button class="term-ctl term-main" id="termPaste" type="button"
                         data-i18n-aria="term.paste" title="Paste">
-                  <i class="fa fa-paste"></i>
+                  <i class="fa fa-paste" aria-hidden="true"></i>
                 </button>
-                <button class="icon-btn term-ctl term-caret" id="termPasteCaret" type="button"
+                <button class="term-ctl term-caret" id="termPasteCaret" type="button"
                         aria-haspopup="true" aria-expanded="false" aria-controls="termPasteMenu"
                         data-i18n-aria="term.paste_menu" title="Paste options">
                   <i class="fa fa-caret-down" aria-hidden="true"></i>
                 </button>
                 <span class="term-menu" id="termPasteMenu" role="menu" hidden>
-                  <button class="term-menu-item" type="button" role="menuitem"
-                          id="termMenuPaste" data-action="paste"
-                          data-i18n="term.paste">Paste</button>
-                  <button class="term-menu-item" type="button" role="menuitem"
-                          id="termMenuPasteCode" data-action="paste-code"
-                          data-i18n="term.paste_code">Paste as Code Block</button>
+                  <button class="term-menu-item" type="button" role="menuitem" id="termMenuPaste" data-action="paste" data-i18n="term.paste_normal">Paste normal</button>
+                  <button class="term-menu-item" type="button" role="menuitem" id="termMenuPasteCode" data-action="paste-code" data-i18n="term.paste_code">Paste as Code Block</button>
                 </span>
               </span>
 
-              <button class="icon-btn term-ctl" id="termTui" type="button"
-                      data-i18n-aria="term.tui_mode" title="TUI Passthrough" aria-pressed="false">
-                <i class="fa fa-hand-pointer"></i>
-              </button>
+              <span class="term-split" id="termSettingsSplit">
+                <button class="term-ctl term-main" id="termSettings" type="button" aria-haspopup="true"
+                        aria-expanded="false" aria-controls="termSettingsMenu" data-i18n-aria="term.settings" title="Settings">
+                  <i class="fa fa-gear" aria-hidden="true"></i>
+                </button>
+                <button class="term-ctl term-caret" id="termSettingsCaret" type="button"
+                        aria-haspopup="true" aria-expanded="false" aria-controls="termSettingsMenu"
+                        data-i18n-aria="term.settings_menu" title="Settings options"><i class="fa fa-caret-down" aria-hidden="true"></i></button>
+                <span class="term-menu" id="termSettingsMenu" role="menu" hidden>
+                  <button class="term-menu-item" type="button" role="menuitemcheckbox" aria-checked="false" id="termMenuTui" data-action="tui" data-i18n="term.tui_mode">TUI Passthrough</button>
+                  <button class="term-menu-item" type="button" role="menuitemcheckbox" aria-checked="false" id="termMenuKeepAwake" data-action="keep-awake" data-i18n="term.keep_awake">Keep Screen On</button>
+                </span>
+              </span>
+
+              <span class="term-split" id="termFullscreenSplit">
+                <button class="term-ctl term-main" id="termFullscreen" type="button"
+                        data-i18n-aria="term.full_page" title="Full Page" aria-pressed="false">
+                  <i class="fa fa-expand" aria-hidden="true"></i>
+                </button>
+                <button class="term-ctl term-caret" id="termFullscreenCaret" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="termFullscreenMenu" data-i18n-aria="term.fullscreen_menu" title="Full options"><i class="fa fa-caret-down" aria-hidden="true"></i></button>
+                <span class="term-menu" id="termFullscreenMenu" role="menu" hidden>
+                  <button class="term-menu-item" type="button" role="menuitemcheckbox" aria-checked="false" id="termMenuFullPage" data-action="full-page" data-i18n="term.full_page">Full Page</button>
+                  <button class="term-menu-item" type="button" role="menuitemcheckbox" aria-checked="false" id="termMenuFullscreen" data-action="fullscreen" data-i18n="term.fullscreen">Fullscreen</button>
+                </span>
+              </span>
             </div>
           </div>
 
@@ -809,7 +798,13 @@
           <h3 class="modal-title" id="cliLaunchTitle" data-i18n="cli.launch_title">Launch CLI Tool</h3>
           <div class="form-row">
             <label class="form-label" for="cliModel" data-i18n="cli.model">Model</label>
-            <select class="form-input" id="cliModel"></select>
+            <div class="aigate-combo">
+              <input class="form-input" type="text" id="cliModel" name="cliModel" autocomplete="off"
+                     placeholder="Search or type a model…"
+                     role="combobox" aria-expanded="false"
+                     aria-controls="cliModelList" aria-autocomplete="list" />
+              <ul class="aigate-combo-list" id="cliModelList" role="listbox" hidden></ul>
+            </div>
           </div>
           <p class="cli-hint" id="cliHint" hidden></p>
           <p class="settings-msg" id="cliMsg" role="status" aria-live="polite"></p>
@@ -844,9 +839,9 @@
             <div class="form-row">
               <label class="form-label" for="comboStrategy" data-i18n="combos.strategy">Strategy</label>
               <select class="form-input" id="comboStrategy" name="strategy">
-                <option value="fallback">fallback</option>
-                <option value="load_balance">load_balance</option>
-                <option value="latency_cost">latency_cost</option>
+                <option value="fallback" data-i18n="combos.strategy.fallback">fallback</option>
+                <option value="load_balance" data-i18n="combos.strategy.load_balance">load_balance</option>
+                <option value="latency_cost" data-i18n="combos.strategy.latency_cost">latency_cost</option>
                 <option value="three_tier" data-i18n="combos.strategy.three_tier">three_tier</option>
               </select>
             </div>
@@ -948,10 +943,10 @@
             <div class="form-row">
               <label class="form-label" for="poolStrategy" data-i18n="proxies.strategy">Rotation</label>
               <select class="form-input" id="poolStrategy" name="rotation_strategy">
-                <option value="round_robin">round_robin</option>
-                <option value="random">random</option>
-                <option value="latency_cost">latency_cost</option>
-                <option value="least_latency">least_latency</option>
+                <option value="round_robin" data-i18n="proxies.strategy.round_robin">round_robin</option>
+                <option value="random" data-i18n="proxies.strategy.random">random</option>
+                <option value="latency_cost" data-i18n="proxies.strategy.latency_cost">latency_cost</option>
+                <option value="least_latency" data-i18n="proxies.strategy.least_latency">least_latency</option>
               </select>
             </div>
             <div class="form-row">
@@ -1002,8 +997,8 @@
               <label class="form-label" for="endpointBindType" data-i18n="endpoints.bind_type">Bind To</label>
               <select class="form-input" id="endpointBindType" name="bind_type">
                 <option value="none" data-i18n="endpoints.none">None</option>
-                <option value="provider">provider</option>
-                <option value="combo">combo</option>
+                <option value="provider" data-i18n="endpoints.bind.provider">provider</option>
+                <option value="combo" data-i18n="endpoints.bind.combo">combo</option>
               </select>
             </div>
             <div class="form-row" id="endpointBindIdRow">
@@ -1099,7 +1094,9 @@
   <script src="clitools.js" defer></script>
   <!-- Self-Heal UI (B4.1) — needs i18n.js (window.I18N) + clitools.js -->
   <script src="selfheal.js" defer></script>
-  <!-- Terminal manager (B3.3) — after xterm CDN + app.js -->
-  <script src="terminal.js" defer></script>
+  <!-- Terminal manager (B3.3) — after xterm CDN + app.js. ?v= cache-buster:
+       a plain src lets the browser run a STALE cached copy after an update
+       (bump the value whenever terminal.js changes). -->
+  <script src="terminal.js?v=20260906" defer></script>
 </body>
 </html>

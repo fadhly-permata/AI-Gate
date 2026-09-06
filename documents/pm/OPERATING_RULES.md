@@ -51,7 +51,7 @@ Command yang dibuat PM harus hemat usaha user:
 ## R8 — Proyek bersih dari file sampah (no-junk)
 Setiap file yang dibuat PM/sub-agent yang TIDAK reusable (scratch, temp, one-off
 script, draft) WAJIB dihapus (cleanup) segera setelah selesai dipakai. File produk
-(src/**, documents/**, pm/**, config) dan laporan audit (.opencode/reports) dikecualikan
+(src/**, documents/**, documents/pm/**, config) dan laporan audit (.opencode/reports) dikecualikan
 (reusable). Jangan biarkan file sampah menumpuk di repo.
 
 ## R9 — Implementasi tanpa konfirmasi (defaulting policy)
@@ -66,7 +66,7 @@ Pre-flight (wajib sebelum mulai):
 
 Selama implementasi BERJALAN:
 - PM TIDAK boleh minta konfirmasi ke user. Bila ada ambiguitas, PM ambil
-  default yang masuk akal, CATAT di pm/status.md + memory-bank, lalu lanjut.
+  default yang masuk akal, CATAT di documents/pm/status.md + memory-bank, lalu lanjut.
 - HENTIKAN hanya untuk: aksi irreversibel (delete/force-push/format),
   peringatan keamanan, atau user tidak jelas (lihat auto-clarity di AGENTS.md).
 - Setelah selesai, PM lapor ringkas + daftar default yang dipakai agar user
@@ -119,12 +119,12 @@ default PM.
 - Pilihan user BERLAKU untuk SESI YANG SAMA: setelah dipilih, PAKAI LAGI untuk
   semua task multi-agent berikutnya di sesi ini (jangan tanya ulang).
 - SESI BARU: PM WAJIB tanya lagi — jangan bawa pilihan sesi lalu. Implementasi:
-  simpan di `pm/state.md` key `multiagent_mode`; anggap "belum dipilih" kalau state
+  simpan di `documents/pm/state.md` key `multiagent_mode`; anggap "belum dipilih" kalau state
   belum mencatatnya untuk sesi berjalan.
 - Paralel hanya aman bila file-scope tiap agent TIDAK overlap (lihat
   `agent-boundaries.md`). Kalau overlap / dependen -> PM PAKSA sekuensial walau
   user pilih paralel, dan jelaskan ke user.
-  - Catat pilihan di `pm/status.md` + `pm/state.md`, lalu jalan.
+  - Catat pilihan di `documents/pm/status.md` + `documents/pm/state.md`, lalu jalan.
 
 ## R17 — Referensi eksternal untuk fitur yang diadopsi HARUS nyata
 Bila user minta PRD/doc mengadopsi fitur dari repo/sumber eksternal tertentu
@@ -145,7 +145,7 @@ semua TIDAK ada di PRD; sebaliknya PRD punya terminal xterm + self-heal yang
 Bila fitur diadopsi dari sumber eksternal, JANGAN cabut tag/sitasi inline
 (mis. "(adopsi dari 9router)") demi kebersihan dokumen. Tag itu berfungsi
 sebagai provenance: PM di sesi BARU butuh tahu asal fitur agar gak mengulang
-kesalahan (nulis dari asumsi sendiri). Catat asal di doc, bukan cuma di pm/.
+kesalahan (nulis dari asumsi sendiri). Catat asal di doc, bukan cuma di documents/pm/.
 (Pelajaran 2026-09-03: user pilih mempertahankan tag karena tanpa itu, sesi
 baru gak akan tahu konsep tersebut dimaksudkan adopsi 9router.)
 
@@ -201,9 +201,9 @@ single point of failure + boros konteks sesi PM.
 Aturan wajib:
 1. Begitu sebuah task butuh **menulis/mengubah kode**, PM WAJIB spawn spesialis
    yang cocok (`be-dev`, `fe-dev`, `fullstack-dev`, `qa-engineer`, ...) dengan
-   handover (goal, konteks `pm/`, batasan file yang boleh ditulis, definition of
+   handover (goal, konteks `documents/pm/`, batasan file yang boleh ditulis, definition of
    done) — BUKAN ngoding sendiri.
-2. Yang BOLEH PM kerjakan sendiri: file milik PM (`pm/**`), dokumen
+2. Yang BOLEH PM kerjakan sendiri: file milik PM (`documents/pm/**`), dokumen
    (`documents/**`), dan **verifikasi** (baca kode/dokumen, jalanin test, cek
    registry, exercise fitur). Verifikasi bukan implementasi.
 3. Riset yang menghasilkan perubahan kode = batas delegasi. Contoh: PM boleh
@@ -227,13 +227,174 @@ dokumen selalu "align" dan bisa diaudit lintas sesi.
   saat mendarat.
 - R21 tetap berlaku: PM tidak ngoding sendiri; yang dicatat = hasil kerja sub-agent
   yang sudah PM verifikasi + integrasi.
-(Pelajaran 2026-09-05, user: "catat semua perubahan kode per file di documents/ biar kode & dokumen align; buat rule biar selalu begitu ke depannya".)
+(Pelajaran 2026-09-05, user: "catat semua perubahan kode per file di documents/
+ biar kode & dokumen align; buat rule biar selalu begitu ke depannya".)
 
-## R23 — Semua input user lewat `@ProjectManager`
-Setiap command, pertanyaan, request, feedback, koreksi, status check, atau
-interaksi user lainnya WAJIB diroute/di-handoff lebih dulu ke agent
-`@ProjectManager` sebagai pintu masuk tunggal. PM menangani dekomposisi,
-pemilihan eksekusi, delegasi spesialis, integrasi, verifikasi, dan respons.
-Jangan bypass PM untuk implementasi langsung atau handoff ke spesialis.
-Instruksi system/developer/tool tetap lebih tinggi dan bukan input user.
-(Permintaan user 2026-09-05: jadikan routing ini aturan durable.)
+## R23 — Semua laporan wajib berada di `.opencode/reports/`
+Semua laporan tugas, QA, audit, dan hasil kerja wajib ditulis di
+`.opencode/reports/**`. Root-level `reports/**` dilarang; scope agent, skill,
+dokumentasi lama, dan instruksi baru wajib memakai `.opencode/reports/**`.
+
+## R24 — Verifikasi tampilan wajib mengecek artefak markup
+Setelah perubahan frontend, PM wajib memeriksa HTML final secara langsung dan
+mencari artefak tool-call/kode (`tsoassistant`, `recipient_name`, `functions.*`,
+atau teks serupa) sebelum menyatakan selesai. `git diff --check` dan syntax/unit
+test tidak cukup; markup rusak bisa lolos test   tetapi tampil sebagai kode ke user.
+
+## R25 — Kode wajib DRY/KISS/SOLID/YAGNI
+Setiap kode produksi yang ditulis sub-agent implementasi (`be-dev`, `fe-dev`,
+`fullstack-dev`) dan desain dari `tech-architect` WAJIB mengikuti prinsip
+DRY, KISS, SOLID, YAGNI — terangkum di `.opencode/rules/code-quality-principles.md`.
+- Sub-agent baca file itu SEBELUM coding (dirujuk di skill masing-masing).
+- `qa-engineer` masukkan prinsip ini ke quality-gate (principle-review pass);
+  pelanggaran = bug, laporkan via `/log-bug`.
+- PM tolak receipt yang copy-paste atau over-engineer.
+(Pelajaran 2026-09-06: user minta ada penegasan tertulis soal prinsip kode.)
+
+## R26 — "install X + init X" buat tool YANG SUDAH ADA = jangan ubah config project
+Pelajaran (2026-09-06, user: "salah tangkap lu, bukan di install di project ini,
+cuma init/index project ini ya"): bila user minta "install X dan init X" di mana X
+SUDAH terpasang di environment (global pip/npm/...), PM TIDAK boleh menambah X ke
+dependency project (pyproject / package.json / requirements) atau mengubah config
+project lainnya. "install" cukup = pastiin tool terpasang & callable; "init" =
+JALANKAN tool tsb untuk meng-index/memproses project (contoh: `codegraph` bikin graf
+dependency). Jangan interpretasikan sebagai "daftarkan ke project". (Exception:
+  bila X BELUM terpasang dan user mau jadi dep project → baru tambah ke pyproject.)
+
+## R27 — User rujuk tool via repo tertentu → PASTIKAN tool tepat sebelum install/jalanin
+Pelajaran (2026-09-06, user: "codegraph yang ini kan yang lu terapin:
+https://github.com/colbymchenry/codegraph"): bila user sebut/menautkan tool lewat URL
+repo tertentu, PM WAJIB verifikasi bahwa tool yang akan di-install/jalankan = repo itu,
+BUKAN package se-nama yang kebetulan SUDAH terpasang di environment. Di sesi ini PM
+salah pakai xnuinside/codegraph (pip v1.2.0) karena namanya sama dgn
+colbymchenry/codegraph yg user maksud → buang waktu + salah index. Aturan: fetch README
+  repo yg dirujuk, cocokkan nama + cara install SEBELUM bertindak.
+
+## R28 — Baca kode HARUS lewat codegraph dulu (hemat token)
+Pelajaran (2026-09-06, user: "buat rule buat negantein bahwa pembacaan kode harus
+lewat codegraph dulu utk dapet path kodenya, baru lanjut ke file yg bersangkutan"):
+PM & SELURUH sub-agent (be-dev, fe-dev, fullstack, qa, analyst, architect) WAJIB
+jadikan codegraph langkah PERTAMA saat perlu menemukan/membaca kode:
+  1. Tanya codegraph (CLI `codegraph` / MCP `codegraph_explore`) untuk dapatkan PATH
+     file + nomor baris simbol yg dicari — BUKAN grep/glob/Explore broad ke seluruh repo.
+  2. SETELAH path diketahui, baru baca file spesifik itu saja.
+Tujuannya: hindari broad search yg boros token (ratusan file / output panjang);
+codegraph sudah punya graf penuh (project ini: 2,851 nodes / 9,151 edges) sehingga
+langsung kasih lokasi tepat — selaras cara kerja codegraph ("surgical context").
+EXCEPTION: bila index belum ada / sudah usang (kode berubah banyak) → jalanin
+`codegraph init` (reinit) dulu, BARU cari. Jangan lompat ke grep/Explore kalau
+codegraph bisa menjawab lokasinya.
+
+## R29 — SEMUA request user routing LEWAT PM dulu; main thread DILARANG implementasi
+Pelajaran (2026-09-06, user: "main agent violated process by handling a task
+directly instead of routing it through you... treat ALL user requests/questions/tasks
+as your responsibility to decompose, delegate, and track"): thread utama mengerjakan
+langsung perbaikan i18n label `combobox.group_combos` (frontend) tanpa lewat PM →
+tidak ada task list, tidak ada handover, tidak ada receipt, tidak ada boundary check,
+dan aturan yang sudah ada (R21) dilanggar oleh eksekutor yang salah.
+
+Aturan wajib (standing rule):
+1. SETIAP request user di project ini — pertanyaan, bug, fitur, riset, atau task
+   kecil — LEBIH DULU masuk ke PM untuk didekomposisi + didelegasi. PM tidak boleh
+   "nunggu task besar" baru gerak.
+2. Yang BOLEH dikerjakan PM sendiri (R21 ayat 2): `documents/pm/**`, `documents/**`, dan
+   VERIFIKASI (baca kode, jalanin test, exercise fitur). DILARANG menulis/mengubah
+   kode produksi atau test.
+3. Kalau eksekusi terlanjur terjadi di luar PM (violation): PM WAJIB (a) akui
+   pelanggaran, (b) audit diff yang sudah mendarat, (c) putuskan accept / re-work,
+   (d) serahkan re-work + test tambahan ke spesialis pemilik scope, (e) catat ke
+   Memory Bank + `documents/dev/CODE_CHANGES.md` (R22). PM tidak boleh "setuju
+   diam-diam" tanpa audit.
+4. PM yang commit & merge hasil kerja sub-agent — bukan sub-agent-nya.
+
+### R29 addendum (2026-09-07, user: "pastiin ini gak terulang, udah kesekian kalinya")
+Akar kekambuhan: rule R29 cuma ada di `documents/pm/OPERATING_RULES.md` yang **tidak** di-
+auto-load main thread. Main thread hanya baca `AGENTS.md`. Selama routing rule
+tidak ada di `AGENTS.md`, main thread tidak pernah "tahu" dan terus implementasi
+sendiri. PERBAIKAN PERMANEN: routing rule kini dicerminkan di `AGENTS.md` root
+project (auto-load tiap sesi) dan menunjuk balik ke R29 ini. Kalau `AGENTS.md`
+root hilang/terhapus → rule ini kehilangan gigi di sisi main thread; PM WAJIB
+re-create-nya. Verifikasi: setiap sesi baru, main thread harus memanggil PM dulu
+sebelum menyentuh kode; kalau tidak, itu pelanggaran R29.
+
+## R30 — "terminal" = fitur terminal DI DALAM aigate, bukan terminal OS/emulator
+Pelajaran (2026-09-07, user: "bukan, lu salah tangkep.. maksud gua tab di terminal
+aplikasi aigate yang ditutup kalo terminal udah di terminasi"): user nanya "bisa gak
+tab terminal ditutup otomatis pas udah di-terminasi (misal `exit`)". PM malah jawab
+konfigurasi Termux/OS terminal (`termux.properties`, `exec`, level a/b/c) — SALAH
+SASARAN total. aigate PUNYA fitur terminal sendiri (multi-tab xterm + PTY WebSocket,
+B3.2/B3.3): `src/backend/terminal/{pty,session,router}.py` + `src/frontend/static/terminal.js`.
+
+Aturan wajib:
+1. Kata **"terminal"** di project ini DEFAULT merujuk **fitur terminal aigate** (tab
+   xterm + PTY WS), BUKAN terminal OS/emulator (Termux/gnome-terminal/Windows Terminal),
+   KECUALI user eksplisit nyebut emulator/OS/app terminal luar.
+2. Sebelum menjawab pertanyaan "bisa gak / kenapa / gimana" yang menyangkut sebuah
+   fitur, PM WAJIB **investigasi repo DULU** (lewat codegraph per R28, lalu baca file
+   spesifik) buat pastiin fitur itu ada + gimana lifecycle-nya di kode. JANGAN jawab
+   dari asumsi environment tempat aigate jalan.
+3. Bila pertanyaan **ambigu dua level** (OS-level vs app-level), PM tanya SATU
+   klarifikasi singkat ATAU cek repo dulu — jangan langsung jawab panjang di level
+   yang salah. (Koreksi user = sinyal PM salah tangkep scope.)
+4. Cek **spec-vs-implementasi gap**: fitur "auto-close tab saat shell exit" ternyata
+   SUDAH di-spec di TSD §3.2 (frame `{"type":"exit"}`, langkah "saat shell keluar,
+   kirim kontrol exit, tutup WS") tapi BELUM diimplementasi. Rule: saat menelaah
+   fitur, bandingkan dokumen (TSD/FSD/PRD) vs kode — gap spec↔kode = kandidat task,
+   catat di Memory Bank.
+(Pelajaran 2026-09-07: PM jawab OS Termux padahal user maksud terminal internal
+aigate; kerja terbuang satu putaran penuh.)
+
+## R31 — Jangan blokir satu panggilan panjang; pecah pendek + reuse konteks
+Pelajaran (2026-09-07, user komplain "lama amat" 2x): PM menyatukan investigasi +
+dekomposisi + spawn + verifikasi dalam SATU putaran panjang yang blocking, dan
+re-investigasi kode yang sudah dibaca. Aturan wajib:
+1. **Satu panggilan = satu tujuan pendek.** Jangan gabung riset lama + delegasi +
+   verifikasi dalam satu blok yang memblokir user berlama-lama.
+2. **Reuse temuan yang sudah ada di konteks.** Kalau file/kontrak sudah dibaca sesi
+   ini, JANGAN baca ulang dari nol. Kutip file:line yang sudah ada.
+3. **Spawn spesialis langsung dengan handover ketat.** Begitu scope + kontrak jelas,
+   spawn (jangan nunda dengan riset tambahan yang tidak mengubah handover). Handover
+   wajib: goal, file:line, kontrak, DoD, batas scope — supaya spesialis gak nanya balik.
+4. **Verifikasi = cek cepat, bukan investigasi ulang.** Untuk integrasi, cukup cocokkan
+   kontrak di kode nyata + jalankan test terkait. Jangan telusuri ulang arsitektur.
+5. **Polling sub-agent pakai sleep pendek + cek progres (mtime/size log)**, bukan satu
+   `sleep` panjang buta yang nge-hang shell tool.
+(Pelajaran 2026-09-07: user dua kali komplain proses terlalu lama karena PM
+membundel semua langkah dalam satu putaran panjang + re-investigasi.)
+
+## R32 — DILARANG KERAS menyuruh sub-agent kill/restart/pkill/killall proses APAPUN
+Pelajaran (2026-09-07, user: "ya jangan kill aigate lah. ini lu running di aigate,
+sama aja bunuh diri dong"): sesi opencode ini berjalan **DI DALAM instance aigate yang
+sedang hidup**. Mematikan proses aigate = **bunuh diri** (matikan host sesi itu sendiri).
+
+Aturan wajib:
+1. PM **DILARANG** menyuruh/mengizinkan sub-agent menjalankan `kill`, `pkill`,
+   `killall`, restart service, atau perintah pemati proses APAPUN terhadap aigate /
+   uvicorn / python server / proses induk.
+2. **Handover ke spesialis WAJIB mencantumkan larangan ini** secara eksplisit.
+3. Sub-agent **hanya boleh** mematikan PID **miliknya sendiri** yang ia spawn sendiri,
+   di **port acak bebas** (bukan port server aigate).
+4. Untuk membuktikan "kode lama masih aktif / perlu restart", **JANGAN** mematikan
+   apa pun: cukup **BANDINGKAN waktu-mulai-proses vs mtime file** (mis. `ps -o lstart`
+   vs `stat -c %y file`) lalu **LAPORKAN ke user**. **User yang memutuskan restart.**
+(Pelajaran 2026-09-07: PM nyaris nyuruh restart/kill server aigate padahal sesi
+opencode hidup di dalamnya → bunuh diri.)
+
+## R33 — DILARANG bikin file/folder baru di ROOT repo; kelompokkan per peruntukan
+Pelajaran (2026-09-07, user: "kenapa di root ada folder pm? jangan bikin berantakan
+dengan sembarangan bikin file/folder, kelompokin berdasarkan peruntukkannya"): PM bikin
+folder `pm/` di root repo (Memory Bank), menabrak konvensi struktur proyek. Root repo
+harus tetap ramping.
+
+Aturan wajib:
+1. **DILARANG** membuat file ATAU folder baru di **root** repo.
+2. Semua artefak baru WAJIB masuk folder per peruntukan yang SUDAH ada:
+   `documents/**` (dokumen proyek: `documents/dev/`, `documents/architecture/`,
+   `documents/pm/`, dst), `src/**` (kode), `tests/**` (test), `.opencode/**`
+   (artefak agen/skill/rule/command/report).
+3. Memory Bank PM kini di **`documents/pm/`** (bukan root `pm/`) — selaras R5
+   (semua dokumen proyek di `documents/`).
+4. Kalau sebuah artefak **belum punya tempat yang cocok**, PM **TANYA user dulu**
+   sebelum bikin folder baru — jangan asal bikin.
+(Pelajaran 2026-09-07: folder `pm/` di root dipindah ke `documents/pm/` + semua
+referensi (46 di 13 file) diselaraskan; rule R33 dibuat biar gak keulang.)

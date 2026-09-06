@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 
 // clitools.js is an IIFE attaching pure helpers onto window.aigate.
 // It only touches window.Terminal / DOM inside methods, so importing it
@@ -197,5 +197,38 @@ describe("renderGroups — strike-through for unverified tools", () => {
     expect(modal.hidden, "launch modal must stay closed for an unverified tool").toBe(true);
     expect(msg.textContent).toBe(window.I18N.en["cli.reason.pending"]);
     expect(msg.className).toContain("settings-msg-warn");
+  });
+});
+
+/* =====================================================================
+ * comboGroupName: the CLI model picker's combo group header must follow
+ * the active locale (never the old hardcoded "Kombo/Combos" literal).
+ * ===================================================================== */
+const comboGroupName = window.aigate.cliTools._test.comboGroupName;
+
+describe("comboGroupName — localized combo group header", () => {
+  const prev = document.documentElement.getAttribute("data-locale");
+  afterEach(() => {
+    if (prev === null) document.documentElement.removeAttribute("data-locale");
+    else document.documentElement.setAttribute("data-locale", prev);
+  });
+
+  it("resolves to the English label when locale is en", () => {
+    document.documentElement.setAttribute("data-locale", "en");
+    expect(comboGroupName()).toBe(window.I18N.en["combobox.group_combos"]);
+    expect(comboGroupName()).toBe("Combos");
+  });
+
+  it("resolves to the Indonesian label when locale is id", () => {
+    document.documentElement.setAttribute("data-locale", "id");
+    expect(comboGroupName()).toBe(window.I18N.id["combobox.group_combos"]);
+    expect(comboGroupName()).toBe("Kombo");
+  });
+
+  it("never leaks the old combined 'Kombo/Combos' literal", () => {
+    for (const loc of ["en", "id"]) {
+      document.documentElement.setAttribute("data-locale", loc);
+      expect(comboGroupName()).not.toBe("Kombo/Combos");
+    }
   });
 });

@@ -242,10 +242,16 @@ describe("terminal panel redesign — HTML structure", () => {
     expect(stage.contains(floating)).toBe(false);
     expect(floating.getAttribute("role")).toBe("group");
     expect(floating.hasAttribute("data-i18n-aria")).toBe(true);
-    // All three control hooks still live inside the cluster.
-    ["termFullscreen", "termPaste", "termTui"].forEach((id) => {
+    // All three requested groups live inside the cluster, with stateful controls
+    // inside Settings rather than as standalone toolbar buttons.
+    expect([...floating.children].map((el) => el.id)).toEqual([
+      "termPasteSplit", "termSettingsSplit", "termFullscreenSplit"
+    ]);
+    ["termFullscreen", "termPaste", "termSettings", "termMenuTui", "termMenuKeepAwake"].forEach((id) => {
       expect(floating.querySelector("#" + id)).not.toBeNull();
     });
+    expect(floating.querySelector("#termTui")).toBeNull();
+    expect(floating.querySelector("#termKeepAwake")).toBeNull();
   });
 
   it("empty state exists in the stage, hidden by default, i18n-bound", () => {

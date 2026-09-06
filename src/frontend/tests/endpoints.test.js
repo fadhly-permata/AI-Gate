@@ -22,7 +22,7 @@ describe("endpoints mapper + render (B2.5)", () => {
     expect(row.listen).toBe("0.0.0.0:9000");
     expect(row.enabled).toBe(true);
     expect(row.proxy_pool_id).toBe(5);
-    expect(row.binding_text).toBe("provider:12");
+    expect(row.binding_text).toBe("Provider: 12");
   });
 
   it("mapEndpointToRow falls back to defaults and '—' when no binding", () => {
@@ -33,7 +33,7 @@ describe("endpoints mapper + render (B2.5)", () => {
     expect(row.binding_text).toBe("—");
   });
 
-  it("renderEndpoints renders rows with edit/delete buttons", () => {
+  it("renderEndpoints renders rows with a kebab action menu", () => {
     window.aigate.endpoints.renderEndpoints([
       { id: 8, name: "EP", listen_host: "127.0.0.1", listen_port: 8000,
         access_control_enabled: false, proxy_pool_id: null, binding: null }
@@ -41,8 +41,8 @@ describe("endpoints mapper + render (B2.5)", () => {
     const html = document.getElementById("endpointTableBody").innerHTML;
     expect(html).toContain('data-id="8"');
     expect(html).toContain("EP");
-    expect(html).toContain("js-edit");
-    expect(html).toContain("js-del");
+    expect(html).toContain("js-row-menu");
+    expect(html).toContain("row-actions");
   });
 
   it("renderEndpoints shows the empty-state message when there are no items", () => {
@@ -66,7 +66,7 @@ describe("endpoints mapper + render (B2.5)", () => {
     await window.aigate.endpoints.loadEndpoints();
     const html = document.getElementById("endpointTableBody").innerHTML;
     expect(html).toContain("API");
-    expect(html).toContain("combo:3");
+    expect(html).toContain("Combo: 3");
     vi.unstubAllGlobals();
   });
 });

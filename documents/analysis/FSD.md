@@ -3,7 +3,7 @@
 **Versi:** 1.0
 **Tanggal:** 2026-09-03
 **Penulis:** System Analyst (stand-in)
-**Sumber rujukan:** `documents/PRD.md` (PRD aigate), `docs/business/BRD.md` (BRD aigate), `pm/memory-bank.md`, `pm/status.md`
+**Sumber rujukan:** `documents/PRD.md` (PRD aigate), `docs/business/BRD.md` (BRD aigate), `documents/pm/memory-bank.md`, `documents/pm/status.md`
 **Storage engine target:** SQLite (lihat PRD §3 — Configuration Engine)
 
 ---
