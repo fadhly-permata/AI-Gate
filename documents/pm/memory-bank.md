@@ -145,6 +145,14 @@
   - ADR-008 (proxy binding): RESOLVED — binding di level Endpoint; Endpoint
     menunjuk ke Combo (Endpoint -> Combo). (putus 2026-09-03)
 
+- 2026-09-06: Semua input user diroute ke `@ProjectManager` sebagai entrypoint
+  tunggal melalui `.opencode/rules/request-routing.md`; instruksi priority lebih
+  tinggi tetap berlaku.
+- 2026-09-06: Durable request-routing rule selesai dibuat. (Di `main` dinomori
+  **R23**; di branch `refactor/ui` konsep yang sama = **R29** — lihat
+  `documents/pm/OPERATING_RULES.md`. Saat merge #4, duplikat R23-routing `main`
+  tidak dimasukkan karena sudah tercakup R29.)
+
 ## Open risks
 - Agent file business-analyst / system-analyst / tech-architect SUDAH dibuat tapi
   belum terdaftar di sesi berjalan; perlu reload opencode agar bisa dipakai sbg
