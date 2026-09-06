@@ -51,7 +51,7 @@ Command yang dibuat PM harus hemat usaha user:
 ## R8 — Proyek bersih dari file sampah (no-junk)
 Setiap file yang dibuat PM/sub-agent yang TIDAK reusable (scratch, temp, one-off
 script, draft) WAJIB dihapus (cleanup) segera setelah selesai dipakai. File produk
-(src/**, documents/**, pm/**, config) dan laporan audit (.opencode/reports) dikecualikan
+(src/**, documents/**, documents/pm/**, config) dan laporan audit (.opencode/reports) dikecualikan
 (reusable). Jangan biarkan file sampah menumpuk di repo.
 
 ## R9 — Implementasi tanpa konfirmasi (defaulting policy)
@@ -66,7 +66,7 @@ Pre-flight (wajib sebelum mulai):
 
 Selama implementasi BERJALAN:
 - PM TIDAK boleh minta konfirmasi ke user. Bila ada ambiguitas, PM ambil
-  default yang masuk akal, CATAT di pm/status.md + memory-bank, lalu lanjut.
+  default yang masuk akal, CATAT di documents/pm/status.md + memory-bank, lalu lanjut.
 - HENTIKAN hanya untuk: aksi irreversibel (delete/force-push/format),
   peringatan keamanan, atau user tidak jelas (lihat auto-clarity di AGENTS.md).
 - Setelah selesai, PM lapor ringkas + daftar default yang dipakai agar user
@@ -119,12 +119,12 @@ default PM.
 - Pilihan user BERLAKU untuk SESI YANG SAMA: setelah dipilih, PAKAI LAGI untuk
   semua task multi-agent berikutnya di sesi ini (jangan tanya ulang).
 - SESI BARU: PM WAJIB tanya lagi — jangan bawa pilihan sesi lalu. Implementasi:
-  simpan di `pm/state.md` key `multiagent_mode`; anggap "belum dipilih" kalau state
+  simpan di `documents/pm/state.md` key `multiagent_mode`; anggap "belum dipilih" kalau state
   belum mencatatnya untuk sesi berjalan.
 - Paralel hanya aman bila file-scope tiap agent TIDAK overlap (lihat
   `agent-boundaries.md`). Kalau overlap / dependen -> PM PAKSA sekuensial walau
   user pilih paralel, dan jelaskan ke user.
-  - Catat pilihan di `pm/status.md` + `pm/state.md`, lalu jalan.
+  - Catat pilihan di `documents/pm/status.md` + `documents/pm/state.md`, lalu jalan.
 
 ## R17 — Referensi eksternal untuk fitur yang diadopsi HARUS nyata
 Bila user minta PRD/doc mengadopsi fitur dari repo/sumber eksternal tertentu
@@ -145,7 +145,7 @@ semua TIDAK ada di PRD; sebaliknya PRD punya terminal xterm + self-heal yang
 Bila fitur diadopsi dari sumber eksternal, JANGAN cabut tag/sitasi inline
 (mis. "(adopsi dari 9router)") demi kebersihan dokumen. Tag itu berfungsi
 sebagai provenance: PM di sesi BARU butuh tahu asal fitur agar gak mengulang
-kesalahan (nulis dari asumsi sendiri). Catat asal di doc, bukan cuma di pm/.
+kesalahan (nulis dari asumsi sendiri). Catat asal di doc, bukan cuma di documents/pm/.
 (Pelajaran 2026-09-03: user pilih mempertahankan tag karena tanpa itu, sesi
 baru gak akan tahu konsep tersebut dimaksudkan adopsi 9router.)
 
@@ -201,9 +201,9 @@ single point of failure + boros konteks sesi PM.
 Aturan wajib:
 1. Begitu sebuah task butuh **menulis/mengubah kode**, PM WAJIB spawn spesialis
    yang cocok (`be-dev`, `fe-dev`, `fullstack-dev`, `qa-engineer`, ...) dengan
-   handover (goal, konteks `pm/`, batasan file yang boleh ditulis, definition of
+   handover (goal, konteks `documents/pm/`, batasan file yang boleh ditulis, definition of
    done) — BUKAN ngoding sendiri.
-2. Yang BOLEH PM kerjakan sendiri: file milik PM (`pm/**`), dokumen
+2. Yang BOLEH PM kerjakan sendiri: file milik PM (`documents/pm/**`), dokumen
    (`documents/**`), dan **verifikasi** (baca kode/dokumen, jalanin test, cek
    registry, exercise fitur). Verifikasi bukan implementasi.
 3. Riset yang menghasilkan perubahan kode = batas delegasi. Contoh: PM boleh
@@ -297,7 +297,7 @@ Aturan wajib (standing rule):
 1. SETIAP request user di project ini — pertanyaan, bug, fitur, riset, atau task
    kecil — LEBIH DULU masuk ke PM untuk didekomposisi + didelegasi. PM tidak boleh
    "nunggu task besar" baru gerak.
-2. Yang BOLEH dikerjakan PM sendiri (R21 ayat 2): `pm/**`, `documents/**`, dan
+2. Yang BOLEH dikerjakan PM sendiri (R21 ayat 2): `documents/pm/**`, `documents/**`, dan
    VERIFIKASI (baca kode, jalanin test, exercise fitur). DILARANG menulis/mengubah
    kode produksi atau test.
 3. Kalau eksekusi terlanjur terjadi di luar PM (violation): PM WAJIB (a) akui
@@ -308,7 +308,7 @@ Aturan wajib (standing rule):
 4. PM yang commit & merge hasil kerja sub-agent — bukan sub-agent-nya.
 
 ### R29 addendum (2026-09-07, user: "pastiin ini gak terulang, udah kesekian kalinya")
-Akar kekambuhan: rule R29 cuma ada di `pm/OPERATING_RULES.md` yang **tidak** di-
+Akar kekambuhan: rule R29 cuma ada di `documents/pm/OPERATING_RULES.md` yang **tidak** di-
 auto-load main thread. Main thread hanya baca `AGENTS.md`. Selama routing rule
 tidak ada di `AGENTS.md`, main thread tidak pernah "tahu" dan terus implementasi
 sendiri. PERBAIKAN PERMANEN: routing rule kini dicerminkan di `AGENTS.md` root
@@ -379,3 +379,22 @@ Aturan wajib:
    vs `stat -c %y file`) lalu **LAPORKAN ke user**. **User yang memutuskan restart.**
 (Pelajaran 2026-09-07: PM nyaris nyuruh restart/kill server aigate padahal sesi
 opencode hidup di dalamnya → bunuh diri.)
+
+## R33 — DILARANG bikin file/folder baru di ROOT repo; kelompokkan per peruntukan
+Pelajaran (2026-09-07, user: "kenapa di root ada folder pm? jangan bikin berantakan
+dengan sembarangan bikin file/folder, kelompokin berdasarkan peruntukkannya"): PM bikin
+folder `pm/` di root repo (Memory Bank), menabrak konvensi struktur proyek. Root repo
+harus tetap ramping.
+
+Aturan wajib:
+1. **DILARANG** membuat file ATAU folder baru di **root** repo.
+2. Semua artefak baru WAJIB masuk folder per peruntukan yang SUDAH ada:
+   `documents/**` (dokumen proyek: `documents/dev/`, `documents/architecture/`,
+   `documents/pm/`, dst), `src/**` (kode), `tests/**` (test), `.opencode/**`
+   (artefak agen/skill/rule/command/report).
+3. Memory Bank PM kini di **`documents/pm/`** (bukan root `pm/`) — selaras R5
+   (semua dokumen proyek di `documents/`).
+4. Kalau sebuah artefak **belum punya tempat yang cocok**, PM **TANYA user dulu**
+   sebelum bikin folder baru — jangan asal bikin.
+(Pelajaran 2026-09-07: folder `pm/` di root dipindah ke `documents/pm/` + semua
+referensi (46 di 13 file) diselaraskan; rule R33 dibuat biar gak keulang.)

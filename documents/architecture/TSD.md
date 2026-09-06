@@ -3,7 +3,7 @@
 **Versi:** 1.0
 **Tanggal:** 2026-09-03
 **Penulis:** Tech Architect (stand-in)
-**Sumber rujukan:** `documents/PRD.md` (PRD aigate), `docs/business/BRD.md` (BRD), `docs/analysis/FSD.md` (FSD), `docs/analysis/ERD.md` (ERD), `pm/memory-bank.md`, `pm/status.md`
+**Sumber rujukan:** `documents/PRD.md` (PRD aigate), `docs/business/BRD.md` (BRD), `docs/analysis/FSD.md` (FSD), `docs/analysis/ERD.md` (ERD), `documents/pm/memory-bank.md`, `documents/pm/status.md`
 **Lingkup tulis:** `docs/architecture/` (per aturan specialist Tech Architect).
 
 ---

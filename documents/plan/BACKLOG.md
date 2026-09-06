@@ -9,7 +9,7 @@ ini untuk delegasikan ke sub-agent (be-dev / fe-dev / qa) secara rapi.
 - Status: `todo` | `in_progress` | `done`
   - Owner: `be-dev` | `fe-dev` | `qa` | `PM`
 - `Dep`: task yang harus selesai duluan.
-- **Aturan wajib (lihat `pm/OPERATING_RULES.md`):**
+- **Aturan wajib (lihat `documents/pm/OPERATING_RULES.md`):**
   - R10 Stack: FastAPI `<0.100` + Pydantic **v1** (pure Python, no Rust).
   - R11 Secret + config = **plaintext di DB** (tanpa enkripsi, tanpa masking UI).
   - R12 Logging **wajib ke `LogEntry`** (severity+stacktrace); dilarang `except: pass`.
@@ -98,5 +98,5 @@ ini untuk delegasikan ke sub-agent (be-dev / fe-dev / qa) secara rapi.
 
 ## Catatan
 - Urutan mempertimbangkan dependensi; jangan mulai Fase 2 sebelum B0.2 siap.
-- Tiap task selesai: update status di file ini + log ke `pm/status.md`.
+- Tiap task selesai: update status di file ini + log ke `documents/pm/status.md`.
 - Implementasi berjalan tanpa konfirmasi (R9); PM catat default yg dipakai.

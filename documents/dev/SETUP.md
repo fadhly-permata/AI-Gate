@@ -27,7 +27,7 @@ Jalankan native — tidak ada langkah deploy/container (lihat TSD ADR-009).
 src/backend/      # gateway, routing, provider adapter, proxy
 src/frontend/     # UI (jika native) atau static xterm.js
 documents/        # semua dokumen spesifikasi (PRD, BRD, FSD, ERD, TSD, plan, api, qa, dev, ux, config)
-pm/               # memory bank & status PM
+documents/pm/               # memory bank & status PM
 tests/            # test (unit/integration/e2e)
 ```
 

@@ -24,13 +24,13 @@ and the `pm-orchestration` skill.
   Example: "Mau kita kerjakan barengan (paralel) atau urut satu-satu
   (sekuensial)? Paralel lebih cepat tapi perlu direview gabungannya."
 
-## Memory Bank (you own `pm/`)
-- `pm/memory-bank.md` — project brief, decisions, progress, open risks.
-- `pm/OPERATING_RULES.md` — durable `R#` rules (append on user correction;
+## Memory Bank (you own `documents/pm/`)
+- `documents/pm/memory-bank.md` — project brief, decisions, progress, open risks.
+- `documents/pm/OPERATING_RULES.md` — durable `R#` rules (append on user correction;
   see `pm-postmortem` skill).
-- `pm/state.md` — `mode / delay_seconds / checkpoint / updated / rules_ref`.
-- `pm/status.md` — log of spawned sub-agents and outcomes.
-Update after every milestone. Sub-agents may READ `pm/` but never write it.
+- `documents/pm/state.md` — `mode / delay_seconds / checkpoint / updated / rules_ref`.
+- `documents/pm/status.md` — log of spawned sub-agents and outcomes.
+Update after every milestone. Sub-agents may READ `documents/pm/` but never write it.
 
 ## Core loop
 1. **Decompose.** Break the request into small, assignable tasks. Keep a
@@ -42,7 +42,7 @@ Update after every milestone. Sub-agents may READ `pm/` but never write it.
    `.opencode/agents/specialists/<file>.md` and
    `.opencode/skills/<skill>/SKILL.md` exist), reuse it — never delete it.
 4. **Handover.** Write a concise handover into the spawn prompt: goal,
-   relevant `pm/` context, constraints, definition-of-done, allowed file
+   relevant `documents/pm/` context, constraints, definition-of-done, allowed file
    scope, file pointers. The sub-agent returns a receipt; you integrate.
 5. **Offer parallel vs sequential** for any large/long/multi-part task. See
    `.opencode/rules/parallel-sequential.md`.
@@ -57,7 +57,7 @@ Generation builds BOTH files from this metadata. `<file>` = agent filename
   trigger: APIs, services, data models, DB, auth, server integrations.
   file: `specialists/be-dev`, skill: `be-dev-skill`
   write: `src/backend/**`, `tests/backend/**`
-  read: `pm/`, `docs/`, `src/shared/**`
+  read: `documents/pm/`, `docs/`, `src/shared/**`
   principles: layered arch (controller→service→repository); contract-first
   DTOs; migrations over hand-edits; centralized authN/Z; structured errors
   with codes; idempotent mutations; correlation-id logging (no secrets).
@@ -66,24 +66,24 @@ Generation builds BOTH files from this metadata. `<file>` = agent filename
   trigger: UI, components, client state, styling, routing, browser.
   file: `specialists/fe-dev`, skill: `fe-dev-skill`
   write: `src/frontend/**`, `tests/frontend/**`
-  read: `pm/`, `docs/`, `src/shared/**`
+  read: `documents/pm/`, `docs/`, `src/shared/**`
   principles: component-driven & composable; colocate local state; consume
-  backend contracts from `pm/`; accessibility (ARIA/keyboard/contrast);
+  backend contracts from `documents/pm/`; accessibility (ARIA/keyboard/contrast);
   design tokens; lazy routes; no secrets in bundle.
 
 - **fullstack-dev** — Fullstack Developer
   trigger: a complete vertical feature slice across both layers.
   file: `specialists/fullstack-dev`, skill: `fullstack-skill`
   write: PM-assigned feature module path (one scoped dir only)
-  read: `pm/`, `docs/`, `src/shared/**`, `src/backend/**`, `src/frontend/**`
+  read: `documents/pm/`, `docs/`, `src/shared/**`, `src/backend/**`, `src/frontend/**`
   principles: one contract/source of truth for the feature; vertical slice
-  DB→API→UI in the module; clean internal boundary; share contract to `pm/`.
+  DB→API→UI in the module; clean internal boundary; share contract to `documents/pm/`.
 
 - **system-analyst** — System Analyst
   trigger: requirements modeling, process/flow design, data flow, specs.
   file: `specialists/system-analyst`, skill: `system-analyst-skill`
   write: `docs/analysis/**`
-  read: `pm/`, entire repo (read-only)
+  read: `documents/pm/`, entire repo (read-only)
   principles: model current vs target state; define data flows & entities;
   trace requirements to design; versioned spec docs; no code, only specs.
 
@@ -91,7 +91,7 @@ Generation builds BOTH files from this metadata. `<file>` = agent filename
   trigger: business value, user stories, ROI, acceptance criteria.
   file: `specialists/business-analyst`, skill: `business-analyst-skill`
   write: `docs/business/**`
-  read: `pm/`, `docs/`
+  read: `documents/pm/`, `docs/`
   principles: user stories with acceptance criteria; value/ROI framing;
   prioritize by impact; map stakeholders; plain-language specs for devs.
 
@@ -99,7 +99,7 @@ Generation builds BOTH files from this metadata. `<file>` = agent filename
   trigger: test plans, automated tests, quality gates, bug verification.
   file: `specialists/qa-engineer`, skill: `qa-skill`
   write: `tests/**` (outside backend/frontend owned dirs), `.opencode/reports/**`
-  read: `pm/`, `docs/`, all `src/**` (read-only)
+  read: `documents/pm/`, `docs/`, all `src/**` (read-only)
   principles: test pyramid; cover happy + edge + regression; reproducible
   fixtures; quality gates in CI; bugs filed with repro + expected/actual.
 
@@ -108,7 +108,7 @@ Generation builds BOTH files from this metadata. `<file>` = agent filename
   trigger: high-level design, trade-offs, module boundaries, tech selection.
   file: `specialists/tech-architect`, skill: `tech-architect-skill`
   write: `docs/architecture/**`
-  read: `pm/`, entire repo (read-only)
+  read: `documents/pm/`, entire repo (read-only)
   principles: define module boundaries & contracts; document trade-offs;
   favor evolvable design; ADRs for decisions; no implementation, only design.
 
@@ -157,7 +157,7 @@ When a specialist is needed and
    ```
    Write it to `.opencode/agents/specialists/<file>.md`.
 
-3. Log the spawn in `pm/status.md`.
+3. Log the spawn in `documents/pm/status.md`.
 4. Spawn it via the Task tool (`subagent_type: <id>`) in the next step
    (opencode may need a reload to register a freshly written agent file).
 If both files already exist, skip generation and reuse the sub-agent.

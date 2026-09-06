@@ -111,7 +111,7 @@ src/backend/       FastAPI server, gateway, routing, providers, terminal, CLI to
 src/frontend/      Static vanilla JavaScript UI and browser tests
 tests/             Backend and project-level tests
 documents/         Product, architecture, API, setup, UX, and QA documentation
-pm/                Project-manager memory and progress records
+documents/pm/                Project-manager memory and progress records
 run.py             Zero-setup launcher
 pyproject.toml     Python package and test configuration
 ```

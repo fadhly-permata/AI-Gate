@@ -181,7 +181,7 @@ end-to-end live di browser.
 the project documents never drift apart ("align"). This is the audit trail that
 ties a running change back to the spec it implements.
 
-**Rule.** Maintained per `pm/OPERATING_RULES.md` **R22** — PM records each
+**Rule.** Maintained per `documents/pm/OPERATING_RULES.md` **R22** — PM records each
 verified code change here (newest section on top). Changes are logged AFTER they
 are verified (tests run), not before. Environment tweaks outside the repo are
 noted under "Environment (outside repo)". Not-yet-done work is marked **PENDING**

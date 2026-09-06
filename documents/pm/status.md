@@ -1,9 +1,23 @@
 # PM Status
 
+## Relokasi Memory Bank `pm/` → `documents/pm/` — 2026-09-07 (PM-owned)
+**Teguran user → RULE BARU R30... R33:** "kenapa di root ada folder pm? jangan bikin
+berantakan". Root repo harus ramping; `documents/` = rumah mapan dokumen (R5).
+- `git mv pm documents/pm` (history ke-jejak; gak ada file untracked).
+- 46 referensi `pm/` di 13 file diselaraskan → `documents/pm/` (AGENTS.md, README.md,
+  ProjectManager.md, pm-orchestration/SKILL.md, dokumen BACKLOG/TEST_PLAN/SETUP/
+  CODE_CHANGES/BRD/TSD/FSD, + isi pm itu sendiri). src/** & tests/** = 0 referensi.
+- **Verifikasi:** grep `(?<![\w/.])pm/` → **0 referensi AKTIF**; 9 sisanya = penyebutan
+  HISTORIS path lama di dalam catatan migrasi ini sendiri (status/memory-bank/R33) —
+  pengecualian berlabel. Gak ada korup `documents/documents/` / `npm`; root `pm/` hilang.
+- **R33** ditulis: dilarang bikin file/folder baru di root; artefak baru masuk folder
+  per peruntukan; belum ada tempat → tanya user dulu.
+- **Status: BELUM di-commit** (PR #4 masih terbuka; user putuskan).
+
 ## Terminal tab auto-close on shell exit — 2026-09-07 (sesi ini, PM-owned)
 **Koreksi user → RULE BARU R30:** PM salah tangkep "terminal" sebagai terminal OS
 (Termux) padahal maksud user fitur terminal DI DALAM aigate. R30 ditulis di
-`pm/OPERATING_RULES.md`: "terminal" default = fitur aigate; investigasi repo dulu;
+`documents/pm/OPERATING_RULES.md`: "terminal" default = fitur aigate; investigasi repo dulu;
 cek spec↔kode gap.
 
 **Investigasi (read-only, PM):** satu-satunya fitur terminal = multi-tab B3.2/B3.3
@@ -41,7 +55,7 @@ tab gak nutup saat shell `exit`:
 - [x] T3 PM verifikasi integrasi: kontrak BE↔FE COCOK (frame dulu → close 1000; FE
       gak nunggu yang gak dikirim BE). Test ASLI PM re-run: backend terminal **64
       passed, 1 skipped**; FE terminal_exit **14 passed**; FE full **436 passed
-      (23 files)** no regresi. Working tree bersih (cuman file scope + pm/).
+      (23 files)** no regresi. Working tree bersih (cuman file scope + documents/pm/).
 
 **Keputusan open question:**
 - Q1 `tests/frontend/terminal.test.js` (repo-root) orphaned (vitest config gak include
@@ -71,14 +85,19 @@ tab gak nutup saat shell `exit`:
 - **RULE BARU R32** ditulis: DILARANG nyuruh sub-agent kill/restart proses aigate
   (sesi opencode hidup DI DALAM aigate = bunuh diri); bukti kode lama aktif = bandingkan
   start-time vs mtime + laporkan, user yang restart.
-- **Status: SELESAI, BELUM di-commit.** Menunggu user: tes end-to-end live + keputusan
-  commit + keputusan Q1.
+- **Status: SELESAI, di-commit (`a06ef9b`) + di-push (`origin/refactor/ui`).**
+- **PR #4 dibuka: `refactor/ui` → `main`** — https://github.com/fadhly-permata/AI-Gate/pull/4
+  (BELUM merge/approve). ⚠️ Scope PR LEBAR: 11 commit / 49 file / +4384−548 — terminal
+  auto-close (headline) + seluruh UI-refactor branch (combobox/sidebar/toolbar/kebab/
+  i18n) + dokumen PM. Sudah dicatat jelas di body PR.
+- Menunggu user: tes end-to-end live di browser + keputusan review/merge PR + Q1
+  (`tests/frontend/terminal.test.js` orphan).
 
 ## PROCESS VIOLATION + i18n combo group header — 2026-09-06 (sesi ini, PM-owned)
 **Violation:** main thread mengerjakan perbaikan frontend (`combobox.group_combos`)
 sendiri tanpa lewat PM → tidak ada task list / handover / receipt / boundary check.
 **RULE BARU R29** ditulis: semua request user routing lewat PM dulu; PM hanya boleh
-menulis `pm/**` + `documents/**` + verifikasi; kalau terlanjur dikerjakan di luar PM →
+menulis `documents/pm/**` + `documents/**` + verifikasi; kalau terlanjur dikerjakan di luar PM →
 audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
 
 **Task list (PM):**
@@ -94,7 +113,7 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
       Scope tulis: `src/frontend/**` saja.
 - [ ] T6 **qa-engineer** (setelah T5, sekuensial — dependen): quality gate independen,
       cek parity en/id, grep literal bug, jalanin suite, laporan ke
-      `.opencode/reports/**`, bug → `pm/bugs.md`. Scope tulis: `tests/**` (di luar
+      `.opencode/reports/**`, bug → `documents/pm/bugs.md`. Scope tulis: `tests/**` (di luar
       frontend) + `.opencode/reports/**`.
 - [ ] T7 PM integrasi: update `documents/dev/CODE_CHANGES.md` (R22 — masih ada 4
       rujukan `Kombo/Combos` yang jadi basi), commit, update Memory Bank.
@@ -198,7 +217,7 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
 ## Implementation runner
 - Command: `.opencode/commands/run-impl.md` -> `/run-impl [fresh|continue|status]`.
   `fresh` mulai B0.1; `continue` (default) lanjut task belum selesai; `status`
-  tampilkan progres. Progres tersimpan di BACKLOG.md + pm/status.md supaya bisa
+  tampilkan progres. Progres tersimpan di BACKLOG.md + documents/pm/status.md supaya bisa
   dilanjut bila sesi terputus (batre/restart). Sesuai R9 (tanpa konfirmasi).
 - **2026-09-03 (fresh):** aktif task = **B0.1** (Inisialisasi project). Mode fresh
   dijalankan setelah `/revise-docs` menambah desain UI AdminLTE (PRD §2.7, BRD §5.7,
@@ -363,7 +382,7 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
 - 2026-09-03: **B4.3 SELESAI** (qa: pytest 101 passed/3 skipped, src coverage 79% (gate 60%);
   frontend vitest + playwright terblokir env sandbox — dilaporkan di
   `.opencode/reports/2026-09-03/qa/1350_b4_3_qa.md`. **SELURUH BACKLOG aigate SELESAI**
-  (B0.1 → B4.3). Progres tersimpan di BACKLOG.md + pm/status.md; sesi berikut cukup
+  (B0.1 → B4.3). Progres tersimpan di BACKLOG.md + documents/pm/status.md; sesi berikut cukup
   `/run-impl status` atau lanjut task baru tanpa ulang dari nol.
 - 2026-09-03: **B4.2 SELESAI** (fe-dev: i18n audit + responsif + device simulation phone
   non-AdminLTE bottom-nav + i18n EN/ID; helper deviceAttr). Lanjut otomatis **B4.3**
@@ -495,7 +514,7 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
 - Mode `continue` arg. Active task pertama belum `[x]` = **B5.1** (Multi-akun per
   provider + OAuth login + token auto-refresh). Owner `be-dev`+`fe-dev`.
 - Pilihan mode multi-agent (R16): user pilih **SEKUENSIAL** ("sekuen").
-  `multiagent_mode: sequential` di `pm/state.md`. PM jalankan be-dev dulu, lalu
+  `multiagent_mode: sequential` di `documents/pm/state.md`. PM jalankan be-dev dulu, lalu
   fe-dev setelahnya.
 - B5.1 be-dev scope: model `ProviderAccount` (ERD) + router `/api/accounts` +
   `/api/oauth/<provider>/{start,callback}` + auto-refresh `get_valid_token` +
@@ -510,7 +529,7 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
   re-spawn fe-dev (UI B5.1) untuk lanjut — scope sama: Accounts subsection di
   `#provDetail` + Add/Delete/Connect OAuth + i18n + tests/accounts.test.js.
 - Catatan R9: ambiguitas OAuth (endpoint per provider-type) → be-dev pakai registry
-  built-in + fallback 400 bila tak dikenal; log ke pm/status.md.
+  built-in + fallback 400 bila tak dikenal; log ke documents/pm/status.md.
 
 ## Run-impl session 2026-09-03 (continue) — B5.1 SELESAI
 - **B5.1 be-dev**: model `ProviderAccount` + `accounts_router.py` (CRUD + OAuth
@@ -552,7 +571,7 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
   nyaris ilang (belum di-commit).
 - User minta rule: "setiap task baru jalan langsung buat checkpoint di git;
   setiap subtask selesai langsung commit."
-- Diabadikan: **R19** di `pm/OPERATING_RULES.md` (checkpoint awal task + commit
+- Diabadikan: **R19** di `documents/pm/OPERATING_RULES.md` (checkpoint awal task + commit
   tiap subtask beres; prefix `checkpoint:`/`wip:`; hormati .gitignore; cek
   `git status` sebelum commit). Ditanam juga ke prosedur
   `.opencode/commands/run-impl.md` (langkah 3 checkpoint, langkah 5 commit/subtask,
@@ -819,7 +838,7 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
   `e876a6f` "fix: serve UI static + correct Playwright server path"); pytest
   smoke `test_health.py` PASS (1 passed). State repo konsisten dgn laporan status
   sebelumnya.
-- `pm/state.md` diupdate: mode `paused` -> `completed`, checkpoint = semua backlog
+- `documents/pm/state.md` diupdate: mode `paused` -> `completed`, checkpoint = semua backlog
   selesai.
 - Rekomendasi user (opsional, tdk otomatis): jalankan e2e nyata
   (`PW_EXECUTABLE=... PW_NO_SANDBOX=1 npm run test:e2e:android` atau Playwright
@@ -863,7 +882,7 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
 - BUG-260903-2 (medium, open): CLI Tools view kosong — perlu diisi.
 - BUG-260903-3 (medium, open): User temukan error di log — perlu investigasi
   (PM akan cek /api/logs; naikkan ke high bila terbukti blocker).
-- Semua severity auto=medium (tak ada indikasi crash/data-loss). pm/bugs.md dibuat
+- Semua severity auto=medium (tak ada indikasi crash/data-loss). documents/pm/bugs.md dibuat
   (baru) dgn header + 3 entry.
 
 ## Backend fixes 2026-09-03 (dari log triage) — SELESAI (be-dev)
@@ -889,14 +908,14 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
   `origin/refactor/ui`.
 - Pre-existing untracked files left untouched: `AGENTS.md`, `a.out`,
   `aichat-aigate.yaml`.
-- Diabadikan: R16 di `pm/OPERATING_RULES.md` (pengecualian R9), update
+- Diabadikan: R16 di `documents/pm/OPERATING_RULES.md` (pengecualian R9), update
   `.opencode/rules/parallel-sequential.md` (trigger multi-agent + session persistence
-  + forced-sequential), dan `multiagent_mode: ask` di `pm/state.md`.
+  + forced-sequential), dan `multiagent_mode: ask` di `documents/pm/state.md`.
 - Berlaku mulai sekarang: untuk BUG-260903-1 (provider model + test) yang butuh
   be-dev+fe-dev, PM akan tanya dulu mode-nya.
 
 ## BUG-260903-1 fix 2026-09-03 (sekuensial, R16) — SELESAI (be-dev -> fe-dev)
-- Mode: SEKUENSIAL (user pilih). `multiagent_mode: sequential` di pm/state.md.
+- Mode: SEKUENSIAL (user pilih). `multiagent_mode: sequential` di documents/pm/state.md.
 - be-dev dulu: +kolom `default_model` di Provider + endpoint `POST /api/providers/test`
   (body {type,base_url,api_key,model?} -> 200 {ok,error?}). Backend **114 passed, 1 skipped**.
 - fe-dev: form provider + field Model (datalist dari hasil discover) + tombol
@@ -938,7 +957,7 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
 - Insiden: user suruh referensi 9router pas bikin PRD (fitur yang diadopsi),
   tapi PRD ditulis tanpa sebutan 9router sama sekali (grep = 0 match di repo).
   Fitur adopsi diverge jauh dari 9router asli.
-- Aturan baru R17 di `pm/OPERATING_RULES.md`: bila user minta adopsi dari sumber
+- Aturan baru R17 di `documents/pm/OPERATING_RULES.md`: bila user minta adopsi dari sumber
   eksternal, PM wajib fetch + cite + align + verify (grep) sebelum klaim selesai.
 - Tindakan lanjut (belum dijalankan): selaraskan bagian fitur adopsi di PRD ke
   fitur asli 9router; pertahankan fitur khas aigate (terminal xterm, self-heal)
@@ -1072,7 +1091,7 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
 - RULE BARU **R26** (jangan ubah config project utk "install X + init X") + **R27**
   (user rujuk repo tool tertentu → PASTIKAN tool tepat sebelum install/jalanin; jangan
   asumsi package se-nama yg sudah keinstall = yang dimaksud).
-- Dokumentasi: `pm/memory-bank.md` (Tooling) + `documents/dev/CODE_CHANGES.md`
+- Dokumentasi: `documents/pm/memory-bank.md` (Tooling) + `documents/dev/CODE_CHANGES.md`
   (Environment, luar repo). Perubahan project: NOL (cuma `.codegraph/` hasil init, sdh
   di-gitignore oleh tool sendiri). `.gitignore` project TIDAK diubah.
 - BELUM di-commit (user belum minta).
@@ -1080,7 +1099,7 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
 ## Rule R28 — baca kode lewat codegraph dulu (hemat token) — 2026-09-06
 - User minta rule buat negantein: pembacaan kode HARUS lewat codegraph dulu utk dapet
   path, baru lanjut baca file yg bersangkutan (hemat token, hindari broad grep/Explore).
-- **R28** ditambah di `pm/OPERATING_RULES.md`. Berlaku utk PM + semua sub-agent.
+- **R28** ditambah di `documents/pm/OPERATING_RULES.md`. Berlaku utk PM + semua sub-agent.
 - User setuju `codegraph init` (reinit) boleh dipakai kalau index usang. PM re-init:
   `codegraph init` → index rebuild (121 files / 2,851 nodes / 9,151 edges, ~2s, "up to
   date"). Reinit dijalankan sesi ini.
@@ -1090,15 +1109,15 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
 - Kejadian: main thread (opencode) sekali lagi mengerjakan task i18n combo group
   header ("Kombo/Combos" -> localized) LANGSUNG tanpa lewat PM. User: "pastiin ini
   gak terulang, udah kesekian kalinya task gak pernah didelegasikan ke PM."
-- Akar: R29 udah ada tapi cuma di `pm/OPERATING_RULES.md` yang TIDAK di-auto-load
+- Akar: R29 udah ada tapi cuma di `documents/pm/OPERATING_RULES.md` yang TIDAK di-auto-load
   main thread. Main thread hanya baca `AGENTS.md`. Project ini belum punya
   `AGENTS.md` root -> rule gak pernah nyampe ke eksekutor -> diulang terus.
 - Perbaikan permanen:
   - CREATE `AGENTS.md` (root project) — routing rule "semua request -> @ProjectManager
     dulu; main thread DILARANG implementasi", nunjuk balik ke R29. Auto-load tiap sesi.
-  - `pm/OPERATING_RULES.md` — R29 addendum: catat akar + kewajiban PM re-create
+  - `documents/pm/OPERATING_RULES.md` — R29 addendum: catat akar + kewajiban PM re-create
     `AGENTS.md` kalau hilang.
-  - `pm/state.md` — checkpoint di-update (opsi B: perubahan diterima, 422 tests green).
+  - `documents/pm/state.md` — checkpoint di-update (opsi B: perubahan diterima, 422 tests green).
 - Verifikasi rule baru: tiap sesi, langkah pertama main thread HARUS panggil PM sebelum
   sentuh kode. Kalau nggak = pelanggaran R29.
 - Status task i18n: ACCEPTED (opsi B). Follow-up opsional (fe-dev harden + qa gate +

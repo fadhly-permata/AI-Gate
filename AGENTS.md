@@ -18,14 +18,14 @@ This is non-negotiable and has been violated repeatedly. Read before acting.
    delegate any remaining work to the owning specialist, and record it (R29 ayat 3).
 
 ### Why this file exists
-The routing rule lives in `pm/OPERATING_RULES.md` (R29), but the main thread does
-NOT auto-load `pm/**` — it only auto-loads `AGENTS.md`. So the rule never reached
+The routing rule lives in `documents/pm/OPERATING_RULES.md` (R29), but the main thread does
+NOT auto-load `documents/pm/**` — it only auto-loads `AGENTS.md`. So the rule never reached
 the executor and the mistake kept recurring. This file closes that gap: it is read
 at the start of every session in this project.
 
 ### Source of truth
-Full rule + rationale: `pm/OPERATING_RULES.md` → **R29** (and R21: PM delegates,
-never implements). PM owns `pm/`; specialists own their scoped files. Main thread
+Full rule + rationale: `documents/pm/OPERATING_RULES.md` → **R29** (and R21: PM delegates,
+never implements). PM owns `documents/pm/`; specialists own their scoped files. Main thread
 owns NOTHING here except routing.
 
 ## Language

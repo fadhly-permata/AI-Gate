@@ -55,7 +55,7 @@ PM facts:
 - Vanilla JS, no build step (R13). Match each file's existing IIFE/style.
 - DRY / KISS / SOLID / YAGNI (R25): no new abstraction beyond the parity guard.
 - **WRITE ONLY: `src/frontend/**`** (production + `src/frontend/tests/**`). Never write
-  `documents/**`, `pm/**`, `src/backend/**`. Do NOT change the existing
+  `documents/**`, `documents/pm/**`, `src/backend/**`. Do NOT change the existing
   `combobox.group_combos` values ("Combos"/"Kombo") — accepted as-is.
 - Do NOT run any state-changing git command (add / commit / stash / checkout / restore).
   PM owns commits (R21).

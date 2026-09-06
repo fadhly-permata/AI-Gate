@@ -7,6 +7,14 @@
 - 2026-09-03: Arsitektur agen PM + sub-agent spesialis (on-demand, scoped).
 
 ## Decisions
+- 2026-09-07 (R33 + relokasi Memory Bank): folder `pm/` DIHAPUS dari root → pindah ke
+  **`documents/pm/`** (`git mv`, history ke-jejak). Alasan: root repo harus ramping;
+  `documents/` = rumah mapan dokumen proyek (R5). 46 referensi `pm/` di 13 file
+  (AGENTS.md, README.md, .opencode/agents/ProjectManager.md, .opencode/skills/
+  pm-orchestration/SKILL.md, dokumen BACKLOG/TEST_PLAN/SETUP/CODE_CHANGES/BRD/TSD/FSD,
+  + file pm itu sendiri) diselaraskan ke `documents/pm/`. src/** & tests/** = 0 referensi.
+  Rule **R33** ditulis: dilarang bikin file/folder baru di root; artefak baru masuk folder
+  per peruntukan; belum ada tempat → tanya user dulu.
 - 2026-09-07 (R30): Kata "terminal" = fitur terminal aigate (multi-tab xterm + PTY WS),
   BUKAN terminal OS/emulator. Investigasi repo dulu sebelum jawab pertanyaan fitur.
 - 2026-09-06 (i18n label policy): Label UI TIDAK boleh berupa string gabungan bilingual
@@ -38,8 +46,10 @@
   versi baru. BE **terbukti benar via runtime** (frame exit + close 1000 terkirim).
   RESOLUSI FINAL: FE hardened (exit frame + close(1000) → tutup tab) + **toast
   `term.session_ended` (id+en)** + **cache-buster `?v=20260906` di index.html**.
-  ANGKA FINAL (PM re-run): FE **442 passed**, BE **65 passed / 1 skipped**. Belum
-  di-commit. RULE BARU **R32**: dilarang nyuruh sub-agent kill/restart proses aigate
+  ANGKA FINAL (PM re-run): FE **442 passed**, BE **65 passed / 1 skipped**.
+  **DI-COMMIT `a06ef9b` + PUSH `origin/refactor/ui`. PR #4 `refactor/ui`→`main`:**
+  https://github.com/fadhly-permata/AI-Gate/pull/4 (belum merge; scope PR lebar =
+  11 commit/49 file, terminal + seluruh UI-refactor branch — sudah dicatat di body). RULE BARU **R32**: dilarang nyuruh sub-agent kill/restart proses aigate
   (sesi opencode hidup DI DALAM aigate = bunuh diri); bukti kode lama aktif cukup
   bandingkan start-time vs mtime + laporkan, user yang restart.
 - 2026-09-07: **Terminal tab auto-close on shell exit** — investigasi PM (read-only).

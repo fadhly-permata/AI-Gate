@@ -12,8 +12,8 @@ verify, and file bugs.
   instead of a locale-appropriate label. Fix (already applied + hardened by fe-dev):
   label resolves via `getStr("combobox.group_combos")` → `"Combos"` (en) / `"Kombo"` (id);
   `combobox.js` gained `setGroupOrder()` so the pinned group is re-resolved per fetch.
-- Read `pm/handovers/2026-09-06-fe-dev-combo-i18n.md` for the intended scope, and
-  `pm/memory-bank.md` for project rules context.
+- Read `documents/pm/handovers/2026-09-06-fe-dev-combo-i18n.md` for the intended scope, and
+  `documents/pm/memory-bank.md` for project rules context.
 - fe-dev's receipt will be summarized by PM in this session; verify the CODE, not the claim.
 
 ## Checks to perform (all read-only on src/**)
@@ -44,7 +44,7 @@ verify, and file bugs.
 - **WRITE ONLY:** `tests/**` outside `src/frontend/**` and `src/backend/**` (those dirs
   belong to fe-dev/be-dev — do NOT edit them), plus `.opencode/reports/**`.
 - Never edit production source. Findings go in the report; real defects go through
-  `/log-bug` into `pm/bugs.md`.
+  `/log-bug` into `documents/pm/bugs.md`.
 - Do NOT run state-changing git commands. PM owns commits.
 - Quality gate must include the DRY/KISS/SOLID/YAGNI principle review
   (`.opencode/rules/code-quality-principles.md`) on the changed frontend files.
