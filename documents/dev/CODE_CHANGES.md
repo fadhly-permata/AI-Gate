@@ -1,5 +1,62 @@
 # Code Changes Register (code ↔ docs alignment)
 
+## 2026-09-06 — Terminal toolbar icon-only main buttons — DONE
+
+### `src/frontend/static/index.html`
+- Removed visible Paste, Settings, and Full text from main dropdown buttons; submenu labels remain.
+
+### `src/frontend/static/styles.css`
+- Sized and centered icon-only main split buttons.
+
+### `src/frontend/tests/terminal_toolbar.test.js`
+- Added assertions for icon-only controls, accessibility labels, titles, and icon classes.
+
+**Verification.** Vitest 395 passed (21 files); syntax and diff checks passed.
+
+---
+
+## 2026-09-06 — Terminal toolbar grouped dropdowns — DONE
+
+### `src/frontend/static/index.html`
+- Reordered terminal controls into three labeled dropdown groups: Paste, Settings, Full.
+- Moved TUI Passthrough and Keep Screen On into Settings menu; retained two paste choices and two fullscreen choices.
+
+### `src/frontend/static/terminal.js`
+- Generalized dropdown setup and actions for Settings menu.
+- Synchronized TUI, wake-lock, Full Page, and Fullscreen menu ARIA states.
+
+### `src/frontend/static/i18n.js`
+- Added labels for grouped toolbar controls and Paste normal action.
+
+### `src/frontend/tests/terminal_layout.test.js`
+- Verified exact three-group order and absence of standalone controls.
+
+### `src/frontend/tests/terminal_toolbar.test.js`, `src/frontend/tests/views.test.js`
+- Updated toolbar fixture IDs and behavior coverage.
+
+**Verification.** Vitest 394 passed (21 files); syntax checks, diff check, and HTML artifact scan passed.
+
+---
+
+## 2026-09-06 — Tooltip lifecycle and independent fullscreen states — DONE
+
+### `src/frontend/static/app.js`
+- Icon popovers now auto-close 2 seconds after tap/click; timer is cleared on replacement and close events.
+
+### `src/frontend/static/terminal.js`
+- Added explicit `fullPageSelected` state and preserved it across true browser fullscreen entry/exit/failure.
+- Synchronizes Full Page and true Fullscreen `aria-pressed`/`aria-checked` independently.
+
+### `src/frontend/static/styles.css`
+- Active blue styling applies only to controls with their own active ARIA state; caret has no active mode styling.
+
+### `src/frontend/tests/terminal_toolbar.test.js`
+- Added coverage for independent visual/accessibility states and request-failure restoration.
+
+**Verification.** Vitest 394 passed (21 files), terminal toolbar 62 passed; syntax and diff checks passed.
+
+---
+
 **Purpose.** Every source-code change is logged here **per file** so the code and
 the project documents never drift apart ("align"). This is the audit trail that
 ties a running change back to the spec it implements.
@@ -9,6 +66,18 @@ verified code change here (newest section on top). Changes are logged AFTER they
 are verified (tests run), not before. Environment tweaks outside the repo are
 noted under "Environment (outside repo)". Not-yet-done work is marked **PENDING**
 and completed when it lands.
+
+---
+
+## 2026-09-06 — Terminal toolbar markup repair — DONE ✅
+
+**Goal.** Remove accidental tool-call text rendered beside the fullscreen icon and restore valid terminal toolbar HTML.
+
+### `src/frontend/static/index.html`
+- Replaced corrupted fullscreen split-button opening tag with valid `<span class="term-split" id="termFullscreenSplit">` markup.
+- Preserved Keep Screen On control and `fa-mobile-screen-button` icon.
+
+**Verification.** Final HTML read directly; frontend scan found no tool-call artifacts; `git diff --check` and JS syntax checks passed.
 
 ---
 

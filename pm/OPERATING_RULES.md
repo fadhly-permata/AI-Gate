@@ -234,3 +234,9 @@ dokumen selalu "align" dan bisa diaudit lintas sesi.
 Semua laporan tugas, QA, audit, dan hasil kerja wajib ditulis di
 `.opencode/reports/**`. Root-level `reports/**` dilarang; scope agent, skill,
 dokumentasi lama, dan instruksi baru wajib memakai `.opencode/reports/**`.
+
+## R24 — Verifikasi tampilan wajib mengecek artefak markup
+Setelah perubahan frontend, PM wajib memeriksa HTML final secara langsung dan
+mencari artefak tool-call/kode (`tsoassistant`, `recipient_name`, `functions.*`,
+atau teks serupa) sebelum menyatakan selesai. `git diff --check` dan syntax/unit
+test tidak cukup; markup rusak bisa lolos test tetapi tampil sebagai kode ke user.

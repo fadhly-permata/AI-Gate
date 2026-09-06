@@ -1173,7 +1173,119 @@
     }
   }
 
+  /* Shared accessible popovers for controls whose visible content is only an
+     icon. Delegation covers buttons rendered later by view modules. Native
+     title remains intact as a browser fallback; aria-label is preferred so
+     locale updates are reflected immediately. */
+  var iconPopover = null;
+  var iconPopoverTarget = null;
+  var iconPopoverTimer = null;
+
+  function clearIconPopoverTimer() {
+    if (iconPopoverTimer !== null) {
+      clearTimeout(iconPopoverTimer);
+      iconPopoverTimer = null;
+    }
+  }
+
+  function iconOnlyControl(node) {
+    if (!node || !node.matches || !node.matches("button, a")) return false;
+    if (node.disabled || node.getAttribute("aria-disabled") === "true") return false;
+    var clone = node.cloneNode(true);
+    clone.querySelectorAll("i, svg, img, .fa, [aria-hidden=\"true\"]").forEach(function (el) { el.remove(); });
+    var navIconOnly = (node.classList.contains("bn-item") ||
+      (node.classList.contains("nav-item") && document.body.classList.contains("sidebar-collapsed")));
+    return (navIconOnly || !clone.textContent.trim()) &&
+      !!(node.getAttribute("aria-label") || node.getAttribute("title"));
+  }
+
+  function closeIconPopover() {
+    clearIconPopoverTimer();
+    if (iconPopover) iconPopover.remove();
+    iconPopover = null;
+    iconPopoverTarget = null;
+  }
+
+  function positionIconPopover(control, pop) {
+    var rect = control.getBoundingClientRect();
+    var gap = 10;
+    var width = pop.offsetWidth;
+    var height = pop.offsetHeight;
+    var placements = [
+      { name: "top", space: rect.top }, { name: "bottom", space: window.innerHeight - rect.bottom },
+      { name: "right", space: window.innerWidth - rect.right }, { name: "left", space: rect.left }
+    ];
+    var placement = placements[0];
+    for (var i = 0; i < placements.length; i++) {
+      var needed = (placements[i].name === "top" || placements[i].name === "bottom") ? height + gap : width + gap;
+      if (placements[i].space >= needed) { placement = placements[i]; break; }
+      if (placements[i].space > placement.space) placement = placements[i];
+    }
+    var left = rect.left + (rect.width - width) / 2;
+    var top = rect.top - height - gap;
+    if (placement.name === "bottom") top = rect.bottom + gap;
+    if (placement.name === "left") { left = rect.left - width - gap; top = rect.top + (rect.height - height) / 2; }
+    if (placement.name === "right") { left = rect.right + gap; top = rect.top + (rect.height - height) / 2; }
+    left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
+    top = Math.max(8, Math.min(top, window.innerHeight - height - 8));
+    pop.dataset.placement = placement.name;
+    pop.style.left = left + "px";
+    pop.style.top = top + "px";
+  }
+
+  function showIconPopover(control, transient) {
+    if (!iconOnlyControl(control)) return;
+    var label = control.getAttribute("aria-label") || control.getAttribute("title");
+    if (!label || !label.trim()) return;
+    if (iconPopoverTarget !== control || !iconPopover) {
+      closeIconPopover();
+      var pop = document.createElement("div");
+      pop.className = "icon-popover";
+      pop.setAttribute("role", "tooltip");
+      pop.dataset.state = "hidden";
+      pop.textContent = label.trim();
+      document.body.appendChild(pop);
+      iconPopover = pop;
+      iconPopoverTarget = control;
+      positionIconPopover(control, pop);
+      requestAnimationFrame(function () {
+        if (iconPopover === pop) pop.dataset.state = "visible";
+      });
+    } else {
+      positionIconPopover(control, iconPopover);
+    }
+    if (transient) {
+      clearIconPopoverTimer();
+      iconPopoverTimer = setTimeout(closeIconPopover, 2000);
+    }
+  }
+
+  function initIconPopovers() {
+    document.addEventListener("pointerover", function (e) {
+      var control = e.target.closest && e.target.closest("button, a");
+      if (control && (!e.relatedTarget || !control.contains(e.relatedTarget))) showIconPopover(control);
+    });
+    document.addEventListener("pointerout", function (e) {
+      var control = e.target.closest && e.target.closest("button, a");
+      if (control && iconPopoverTarget === control && (!e.relatedTarget || !control.contains(e.relatedTarget)) && document.activeElement !== control) closeIconPopover();
+    });
+    document.addEventListener("focusin", function (e) { showIconPopover(e.target.closest && e.target.closest("button, a")); });
+    document.addEventListener("focusout", function (e) {
+      var control = e.target.closest && e.target.closest("button, a");
+      if (control && iconPopoverTarget === control && (!e.relatedTarget || !control.contains(e.relatedTarget))) closeIconPopover();
+    });
+    document.addEventListener("click", function (e) {
+      var control = e.target.closest && e.target.closest("button, a");
+      if (control && iconOnlyControl(control)) { showIconPopover(control, true); return; }
+      if (!e.target.closest || !e.target.closest(".icon-popover")) closeIconPopover();
+    });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeIconPopover(); });
+    window.addEventListener("resize", closeIconPopover);
+    window.addEventListener("scroll", closeIconPopover, true);
+  }
+
   function init() {
+    initIconPopovers();
     var theme = read(THEME_KEY, DEFAULT_THEME);
     var locale = read(LOCALE_KEY, DEFAULT_LOCALE);
     var sidebar = read(SIDEBAR_KEY, DEFAULT_SIDEBAR);

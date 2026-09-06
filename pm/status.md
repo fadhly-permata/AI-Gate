@@ -1,5 +1,31 @@
 # PM Status
 
+## Terminal toolbar icon-only labels — 2026-09-06
+- fe-dev removed visible text from main Paste, Settings, and Full dropdown buttons; kept icons, title/ARIA labels, and submenu text labels.
+- Added icon-only sizing and tests for accessibility metadata and icon classes.
+- Verification: Vitest **395 passed / 21 files**, syntax checks and `git diff --check` passed; final HTML scan clean.
+
+## Terminal toolbar grouped dropdowns — 2026-09-06
+- fe-dev changed toolbar order to `Paste → Settings → Full`.
+- Paste menu: Paste normal + Paste as Code Block. Settings menu: TUI Passthrough + Keep Screen On. Full menu: Full Page + Fullscreen.
+- Removed standalone TUI/Keep Screen On controls; generalized menu wiring and synchronized menu ARIA states.
+- Verification: frontend Vitest **394 passed / 21 files**, syntax checks and `git diff --check` passed; HTML scan confirmed exactly three groups and no artifacts.
+
+## Incident: corrupted frontend markup — 2026-09-06
+- User reported icons rendered as code. Root cause: literal tool-call artifact was inserted into `src/frontend/static/index.html` at the fullscreen split-button span.
+- fe-dev removed artifact and restored valid HTML. Verified final markup, searched frontend for tool artifacts (none), `git diff --check`, and JS syntax checks passed.
+- New durable rule: **R24** — inspect final HTML and scan for tool-call/code artifacts after every frontend change; tests alone are insufficient.
+
+## Fullscreen/tooltip state fix — 2026-09-06
+- fe-dev made icon popovers transient: tap auto-closes after 2 seconds; Escape/outside/scroll/resize close immediately.
+- Full Page and true browser Fullscreen now use explicit independent state; only selected mode gets blue active styling, caret stays neutral; ARIA states synchronized.
+- Verification: node checks + `git diff --check` passed; Vitest **394 passed / 21 files**, terminal toolbar **62 passed**; frontend artifact scan clean.
+
+## Recent UI polish — 2026-09-06
+- fe-dev restored terminal `#termKeepAwake`, changed icon from ambiguous sun to `fa-mobile-screen-button`, and kept wake-lock behavior intact.
+- fe-dev added delegated popover tooltips for icon-only buttons/links in `app.js` + `styles.css`; labels use `aria-label`/`title`; hover/focus/tap, Escape, outside click, resize, and scroll handled.
+- Verification: `node --check` passed for `app.js` and `terminal.js`; `git diff --check` passed; frontend Vitest **392 passed / 21 files**, terminal toolbar **60 passed**.
+
 ## Spawned sub-agents (generated on demand)
 - business-analyst (+skill) — dibuat saat doc creation (2026-09-03).
 - system-analyst (+skill) — dibuat saat doc creation (2026-09-03).

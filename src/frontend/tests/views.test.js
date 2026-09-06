@@ -126,7 +126,7 @@ describe("terminal container chrome removed — flattened view (regression guard
 
   it("JS-referenced terminal IDs survive the flattening", () => {
     ["terminalBody", "termStage", "termContainers", "termTabBar", "termNewTab",
-     "termFloating", "termFullscreen", "termPaste", "termTui"].forEach(function (id) {
+     "termFloating", "termFullscreen", "termPaste", "termSettings", "termMenuTui", "termMenuKeepAwake"].forEach(function (id) {
       expect(doc.getElementById(id), "#" + id + " present").not.toBeNull();
     });
   });

@@ -163,8 +163,7 @@
   }
 
   /* Can this browser take a screen wake lock? navigator.wakeLock only EXISTS
-     in a secure context (https, or http://localhost / 127.0.0.1), so this is
-     also the "are we on a plain-http LAN address" test. Pure + testable. */
+     in a secure context (https, or http://localhost / 127.0.0.1). */
   function wakeLockSupported(nav) {
     nav = nav || (typeof navigator !== "undefined" ? navigator : null);
     if (!nav) return false;
@@ -237,7 +236,7 @@
   var emptyNewTabBtn = null; // the hint's own "New Tab" affordance
   var stageResizeObs = null; // BUG2: ResizeObserver on the shared .term-stage
   var debouncedRefit = null;  // BUG2: debounced refitActive() for resize storms
-  var fsCarriedFullPage = false; // true fullscreen added the full-page class
+  var fullPageSelected = false; // user-selected Full Page mode
 
   function activeTab() { return activeId ? tabs.get(activeId) : null; }
 
@@ -582,6 +581,7 @@
     observeActiveStage();
     var tab = tabs.get(id);
     if (tab) { try { tab.term.focus(); } catch (e) {} }
+    syncTuiMenu();
   }
 
   function refitActive() {
@@ -652,15 +652,8 @@
    * exactly what it always was — the caret only ADDS choices. */
   function toggleFullscreen() {
     if (!bodyEl) return;
-    var on = bodyEl.classList.toggle("terminal-fullscreen");
-    var btn = document.getElementById("termFullscreen");
-    if (btn) {
-      var icon = btn.querySelector("i");
-      if (icon) icon.className = on ? "fa fa-compress" : "fa fa-expand";
-      btn.title = t(on ? "term.exit_full_page" : "term.full_page");
-      btn.setAttribute("aria-label", btn.title);
-      btn.setAttribute("aria-pressed", on ? "true" : "false");
-    }
+    fullPageSelected = !fullPageSelected;
+    bodyEl.classList.toggle("terminal-fullscreen", fullPageSelected);
     syncFullscreenMenu();
     // Refit after the layout change settles.
     requestAnimationFrame(function () { refitActive(); });
@@ -700,30 +693,11 @@
       fsCall(document, ["exitFullscreen", "webkitExitFullscreen"]);
       return;
     }
-    // Carry the full-page layout with us; remember whether it was our doing.
-    if (!bodyEl.classList.contains("terminal-fullscreen")) {
-      bodyEl.classList.add("terminal-fullscreen");
-      fsCarriedFullPage = true;
-    }
     var p = fsCall(bodyEl, ["requestFullscreen", "webkitRequestFullscreen"]);
     if (p && typeof p.catch === "function") {
-      p.catch(function () { fsRollbackCarried(); syncFullscreenMenu(); });
-    }
-  }
-
-  // Undo ONLY the full-page class we added on the way in, so exiting true
-  // fullscreen never leaves the panel in a state the user did not ask for.
-  function fsRollbackCarried() {
-    if (!fsCarriedFullPage) return;
-    fsCarriedFullPage = false;
-    if (bodyEl) bodyEl.classList.remove("terminal-fullscreen");
-    var btn = document.getElementById("termFullscreen");
-    if (btn) {
-      var icon = btn.querySelector("i");
-      if (icon) icon.className = "fa fa-expand";
-      btn.title = t("term.full_page");
-      btn.setAttribute("aria-label", btn.title);
-      btn.setAttribute("aria-pressed", "false");
+      p.catch(function () { syncFullscreenMenu(); });
+    } else if (!p) {
+      syncFullscreenMenu();
     }
   }
 
@@ -746,25 +720,23 @@
       }
       item.setAttribute("aria-checked", on ? "true" : "false");
     }
-    var fp = document.getElementById("termMenuFullPage");
-    if (fp && bodyEl) {
-      fp.setAttribute("aria-checked",
-        bodyEl.classList.contains("terminal-fullscreen") ? "true" : "false");
+    var userFullPage = fullPageSelected;
+    var main = document.getElementById("termFullscreen");
+    if (main) {
+      var icon = main.querySelector("i");
+      if (icon) icon.className = userFullPage ? "fa fa-compress" : "fa fa-expand";
+      main.title = t(userFullPage ? "term.exit_full_page" : "term.full_page");
+      main.setAttribute("aria-label", main.title);
+      main.setAttribute("aria-pressed", userFullPage ? "true" : "false");
     }
-    // The caret is a menu button, not a toggle, so it gets a styling hook rather
-    // than aria-pressed (which would fight its aria-haspopup role).
+    var fp = document.getElementById("termMenuFullPage");
+    if (fp) fp.setAttribute("aria-checked", userFullPage ? "true" : "false");
+    // The caret is a menu button, not a toggle, so it gets no active styling.
     var caret = document.getElementById("termFullscreenCaret");
-    if (caret) caret.setAttribute("data-fs", on ? "on" : "off");
+    if (caret) caret.setAttribute("data-fs", "off");
   }
 
   function onFullscreenChange() {
-    if (!fsElement()) fsRollbackCarried();
-    else if (bodyEl && !bodyEl.classList.contains("terminal-fullscreen")) {
-      // The engine went full-screen without us (e.g. a gesture on the element):
-      // still carry the layout class so the flex chain fills the screen.
-      bodyEl.classList.add("terminal-fullscreen");
-      fsCarriedFullPage = true;
-    }
     syncFullscreenMenu();
     refitActive(); // the box changed size; ResizeObserver helps, refit anyway
   }
@@ -826,7 +798,9 @@
     catch (e) { /* storage unavailable → the toggle still works for this page */ }
   }
 
-  function keepAwakeBtn() { return document.getElementById("termKeepAwake"); }
+  function keepAwakeBtn() { return document.getElementById("termMenuKeepAwake"); }
+
+  function tuiMenuItem() { return document.getElementById("termMenuTui"); }
 
   /* Paint the button from the state triple (supported / held / error). */
   function renderKeepAwake(errTitle) {
@@ -836,6 +810,7 @@
       btn.setAttribute("aria-disabled", "true");
       btn.disabled = true;
       btn.setAttribute("aria-pressed", "false");
+      btn.setAttribute("aria-checked", "false");
       var why = t("term.keep_awake_unsupported");
       btn.title = why;
       btn.setAttribute("aria-label", why);
@@ -845,6 +820,7 @@
     btn.disabled = false;
     var held = !!keepAwake.sentinel;
     btn.setAttribute("aria-pressed", held ? "true" : "false");
+    btn.setAttribute("aria-checked", held ? "true" : "false");
     var label = errTitle || t(held ? "term.keep_awake_on" : "term.keep_awake_off");
     btn.title = label;
     btn.setAttribute("aria-label", label);
@@ -913,9 +889,11 @@
   }
 
   function setupKeepAwake() {
+    var btn = keepAwakeBtn();
+    // Keep legacy callers harmless when toolbar no longer includes this control.
+    if (!btn) return;
     keepAwake.supported = wakeLockSupported();
     keepAwake.desired = keepAwake.supported ? readKeepAwakeIntent() : false;
-    var btn = keepAwakeBtn();
     // Marker lives ON the element, so a rebuilt DOM re-wires but a re-run of
     // setup against the same node never stacks a second listener (which would
     // toggle the lock twice per tap).
@@ -1064,11 +1042,25 @@
       document.getElementById("termPasteCaret"),
       document.getElementById("termPasteMenu")
     );
+    var settingsMenu = createTermMenu(
+      document.getElementById("termSettingsCaret"),
+      document.getElementById("termSettingsMenu")
+    );
+
+    // Settings main button is intentionally a menu opener, matching its caret.
+    var settingsMain = document.getElementById("termSettings");
+    if (settingsMain && !settingsMain._termSettingsWired) {
+      settingsMain._termSettingsWired = true;
+      settingsMain.addEventListener("click", function () {
+        if (settingsMenu) settingsMenu.open(true);
+      });
+    }
 
     bindOnce(document.getElementById("termMenuFullPage"), "_tmWired", toggleFullscreen);
     bindOnce(document.getElementById("termMenuFullscreen"), "_tmWired", toggleTrueFullscreen);
     bindOnce(document.getElementById("termMenuPaste"), "_tmWired", pasteActive);
     bindOnce(document.getElementById("termMenuPasteCode"), "_tmWired", pasteAsCodeBlock);
+    bindOnce(document.getElementById("termMenuTui"), "_tmWired", toggleTui);
 
     if (!controlMenusWired) {
       controlMenusWired = true;
@@ -1080,7 +1072,18 @@
     }
 
     syncFullscreenMenu();
-    return { fullscreen: fsMenu, paste: pasteMenu };
+    renderKeepAwake();
+    syncTuiMenu();
+    return { fullscreen: fsMenu, paste: pasteMenu, settings: settingsMenu };
+  }
+
+  function syncTuiMenu() {
+    var tab = activeTab();
+    var item = tuiMenuItem();
+    if (!item) return;
+    var on = !!(tab && tab.tuiMode);
+    item.setAttribute("aria-checked", on ? "true" : "false");
+    item.setAttribute("aria-pressed", on ? "true" : "false");
   }
 
   function toggleTui() {
@@ -1088,9 +1091,10 @@
     if (!tab) return;
     tab.tuiMode = !tab.tuiMode;
     stopInertia(); // a fling must not keep scrolling into a just-enabled passthrough
-    var btn = document.getElementById("termTui");
+    var btn = tuiMenuItem();
     if (btn) {
       btn.setAttribute("aria-pressed", tab.tuiMode ? "true" : "false");
+      btn.setAttribute("aria-checked", tab.tuiMode ? "true" : "false");
       btn.title = t(tab.tuiMode ? "term.tui_on" : "term.tui_off");
       btn.setAttribute("aria-label", btn.title);
     }
@@ -1274,9 +1278,6 @@
     if (fs) fs.addEventListener("click", toggleFullscreen);
     var pst = document.getElementById("termPaste");
     if (pst) pst.addEventListener("click", pasteActive);
-    var tui = document.getElementById("termTui");
-    if (tui) tui.addEventListener("click", toggleTui);
-
     setupControlMenus();
     setupKeepAwake();
 
@@ -1385,7 +1386,6 @@
     _toggleTrueFullscreen: toggleTrueFullscreen,
     _onFullscreenChange: onFullscreenChange,
     _fsSupported: fsSupported,
-    _fsCarriedFullPage: function () { return fsCarriedFullPage; },
     _pasteActive: pasteActive,
     _pasteAsCodeBlock: pasteAsCodeBlock,
     _createTermMenu: createTermMenu,
