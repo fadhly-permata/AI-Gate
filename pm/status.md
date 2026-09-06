@@ -939,3 +939,34 @@
   file stabil (md5 tak berubah, 0 penulis aktif). Suite: **21 file / 390 passed**
   (330 + 60), 0 regresi. `CODE_CHANGES.md` di-flip PENDING->DONE (R22 dijalankan).
   Belum di-commit.
+
+## codegraph init (colbymchenry) — 2026-09-06 (PM, tooling/verify)
+- Request user: "install codegraph dan init codegraph pada project ini" + rujuk repo
+  https://github.com/colbymchenry/codegraph. Klarifikasi user: BUKAN daftarkan ke
+  project (R26) — tool di-install global, lalu `codegraph init` di project.
+- PM sempat SALAH: pakai xnuinside/codegraph (v1.2.0 pip, se-nama) → di-uninstall
+  (`pip uninstall codegraph`) & diganti @colbymchenry/codegraph (npm global v1.6.0).
+  R27 lahir dari insiden ini.
+- TERMUX HACK (env luar repo, lihat CODE_CHANGES.md): force `target='linux-arm64'` di
+  shim, ganti shebang shim ke node absolut, exec `node` bundle lewat loader glibc
+  `/usr/glibc/lib/ld-linux-aarch64.so.1` (Termux gak punya build android & loader glibc
+  standar). Bundle di-cache `~/.codegraph/bundles/linux-arm64-1.6.0`.
+- INIT SELESAI: `codegraph init` di project root → `.codegraph/codegraph.db` (11.3MB).
+  **121 files (80 py + 41 js), 2,851 nodes, 9,151 edges** in 2.0s. `codegraph status`
+  → "Index is up to date". `.codegraph/.gitignore` sudah abaikan db.
+- RULE BARU **R26** (jangan ubah config project utk "install X + init X") + **R27**
+  (user rujuk repo tool tertentu → PASTIKAN tool tepat sebelum install/jalanin; jangan
+  asumsi package se-nama yg sudah keinstall = yang dimaksud).
+- Dokumentasi: `pm/memory-bank.md` (Tooling) + `documents/dev/CODE_CHANGES.md`
+  (Environment, luar repo). Perubahan project: NOL (cuma `.codegraph/` hasil init, sdh
+  di-gitignore oleh tool sendiri). `.gitignore` project TIDAK diubah.
+- BELUM di-commit (user belum minta).
+
+## Rule R28 — baca kode lewat codegraph dulu (hemat token) — 2026-09-06
+- User minta rule buat negantein: pembacaan kode HARUS lewat codegraph dulu utk dapet
+  path, baru lanjut baca file yg bersangkutan (hemat token, hindari broad grep/Explore).
+- **R28** ditambah di `pm/OPERATING_RULES.md`. Berlaku utk PM + semua sub-agent.
+- User setuju `codegraph init` (reinit) boleh dipakai kalau index usang. PM re-init:
+  `codegraph init` → index rebuild (121 files / 2,851 nodes / 9,151 edges, ~2s, "up to
+  date"). Reinit dijalankan sesi ini.
+- BELUM di-commit (user belum minta).

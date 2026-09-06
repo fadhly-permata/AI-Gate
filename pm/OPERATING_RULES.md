@@ -250,3 +250,37 @@ DRY, KISS, SOLID, YAGNI — terangkum di `.opencode/rules/code-quality-principle
   pelanggaran = bug, laporkan via `/log-bug`.
 - PM tolak receipt yang copy-paste atau over-engineer.
 (Pelajaran 2026-09-06: user minta ada penegasan tertulis soal prinsip kode.)
+
+## R26 — "install X + init X" buat tool YANG SUDAH ADA = jangan ubah config project
+Pelajaran (2026-09-06, user: "salah tangkap lu, bukan di install di project ini,
+cuma init/index project ini ya"): bila user minta "install X dan init X" di mana X
+SUDAH terpasang di environment (global pip/npm/...), PM TIDAK boleh menambah X ke
+dependency project (pyproject / package.json / requirements) atau mengubah config
+project lainnya. "install" cukup = pastiin tool terpasang & callable; "init" =
+JALANKAN tool tsb untuk meng-index/memproses project (contoh: `codegraph` bikin graf
+dependency). Jangan interpretasikan sebagai "daftarkan ke project". (Exception:
+  bila X BELUM terpasang dan user mau jadi dep project → baru tambah ke pyproject.)
+
+## R27 — User rujuk tool via repo tertentu → PASTIKAN tool tepat sebelum install/jalanin
+Pelajaran (2026-09-06, user: "codegraph yang ini kan yang lu terapin:
+https://github.com/colbymchenry/codegraph"): bila user sebut/menautkan tool lewat URL
+repo tertentu, PM WAJIB verifikasi bahwa tool yang akan di-install/jalankan = repo itu,
+BUKAN package se-nama yang kebetulan SUDAH terpasang di environment. Di sesi ini PM
+salah pakai xnuinside/codegraph (pip v1.2.0) karena namanya sama dgn
+colbymchenry/codegraph yg user maksud → buang waktu + salah index. Aturan: fetch README
+  repo yg dirujuk, cocokkan nama + cara install SEBELUM bertindak.
+
+## R28 — Baca kode HARUS lewat codegraph dulu (hemat token)
+Pelajaran (2026-09-06, user: "buat rule buat negantein bahwa pembacaan kode harus
+lewat codegraph dulu utk dapet path kodenya, baru lanjut ke file yg bersangkutan"):
+PM & SELURUH sub-agent (be-dev, fe-dev, fullstack, qa, analyst, architect) WAJIB
+jadikan codegraph langkah PERTAMA saat perlu menemukan/membaca kode:
+  1. Tanya codegraph (CLI `codegraph` / MCP `codegraph_explore`) untuk dapatkan PATH
+     file + nomor baris simbol yg dicari — BUKAN grep/glob/Explore broad ke seluruh repo.
+  2. SETELAH path diketahui, baru baca file spesifik itu saja.
+Tujuannya: hindari broad search yg boros token (ratusan file / output panjang);
+codegraph sudah punya graf penuh (project ini: 2,851 nodes / 9,151 edges) sehingga
+langsung kasih lokasi tepat — selaras cara kerja codegraph ("surgical context").
+EXCEPTION: bila index belum ada / sudah usang (kode berubah banyak) → jalanin
+`codegraph init` (reinit) dulu, BARU cari. Jangan lompat ke grep/Explore kalau
+codegraph bisa menjawab lokasinya.

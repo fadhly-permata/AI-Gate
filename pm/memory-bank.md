@@ -96,4 +96,26 @@
   `fastapi>=0.95,<0.100` + `pydantic>=1.10,<2` (Pydantic v1 pure Python, tanpa
   pydantic-core/Rust). Semua dep inti pure Python → aigate jalan di Termux & semua
   platform tanpa compile Rust. Expo/React Native ditolak (bukan pengganti backend
-  Python; tak kasih PTY utk CLI). Lihat TSD ADR-002.
+   Python; tak kasih PTY utk CLI). Lihat TSD ADR-002.
+
+## Tooling
+- 2026-09-06: **codegraph = colbymchenry/codegraph (BUKAN xnuinside)**. User rujuk repo
+  https://github.com/colbymchenry/codegraph. PM sempat salah pakai xnuinside/codegraph
+  (v1.2.0 pip, se-nama) → di-uninstall & diganti yang benar (R27).
+- Install (global, BUKAN dep project — R26): `npm i -g @colbymchenry/codegraph`
+  (v1.6.0). `codegraph init` di project root → bangun indeks di `.codegraph/`
+  (`codegraph.db` 11.3MB). Hasil: **121 files (80 py + 41 js), 2,851 nodes, 9,151
+  edges** in 2.0s. `codegraph status` → "Index is up to date".
+- **Termux/Android workaround (wajib, env luar repo):** tool ini Rust-kernel + bundled
+  Node glibc; di Termux gak ada build `android-arm64` & binary glibc butuh loader yg
+  gak ada. 3 patch (lihat CODE_CHANGES.md Environment): (1) force `target='linux-arm64'`
+  di shim; (2) shebang shim → node absolut; (3) launcher bundle exec `node` lewat loader
+  glibc `/usr/glibc/lib/ld-linux-aarch64.so.1` (loader glibc Termux ada & jalan).
+  Tanpa patch `codegraph` gagal total di Termux. Patch di env global / cache bundle —
+  hilang kalau npm reinstall / bundle dihapus.
+- Catatan: 1 baris error pasca-init `error while loading shared libraries: -e:` (spawn
+  daemon auto-sync gagal di Termux) — indeks tetap ke-build utuh & query-able. Auto-sync
+  watcher mungkin gak jalan di Termux; rebuild manual via `codegraph init` bila perlu.
+- RULE BARU **R28**: baca kode HARUS lewat codegraph dulu (dapet path + line) baru baca
+  file yg bersangkutan — hemat token, hindari broad grep/Explore. Reinit via
+  `codegraph init` kalau index usang. Berlaku utk PM + semua sub-agent.

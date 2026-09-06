@@ -247,3 +247,33 @@ reload (fresh `tabs` Map + `activeId`). Covers:
   Termux-hosted aigate server (and its terminal PTYs) are not frozen by Android
   doze when the tablet screen is off. No package installed (binary already
   present). Wake lock also acquired live in the current session (exit 0).
+
+---
+
+## 2026-09-06 — codegraph bug patch (environment, outside repo) — DONE
+
+### Environment (outside repo)
+- **colbymchenry/codegraph v1.6.0** (npm global `@colbymchenry/codegraph`) — tool
+  semantic code-graph (Rust kernel + bundled Node glibc). Di Termux/Android tool ini
+  gagal out-of-the-box karena: (a) shim deteksi `process.platform='android'` → cari
+  bundle `codegraph-android-arm64` yg TIDAK ada (404); (b) binary glibc butuh loader
+  `/lib/ld-linux-aarch64.so.1` yg gak ada di Termux, padahal loader glibc WORKING ada
+  di `/data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1` (libc.so.6 valid).
+  Tiga patch diterapkan biar jalan:
+  1. File global
+     `/data/data/com.termux/files/usr/lib/node_modules/@colbymchenry/codegraph/npm-shim.js`
+     — baris `var target = process.platform + '-' + process.arch;` diubah jadi
+     `var target = 'linux-arm64';` (paksa download bundle linux-arm64 yg valid).
+  2. Shebang shim `#!/usr/bin/env node` → `#!/data/data/com.termux/files/usr/bin/node`
+     (Termux tidak punya `/usr/bin/env`).
+  3. Launcher bundle `~/.codegraph/bundles/linux-arm64-1.6.0/bin/codegraph`: baris
+     `exec "$DIR/node" ...` diubah jadi
+     `exec /data/data/com.termux/files/usr/glibc/lib/ld-linux-aarch64.so.1 "$DIR/node" ...`
+     agar node glibc dieksekusi lewat loader glibc yang ada.
+  Tanpa patch ini `codegraph init` gagal total di Termux. Hasil: `codegraph init` di
+  project → `.codegraph/codegraph.db`, 121 files / 2,851 nodes / 9,151 edges, 2.0s.
+  CATATAN: (1)+(2) ada di global npm package — hilang kalau
+  `npm i -g @colbymchenry/codegraph` diulang; (3) ada di cache bundle
+  `~/.codegraph/bundles/linux-arm64-1.6.0` — hilang kalau dihapus. Bukan file repo;
+  tidak ikut commit. (Catatan lama soal xnuinside/codegraph sudah tidak berlaku — itu
+  tool salah yg sudah di-uninstall.)
