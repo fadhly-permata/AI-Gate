@@ -10,10 +10,10 @@
 // Yang di-drive (semua selector diverifikasi dari app.js / index.html /
 // usage.js / analytics.js — bukan asumsi):
 //   seed   : POST /api/providers + POST /api/accounts (via page.evaluate fetch)
-//   B5.1   : nav providers -> baris #provTableBody -> .js-disc -> #provDetail
-//            -> #accountsBody berisi "e2e-acc" + #provConnectOAuthBtn
-//            CATATAN: klik baris = buka modal EDIT (renderProviders app.js);
-//            jalur nyata ke #provDetail adalah tombol discover (.js-disc).
+//   B5.1   : nav providers -> baris #provTableBody -> menu aksi (kebab) ->
+//            item "discover" -> #provDetail -> #accountsBody "e2e-acc".
+//            CATATAN: semua aksi baris kini lewat menu kebab (.js-row-menu),
+//            konsisten dgn Combos/Proxy Pools/Endpoints.
 //   B5.5   : nav usage -> #quotaTableBody tr.quota-row (provider seed muncul,
 //            kemungkinan "unlimited") + #usageTotals .usage-stat
 //   B5.6   : nav analytics -> #analyticsChart .trend-col >= 1 +
@@ -133,8 +133,10 @@ async function testProvidersAccounts(pg, providerId) {
   assert((name || "").indexOf("e2e-anth") !== -1,
     "sel nama provider seed salah: " + JSON.stringify(name));
 
-  // Buka DETAIL via tombol discover di baris (openDetail -> loadAccounts).
-  await pg.click(rowSel + " .js-disc");
+  // Buka DETAIL via menu aksi (kebab) -> item "discover" (openDetail -> loadAccounts).
+  await pg.click(rowSel + " .js-row-menu");
+  await pg.waitForSelector('.row-menu .row-menu-item[data-action="discover"]', { visible: true, timeout: WAIT });
+  await pg.click('.row-menu .row-menu-item[data-action="discover"]');
   await pg.waitForFunction(() => {
     const d = document.getElementById("provDetail");
     return !!d && !d.hidden;

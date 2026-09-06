@@ -77,10 +77,47 @@
     });
   }
 
-  function markActiveLang(locale) {
-    document.querySelectorAll(".lang-btn").forEach(function (b) {
-      b.classList.toggle("active", b.getAttribute("data-lang") === locale);
-    });
+  /* ---- Language dropdown (header) ----
+     Trigger shows "[flag] [lang name]" of the ACTIVE locale; the menu lists
+     every language as "[flag] [lang name]" too. Names resolve through the
+     dictionary, so the dropdown follows the active language. */
+  function langName(l) { return getStr(l.nameKey); }
+
+  function updateLangUI(locale) {
+    var langs = window.LANGS || [];
+    var active = null;
+    langs.forEach(function (l) { if (l.code === locale) active = l; });
+    if (!active) active = langs[0];
+    var trigFlag = document.getElementById("langTriggerFlag");
+    var trigName = document.getElementById("langTriggerName");
+    if (trigFlag && active) trigFlag.textContent = active.flag;
+    if (trigName && active) trigName.textContent = langName(active);
+    var menu = document.getElementById("langMenu");
+    if (menu) {
+      menu.innerHTML = langs.map(function (l) {
+        return '<button type="button" class="lang-menu-item' +
+          (active && l.code === active.code ? " active" : "") +
+          '" data-lang="' + escapeHtml(l.code) + '" role="menuitem">' +
+          '<span class="lang-flag">' + escapeHtml(l.flag) + "</span>" +
+          '<span class="lang-name">' + escapeHtml(langName(l)) + "</span></button>";
+      }).join("");
+    }
+  }
+
+  function closeLangMenu() {
+    var menu = document.getElementById("langMenu");
+    var btn = document.getElementById("langMenuBtn");
+    if (menu) menu.hidden = true;
+    if (btn) btn.setAttribute("aria-expanded", "false");
+  }
+
+  function toggleLangMenu() {
+    var menu = document.getElementById("langMenu");
+    var btn = document.getElementById("langMenuBtn");
+    if (!menu || !btn) return;
+    var open = menu.hidden;
+    menu.hidden = !open;
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
   }
 
   // Translate a key for the active (or given) locale.
@@ -198,7 +235,7 @@
         // Keep localStorage in sync with the topbar toggle / lang buttons.
         write(THEME_KEY, f.theme.value);
         write(LOCALE_KEY, f.locale.value);
-        markActiveLang(f.locale.value);
+        updateLangUI(f.locale.value);
         setMsg(getStr("settings.saved"), "ok");
       })
       .catch(function (err) {
@@ -391,6 +428,7 @@
   }
 
   window.aigate.mapProviderToRow = mapProviderToRow;
+  window.aigate.renderProviders = renderProviders;
   window.aigate.buildHeadersDict = buildHeadersDict;
   window.aigate.headersToRows = headersToRows;
   window.aigate.saveProvider = saveProvider;
@@ -556,6 +594,105 @@
     });
   }
 
+  /* ---- Shared row action menu (kebab) ----
+     ONE consistent pattern for every management table (Providers, Combos,
+     Proxy Pools, Endpoints): an "Actions" column with a kebab button that
+     opens a dropdown of row actions (Edit / Delete / …). The menu is a
+     singleton appended to <body> (fixed positioning) so it never clips
+     inside table overflow. Modules build the button via rowMenuCellHtml()
+     and open it via rowMenu.open(btn, actions). */
+  var rowMenuEl = null;
+  var rowMenuBtn = null;
+
+  function closeRowMenu() {
+    if (!rowMenuEl) return;
+    rowMenuEl.remove();
+    rowMenuEl = null;
+    if (rowMenuBtn) rowMenuBtn.setAttribute("aria-expanded", "false");
+    rowMenuBtn = null;
+  }
+
+  function positionRowMenu(btn, menu) {
+    var rect = btn.getBoundingClientRect();
+    var w = menu.offsetWidth;
+    var h = menu.offsetHeight;
+    var left = Math.max(8, Math.min(rect.right - w, window.innerWidth - w - 8));
+    var top = rect.bottom + 4;
+    if (top + h > window.innerHeight - 8) top = Math.max(8, rect.top - h - 4);
+    menu.style.left = left + "px";
+    menu.style.top = top + "px";
+  }
+
+  function openRowMenu(btn, actions) {
+    var reopen = rowMenuBtn === btn;
+    closeRowMenu();
+    if (reopen) return; // second click toggles closed
+    var menu = document.createElement("div");
+    menu.className = "row-menu";
+    menu.setAttribute("role", "menu");
+    (actions || []).forEach(function (a) {
+      a = a || {};
+      if (!a.label) return;
+      var item = document.createElement("button");
+      item.type = "button";
+      item.className = "row-menu-item" + (a.danger ? " is-danger" : "");
+      item.setAttribute("role", "menuitem");
+      if (a.action) item.setAttribute("data-action", a.action);
+      item.innerHTML = '<i class="fa ' + escapeHtml(a.icon || "fa-ellipsis") +
+        '" aria-hidden="true"></i><span>' + escapeHtml(a.label) + "</span>";
+      item.addEventListener("click", function () {
+        closeRowMenu();
+        if (typeof a.onClick === "function") a.onClick();
+      });
+      menu.appendChild(item);
+    });
+    document.body.appendChild(menu);
+    positionRowMenu(btn, menu);
+    menu.dataset.state = "open";
+    btn.setAttribute("aria-expanded", "true");
+    rowMenuEl = menu;
+    rowMenuBtn = btn;
+  }
+
+  // Kebab cell markup for a table row. `actions` are resolved lazily by
+  // rowMenu.open on click, so labels follow the active locale.
+  function rowMenuCellHtml() {
+    return '<td class="row-actions">' +
+      '<button type="button" class="icon-btn-small js-row-menu" aria-haspopup="true" ' +
+      'aria-expanded="false" title="' + escapeHtml(getStr("common.actions")) + '" ' +
+      'aria-label="' + escapeHtml(getStr("common.actions")) + '">' +
+      '<i class="fa fa-ellipsis-vertical"></i></button></td>';
+  }
+
+  function wireRowMenu(scope, getActions) {
+    Array.prototype.forEach.call(
+      (scope || document).querySelectorAll(".js-row-menu"), function (btn) {
+        btn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          var tr = btn.closest("tr");
+          openRowMenu(btn, typeof getActions === "function" ? getActions(tr) : []);
+        });
+      });
+  }
+
+  function initRowMenuGlobal() {
+    document.addEventListener("click", function (e) {
+      if (rowMenuEl && !e.target.closest(".row-menu") && !e.target.closest(".js-row-menu")) {
+        closeRowMenu();
+      }
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") closeRowMenu();
+    });
+    window.addEventListener("resize", closeRowMenu);
+    window.addEventListener("scroll", closeRowMenu, true);
+  }
+
+  window.aigate = window.aigate || {};
+  window.aigate.rowMenu = { open: openRowMenu, close: closeRowMenu };
+  window.aigate.rowMenuCellHtml = rowMenuCellHtml;
+  window.aigate.wireRowMenu = wireRowMenu;
+
   /* ---- List ---- */
   function loadProviders() {
     setProvMsg("");
@@ -572,7 +709,7 @@
     if (!body) return;
     if (!list.length) {
       body.innerHTML = '<tr><td colspan="6" class="empty-cell">' +
-        escapeHtml(getStr("providers.no_models")) + "</td></tr>";
+        escapeHtml(getStr("providers.no_items")) + "</td></tr>";
       return;
     }
     body.innerHTML = list.map(function (p) {
@@ -586,26 +723,18 @@
         "<td>" + escapeHtml(row.base_url) + "</td>" +
         "<td>" + badge + "</td>" +
         "<td>" + row.modelCount + "</td>" +
-        '<td class="row-actions">' +
-          '<button type="button" class="icon-btn-small js-disc" title="' + escapeHtml(getStr("providers.discover")) + '">' +
-            '<i class="fa fa-magnifying-glass"></i></button>' +
-          '<button type="button" class="icon-btn-small js-del" title="' + escapeHtml(getStr("providers.delete")) + '">' +
-            '<i class="fa fa-trash"></i></button>' +
-        "</td>" +
+        rowMenuCellHtml() +
       "</tr>";
     }).join("");
 
-    Array.prototype.forEach.call(body.querySelectorAll(".prov-row"), function (tr) {
-      var id = tr.getAttribute("data-id");
-      // Whole row click -> edit (req: click a row to edit).
-      tr.addEventListener("click", function () { openEditModal(id); });
-      // Action buttons stop propagation so they don't trigger the row edit.
-      tr.querySelector(".js-disc").addEventListener("click", function (e) {
-        e.stopPropagation(); discoverModels(id);
-      });
-      tr.querySelector(".js-del").addEventListener("click", function (e) {
-        e.stopPropagation(); deleteProvider(id);
-      });
+    // Consistent with the other tables: actions live in the kebab menu only.
+    wireRowMenu(body, function (tr) {
+      var id = tr ? tr.getAttribute("data-id") : null;
+      return [
+        { action: "edit", label: getStr("common.edit"), icon: "fa-pen", onClick: function () { openEditModal(id); } },
+        { action: "discover", label: getStr("providers.discover"), icon: "fa-magnifying-glass", onClick: function () { discoverModels(id); } },
+        { action: "delete", label: getStr("common.delete"), icon: "fa-trash", danger: true, onClick: function () { deleteProvider(id); } }
+      ];
     });
   }
 
@@ -630,7 +759,8 @@
     row.innerHTML =
       '<input class="form-input hdr-key" type="text" />' +
       '<input class="form-input hdr-val" type="text" />' +
-      '<button type="button" class="icon-btn-small hdr-del" aria-label="Remove">' +
+      '<button type="button" class="icon-btn-small hdr-del" aria-label="' +
+        escapeHtml(getStr("common.remove")) + '">' +
         '<i class="fa fa-xmark"></i></button>';
     row.querySelector(".hdr-key").placeholder = getStr("providers.header_key_ph");
     row.querySelector(".hdr-val").placeholder = getStr("providers.header_val_ph");
@@ -864,7 +994,8 @@
     body.innerHTML = list.map(function (a) {
       var credential;
       if (a.auth_type === "oauth") {
-        credential = '<span class="badge badge-ok">OAuth ✓</span>';
+        credential = '<span class="badge badge-ok">' +
+          escapeHtml(getStr("accounts.oauth_badge")) + " ✓</span>";
         if (a.expires_at) {
           credential += ' <span class="acc-expires">' +
             escapeHtml(getStr("accounts.expires")) + ": " +
@@ -1190,6 +1321,7 @@
 
   function iconOnlyControl(node) {
     if (!node || !node.matches || !node.matches("button, a")) return false;
+    if (node.matches(".js-row-menu, .lang-menu-btn")) return false;
     if (node.disabled || node.getAttribute("aria-disabled") === "true") return false;
     var clone = node.cloneNode(true);
     clone.querySelectorAll("i, svg, img, .fa, [aria-hidden=\"true\"]").forEach(function (el) { el.remove(); });
@@ -1295,7 +1427,8 @@
     applySidebar(sidebar);
     applyDevice(device);
     if (window.applyLocale) window.applyLocale(locale);
-    markActiveLang(locale);
+    updateLangUI(locale);
+    initRowMenuGlobal();
 
     // --- Theme toggle ---
     var themeBtn = document.getElementById("themeToggle");
@@ -1308,16 +1441,34 @@
       });
     }
 
-    // --- Language switch ---
-    document.querySelectorAll(".lang-btn").forEach(function (b) {
-       b.addEventListener("click", function () {
-        var next = b.getAttribute("data-lang");
+    // --- Language dropdown switch ---
+    var langBtn = document.getElementById("langMenuBtn");
+    if (langBtn) {
+      langBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        toggleLangMenu();
+      });
+    }
+    var langMenu = document.getElementById("langMenu");
+    if (langMenu) {
+      langMenu.addEventListener("click", function (e) {
+        var item = e.target.closest("[data-lang]");
+        if (!item) return;
+        var next = item.getAttribute("data-lang");
         if (window.applyLocale) window.applyLocale(next);
         write(LOCALE_KEY, next);
-        markActiveLang(next);
+        updateLangUI(next);
+        closeLangMenu();
         // Keep the Log Window toggle's aria/title label in sync with the locale.
         applyLogVisible(isLogVisible());
       });
+    }
+    document.addEventListener("click", function (e) {
+      if (e.target.closest && e.target.closest(".lang-switch")) return;
+      closeLangMenu();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") closeLangMenu();
     });
 
     // --- Sidebar toggle ---

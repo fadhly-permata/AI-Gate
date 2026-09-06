@@ -710,6 +710,13 @@
         computeVisible();
         render();
       },
+      /* Re-pin the group order at runtime. Callers that localize a group name
+         (e.g. the CLI model picker's combo group) must refresh the pin after a
+         locale switch, otherwise the translated group no longer matches the
+         creation-time groupOrder and loses its top position. */
+      setGroupOrder: function (names) {
+        groupOrder = Array.isArray(names) ? names.slice() : [];
+      },
       getValue: function () {
         var inp = input();
         return inp ? String(inp.value || "").trim() : "";

@@ -166,15 +166,15 @@ describe("combos mapper + render (B2.4)", () => {
     });
   });
 
-  it("renderCombos fills the table body and escapes data", () => {
+  it("renderCombos fills the table body, escapes data, kebab menu", () => {
     window.aigate.combos.renderCombos([
       { id: 1, name: "Alpha <x>", strategy: "fallback", enabled: true, members: [] }
     ]);
     const html = document.getElementById("comboTableBody").innerHTML;
     expect(html).toContain("Alpha &lt;x&gt;");
     expect(html).toContain('data-id="1"');
-    expect(html).toContain("js-edit");
-    expect(html).toContain("js-del");
+    expect(html).toContain("js-row-menu");
+    expect(html).toContain("row-actions");
   });
 
   it("renderCombos shows the empty-state message when there are no items", () => {

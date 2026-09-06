@@ -39,15 +39,20 @@
 
         <!-- Theme toggle -->
         <button id="themeToggle" class="icon-btn" type="button"
-                aria-label="Toggle theme" title="Theme">
+                data-i18n-aria="btn.theme" aria-label="Theme" title="Theme">
           <i class="fa fa-moon"></i>
         </button>
 
-        <!-- Language switcher -->
+        <!-- Language switcher (dropdown with flags) -->
         <div class="lang-switch" role="group" aria-label="Language">
-          <button class="lang-btn" type="button" data-lang="en">EN</button>
-          <span class="lang-sep">|</span>
-          <button class="lang-btn" type="button" data-lang="id">ID</button>
+          <button id="langMenuBtn" class="lang-menu-btn" type="button"
+                  aria-haspopup="true" aria-expanded="false" aria-controls="langMenu"
+                  data-i18n-aria="btn.lang" title="Language">
+            <span class="lang-flag" id="langTriggerFlag">🇺🇸</span>
+            <span class="lang-name" id="langTriggerName">English</span>
+            <i class="fa fa-caret-down" aria-hidden="true"></i>
+          </button>
+          <div class="lang-menu" id="langMenu" role="menu" hidden></div>
         </div>
       </div>
     </header>
@@ -236,7 +241,7 @@
                 <th data-i18n="providers.base_url">Base URL</th>
                 <th data-i18n="providers.enabled">Enabled</th>
                 <th data-i18n="providers.models">Models</th>
-                <th></th>
+                <th data-i18n="common.actions">Actions</th>
               </tr>
             </thead>
             <tbody id="provTableBody"></tbody>
@@ -252,10 +257,10 @@
                 <i class="fa fa-magnifying-glass"></i>
                 <span data-i18n="providers.discover">Discover Models</span>
               </button>
-              <button class="btn" id="provEditBtn" type="button" title="Edit">
+              <button class="btn" id="provEditBtn" type="button" title="Edit" data-i18n-aria="common.edit">
                 <i class="fa fa-pen"></i>
               </button>
-              <button class="btn btn-danger" id="provDeleteBtn" type="button" title="Delete">
+              <button class="btn btn-danger" id="provDeleteBtn" type="button" title="Delete" data-i18n-aria="common.delete">
                 <i class="fa fa-trash"></i>
               </button>
             </div>
@@ -266,8 +271,8 @@
           <table class="data-table" id="provModelsTable">
             <thead>
               <tr>
-                <th>model_id</th>
-                <th>model_name</th>
+                <th data-i18n="providers.model_id">Model ID</th>
+                <th data-i18n="providers.model_name">Model Name</th>
               </tr>
             </thead>
             <tbody id="provModelsBody"></tbody>
@@ -366,7 +371,7 @@
                 <th data-i18n="combos.strategy">Strategy</th>
                 <th data-i18n="combos.enabled">Enabled</th>
                 <th data-i18n="combos.members">Members</th>
-                <th></th>
+                <th data-i18n="common.actions">Actions</th>
               </tr>
             </thead>
             <tbody id="comboTableBody"></tbody>
@@ -393,7 +398,7 @@
                 <th data-i18n="proxies.strategy">Rotation</th>
                 <th data-i18n="proxies.enabled">Enabled</th>
                 <th data-i18n="proxies.nodes">Nodes</th>
-                <th></th>
+                <th data-i18n="common.actions">Actions</th>
               </tr>
             </thead>
             <tbody id="poolTableBody"></tbody>
@@ -421,7 +426,7 @@
                 <th data-i18n="endpoints.access_control">Access Control</th>
                 <th data-i18n="endpoints.proxy_pool">Proxy Pool</th>
                 <th data-i18n="endpoints.binding">Binding</th>
-                <th></th>
+                <th data-i18n="common.actions">Actions</th>
               </tr>
             </thead>
             <tbody id="endpointTableBody"></tbody>
@@ -834,9 +839,9 @@
             <div class="form-row">
               <label class="form-label" for="comboStrategy" data-i18n="combos.strategy">Strategy</label>
               <select class="form-input" id="comboStrategy" name="strategy">
-                <option value="fallback">fallback</option>
-                <option value="load_balance">load_balance</option>
-                <option value="latency_cost">latency_cost</option>
+                <option value="fallback" data-i18n="combos.strategy.fallback">fallback</option>
+                <option value="load_balance" data-i18n="combos.strategy.load_balance">load_balance</option>
+                <option value="latency_cost" data-i18n="combos.strategy.latency_cost">latency_cost</option>
                 <option value="three_tier" data-i18n="combos.strategy.three_tier">three_tier</option>
               </select>
             </div>
@@ -938,10 +943,10 @@
             <div class="form-row">
               <label class="form-label" for="poolStrategy" data-i18n="proxies.strategy">Rotation</label>
               <select class="form-input" id="poolStrategy" name="rotation_strategy">
-                <option value="round_robin">round_robin</option>
-                <option value="random">random</option>
-                <option value="latency_cost">latency_cost</option>
-                <option value="least_latency">least_latency</option>
+                <option value="round_robin" data-i18n="proxies.strategy.round_robin">round_robin</option>
+                <option value="random" data-i18n="proxies.strategy.random">random</option>
+                <option value="latency_cost" data-i18n="proxies.strategy.latency_cost">latency_cost</option>
+                <option value="least_latency" data-i18n="proxies.strategy.least_latency">least_latency</option>
               </select>
             </div>
             <div class="form-row">
@@ -992,8 +997,8 @@
               <label class="form-label" for="endpointBindType" data-i18n="endpoints.bind_type">Bind To</label>
               <select class="form-input" id="endpointBindType" name="bind_type">
                 <option value="none" data-i18n="endpoints.none">None</option>
-                <option value="provider">provider</option>
-                <option value="combo">combo</option>
+                <option value="provider" data-i18n="endpoints.bind.provider">provider</option>
+                <option value="combo" data-i18n="endpoints.bind.combo">combo</option>
               </select>
             </div>
             <div class="form-row" id="endpointBindIdRow">

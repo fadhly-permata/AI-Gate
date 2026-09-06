@@ -113,10 +113,16 @@
      <input> wired to a custom <ul id="cliModelList"> panel. The controller is
      created LAZILY (first use) and resolves its elements by id, so it survives
      DOM rebuilds. searchInside=true gives an in-panel search box; groupBy="group"
-     groups options by provider (option.group), with the literal group
-     "Kombo/Combos" pinned to the top via groupOrder. The option VALUE stays
-     the full gateway id (provider:... / combo:...) so launch() can POST it
-     verbatim; only the LABEL is the human model portion. */
+     groups options by provider (option.group), with the combo group pinned to the
+     top via groupOrder. The combo group LABEL is localized through
+     `combobox.group_combos` ("Combos" in EN, "Kombo" in ID) — never a hardcoded
+     literal — and re-pinned on every fetch so a locale switch keeps it on top.
+     The option VALUE stays the full gateway id (provider:... / combo:...) so
+     launch() can POST it verbatim; only the LABEL is the human model portion. */
+  function comboGroupName() {
+    return getStr("combobox.group_combos");
+  }
+
   var cliModelCombo = null;
   function cliModelCtl() {
     if (!cliModelCombo && typeof window.aigate !== "undefined" &&
@@ -126,7 +132,7 @@
         listId: "cliModelList",
         searchInside: true,
         groupBy: "group",
-        groupOrder: ["Kombo/Combos"],
+        groupOrder: [comboGroupName()],
         subGroupBy: "prefix" // two-level: provider (main) -> model-name prefix (sub)
       });
     }
@@ -248,11 +254,12 @@
     return fetchJson(MODELS_API).then(function (data) {
       var list = (data && data.data) ? data.data : [];
       var c = cliModelCtl();
-      var comboCombo = "Kombo/Combos"; // literal group name (user wording)
+      var comboCombo = comboGroupName(); // localized: "Combos" (EN) / "Kombo" (ID)
+      if (c && typeof c.setGroupOrder === "function") c.setGroupOrder([comboCombo]);
       var opts = list.map(function (m) {
         var id = m.id != null ? m.id : "";
         if (id.indexOf("combo:") === 0) {
-          // Combo models stay FLAT under Kombo/Combos: explicitly opt out of
+          // Combo models stay FLAT under the combo group: explicitly opt out of
           // sub-grouping so they render directly under the main header.
           return { value: id, label: id.slice("combo:".length), group: comboCombo, subGroup: false };
         }
@@ -361,7 +368,7 @@
     onShow: loadCliTools,
     buildLaunchCommand: buildLaunchCommand,
     loadCliTools: loadCliTools,
-    _test: { renderGroups: renderGroups }
+    _test: { renderGroups: renderGroups, comboGroupName: comboGroupName }
   };
 
   if (document.readyState === "loading") {

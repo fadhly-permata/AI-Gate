@@ -130,6 +130,13 @@
     m.className = "settings-msg" + (kind ? " settings-msg-" + kind : "");
   }
 
+  /* Human label for a strategy value; unknown values fall back to raw. */
+  function strategyLabel(value) {
+    var key = "combos.strategy." + value;
+    var s = getStr(key);
+    return s === key ? String(value == null ? "" : value) : s;
+  }
+
   /* ---- List + render ---- */
   function loadCombos() {
     setMsg("");
@@ -149,6 +156,7 @@
         escapeHtml(getStr("combos.no_items")) + "</td></tr>";
       return;
     }
+    var app0 = app();
     body.innerHTML = list.map(function (c) {
       var row = mapComboToRow(c);
       var badge = row.enabled
@@ -156,27 +164,22 @@
         : '<span class="badge badge-off">' + escapeHtml(getStr("providers.disabled")) + "</span>";
       return '<tr class="combo-row" data-id="' + escapeHtml(row.id) + '">' +
         '<td class="combo-name">' + escapeHtml(row.name) + "</td>" +
-        "<td>" + escapeHtml(row.strategy) + "</td>" +
+        "<td>" + escapeHtml(strategyLabel(row.strategy)) + "</td>" +
         "<td>" + badge + "</td>" +
         "<td>" + row.memberCount + "</td>" +
-        '<td class="row-actions">' +
-          '<button type="button" class="icon-btn-small js-edit" title="' + escapeHtml(getStr("combos.edit")) + '">' +
-            '<i class="fa fa-pen"></i></button>' +
-          '<button type="button" class="icon-btn-small js-del" title="' + escapeHtml(getStr("combos.delete")) + '">' +
-            '<i class="fa fa-trash"></i></button>' +
-        "</td>" +
+        (app0.rowMenuCellHtml ? app0.rowMenuCellHtml() : "") +
       "</tr>";
     }).join("");
 
-    Array.prototype.forEach.call(body.querySelectorAll(".combo-row"), function (tr) {
-      var id = tr.getAttribute("data-id");
-      tr.querySelector(".js-edit").addEventListener("click", function (e) {
-        e.stopPropagation(); openEditModal(id);
+    if (app0.wireRowMenu) {
+      app0.wireRowMenu(body, function (tr) {
+        var id = tr ? tr.getAttribute("data-id") : null;
+        return [
+          { action: "edit", label: getStr("common.edit"), icon: "fa-pen", onClick: function () { openEditModal(id); } },
+          { action: "delete", label: getStr("common.delete"), icon: "fa-trash", danger: true, onClick: function () { deleteCombo(id); } }
+        ];
       });
-      tr.querySelector(".js-del").addEventListener("click", function (e) {
-        e.stopPropagation(); deleteCombo(id);
-      });
-    });
+    }
   }
 
   /* ================================================================
