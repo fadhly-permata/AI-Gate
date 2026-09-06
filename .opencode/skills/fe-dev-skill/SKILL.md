@@ -12,6 +12,8 @@ Scope: src/frontend/**, tests/frontend/**. Never touch other agents' write roots
 - Design tokens; lazy routes where applicable.
 - NO secrets in the frontend bundle. Keys stay server-side / injected via PTY env.
 - Keep JS clear; type where used.
+- Code quality MANDATORY: apply DRY/KISS/SOLID/YAGNI from
+  `.opencode/rules/code-quality-principles.md`. Read it before coding.
 ## Domain specifics (aigate — Web UI lokal, ADR-001)
 - UI served by the SAME FastAPI server as the gateway (static + SPA JS).
 - Terminal pane: xterm.js multi-tab + FitAddon/WebLinksAddon.

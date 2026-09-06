@@ -239,4 +239,14 @@ dokumentasi lama, dan instruksi baru wajib memakai `.opencode/reports/**`.
 Setelah perubahan frontend, PM wajib memeriksa HTML final secara langsung dan
 mencari artefak tool-call/kode (`tsoassistant`, `recipient_name`, `functions.*`,
 atau teks serupa) sebelum menyatakan selesai. `git diff --check` dan syntax/unit
-test tidak cukup; markup rusak bisa lolos test tetapi tampil sebagai kode ke user.
+test tidak cukup; markup rusak bisa lolos test   tetapi tampil sebagai kode ke user.
+
+## R25 — Kode wajib DRY/KISS/SOLID/YAGNI
+Setiap kode produksi yang ditulis sub-agent implementasi (`be-dev`, `fe-dev`,
+`fullstack-dev`) dan desain dari `tech-architect` WAJIB mengikuti prinsip
+DRY, KISS, SOLID, YAGNI — terangkum di `.opencode/rules/code-quality-principles.md`.
+- Sub-agent baca file itu SEBELUM coding (dirujuk di skill masing-masing).
+- `qa-engineer` masukkan prinsip ini ke quality-gate (principle-review pass);
+  pelanggaran = bug, laporkan via `/log-bug`.
+- PM tolak receipt yang copy-paste atau over-engineer.
+(Pelajaran 2026-09-06: user minta ada penegasan tertulis soal prinsip kode.)
