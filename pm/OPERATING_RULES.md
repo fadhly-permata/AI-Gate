@@ -284,3 +284,35 @@ langsung kasih lokasi tepat — selaras cara kerja codegraph ("surgical context"
 EXCEPTION: bila index belum ada / sudah usang (kode berubah banyak) → jalanin
 `codegraph init` (reinit) dulu, BARU cari. Jangan lompat ke grep/Explore kalau
 codegraph bisa menjawab lokasinya.
+
+## R29 — SEMUA request user routing LEWAT PM dulu; main thread DILARANG implementasi
+Pelajaran (2026-09-06, user: "main agent violated process by handling a task
+directly instead of routing it through you... treat ALL user requests/questions/tasks
+as your responsibility to decompose, delegate, and track"): thread utama mengerjakan
+langsung perbaikan i18n label `combobox.group_combos` (frontend) tanpa lewat PM →
+tidak ada task list, tidak ada handover, tidak ada receipt, tidak ada boundary check,
+dan aturan yang sudah ada (R21) dilanggar oleh eksekutor yang salah.
+
+Aturan wajib (standing rule):
+1. SETIAP request user di project ini — pertanyaan, bug, fitur, riset, atau task
+   kecil — LEBIH DULU masuk ke PM untuk didekomposisi + didelegasi. PM tidak boleh
+   "nunggu task besar" baru gerak.
+2. Yang BOLEH dikerjakan PM sendiri (R21 ayat 2): `pm/**`, `documents/**`, dan
+   VERIFIKASI (baca kode, jalanin test, exercise fitur). DILARANG menulis/mengubah
+   kode produksi atau test.
+3. Kalau eksekusi terlanjur terjadi di luar PM (violation): PM WAJIB (a) akui
+   pelanggaran, (b) audit diff yang sudah mendarat, (c) putuskan accept / re-work,
+   (d) serahkan re-work + test tambahan ke spesialis pemilik scope, (e) catat ke
+   Memory Bank + `documents/dev/CODE_CHANGES.md` (R22). PM tidak boleh "setuju
+   diam-diam" tanpa audit.
+4. PM yang commit & merge hasil kerja sub-agent — bukan sub-agent-nya.
+
+### R29 addendum (2026-09-07, user: "pastiin ini gak terulang, udah kesekian kalinya")
+Akar kekambuhan: rule R29 cuma ada di `pm/OPERATING_RULES.md` yang **tidak** di-
+auto-load main thread. Main thread hanya baca `AGENTS.md`. Selama routing rule
+tidak ada di `AGENTS.md`, main thread tidak pernah "tahu" dan terus implementasi
+sendiri. PERBAIKAN PERMANEN: routing rule kini dicerminkan di `AGENTS.md` root
+project (auto-load tiap sesi) dan menunjuk balik ke R29 ini. Kalau `AGENTS.md`
+root hilang/terhapus → rule ini kehilangan gigi di sisi main thread; PM WAJIB
+re-create-nya. Verifikasi: setiap sesi baru, main thread harus memanggil PM dulu
+sebelum menyentuh kode; kalau tidak, itu pelanggaran R29.

@@ -6,7 +6,26 @@
 ## Decisions
 - 2026-09-03: Arsitektur agen PM + sub-agent spesialis (on-demand, scoped).
 
+## Decisions
+- 2026-09-06 (i18n label policy): Label UI TIDAK boleh berupa string gabungan bilingual
+  ("Kombo/Combos"). Satu key = satu nilai per locale. **Locale baru** cukup 3 hal, tanpa
+  ubah kode: (1) blok kamus `window.I18N.<code>`, (2) entri registry `window.LANGS`
+  `{code, flag, nameKey}` + key `lang.<code>`, (3) lengkapi key yang dipakai dinamis
+  (mis. `combobox.group_combos`) — kelengkapan ini DIPAKSA oleh parity-guard test di
+  `src/frontend/tests/`. Grup yang di-pin (`groupOrder`) selalu di-resolve ulang tiap
+  fetch, jadi header ikut locale otomatis.
+- 2026-09-06 (R29): SEMUA request user routing lewat PM; main thread dilarang
+  implementasi. Kalau terlanjur dikerjakan di luar PM → PM audit diff, accept/re-work,
+  delegasi re-work ke pemilik scope, baru catat + commit.
+
 ## Progress
+- 2026-09-06: Header grup "Kombo" di model picker CLI Tools kini terlokalisasi penuh
+  (EN "Combos" / ID "Kombo") lewat key `combobox.group_combos`; literal bilingual
+  dihapus dari kode produksi; `combobox.js` dapat `setGroupOrder()` supaya grup yang
+  di-pin ikut locale (controller dibuat lazy + di-cache, jadi pin lama bisa basi).
+  Dikerjakan inline oleh main thread (PELANGGARAN → R29), lalu diaudit PM (diterima
+  fungsional) dan di-hardening oleh `fe-dev` (parity guard + test re-pin + pembersihan
+  fixture) dengan gate `qa-engineer`. Suite awal: 422 passed / 22 files.
 - 2026-09-06: Label teks tombol utama toolbar terminal dihapus; toolbar kini ikon-only dengan tooltip/ARIA, sedangkan label lengkap tetap di submenu. Vitest 395 passed (21 files).
 - 2026-09-06: Toolbar terminal ditata ulang menjadi tiga dropdown berurutan: Paste (normal/code block), Settings (TUI passthrough/Keep Screen On), Full (Full Page/Fullscreen). Wiring, ARIA state, dan test fixture diselaraskan. Vitest 394 passed (21 files).
 - 2026-09-06: Tooltip icon-only dibuat transient (tap auto-close 2 detik; Escape/outside/scroll/resize tetap menutup). State Full Page dan true Fullscreen dipisah eksplisit; hanya mode aktif yang biru, caret tidak aktif. Vitest 394 passed (21 files), terminal toolbar 62 passed.

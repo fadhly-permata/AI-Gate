@@ -1,5 +1,32 @@
 # PM Status
 
+## PROCESS VIOLATION + i18n combo group header — 2026-09-06 (sesi ini, PM-owned)
+**Violation:** main thread mengerjakan perbaikan frontend (`combobox.group_combos`)
+sendiri tanpa lewat PM → tidak ada task list / handover / receipt / boundary check.
+**RULE BARU R29** ditulis: semua request user routing lewat PM dulu; PM hanya boleh
+menulis `pm/**` + `documents/**` + verifikasi; kalau terlanjur dikerjakan di luar PM →
+audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
+
+**Task list (PM):**
+- [x] T1 Audit diff yang sudah mendarat (clitools.js, combobox.js, i18n.js,
+      clitools.test.js) — PM, verifikasi (R21 ayat 2).
+- [x] T2 Reproduce root cause + cek literal sisa di production — PM.
+- [x] T3 Jalankan ulang suite frontend (422 passed / 22 files) — PM.
+- [x] T4 Audit konsumen combobox lain (app.js:534, combos.js:237) — tidak ada bug
+      serupa; hanya clitools yang pakai `groupOrder`.
+- [~] T5 **fe-dev** (spawn `opencode run --agent fe-dev`, background): locale-parity
+      guard test + direct test `setGroupOrder` + re-pin saat nama grup terlokalisasi
+      ("Kombo" pinned first) + bersihkan fixture "Kombo/Combos" di combobox.test.js.
+      Scope tulis: `src/frontend/**` saja.
+- [ ] T6 **qa-engineer** (setelah T5, sekuensial — dependen): quality gate independen,
+      cek parity en/id, grep literal bug, jalanin suite, laporan ke
+      `.opencode/reports/**`, bug → `pm/bugs.md`. Scope tulis: `tests/**` (di luar
+      frontend) + `.opencode/reports/**`.
+- [ ] T7 PM integrasi: update `documents/dev/CODE_CHANGES.md` (R22 — masih ada 4
+      rujukan `Kombo/Combos` yang jadi basi), commit, update Memory Bank.
+- [ ] T8 Follow-up (belum dieksekusi, dicatat): dokumentasi "cara nambah locale baru"
+      end-to-end + pertimbangkan `lang.<code>`/flag untuk zh/hi di `window.LANGS`.
+
 ## CLI Tools combobox: two-level (provider → model-prefix) grouping — 2026-09-06
 - fe-dev added `subGroupBy` to combobox: CLI Tools model picker now groups provider → model-name-prefix sub-group (non-combo only); combo items stay flat under `Kombo/Combos` via `subGroup:false`. Both levels collapsible + default collapsed + auto-expand on search; state persists across refresh.
 - Verification: PM re-ran vitest — **415 passed (21 files)**; reviewed diff + new tests; backend untouched.
@@ -984,3 +1011,21 @@
   `codegraph init` → index rebuild (121 files / 2,851 nodes / 9,151 edges, ~2s, "up to
   date"). Reinit dijalankan sesi ini.
 - BELUM di-commit (user belum minta).
+
+## R29 addendum — tutup celah enforce routing (anti-kekambuhan) — 2026-09-07
+- Kejadian: main thread (opencode) sekali lagi mengerjakan task i18n combo group
+  header ("Kombo/Combos" -> localized) LANGSUNG tanpa lewat PM. User: "pastiin ini
+  gak terulang, udah kesekian kalinya task gak pernah didelegasikan ke PM."
+- Akar: R29 udah ada tapi cuma di `pm/OPERATING_RULES.md` yang TIDAK di-auto-load
+  main thread. Main thread hanya baca `AGENTS.md`. Project ini belum punya
+  `AGENTS.md` root -> rule gak pernah nyampe ke eksekutor -> diulang terus.
+- Perbaikan permanen:
+  - CREATE `AGENTS.md` (root project) — routing rule "semua request -> @ProjectManager
+    dulu; main thread DILARANG implementasi", nunjuk balik ke R29. Auto-load tiap sesi.
+  - `pm/OPERATING_RULES.md` — R29 addendum: catat akar + kewajiban PM re-create
+    `AGENTS.md` kalau hilang.
+  - `pm/state.md` — checkpoint di-update (opsi B: perubahan diterima, 422 tests green).
+- Verifikasi rule baru: tiap sesi, langkah pertama main thread HARUS panggil PM sebelum
+  sentuh kode. Kalau nggak = pelanggaran R29.
+- Status task i18n: ACCEPTED (opsi B). Follow-up opsional (fe-dev harden + qa gate +
+  CODE_CHANGES.md + commit) BELUM jalan. BELUM di-commit (user belum minta).
