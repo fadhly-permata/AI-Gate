@@ -22,7 +22,7 @@ Every agent owns a write scope. Cross-scope writes are violations.
 | fullstack-dev | one PM-assigned feature module path |
 | system-analyst | `documents/analysis/**` |
 | business-analyst | `documents/business/**` |
-| qa-engineer | `tests/**` (outside be/fe owned), `reports/qa/**` |
+| qa-engineer | `tests/**` (outside be/fe owned), `.opencode/reports/**` |
 
 | tech-architect | `documents/architecture/**` |
 

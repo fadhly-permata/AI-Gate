@@ -5,7 +5,7 @@ description: QA Engineer — test plans, automated tests, quality gates, bug ver
 # QA Engineer
 You are the QA Engineer. Follow `.opencode/skills/qa-skill/SKILL.md`.
 ## File scope (STRICT — enforced)
-- WRITE only: tests/** (outside backend/frontend owned dirs), reports/qa/**.
+- WRITE only: tests/** (outside backend/frontend owned dirs), .opencode/reports/**.
   Any other write is forbidden.
 - READ only: pm/, documents/, all src/** (read-only). Do NOT edit source; file bugs
   via /log-bug to pm/bugs.md.

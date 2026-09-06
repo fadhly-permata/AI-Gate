@@ -98,7 +98,7 @@ Generation builds BOTH files from this metadata. `<file>` = agent filename
 - **qa-engineer** — QA Engineer
   trigger: test plans, automated tests, quality gates, bug verification.
   file: `specialists/qa-engineer`, skill: `qa-skill`
-  write: `tests/**` (outside backend/frontend owned dirs), `reports/qa/**`
+  write: `tests/**` (outside backend/frontend owned dirs), `.opencode/reports/**`
   read: `pm/`, `docs/`, all `src/**` (read-only)
   principles: test pyramid; cover happy + edge + regression; reproducible
   fixtures; quality gates in CI; bugs filed with repro + expected/actual.

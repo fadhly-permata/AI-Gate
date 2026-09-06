@@ -52,6 +52,7 @@
   `documents/dev/CODE_CHANGES.md` (code↔doc align).
 
 ## Decisions
+- 2026-09-06: Semua laporan wajib berada di `.opencode/reports/**`; root-level `reports/**` dihapus dan scope QA/agent diperbaiki sesuai R23.
 - 2026-09-03: Terminal UX — swipe diubah jadi scroll (bukan navigasi TUI) karena
   TUI sering salah tangani swipe. Scroll velocity-based + damping agar natural.
   KOREKSI 2026-09-05: keputusan lama bikin swipe MATI di TUI (alt-buffer tidak

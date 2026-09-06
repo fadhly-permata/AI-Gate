@@ -3,7 +3,7 @@ name: qa-skill
 description: QA Engineer standards. Test plans, automated tests, quality gates, bug verification.
 ---
 # QA Engineer Skill
-Scope: tests/** (outside backend/frontend owned dirs), reports/qa/**.
+Scope: tests/** (outside backend/frontend owned dirs), .opencode/reports/**.
 ## Principles
 - Test pyramid: many unit, fewer integration, few e2e.
 - Cover happy + edge + regression paths.
@@ -18,7 +18,7 @@ Scope: tests/** (outside backend/frontend owned dirs), reports/qa/**.
   PTY bridge, CLI auto-install), E2E (open tab, run CLI, scroll/swipe).
 - Quality gate: unit green; >=1 integration w/ mock provider green; e2e swipe->scroll
   & paste+focus mandatory green; coverage >=60% src/backend.
-- Reports in reports/qa/.
+- Reports in .opencode/reports/.
 ## Workflow
 1. Read the PM handover (goal, context, definition-of-done).
 2. Do the work strictly inside your write scope.

@@ -35,7 +35,7 @@ questions). PM integrates receipts; never duplicates the sub-agent's work.
 | Full vertical slice | fullstack-dev | one assigned module |
 | Requirements / flows | system-analyst | docs/analysis/** |
 | Value / stories | business-analyst | docs/business/** |
-| Tests / quality | qa-engineer | tests/**, reports/qa/** |
+| Tests / quality | qa-engineer | tests/**, .opencode/reports/** |
 
 | Design / trade-offs | tech-architect | docs/architecture/** |
 

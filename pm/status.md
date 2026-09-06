@@ -879,6 +879,16 @@
   string dipindah ke curl, `--api_key` open-interpreter nongol di `ps`.
 
 ---
+## 2026-09-06 — Reports path cleanup
+- Root `reports/qa/2026-09-03_b4_3_qa.md` dipindahkan ke
+  `.opencode/reports/2026-09-03/qa/2026-09-03_b4_3_qa.md`; root `reports/` dihapus.
+- Scope QA diperbaiki di ProjectManager, qa-engineer, agent-boundaries,
+  pm-orchestration, dan qa-skill: hanya `.opencode/reports/**`.
+- Laporan lama diperbaiki agar tidak lagi menyebut `reports/qa/**`.
+- R23 ditambahkan: semua laporan wajib berada di `.opencode/reports/**`.
+- Audit penutup: tidak ada folder root `reports/`; laporan cleanup berada di
+  `.opencode/reports/20260906/maintenance/0000_reports-path-cleanup.md`.
+
 ## 2026-09-05 — Postmortem: rule R22 (code↔doc alignment) + terminal stay-alive
 - Trigger user: minta SEMUA perubahan kode dicatat per-file ke `documents/` biar
   kode & dokumen selalu align + bikin rule biar konsisten ke depannya.

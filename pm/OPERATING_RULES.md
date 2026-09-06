@@ -229,3 +229,8 @@ dokumen selalu "align" dan bisa diaudit lintas sesi.
   yang sudah PM verifikasi + integrasi.
 (Pelajaran 2026-09-05, user: "catat semua perubahan kode per file di documents/
  biar kode & dokumen align; buat rule biar selalu begitu ke depannya".)
+
+## R23 — Semua laporan wajib berada di `.opencode/reports/`
+Semua laporan tugas, QA, audit, dan hasil kerja wajib ditulis di
+`.opencode/reports/**`. Root-level `reports/**` dilarang; scope agent, skill,
+dokumentasi lama, dan instruksi baru wajib memakai `.opencode/reports/**`.
