@@ -738,6 +738,16 @@
 ## Rule created 2026-09-03 (user request) — R16 + parallel-sequential.md
 - User: sebelum proses kompleks/multi-agent, PM WAJIB tanya paralel/sekuensial;
   pilihan berlaku se-sesi; sesi baru tanya lagi (gak semua skenario mendukung paralel).
+
+## Side menu grouping — 2026-09-06
+- fe-dev grouped sidebar items by user need: Gateway Setup, Operations, Insights,
+  System. Added EN/ID labels, accessibility attributes, collapsed-sidebar styling,
+  and frontend regression tests.
+- Verification: Vitest 392 passed.
+- Commit/push: `92c3cc9 feat(ui): group sidebar by user needs`; pushed to
+  `origin/refactor/ui`.
+- Pre-existing untracked files left untouched: `AGENTS.md`, `a.out`,
+  `aichat-aigate.yaml`.
 - Diabadikan: R16 di `pm/OPERATING_RULES.md` (pengecualian R9), update
   `.opencode/rules/parallel-sequential.md` (trigger multi-agent + session persistence
   + forced-sequential), dan `multiagent_mode: ask` di `pm/state.md`.
