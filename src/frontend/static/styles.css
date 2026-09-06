@@ -201,6 +201,24 @@ body.sidebar-collapsed .layout {
 
 .nav { display: flex; flex-direction: column; }
 
+.nav-section {
+  padding: 8px 0 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.nav-section:last-child { border-bottom: 0; }
+
+.nav-section-heading {
+  margin: 0;
+  padding: 4px 16px 6px;
+  color: var(--sidebar-fg);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
 .nav-item {
   display: flex;
   align-items: center;
@@ -237,8 +255,14 @@ body.sidebar-collapsed .layout {
 }
 
 /* Collapsed: icons only */
-body.sidebar-collapsed .nav-label {
+body.sidebar-collapsed .nav-label,
+body.sidebar-collapsed .nav-section-heading {
   display: none;
+}
+
+body.sidebar-collapsed .nav-section {
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 body.sidebar-collapsed .nav-item {

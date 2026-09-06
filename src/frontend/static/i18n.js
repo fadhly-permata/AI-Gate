@@ -5,6 +5,10 @@ window.I18N = {
   en: {
     "app.title": "aigate",
     "app.subtitle": "AI Proxy Gateway",
+    "nav.group.gateway": "Gateway Setup",
+    "nav.group.operations": "Operations",
+    "nav.group.insights": "Insights",
+    "nav.group.system": "System",
     "nav.providers": "Providers",
     "nav.combos": "Combos",
     "nav.proxies": "Proxy Pools",
@@ -312,6 +316,10 @@ window.I18N = {
   id: {
     "app.title": "aigate",
     "app.subtitle": "Gateway Proxy AI",
+    "nav.group.gateway": "Penyiapan Gateway",
+    "nav.group.operations": "Operasi",
+    "nav.group.insights": "Wawasan",
+    "nav.group.system": "Sistem",
     "nav.providers": "Penyedia",
     "nav.combos": "Kombo",
     "nav.proxies": "Pool Proxy",

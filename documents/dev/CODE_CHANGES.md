@@ -12,6 +12,29 @@ and completed when it lands.
 
 ---
 
+## 2026-09-06 — Side menu grouped by user needs — DONE ✅
+
+**Goal.** Make sidebar navigation easier to scan by grouping items according to user needs without changing routes.
+
+### `src/frontend/static/index.html`
+- Grouped navigation into Gateway Setup, Operations, Insights, and System.
+- Preserved all existing `data-view` values.
+- Added accessible group labels and localized `aria-label` values for collapsed icon-only navigation.
+
+### `src/frontend/static/styles.css`
+- Added group headings and separators.
+- Collapsed sidebar hides group text while retaining icon navigation.
+
+### `src/frontend/static/i18n.js`
+- Added EN/ID translations for four group headings.
+
+### `src/frontend/tests/views.test.js`
+- Added assertions for grouping order, route preservation, and localization keys.
+
+**Verification.** Frontend Vitest: 21 files, 392 tests passed.
+
+---
+
 ## 2026-09-05 — Terminal toolbar: Keep Screen On + Fullscreen/Paste dropdowns — DONE ✅
 
 **Goal.** Three terminal-toolbar features: (1) a **Keep Screen On** toggle using

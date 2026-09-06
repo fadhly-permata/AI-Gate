@@ -7,6 +7,7 @@
 - 2026-09-03: Arsitektur agen PM + sub-agent spesialis (on-demand, scoped).
 
 ## Progress
+- 2026-09-06: Side menu dikelompokkan berdasarkan kebutuhan pengguna: Gateway Setup, Operations, Insights, System. EN/ID, aksesibilitas, dan test frontend diperbarui; Vitest 392 passed.
 - Inisialisasi PM agent + rules + skills selesai.
 - 2026-09-03: Enhance PRD terminal — floating control, scroll/swipe natural,
   grouping CLI tools (agentic-first, 3 grup).
