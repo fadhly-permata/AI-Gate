@@ -1088,8 +1088,10 @@
   <script src="endpoints.js" defer></script>
   <!-- Usage & Quota tracking (B5.5) — needs app.js (window.aigate helpers) -->
   <script src="usage.js" defer></script>
-  <!-- Usage Analytics + Request Log viewer (B5.6) — needs app.js + usage.js formatters -->
-  <script src="analytics.js" defer></script>
+  <!-- Usage Analytics + Request Log viewer (B5.6) — needs app.js + usage.js formatters.
+       ?v= cache-buster: a plain src lets the browser run a STALE cached copy after
+       an update (bump the value whenever analytics.js changes). -->
+  <script src="analytics.js?v=20260906" defer></script>
   <!-- CLI Tools launcher (B3.4) — needs app.js (window.aigate) + terminal.js -->
   <script src="clitools.js" defer></script>
   <!-- Self-Heal UI (B4.1) — needs i18n.js (window.I18N) + clitools.js -->

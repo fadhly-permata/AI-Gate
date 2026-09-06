@@ -36,6 +36,18 @@
   delegasi re-work ke pemilik scope, baru catat + commit.
 
 ## Progress
+- 2026-09-07: **Request Log kolom Model/Endpoint kosong — SELESAI (uncommitted,
+  sekuensial BE→FE).** Root cause: combo ref → resolver `upstream_model=""` →
+  router nimpa `ctx["model"]` jadi `''` (RequestLog.model kosong utk semua request
+  combo); Endpoint kosong = by-design (model-based, tanpa header
+  `X-Aigate-Endpoint`). Fix: BE `_upgrade_ctx_model` helper (6 situs, upgrade
+  hanya bila non-empty; combo → prefer model member dari envelope upstream,
+  fallback combo ref) + DTO `endpoint_name` (Pydantic v1); FE `orDash`/
+  `reqlogEndpoint` (nama → id → "—") + cache-buster `analytics.js?v=20260906`
+  (pola precedent terminal.js, PM-owned 1 baris). Verifikasi PM: **BE 423 passed/
+  1 skipped, FE 445 passed (23 files)**. Baris lama `model=''` tidak di-backfill.
+  PENDING: user restart aigate (R32) + hard-refresh. Detail:
+  `documents/dev/CODE_CHANGES.md` 2026-09-07.
 - 2026-09-07: **Terminal tab auto-close on shell exit — SELESAI (uncommitted, mode
   sekuensial BE→FE).** Kontrak exit (sumber kebenaran): server kirim TEXT frame
   `{"type":"exit","code":<int>}` (code = exit status; -1 bila tak terbaca) ke view

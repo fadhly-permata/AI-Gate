@@ -70,18 +70,20 @@ const ANALYTICS_PAYLOAD = {
 };
 
 // request/response arrive as JSON STRINGS (headers redacted server-side).
+// DTO (be-dev): endpoint_name = Endpoint.name when routed via an endpoint,
+// null for model-based requests; old DB rows may still have model:"".
 const REQLOG_PAYLOAD = {
   object: "list",
   data: [
     {
-      id: 3, endpoint_id: 1, model: "gpt-4o", ts: "2026-09-03T10:00:00",
-      duration_ms: 300,
+      id: 3, endpoint_id: 1, endpoint_name: "ep-api", model: "gpt-4o",
+      ts: "2026-09-03T10:00:00", duration_ms: 300,
       request: '{"headers":{"authorization":"Bearer redacted"},"body":{"model":"gpt-4o","messages":[{"role":"user","content":"hi"}]}}',
       response: '{"status":"ok","choices":[{"message":{"content":"hello"}}]}'
     },
     {
-      id: 2, endpoint_id: 2, model: "claude-3-5-sonnet", ts: "2026-09-03T09:59:00",
-      duration_ms: 250,
+      id: 2, endpoint_id: 2, endpoint_name: "ep-other", model: "claude-3-5-sonnet",
+      ts: "2026-09-03T09:59:00", duration_ms: 250,
       // cut mid-payload -> no longer parses + carries the truncation marker
       request: '{"headers":{"x":"y"},"body":{"messages":[{"content":"very long… [truncated 1234 chars]',
       response: '{"status":"ok"}'
@@ -261,6 +263,40 @@ describe("renderRequestLogs (real /api/request-logs shape)", () => {
     expect(first.getAttribute("data-id")).toBe("3");
   });
 
+  it("renders the endpoint NAME (new DTO), not the raw endpoint_id", () => {
+    window.aigate.renderRequestLogs(REQLOG_PAYLOAD.data);
+    const rows = document.querySelectorAll("#reqlogTableBody .reqlog-row");
+    expect(rows[0].cells[2].textContent).toBe("ep-api");
+    expect(rows[1].cells[2].textContent).toBe("ep-other");
+  });
+
+  it("endpoint cell: name -> raw id (legacy responses) -> em-dash when absent", () => {
+    window.aigate.renderRequestLogs([
+      { id: 1, endpoint_id: 12, endpoint_name: "ep-named", model: "gpt-4o",
+        ts: "2026-09-03T10:00:00", duration_ms: 10, request: "{}", response: "{}" },
+      { id: 2, endpoint_id: 12, endpoint_name: null, model: "gpt-4o",
+        ts: "2026-09-03T10:01:00", duration_ms: 20, request: "{}", response: "{}" },
+      { id: 3, endpoint_id: null, endpoint_name: null, model: "o3",
+        ts: "2026-09-03T10:02:00", duration_ms: 30, request: "{}", response: "{}" }
+    ]);
+    const rows = document.querySelectorAll("#reqlogTableBody .reqlog-row");
+    expect(rows[0].cells[2].textContent).toBe("ep-named");
+    expect(rows[1].cells[2].textContent).toBe("12"); // id fallback
+    expect(rows[2].cells[2].textContent).toBe("\u2014"); // model-based request
+  });
+
+  it("model cell: em-dash when model is empty (legacy rows) or missing", () => {
+    window.aigate.renderRequestLogs([
+      { id: 1, endpoint_id: 1, endpoint_name: "ep-api", model: "",
+        ts: "2026-09-03T10:00:00", duration_ms: 10, request: "{}", response: "{}" },
+      { id: 2, endpoint_id: 1, endpoint_name: "ep-api",
+        ts: "2026-09-03T10:01:00", duration_ms: 20, request: "{}", response: "{}" }
+    ]);
+    const rows = document.querySelectorAll("#reqlogTableBody .reqlog-row");
+    expect(rows[0].cells[1].textContent).toBe("\u2014");
+    expect(rows[1].cells[1].textContent).toBe("\u2014");
+  });
+
   it("pretty-prints parsed request/response JSON inside <details>", () => {
     window.aigate.renderRequestLogs(REQLOG_PAYLOAD.data);
     const first = document.querySelector("#reqlogTableBody .reqlog-row");
@@ -292,12 +328,14 @@ describe("renderRequestLogs (real /api/request-logs shape)", () => {
 
   it("escapes payload text (XSS)", () => {
     window.aigate.renderRequestLogs([{
-      id: 1, endpoint_id: 1, model: "<script>alert(1)</script>",
+      id: 1, endpoint_id: 1, endpoint_name: "<script>x</script>",
+      model: "<script>alert(1)</script>",
       ts: "2026-09-03T00:00:00", duration_ms: 1,
       request: "<img src=x>", response: "{}"
     }]);
     const html = document.getElementById("reqlogTableBody").innerHTML;
     expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).not.toContain("<script>x</script>");
     expect(html).toContain("&lt;script&gt;");
     expect(html).toContain("&lt;img src=x&gt;");
   });
@@ -545,9 +583,14 @@ describe("index.html wiring (B5.6 structure)", () => {
   it("loads analytics.js after app.js + usage.js", () => {
     const srcs = Array.from(doc.querySelectorAll("script[src]"))
       .map((s) => s.getAttribute("src"));
-    expect(srcs).toContain("analytics.js");
-    expect(srcs.indexOf("app.js")).toBeLessThan(srcs.indexOf("analytics.js"));
-    expect(srcs.indexOf("usage.js")).toBeLessThan(srcs.indexOf("analytics.js"));
+    // src may carry a ?v= cache-buster (same pattern as terminal.js) — match
+    // on the bare filename so the wiring assertion survives version bumps.
+    const analyticsSrc = srcs.find((s) => s.split("?")[0] === "analytics.js");
+    const appSrc = srcs.find((s) => s.split("?")[0] === "app.js");
+    const usageSrc = srcs.find((s) => s.split("?")[0] === "usage.js");
+    expect(analyticsSrc).toBeDefined();
+    expect(srcs.indexOf(appSrc)).toBeLessThan(srcs.indexOf(analyticsSrc));
+    expect(srcs.indexOf(usageSrc)).toBeLessThan(srcs.indexOf(analyticsSrc));
   });
 });
 

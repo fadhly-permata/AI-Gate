@@ -1,5 +1,42 @@
 # Code Changes Register (code ↔ docs alignment)
 
+## 2026-09-07 — Request Log: kolom Model/Endpoint kosong (combo path + endpoint_name) — DONE
+
+**Root cause (BE):** untuk model ref `combo:<name>`, resolver balikin marker
+`ResolvedTarget(upstream_model="", combo_used=True)` (member asli diputuskan di
+dalam `execute_combo`). `gateway/router.py` nimpa `ctx["model"] = target.upstream_model`
+UNCONDITIONAL → `RequestLog.model = ''` untuk semua request combo. Kolom Endpoint
+kosong = by-design (request model-based tanpa header `X-Aigate-Endpoint` →
+`endpoint_id` NULL) — bukan bug, tapi FE merender id mentah (null → sel kosong).
+Bukti DB: baris 21:28–21:29 `model=''` padahal body `"model":"combo:B.AI"`.
+
+**Perubahan (delegasi be-dev → fe-dev, mode sekuensial):**
+- `src/backend/gateway/router.py` — helper `_upgrade_ctx_model(ctx, upstream_model)`:
+  upgrade `ctx["model"]` hanya bila value non-empty (tidak pernah terdegradasi jadi
+  `''`; error path & fallback tetap bawa model ref). Dipakai di 6 situs:
+  chat non-stream combo (upgrade dari envelope upstream `result.get("model")`,
+  fallback combo ref), chat streaming combo (`member.upstream_model` dari
+  `resolve_combo_stream_target`), responses path (identik chat),
+  `_route_via_endpoint` provider binding + combo binding (stream & non-stream).
+- `src/backend/analytics_router.py` — `RequestLogDTO` + field
+  `endpoint_name: Optional[str]` (Pydantic v1); `_row_to_dto` populate dari
+  `row.endpoint.name` di dalam session aktif; docstring kontrak module di-update.
+- `src/frontend/static/analytics.js` — `orDash(v)` (null/undefined/"" → "—") +
+  `reqlogEndpoint(r)` (`endpoint_name || endpoint_id || "—"`); kolom Model &
+  Endpoint memakai fallback, semua value tetap di-`escapeHtml`.
+- `src/frontend/static/index.html` — cache-buster `analytics.js?v=20260906`
+  (pola sama dgn `terminal.js` — cegah stale copy post-update).
+- Tests: `tests/backend/test_request_log.py` (+5: combo non-stream model terisi,
+  envelope tanpa model → fallback combo ref, combo stream, endpoint_name di API,
+  endpoint_name null utk model-based), `tests/backend/test_analytics.py` (DTO
+  shape), `src/frontend/tests/analytics.test.js` (fixture DTO baru +3 test nama/
+  fallback/dash + XSS escape; wiring test tahan `?v=` cache-buster).
+
+**Verifikasi PM (re-run):** backend `pytest tests/backend` = **423 passed,
+1 skipped** (skip = native PTY); frontend vitest = **445 passed (23 files)**.
+Catatan: baris LAMA di DB (`model=''`) tidak di-backfill — hanya entri baru yang
+benar; user perlu restart aigate agar kode BE aktif (R32 — user yang restart).
+
 ## 2026-09-07 — Terminal tab auto-close on shell exit + session-ended toast — DONE
 
 Akar masalah "tab gak nutup": backend tidak pernah memberi tahu frontend saat shell

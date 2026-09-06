@@ -1141,3 +1141,15 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
   sentuh kode. Kalau nggak = pelanggaran R29.
 - Status task i18n: ACCEPTED (opsi B). Follow-up opsional (fe-dev harden + qa gate +
   CODE_CHANGES.md + commit) BELUM jalan. BELUM di-commit (user belum minta).
+
+## 2026-09-07 — Bug: kolom Model & Endpoint kosong di halaman Request Log — SELESAI
+- User report: tabel reqlog (Time/Model/Endpoint/Duration) — Model & Endpoint kosong, Duration terisi.
+- PM investigasi (read-only): DB `~/.aigate/aigate.db` → request_logs baris ts 21:28–21:29 = `model=''`, `endpoint_id=NULL`.
+  - Root cause #1 (BE): `gateway/router.py` `ctx["model"] = target.upstream_model` (2 situs: ~272 & ~449) — untuk model ref `combo:*`, resolver balikin `ResolvedTarget(upstream_model="", combo_used=True)` → ctx["model"] ketimpa "" → RequestLog.model = ''.
+  - Root cause #2 (data): semua baris `endpoint_id=NULL` (request lewat model-ref, tanpa header `X-Aigate-Endpoint`) → kolom Endpoint memang kosong; FE render `r.endpoint_id` mentah (null → kosong), tanpa fallback nama.
+- **Eksekusi (sekuensial BE→FE, sesuai state.md):**
+  - **be-dev DONE:** helper `_upgrade_ctx_model` (6 situs, upgrade hanya bila non-empty); combo non-stream → prefer `result.get("model")` (member yang melayani), fallback combo ref; streaming → `member.upstream_model`; responses path ikut; DTO + `endpoint_name` (Pydantic v1) + tests (+5). Receipt lengkap, scope dijaga.
+  - **fe-dev DONE:** `orDash()` + `reqlogEndpoint()` di analytics.js (nama → id → "—"; model kosong → "—"; escapeHtml semua), fixture DTO baru + 3 test.
+  - **PM-owned (integrasi):** cache-buster `analytics.js?v=20260906` di index.html (pola precedent terminal.js — hindari stale JS ke-cache); wiring test disesuaikan tahan `?v=`.
+- **Verifikasi PM (re-run sendiri):** `pytest tests/backend` = **423 passed / 1 skipped** (skip native PTY); vitest penuh = **445 passed / 23 files**. 0 regresi.
+- PENDING (user): restart aigate agar BE aktif (R32 — user yang restart); hard-refresh halaman. Baris lama (`model=''`) tidak di-backfill.
