@@ -730,17 +730,16 @@ body[data-device="phone"] .modal { width: 100%; }
 .combo-model-spinner[hidden] { display: none; }
 
 /* ===== Searchable combobox (combobox.js) =====
-   The wrapper (.aigate-combo) is position:relative; the panel
-   (.aigate-combo-list) is absolutely positioned under the input, scrollable,
-   with >=40px touch rows. It flips above the input (.aigate-combo-up) when it
-   would overflow the viewport bottom (short screens / mobile keyboard).
+   The panel (.aigate-combo-list) is position:fixed (anchored to the input's
+   viewport rect by combobox.js:position()), scrollable, with >=40px touch rows.
+   fixed (not absolute) so it is NOT clipped by an ancestor with
+   overflow:auto (e.g. .modal) — the viewport is its containing block because
+   .modal has no transform. It flips above the input (.aigate-combo-up) when
+   there is more room above (direction + capped height decided in JS).
    Theme-safe: uses the same custom properties as the rest of the UI. */
 .aigate-combo { position: relative; }
 .aigate-combo-list {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 100%;
+  position: fixed;
   z-index: 40;
   max-height: 220px;
   overflow-y: auto;
@@ -763,7 +762,7 @@ body[data-device="phone"] .modal { width: 100%; }
   min-height: 40px;
   display: flex;
   align-items: center;
-  padding: 8px 12px;
+  padding: 8px 12px 8px 28px;
   font-size: 14px;
   color: var(--fg);
   cursor: pointer;
@@ -779,6 +778,86 @@ body[data-device="phone"] .modal { width: 100%; }
   font-size: 13px;
   font-style: italic;
   color: var(--muted);
+}
+/* In-panel search row (combobox.js: searchInside). First child of the panel;
+   bottom border separates it from the option list. The inner input mirrors the
+   top combobox value, so it is styled like the combobox input (>=40px touch). */
+.aigate-combo-list .aigate-combo-searchrow {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 6px 8px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--panel-border);
+}
+.aigate-combo-list .aigate-combo-search {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 40px;
+  padding: 8px 10px;
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  outline: none;
+}
+.aigate-combo-list .aigate-combo-search:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+/* Group header (combobox.js: groupBy). Now a toggle (role=button): click or
+   Enter/Space flips collapse. Muted, non-selectable look (never takes the
+   active/hover option styling). Children are indented (opt padding-left:28px)
+   so the hierarchy reads title@12px vs items@28px. */
+.aigate-combo-list .aigate-combo-group {
+  padding: 6px 12px;
+  padding-left: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--panel);
+  cursor: pointer;
+}
+.aigate-combo-list .aigate-combo-group::before {
+  content: "\25BE\00a0"; /* ▾ expanded */
+}
+.aigate-combo-list .aigate-combo-group.aigate-combo-group-collapsed::before {
+  content: "\25B8\00a0"; /* ▸ collapsed */
+}
+.aigate-combo-list .aigate-combo-group:hover,
+.aigate-combo-list .aigate-combo-group.aigate-combo-active {
+  background: color-mix(in srgb, var(--panel-border) 35%, transparent);
+  color: var(--muted);
+}
+/* Two-level sub-group header (combobox.js: subGroupBy). Same look as the main
+    group header but indented further (it is a child of the main group) and with
+    its own caret. Flat (combo) items stay at the group-header indent (28px). */
+.aigate-combo-list .aigate-combo-subgroup {
+  padding: 5px 12px 5px 24px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--panel);
+  cursor: pointer;
+}
+.aigate-combo-list .aigate-combo-subgroup::before {
+  content: "\25BE\00a0"; /* ▾ expanded */
+}
+.aigate-combo-list .aigate-combo-subgroup.aigate-combo-subgroup-collapsed::before {
+  content: "\25B8\00a0"; /* ▸ collapsed */
+}
+.aigate-combo-list .aigate-combo-subgroup:hover {
+  background: color-mix(in srgb, var(--panel-border) 35%, transparent);
+  color: var(--muted);
+}
+/* Options nested under a sub-group sit clearly indented below the sub-title. */
+.aigate-combo-list .aigate-combo-opt.aigate-combo-opt-sub {
+  padding-left: 44px;
 }
 
 .combo-member-actions {

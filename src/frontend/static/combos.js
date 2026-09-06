@@ -234,7 +234,12 @@
       memberModelCombo = app().createCombobox({
         inputId: "comboMemberModel",
         listId: "comboMemberModelList",
-        formId: "comboMemberForm"
+        formId: "comboMemberForm",
+        // B: search box as first panel row + group models by prefix
+        // (e.g. deepseek-v1 + deepseekv2 -> "Deepseek"). The top input keeps
+        // holding the value/free text; see combobox.js.
+        searchInside: true,
+        groupBy: "prefix"
       });
     }
     return memberModelCombo;

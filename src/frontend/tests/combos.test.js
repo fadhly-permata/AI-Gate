@@ -122,6 +122,20 @@ const modelList = () => document.getElementById("comboMemberModelList");
 // The rendered option rows (data-value = model id), in DOM order.
 const modelOptionEls = () => Array.from(modelList().querySelectorAll('li[role="option"]'));
 const modelOptionValues = () => modelOptionEls().map((li) => li.getAttribute("data-value"));
+// Groups are collapsed by default (combobox FIX 2), so child options are not in
+// the DOM until a group is expanded (or a search auto-expands it). Helper to
+// expand every still-collapsed group header.
+function expandAllGroups() {
+  // Re-query each iteration: clicking a header re-renders the DOM and detaches
+  // the previously captured header nodes, so a single captured list won't all fire.
+  let guard = 0;
+  while (guard++ < 50) {
+    const h = modelList().querySelector(
+      ".aigate-combo-group.aigate-combo-group-collapsed");
+    if (!h) break;
+    h.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  }
+}
 // Every rendered option is a real model id now (no placeholder / sentinel).
 const modelIds = modelOptionValues;
 const modelLabels = () => modelOptionEls().map((li) => li.textContent);
@@ -254,7 +268,9 @@ describe("combos members — provider/model dropdown chaining", () => {
     const models = window.aigate.combos.populateModelOptions(1);
     // Cached models are now sorted by name (case-insensitive): GPT-4o < Llama 3.1.
     expect(models.map((m) => m.model_id)).toEqual(["gpt-4o", "llama-3.1"]);
-    // The combobox panel offers exactly the sorted model ids (no sentinel).
+    // The combobox panel groups models; groups start collapsed, so expand them
+    // to reveal the full sorted model ids (no sentinel).
+    expandAllGroups();
     expect(modelOptionValues()).toEqual(["gpt-4o", "llama-3.1"]);
     // Labels show the model NAME (id as fallback).
     expect(modelLabels()).toEqual(["GPT-4o", "Llama 3.1"]);
@@ -326,14 +342,18 @@ describe("combos members — auto model fetch on provider change", () => {
     expect(ul.tagName).toBe("UL");
     expect(ul.getAttribute("role")).toBe("listbox");
     // Options: the sorted model ids, labels = model names (id fallback).
+    // Groups start collapsed, so expand them to reveal the options.
+    expandAllGroups();
     expect(modelIds()).toEqual(["Alpha", "mid", "zeta"]);
     expect(modelLabels()).toEqual(["alpha", "Mid", "Zeta"]);
     // Model names are DATA, never i18n hooks (they must not be translated).
     expect(ul.querySelectorAll("[data-i18n]").length).toBe(0);
-    // Typing filters the fetched list (case-insensitive substring).
+    // Typing filters the fetched list (case-insensitive substring). While a
+    // query is active every group auto-expands so matches are visible.
     typeModel("MI");
     expect(modelIds()).toEqual(["mid"]);
     typeModel("");
+    expandAllGroups();
     expect(modelIds()).toEqual(["Alpha", "mid", "zeta"]);
   });
 
@@ -387,6 +407,7 @@ describe("combos members — auto model fetch on provider change", () => {
     const models = await window.aigate.combos.fetchModelsForProvider(1);
     // provider 1 cached: Llama 3.1 + GPT-4o -> sorted by name: GPT-4o, Llama 3.1.
     expect(models.map((m) => m.model_id)).toEqual(["gpt-4o", "llama-3.1"]);
+    expandAllGroups();
     expect(modelIds()).toEqual(["gpt-4o", "llama-3.1"]);
     const msg = document.getElementById("comboMemberMsg");
     expect(msg.textContent).toContain(window.I18N.en["combos.member.load_failed"]);
@@ -416,9 +437,11 @@ describe("combos members — auto model fetch on provider change", () => {
     sel.value = "2"; sel.dispatchEvent(new Event("change", { bubbles: true })); // seq 2 (latest)
     resolveB();          // latest resolves FIRST
     await tick();
+    expandAllGroups();
     expect(modelIds()).toEqual(["fresh-b"]);
     resolveA();          // stale resolves LATER -> must be ignored
     await tick();
+    expandAllGroups();
     expect(modelIds()).toEqual(["fresh-b"]); // unchanged by the stale response
     expect(document.getElementById("comboMemberModel").disabled).toBe(false);
   });
@@ -456,6 +479,8 @@ describe("combos members — searchable combobox model field (free text native)"
     document.getElementById("comboMemberProvider").value = "1";
     document.getElementById("comboMemberPriority").value = "2";
     document.getElementById("comboMemberWeight").value = "0.5";
+    // Groups are collapsed by default — expand them so the options are in the DOM.
+    expandAllGroups();
     // Click the "GPT-4o" option in the panel.
     const gpt = modelOptionEls().find((li) => li.getAttribute("data-value") === "gpt-4o");
     gpt.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -481,6 +506,7 @@ describe("combos members — searchable combobox model field (free text native)"
     typeModel("LLAMA");
     expect(modelIds()).toEqual(["llama-3.1"]);
     typeModel("");
+    expandAllGroups();
     expect(modelIds()).toEqual(["gpt-4o", "llama-3.1"]);
   });
 

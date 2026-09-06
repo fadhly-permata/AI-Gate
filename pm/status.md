@@ -1,5 +1,19 @@
 # PM Status
 
+## CLI Tools combobox: two-level (provider → model-prefix) grouping — 2026-09-06
+- fe-dev added `subGroupBy` to combobox: CLI Tools model picker now groups provider → model-name-prefix sub-group (non-combo only); combo items stay flat under `Kombo/Combos` via `subGroup:false`. Both levels collapsible + default collapsed + auto-expand on search; state persists across refresh.
+- Verification: PM re-ran vitest — **415 passed (21 files)**; reviewed diff + new tests; backend untouched.
+
+## Model dropdown: indent + collapsible groups + fixed flexible positioning — 2026-09-06
+- fe-dev: group child options indented (28px vs 12px title); groups collapsible, default collapsed (click/Enter/Space on header toggles, state persists across refresh); while searching all groups auto-expand. Dropdown now `position: fixed`, viewport-anchored, opens up/down by available space, height capped to available space — fixes clipping by the modal's `overflow-y:auto`.
+- Verification: PM re-ran vitest — **409 passed (21 files)**; reviewed diff + new tests; backend untouched.
+
+## Model dropdown: in-panel search + grouping — 2026-09-06
+- fe-dev enhanced `src/frontend/static/combobox.js` with `searchInside` (search box as the FIRST panel item) + `groupBy` (`none|prefix|group`) + `groupOrder`. Prefix grouping via `familyOf()`; group headers `role="presentation"` (non-selectable). Custom free-text option preserved (ADR-011).
+- Kombo page (`#comboMemberModel`) wired to `groupBy:"prefix"` (e.g. `deepseek-v1`+`deepseekv2`→`Deepseek`).
+- CLI Tools page (`#cliModel`) converted from `<select>` to the combobox, `groupBy:"group"`; provider models grouped by `owned_by`, combo models grouped under `Kombo/Combos`; values stay full `provider:/combo:` ids so launch posts them verbatim.
+- Verification: PM re-ran vitest — **401 passed (21 files)**; reviewed diff + new tests; no backend touched.
+
 ## Terminal toolbar icon-only labels — 2026-09-06
 - fe-dev removed visible text from main Paste, Settings, and Full dropdown buttons; kept icons, title/ARIA labels, and submenu text labels.
 - Added icon-only sizing and tests for accessibility metadata and icon classes.

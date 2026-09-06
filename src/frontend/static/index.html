@@ -793,7 +793,13 @@
           <h3 class="modal-title" id="cliLaunchTitle" data-i18n="cli.launch_title">Launch CLI Tool</h3>
           <div class="form-row">
             <label class="form-label" for="cliModel" data-i18n="cli.model">Model</label>
-            <select class="form-input" id="cliModel"></select>
+            <div class="aigate-combo">
+              <input class="form-input" type="text" id="cliModel" name="cliModel" autocomplete="off"
+                     placeholder="Search or type a model…"
+                     role="combobox" aria-expanded="false"
+                     aria-controls="cliModelList" aria-autocomplete="list" />
+              <ul class="aigate-combo-list" id="cliModelList" role="listbox" hidden></ul>
+            </div>
           </div>
           <p class="cli-hint" id="cliHint" hidden></p>
           <p class="settings-msg" id="cliMsg" role="status" aria-live="polite"></p>

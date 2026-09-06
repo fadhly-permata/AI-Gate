@@ -108,6 +108,31 @@
 
   function el(id) { return document.getElementById(id); }
 
+  /* ---- Model picker: searchable combobox (combobox.js) ----
+     Replaces the old native <select id="cliModel">. #cliModel is now a text
+     <input> wired to a custom <ul id="cliModelList"> panel. The controller is
+     created LAZILY (first use) and resolves its elements by id, so it survives
+     DOM rebuilds. searchInside=true gives an in-panel search box; groupBy="group"
+     groups options by provider (option.group), with the literal group
+     "Kombo/Combos" pinned to the top via groupOrder. The option VALUE stays
+     the full gateway id (provider:... / combo:...) so launch() can POST it
+     verbatim; only the LABEL is the human model portion. */
+  var cliModelCombo = null;
+  function cliModelCtl() {
+    if (!cliModelCombo && typeof window.aigate !== "undefined" &&
+        typeof window.aigate.createCombobox === "function") {
+      cliModelCombo = window.aigate.createCombobox({
+        inputId: "cliModel",
+        listId: "cliModelList",
+        searchInside: true,
+        groupBy: "group",
+        groupOrder: ["Kombo/Combos"],
+        subGroupBy: "prefix" // two-level: provider (main) -> model-name prefix (sub)
+      });
+    }
+    return cliModelCombo;
+  }
+
   function setCliMsg(text, kind) {
     var m = el("cliLoadMsg");
     if (!m) return;
@@ -222,16 +247,39 @@
     if (!sel) return Promise.resolve([]);
     return fetchJson(MODELS_API).then(function (data) {
       var list = (data && data.data) ? data.data : [];
-      sel.innerHTML = list.map(function (m) {
+      var c = cliModelCtl();
+      var comboCombo = "Kombo/Combos"; // literal group name (user wording)
+      var opts = list.map(function (m) {
         var id = m.id != null ? m.id : "";
-        return '<option value="' + escapeHtml(id) + '">' + escapeHtml(id) + "</option>";
-      }).join("");
+        if (id.indexOf("combo:") === 0) {
+          // Combo models stay FLAT under Kombo/Combos: explicitly opt out of
+          // sub-grouping so they render directly under the main header.
+          return { value: id, label: id.slice("combo:".length), group: comboCombo, subGroup: false };
+        }
+        // provider entry: value = full id (e.g. provider:deepseek:deepseek-v1),
+        // label = human model portion after the last ":". The sub-group (_sub)
+        // is auto-derived from the label prefix by the combobox (subGroupBy:"prefix").
+        return { value: id, label: id.split(":").pop(), group: m.owned_by || "unknown" };
+      });
+      // Sort by label (case-insensitive) before handing to the combobox.
+      opts.sort(function (a, b) {
+        var al = a.label.toLowerCase(), bl = b.label.toLowerCase();
+        return al < bl ? -1 : al > bl ? 1 : 0;
+      });
+      if (c) c.setOptions(opts);
+      // Preselect the first model so launch() always has a default (mirrors the
+      // old <select>'s first-option behavior); value is the full id.
+      if (c && opts.length) c.setValue(opts[0].value);
       if (!list.length) {
-        sel.innerHTML = '<option value="">' + escapeHtml(getStr("cli.no_models")) + "</option>";
+        setCliModalMsg(getStr("cli.no_models"), "warn");
+      } else {
+        setCliModalMsg("");
       }
       return list;
     }).catch(function () {
-      sel.innerHTML = '<option value="">' + escapeHtml(getStr("cli.no_models")) + "</option>";
+      var c = cliModelCtl();
+      if (c) c.setOptions([]); // combobox shows its own no_match row
+      setCliModalMsg(getStr("cli.no_models"), "error");
       return [];
     });
   }

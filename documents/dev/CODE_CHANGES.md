@@ -1,5 +1,72 @@
 # Code Changes Register (code ↔ docs alignment)
 
+## 2026-09-06 — CLI Tools combobox: two-level (provider → model-prefix) grouping — DONE
+
+### `src/frontend/static/combobox.js`
+- Added `subGroupBy` (`null|prefix|group`). Options carry `_sub`; `setOptions` derives it (prefix → `familyOf(label)` unless `subGroup:false`; group → `m.subGroup`). `subGroup:false` opt-out keeps an option flat.
+- Two-level render: main group header → flat items (`_sub==null`) directly under it → sub-group headers with nested items. New `collapsedSub`/`trackedSub` Sets (composite `group\u0001sub`) for per-sub collapse (default collapsed, persists across refresh, auto-expand while searching). `toggleSub(group,sub)`; click/Enter/Space on `.aigate-combo-subgroup` toggles.
+
+### `src/frontend/static/clitools.js`
+- `cliModelCtl()` adds `subGroupBy:"prefix"`. `fetchModels()` sets combo items `subGroup:false` (flat under `Kombo/Combos`); provider items auto sub-group by model-name prefix. Values stay full `provider:/combo:` ids.
+
+### `src/frontend/static/styles.css`
+- Added `.aigate-combo-subgroup` (indented header + caret) and `.aigate-combo-opt.aigate-combo-opt-sub` (44px indent).
+
+### `src/frontend/tests/combobox.test.js`
+- Added 6 tests: default-collapsed two-level, `Kombo/Combos` flat, provider→prefix sub-groups, expand-sub reveals items, keyboard toggle, search auto-expands.
+
+**Verification.** PM re-ran vitest: **415 passed (21 files)**. No backend changes.
+
+---
+
+## 2026-09-06 — Model dropdown: indent + collapsible groups + fixed flexible positioning — DONE
+
+### `src/frontend/static/combobox.js`
+- Group child options indented (render unchanged; CSS does indent).
+- Collapsible groups: `collapsed` Set, default all collapsed; click/Enter/Space on a `role="button"` group header toggles (keeps state across `setOptions` refreshes via a `tracked` Set). While a search query is active, all groups auto-expand so matches show. Headers always render (even when collapsed) so they stay expandable. `renderOptionsHtml()` iterates the full group list; `buildRenderGroups()` removed.
+- `position()` rewritten to `position: fixed`, viewport-anchored to the input rect; opens below when there is room, above otherwise; `maxHeight` capped to `min(320, availableSpace)` so it never overflows. Adds `scroll`(capture)+`resize` listeners on open, removed on close/destroy. Fixes the panel being clipped by `.modal { overflow-y:auto }`.
+
+### `src/frontend/static/styles.css`
+- `.aigate-combo-list` now `position: fixed` (geometry set inline by JS).
+- `.aigate-combo-opt` indented `padding-left: 28px`; `.aigate-combo-group` `cursor:pointer`, caret via `::before` (▾ expanded / ▸ collapsed).
+
+### `src/frontend/tests/combobox.test.js` / `combos.test.js`
+- Added tests: collapsed-by-default, click/keyboard toggle, auto-expand on search, persist across refresh, fixed positioning (above/below/cap/scroll-reposition/detach). `combos.test.js` updated for collapsed-default.
+
+**Verification.** PM re-ran vitest: **409 passed (21 files)**. No backend changes.
+
+---
+
+## 2026-09-06 — Model dropdown: in-panel search + grouping — DONE
+
+### `src/frontend/static/combobox.js`
+- Added `searchInside` (search `<input>` as the FIRST panel `<li>`; two-way mirrored with the top value input; focused + cleared on open; committed value restored on cancel).
+- Added `groupBy` (`none|prefix|group`) + `groupOrder` (pinned order, rest alpha). Prefix uses `familyOf()` (`deepseek-v1`+`deepseekv2`→`Deepseek`; `gpt-4o`→`Gpt`). Group headers are `role="presentation"`, skipped by keyboard nav.
+- No-match + custom: appends a synthetic "Use \"%s\" as custom model" option so free text survives (ADR-011).
+
+### `src/frontend/static/combos.js`
+- `#comboMemberModel` combobox now `searchInside:true, groupBy:"prefix"` (Kombo page groups by model prefix).
+
+### `src/frontend/static/clitools.js`
+- `#cliModel` converted from native `<select>` to the combobox (`searchInside:true, groupBy:"group", groupOrder:["Kombo/Combos"]`).
+- `fetchModels()` maps `/v1/models`: `combo:` → group `Kombo/Combos`; provider → group `owned_by`; value stays the full `provider:/combo:` id so `launch()` posts it verbatim.
+
+### `src/frontend/static/index.html`
+- Replaced `<select id="cliModel">` with combobox markup (`cliModel` input + `cliModelList` ul).
+
+### `src/frontend/static/styles.css`
+- Added `.aigate-combo-searchrow` (sticky top search row), `.aigate-combo-search`, `.aigate-combo-group` (non-selectable header).
+
+### `src/frontend/static/i18n.js`
+- Added `combobox.use_custom` + `combobox.group_combos` (en + id).
+
+### `src/frontend/tests/combobox.test.js`
+- Added 6 tests (prefix grouping, group+groupOrder pin, in-panel search filter+mirror, search focus/clear on open, no-match custom click, custom via Enter).
+
+**Verification.** PM re-ran vitest: **401 passed (21 files)**. No backend changes.
+
+---
+
 ## 2026-09-06 — Terminal toolbar icon-only main buttons — DONE
 
 ### `src/frontend/static/index.html`
