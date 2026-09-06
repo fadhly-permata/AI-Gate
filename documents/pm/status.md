@@ -1153,3 +1153,4 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
   - **PM-owned (integrasi):** cache-buster `analytics.js?v=20260906` di index.html (pola precedent terminal.js — hindari stale JS ke-cache); wiring test disesuaikan tahan `?v=`.
 - **Verifikasi PM (re-run sendiri):** `pytest tests/backend` = **423 passed / 1 skipped** (skip native PTY); vitest penuh = **445 passed / 23 files**. 0 regresi.
 - PENDING (user): restart aigate agar BE aktif (R32 — user yang restart); hard-refresh halaman. Baris lama (`model=''`) tidak di-backfill.
+- **DI-COMMIT `a17264c`** (13 file, +457/−25) **+ PUSH `origin/refactor/ui`** (1165bc1..a17264c) — approve user.

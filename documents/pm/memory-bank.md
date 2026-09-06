@@ -36,8 +36,8 @@
   delegasi re-work ke pemilik scope, baru catat + commit.
 
 ## Progress
-- 2026-09-07: **Request Log kolom Model/Endpoint kosong — SELESAI (uncommitted,
-  sekuensial BE→FE).** Root cause: combo ref → resolver `upstream_model=""` →
+- 2026-09-07: **Request Log kolom Model/Endpoint kosong — SELESAI + DI-COMMIT
+  `a17264c` + PUSH `origin/refactor/ui`.** Root cause: combo ref → resolver `upstream_model=""` →
   router nimpa `ctx["model"]` jadi `''` (RequestLog.model kosong utk semua request
   combo); Endpoint kosong = by-design (model-based, tanpa header
   `X-Aigate-Endpoint`). Fix: BE `_upgrade_ctx_model` helper (6 situs, upgrade
