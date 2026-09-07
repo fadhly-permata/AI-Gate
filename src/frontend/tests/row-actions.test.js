@@ -1,14 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
+import { indexHtml, indexBodyHtml } from "./helpers/dom.js";
 
 import "../static/i18n.js";
 import "../static/combobox.js";
 import "../static/app.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const html = readFileSync(join(__dirname, "..", "static", "index.html"), "utf8");
+const html = indexHtml();
 
 describe("kebab action menu + lang dropdown", () => {
   it("all four management tables have an Actions header", () => {
@@ -45,7 +42,7 @@ describe("kebab action menu + lang dropdown", () => {
   });
 
   it("updateLangUI renders flag + localized name in trigger and menu", () => {
-    document.body.innerHTML = html.slice(html.indexOf("<body>"), html.indexOf("</body>"));
+    document.body.innerHTML = indexBodyHtml();
     window.applyLocale("id");
     // init already ran at import; call the exposed refresh path via a lang click.
     // Instead assert the LANGS registry + key presence (dropdown is data-driven).

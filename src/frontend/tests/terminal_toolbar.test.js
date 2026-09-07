@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import { JSDOM } from "jsdom";
+import { indexDocument, stylesCss } from "./helpers/dom.js";
 
 /* =====================================================================
  * Terminal toolbar — the three control-cluster features that sit on top of
@@ -25,7 +22,6 @@ import { JSDOM } from "jsdom";
  * against the live jsdom document.
  * ===================================================================== */
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /* ---- xterm / WS stubs (same shape as the other terminal suites) ---- */
 class MockWebSocket {
@@ -162,6 +158,14 @@ installFullscreen(document.getElementById("terminalBody"));
 let wakeLock = makeWakeLock();
 Object.defineProperty(navigator, "wakeLock", { configurable: true, writable: true, value: wakeLock });
 
+// Force a cache miss so terminal.js's IIFE init() runs against the DOM
+// mounted just above. Under `isolate: false` the module registry is shared
+// across test files, so a plain import can hand back an instance another
+// terminal suite already initialised — with its cached refs (stageEl,
+// tabBarEl, the visibilitychange/resize listeners) bound to THAT suite's
+// detached fixture, which silently breaks any test that drives those
+// bindings. Same remedy terminal_discard/terminal_exit already use.
+vi.resetModules();
 await import("../static/i18n.js");
 await import("../static/terminal.js");
 
@@ -674,8 +678,7 @@ describe("Shared dropdown — open/close semantics", () => {
  * Markup + i18n parity (the shipped page, not the fixture)
  * ===================================================================== */
 describe("Toolbar markup shipped in index.html", () => {
-  const html = readFileSync(join(__dirname, "..", "static", "index.html"), "utf8");
-  const doc = new JSDOM(html).window.document;
+  const doc = indexDocument();
   const floating = doc.getElementById("termFloating");
 
 it("the cluster holds Paste, Settings, Full in exact order", () => {
@@ -770,8 +773,7 @@ describe("Toolbar i18n keys (EN + ID parity, no drift)", () => {
  * presence of the fix, not pixel values — jsdom has no layout engine).
  * ===================================================================== */
 describe("Dropdown CSS contract", () => {
-  const cssRaw = readFileSync(join(__dirname, "..", "static", "styles.css"), "utf8");
-  const css = cssRaw.replace(/\/\*[\s\S]*?\*\//g, "");
+  const css = stylesCss();
   const block = (re) => { const m = css.match(re); return m ? m[0] : null; };
 
   it("the popover is anchored to the split and opts back into pointer events", () => {

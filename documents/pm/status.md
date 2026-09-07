@@ -1334,5 +1334,74 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
 - **PR #5 dibuat: https://github.com/fadhly-permata/AI-Gate/pull/5** (`refactor/ui` → `main`,
   10 commit / 44 file / +5837 −153) — mencakup 4 commit menggantung pasca-PR #4 + 5 commit
   sesi ini. BELUM di-merge (menunggu user; dan user perlu restart+refresh setelah merge).
+  → **sudah MERGED oleh user (`0e290ae`)**, tapi sebelum commit sidebar `86a5ef1` masuk,
+  jadi commit itu dibawa ke **PR #6**.
+
+## 2026-09-07 (malam) — PERBAIKAN LINGKUNGAN: semua perintah shell lambat (R37)
+- User: "kerja lu lama bangg kalo udah manggil/jalankan perintah bash/shell. perbaiki dong".
+- Ukur dulu (bukan nebak): `time true` 0,000s · `time bash -c true` 0,041s ·
+  **`time bash -ic true` 1,452s** · `python3 -c pass` 0,090s · `node -e 0` 0,302s ·
+  `git status` 0,030s. Lalu `time termux-wake-lock` = **1,208s** → ketemu pelakunya:
+  `~/.bashrc` memanggilnya di SETIAP shell interaktif (Termux: tiap panggilan tool = shell baru).
+- Fix (di luar repo, `~/.bashrc`): state-file `~/.termux-wake-lock.ts` + refresh maks
+  1x/6 jam + dijalankan di background `( … & )`; komentar di file menjelaskan angka & alasannya.
+- Verifikasi: `bash -ic true` **1,452s → 0,047s** (≈25x); state-file ketulis;
+  `termux-wake-lock` dipanggil manual tetap exit 0 (fitur anti-doze aigate tidak hilang).
+- Tidak disentuh: fungsi `opencode()` di `.bashrc` (manggil `sync-bai-models.sh` = jaringan
+  tiap opencode mulai) — dilaporkan ke user sebagai opsi, belum diubah.
+- **CATATAN KESELAMATAN yang dilihat PM di file yang sama:** `GH_TOKEN` / `GITHUB_TOKEN`
+  (PAT GitHub) dan `CONTEXT7_API_KEY` tersimpan **plaintext di `~/.bashrc`** dan diekspor ke
+  SETIAP proses anak. Sudah dilaporkan ke user; rotasi/cypher-store = keputusan user.
+- Rule baru: **R37** (jalur tiap-shell bebas blocking + ukur dulu) & **R38** (handover pendek
+  utk task kecil — dipicu protes user "buset, lama amat bikin item baru di sidemenu").
+
+## 2026-09-07 (malam) — Optimasi kecepatan suite FE (fe-dev) + buang artefak throwaway
+- User menyetujui ("ya udah, lu kerjain deh") pekerjaan lanjutan: bikin vitest lebih cepat.
+- **fe-dev DONE (ses_f82f9e100ffeHe6GYitXwzBvIH):** akar sebenarnya bukan cuma parse HTML —
+  Termux lapor `os.cpus().length===0` → vitest fallback **8 fork** di HP ter-throttle.
+  Kurva terukur: 1 fork 12.6s · **2 fork 8.3s** · 4 fork 10.4s · 8 fork 12.2s.
+  Perubahan: `tests/helpers/dom.js` (parse `index.html` sekali per worker),
+  `tests/helpers/quiet.js` dipasang sebagai `setupFiles` (stop poller log/usage tiap tes —
+  ini menutup flake `expected 1 to be +0` + `ReferenceError: fetch is not defined` yang
+  muncul begitu fork dinaikkan, BUKAN sekadar hiasan), `vitest.config.js`
+  `pool:"forks", maxForks:2, minForks:1`. Ditolak/dibatalin: mount via `<template>`+clone
+  (5x lebih lambat), `--pool=threads` (unhandled error di Termux), beforeEach→beforeAll di
+  4 file hot (murah kok; yang mahal re-import + render combobox 200 opsi), maxForks 3/4/6/8.
+- **PM:** gate suite penuh SEKALI (R35) → **484 passed / 23 file, Duration 13.86s**
+  (collect 24.07→6.82s, environment 28.63→5.61s, tests 23.82→9.71s; un-throttled 12.23→8.27s).
+  Membuang artefak throwaway sesi sebelumnya `src/frontend/tests_orig/` +
+  `vitest.orig.config.js` (untracked, isinya salinan HEAD, config-nya sendiri bilang
+  "Delete after use"). **Commit `618f7d7`** (14 file) + CODE_CHANGES.md (R22).
+- Open (laporan fe-dev, belum diputuskan user): guard `typeof fetch === "function"` di
+  `app.js:1792` selalu lolos di Node modern → poller selalu nyala saat tes; kandidat
+  penguatan. `maxForks:2` = tuning per-box, naikkan kalau pindah host multi-core.
+- PR #6 (`refactor/ui` → `main`) sekarang berisi 2 commit: `86a5ef1` (link repo di sidebar)
+  + `618f7d7` (optimasi tes) + docs.
 - PENDING user: restart aigate + hard-refresh (R32) — cache-buster baru `v=20260911`.
   Item yang user TOLAK: verifikasi flag `--model` per CLI (tetap open item, jangan dikerjakan).
+
+## 2026-09-07 (malam) — Sidebar: tautan Repository sticky di bawah + audit kecepatan vitest
+- User: "di sidemenu tambahin link repo aigate dong … sticky di bawah aja". Lalu protes
+  lama ("buset, lama amat bikin item baru di sidemenu") -> **handover pertama gue dibatalin
+  user**, gue ringkasin jadi ~20 baris.
+- **fe-dev (ses_f8390c573ffeRZDbjnksOQGKTX):** kerjaan kode SUDAH mendarat dari spawn yang
+  di-cancel (PM audit diff-nya, diterima), fe-dev cuma benerin 1 assertion tes
+  (`.bottom-nav .bn-item` 5 -> 7; 7 = jumlah item yang sudah ada, tautan repo TIDAK masuk
+  bottom-nav). Hasil: `index.html` `.sidebar-footer` di luar `<nav>`, `app.js` skip item
+  tanpa `data-view` (kalau tidak, klik repo di-`preventDefault`), `styles.css` `.sidebar`
+  flex column + footer `sticky;bottom:0` + `margin-top:auto`, `i18n` `nav.repo` EN/ID,
+  cache-buster `v=20260912`, `views.test.js` +8 tes.
+- **Commit `86a5ef1`** (1 commit, 5 file) + CODE_CHANGES.md (R22). **PR #5 sudah MERGED**
+  (`0e290ae`) TAPI sebelum commit ini masuk -> link repo masih di `refactor/ui`,
+  perlu PR susulan.
+- **Gate PM (sekali, R35):** vitest penuh **484 passed (23 file), Duration 14.66s**.
+- **Diagnosa "kenapa vitest lama" (terukur, bukan perasaan):**
+  (1) 17 dari 23 file tes meng-import `static/app.js` (70 KB) / `static/terminal.js` (61 KB)
+  yang IIFE-nya menjalankan `init()` saat import -> biaya "collect" 24s, setara biaya
+  tesnya sendiri (23.8s). (2) 9 file `readFileSync` + `new JSDOM(index.html)` — HTML 63 KB
+  di-parse ulang tiap file. (3) ms/tes tertinggi: `row-actions` 148, `terminal_discard` 113,
+  `selfheal` 111, `combos` 110 -> re-init per tes, bukan assertion. (4) Termux:
+  `os.cpus()=0` -> vitest fallback 1 fork (sekuensial) + throttling Android.
+  Yang SUDAH dibenerin sesi ini: `isolate:false` (jsdom gak dibangun ulang 23x).
+  Sisa opsi (belum dikerjakan, nunggu user): helper DOM bersama (1 parse utk semua file),
+  stop `init()` ulang per tes di 4 file terberat.

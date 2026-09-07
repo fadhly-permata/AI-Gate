@@ -1,7 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
+import { stylesCss } from "./helpers/dom.js";
 
 /* =====================================================================
  * Mobile terminal fixes — PROBLEM 1 (dvh height) + PROBLEM 2 (swipe).
@@ -23,9 +21,7 @@ import { dirname, join } from "path";
  *      Mouse gestures and the explicit TUI passthrough must stay untouched.
  * ===================================================================== */
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const cssRaw = readFileSync(join(__dirname, "..", "static", "styles.css"), "utf8");
-const css = cssRaw.replace(/\/\*[\s\S]*?\*\//g, ""); // drop comments
+const css = stylesCss(); // cached, comments dropped (helpers/dom.js)
 
 function ruleBlock(selectorRe) {
   const m = css.match(selectorRe);
@@ -120,6 +116,17 @@ document.body.innerHTML =
     '</div>' +
   '</div>';
 
+// terminal.js caches its DOM refs (stageEl/tabBarEl/...) inside its IIFE init()
+// and binds setupSwipe() to them. Under `isolate: false` the module registry is
+// SHARED across test files, so a plain re-import here would hand back the
+// instance some other terminal suite already initialised — whose cached
+// #termStage belongs to that suite's fixture, not the one mounted just above.
+// setupSwipe() would then bind to a detached node and every gesture test would
+// see zero wheel events. resetModules() forces a fresh init() against THIS
+// file's DOM (the remedy prescribed in vitest.config.js; terminal_exit already
+// does the same). terminal.js has no static imports, so resetting before both
+// imports is safe.
+vi.resetModules();
 await import("../static/i18n.js");
 await import("../static/terminal.js");
 

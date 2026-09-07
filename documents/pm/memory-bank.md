@@ -36,6 +36,24 @@
   delegasi re-work ke pemilik scope, baru catat + commit.
 
 ## Progress
+- 2026-09-07 (malam): **Suite tes FE 1,5x lebih cepat — DONE (`618f7d7`, fe-dev).**
+  Akar TERNAKTA bukan parse HTML doang: Termux lapor `os.cpus().length===0` → vitest
+  fallback **8 fork** di HP ter-throttle. Kurva nyata: 1 fork 12.6s · **2 fork 8.3s** ·
+  4 fork 10.4s · 8 fork 12.2s. Fix: `tests/helpers/dom.js` (parse `index.html` sekali per
+  worker), `tests/helpers/quiet.js` sbg `setupFiles` (stop poller log/usage tiap tes —
+  menutup flake yang muncul begitu fork dinaikkan), `maxForks:2`. Gate PM: **484 passed,
+  13.86s** (saat throttle; 8.27s saat tidak) — collect 24.07→6.82s, environment
+  28.63→5.61s, tests 23.82→9.71s. Artefak throwaway `tests_orig/` + `vitest.orig.config.js`
+  dibuang. Open: guard `typeof fetch` di `app.js:1792` selalu lolos → poller nyala saat tes.
+- 2026-09-07 (malam): **Sidebar + tautan Repository sticky — DONE (`86a5ef1`, belum masuk `main`).**
+  User minta link repo (`https://github.com/fadhly-permata/AI-Gate`) nempel di dasar menu
+  samping. FE-only: `.sidebar-footer` di luar `<nav>` (jaga rule `.nav-section:last-child`),
+  `app.js` skip item tanpa `data-view` (kalau tidak, klik luar di-block), `.sidebar` jadi
+  flex column + footer `sticky;bottom:0`+`margin-top:auto`, i18n `nav.repo` EN/ID,
+  cache-buster `v=20260912`, +8 tes `views.test.js`. Gate PM: vitest **484 passed, 14.66s**.
+  **PR #5 sudah MERGED (`0e290ae`) tapi keburu sebelum commit ini** -> 1 commit ini butuh PR
+  susulan. PELAJARAN PROSES: user protes lama ("buset, lama amat") -> handover PM kepanjangan;
+  spawn pertama dibatalin user, spawn kedua ~20 baris dan langsung kelar.
 - 2026-09-07 (sesi ini, akhir): **BERES-BERES — semua kerjaan numpuk di-commit rapi + suite hijau.**
   (1) **Fitur cleanup log** (BE T1 + FE T2, handover `documents/pm/handover-20260907-logs-{be,fe}.md`):
   `DELETE /api/logs` (severity/before, wipe-all wajib `confirm=all`), retensi startup
@@ -230,6 +248,17 @@
    Python; tak kasih PTY utk CLI). Lihat TSD ADR-002.
 
 ## Tooling
+- 2026-09-07: **Kecepatan shell (lingkungan, di luar repo).** User komplain semua perintah
+  bash lama. Akar: `~/.bashrc` manggil `termux-wake-lock` di SETIAP shell interaktif
+  (Termux = tiap panggilan tool bikin shell baru) → **+1,2 detik per perintah**.
+  Fix: cache state-file `~/.termux-wake-lock.ts` + refresh maks 1x/6 jam + jalan di
+  BACKGROUND. Ukur: `time bash -ic true` **1,452s → 0,047s** (≈25x); fungsi wake lock
+  tetap jalan (`termux-wake-lock` exit 0). Rule baru **R37** (jalur tiap-shell wajib bebas
+  blocking + ukur dulu) dan **R38** (handover pendek utk task kecil — user juga protes
+  soal itu). Laten lain yang diketahui: `npx` shebang rusak (pakai
+  `node node_modules/.bin/…`), `os.cpus()=0` → vitest 1 fork, throttling Android bikin
+  angka antar-run beda 1,5–2x, dan fungsi `opencode()` di `.bashrc` manggil
+  `sync-bai-models.sh` (jaringan) tiap opencode dimulai.
 - 2026-09-06: **codegraph = colbymchenry/codegraph (BUKAN xnuinside)**. User rujuk repo
   https://github.com/colbymchenry/codegraph. PM sempat salah pakai xnuinside/codegraph
   (v1.2.0 pip, se-nama) → di-uninstall & diganti yang benar (R27).

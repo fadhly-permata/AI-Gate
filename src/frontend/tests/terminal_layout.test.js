@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import { JSDOM } from "jsdom";
+import { indexDocument, stylesCss } from "./helpers/dom.js";
 
 /* =====================================================================
  * Terminal layout regression tests — BUG1 (half-height stage) + BUG2
@@ -18,11 +15,10 @@ import { JSDOM } from "jsdom";
  *      closed tab's box is un-observed (no leak).
  * ===================================================================== */
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const cssRaw = readFileSync(join(__dirname, "..", "static", "styles.css"), "utf8");
-// Strip /* ... */ comments so the "old value is gone" assertions aren't
-// tripped by the explanatory comments that still NAME the removed values.
-const css = cssRaw.replace(/\/\*[\s\S]*?\*\//g, "");
+// Cached, comment-stripped stylesheet (helpers/dom.js). Comments are stripped
+// so the "old value is gone" assertions aren't tripped by the explanatory
+// comments that still NAME the removed values.
+const css = stylesCss();
 
 // Pull one top-level rule block out of the stylesheet by its selector regex.
 function ruleBlock(selectorRe) {
@@ -76,8 +72,7 @@ describe("BUG1 — terminal view height chain fills the workspace (CSS)", () => 
  * it — not pixel values (jsdom has no layout engine).
  * ===================================================================== */
 describe("terminal view cannot page-scroll (structural guard)", () => {
-  const html = readFileSync(join(__dirname, "..", "static", "index.html"), "utf8");
-  const doc = new JSDOM(html).window.document;
+  const doc = indexDocument();
 
   it("HTML: #terminalBody is a direct child of the terminal view (no wrappers)", () => {
     const view = doc.querySelector('.view[data-view="terminal"]');
@@ -231,8 +226,7 @@ describe("terminal panel is one cohesive, symmetric unit (CSS)", () => {
 });
 
 describe("terminal panel redesign — HTML structure", () => {
-  const html = readFileSync(join(__dirname, "..", "static", "index.html"), "utf8");
-  const doc = new JSDOM(html).window.document;
+  const doc = indexDocument();
 
   it("controls are docked in the tab strip, not floating over the surface", () => {
     const floating = doc.getElementById("termFloating");
@@ -347,6 +341,14 @@ document.body.innerHTML =
     '</div>' +
   '</div>';
 
+// Force a cache miss so terminal.js's IIFE init() runs against the DOM
+// mounted just above. Under `isolate: false` the module registry is shared
+// across test files, so a plain import can hand back an instance another
+// terminal suite already initialised — with its cached refs (stageEl,
+// tabBarEl, the visibilitychange/resize listeners) bound to THAT suite's
+// detached fixture, which silently breaks any test that drives those
+// bindings. Same remedy terminal_discard/terminal_exit already use.
+vi.resetModules();
 await import("../static/i18n.js");
 await import("../static/terminal.js");
 

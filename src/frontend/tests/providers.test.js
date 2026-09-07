@@ -1,8 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import { JSDOM } from "jsdom";
+import { indexDocument } from "./helpers/dom.js";
 
 // i18n.js attaches window.I18N + window.applyLocale (jsdom provides DOM).
 import "../static/i18n.js";
@@ -13,7 +10,6 @@ import "../static/combobox.js";
 // window.aigate.buildHeadersDict / window.aigate.headersToRows.
 import "../static/app.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Let async .then chains (fetchJson / testProviderConnection) resolve.
 const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -332,9 +328,7 @@ describe("discoverModels populates the Model combobox (B2.2)", () => {
 });
 
 describe("index.html wires #provModel as a combobox (mobile fix)", () => {
-  const doc = new JSDOM(
-    readFileSync(join(__dirname, "..", "static", "index.html"), "utf8")
-  ).window.document;
+  const doc = indexDocument();
 
   it("provModel is a role=combobox input + a <ul role=listbox> panel, no datalist", () => {
     const inp = doc.getElementById("provModel");

@@ -1,8 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import { JSDOM } from "jsdom";
+import { indexDocument } from "./helpers/dom.js";
 
 // i18n dict (window.I18N) so getStr() resolves labels during render.
 import "../static/i18n.js";
@@ -14,21 +11,22 @@ import "../static/app.js";
 // The Combos module registers window.aigate.combos and wires its DOM (guarded).
 import "../static/combos.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Fixture markup as constants, so each test can install it with ONE
+// innerHTML assignment (see withComboModalDom below).
+const LIST_HTML =
+  '<p id="comboMsg"></p>' +
+  '<table id="comboTable"><tbody id="comboTableBody"></tbody></table>';
 
 function withDom() {
-  document.body.innerHTML =
-    '<p id="comboMsg"></p>' +
-    '<table id="comboTable"><tbody id="comboTableBody"></tbody></table>';
+  document.body.innerHTML = LIST_HTML;
 }
 
 // Build the combo modal DOM (mirrors index.html #comboModal) incl. the
 // members editor section, so the members helpers can be driven in tests.
 // Structure mirrors the labeled add-member grid: each field wrapped in a
 // .combo-member-field with a visible <label for=...>. Element ids unchanged.
-function withComboModalDom() {
-  withDom();
-  document.body.innerHTML +=
+const MODAL_HTML =
     '<div id="comboModal">' +
       '<h3 id="comboModalTitle"></h3>' +
       '<form id="comboForm">' +
@@ -75,6 +73,13 @@ function withComboModalDom() {
         '</div>' +
       '</form>' +
     '</div>';
+
+// One assignment instead of `withDom(); innerHTML += ...`: `+=` serialises the
+// live DOM back to a string and then re-parses the WHOLE body, so this fixture
+// was parsed twice per test (it is the beforeEach for most of this file).
+// Resulting DOM is identical: LIST_HTML then MODAL_HTML, same order.
+function withComboModalDom() {
+  document.body.innerHTML = LIST_HTML + MODAL_HTML;
 }
 
 const jsonResponse = (payload) => Promise.resolve({
@@ -756,8 +761,7 @@ describe("combos members — EXISTING combo mode (member endpoints)", () => {
 
 describe("combos strategy select — three_tier (B5.2)", () => {
   it("index.html strategy select keeps the old options and adds three_tier", () => {
-    const html = readFileSync(join(__dirname, "..", "static", "index.html"), "utf8");
-    const doc = new JSDOM(html).window.document;
+    const doc = indexDocument();
     const sel = doc.getElementById("comboStrategy");
     const values = Array.from(sel.querySelectorAll("option")).map((o) => o.value);
     expect(values).toEqual(["fallback", "load_balance", "latency_cost", "three_tier"]);
@@ -798,9 +802,7 @@ describe("combos strategy select — three_tier (B5.2)", () => {
 describe("combos members — add-member sub-form layout + labels (visual fix)", () => {
   // Read the SHIPPED markup (source of truth for the visual fix), not the
   // simplified test DOM, so the layout/label structure is verified for real.
-  const doc = new JSDOM(
-    readFileSync(join(__dirname, "..", "static", "index.html"), "utf8")
-  ).window.document;
+  const doc = indexDocument();
 
   const FIELDS = [
     { id: "comboMemberProvider", key: "combos.member.provider" },

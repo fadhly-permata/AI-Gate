@@ -1,5 +1,96 @@
 # Code Changes Register (code ↔ docs alignment)
 
+## 2026-09-07 — Suite tes frontend: fixture DOM bersama + poller di-stop + maxForks 2 — DONE (commit `618f7d7`)
+
+**Permintaan user:** "apa sih yang bikin lama? terutama pas jalanin vitest" → lalu
+"ya udah, lu kerjain deh".
+
+### Ukur dulu (R35/R37)
+Sebelum: `484 passed (23 file), Duration 14.66s` dengan `collect 24.07s · tests 23.82s ·
+environment 28.63s · transform 4.05s · prepare 6.06s` (kumulatif antar-worker).
+Akar: (a) 9 file tes masang `readFileSync(index.html 63 KB)` + `new JSDOM(html)`
+masing-masing; (b) 17 file meng-import `app.js`/`terminal.js` yang `init()` jalan saat
+import; (c) Termux melapor `os.cpus().length === 0` → vitest fallback ke
+`availableParallelism()` = **8 fork** di HP yang lagi di-throttle.
+
+### Perubahan (semua di `src/frontend/**`, TIDAK menyentuh kode produksi)
+- `tests/helpers/dom.js` (baru): baca + parse `index.html` **sekali per worker**;
+  file read-only pakai hasil parse bersama, file yang mutasi DOM dapat salinan sendiri.
+  NOTE di file: eksperimen `mountBody()` pakai `<template>`+`cloneNode` **5x lebih lambat**
+  (1146ms vs 214ms) — clone pohon ~1.5k node lebih mahal dari HTML parser-nya.
+- `tests/helpers/quiet.js` (baru, dipasang sebagai `setupFiles`): `afterEach` memanggil
+  `stopLogAutoRefresh()` + `stopUsageAutoRefresh()`. Ini **beban kebenaran**, bukan hiasan:
+  dengan `isolate:false` poller 3 detik itu hidup lintas file dalam worker yang sama dan
+  menyenggol fetch-spy tes sebelah → flake `expected 1 to be +0` +
+  `ReferenceError: fetch is not defined` begitu fork dinaikkan. Setelah: 3 run penuh hijau.
+- `vitest.config.js`: `pool:"forks"`, `maxForks:2`, `minForks:1` (isolate:false tetap).
+  Kurva terukur di box ini: 1 fork 12.6s · **2 fork 8.3s** · 4 fork 10.4s · 8 fork 12.2s.
+  Komentar lama "os.cpus()=0 keeps it sequential" dikoreksi — ternyata TIDAK sekuensial.
+- 11 file tes dimigrasi ke helper. Tidak ada tes yang dihapus / di-skip / dilonggarkan;
+  `vi.resetModules()` di `terminal_exit`/`terminal_discard` TETAP (dibuktikan via run:
+  tiap tes discard memang mensimulasikan reload halaman).
+- Dibuang: `tests_orig/` + `vitest.orig.config.js` (artefak throwaway sesi sebelumnya;
+  isinya salinan HEAD dan config-nya sendiri menulis "Delete after use").
+
+### Angka sesudah
+`collect 24.07s → 6.82s`, `environment 28.63s → 5.61s`, `tests 23.82s → 9.71s`,
+`transform 4.05s → 1.86s`. Wall: **12.23s → 8.27s** saat box tidak di-throttle;
+gate PM barusan **13.86s** saat box di-throttle (484 passed / 23 file).
+
+### Catatan untuk nanti (bukan bug)
+- `maxForks: 2` = tuning per-box. Pindah ke host multi-core sungguhan → naikkan.
+- Guard `if (typeof fetch === "function")` di `app.js:1792` mengasumsikan lingkungan tes
+  headless tanpa `fetch`, padahal Node modern selalu punya global itu → poller selalu nyala
+  di tes. Kandidat penguatan kalau nanti mau dirapikan (keputusan PM/user, belum dikerjakan).
+
+## 2026-09-07 — Sidebar: tautan Repository nempel di bawah — DONE (commit `86a5ef1`)
+
+**Permintaan user:** "di sidemenu tambahin link repo aigate dong
+(https://github.com/fadhly-permata/AI-Gate) buat posisinya sticky di bawah aja ya."
+
+### `src/frontend/static/index.html`
+- `<div class="sidebar-footer">` = anak terakhir `<aside class="sidebar">`, **di luar
+  `<nav>`** → `.nav-section:last-child { border-bottom: 0 }` tetap berarti sama.
+- Isinya `<a class="nav-item" target="_blank" rel="noopener noreferrer">` + ikon
+  `fa-brands fa-github` + `<span class="nav-label" data-i18n="nav.repo">`;
+  `aria-label`/`title` + `data-i18n-aria` supaya tetap terbaca saat sidebar di-collapse.
+- Cache-buster dinaikkan ke `?v=20260912` untuk `styles.css`, `app.js`, `i18n.js`.
+
+### `src/frontend/static/app.js` (4 baris)
+- Handler klik navigasi sekarang `if (!item.hasAttribute("data-view")) return;` —
+  tanpa itu tautan repo ikut di-`preventDefault()` dan gak ke mana-mana.
+
+### `src/frontend/static/styles.css`
+- `.sidebar` jadi `display:flex; flex-direction:column` (sebelumnya block) supaya
+  footer bisa didorong ke bawah; `.nav` tidak diubah (min-height otomatis = tinggi
+  konten → menu panjang overflow, `.sidebar` yang scroll).
+- `.sidebar-footer`: `position:sticky; bottom:0` + `margin-top:auto` + `flex:0 0 auto`
+  + `background:var(--sidebar-bg)` + `z-index:1` → dua mekanisme saling melengkapi
+  (menu pendek → nempel bawah; menu panjang/scroll → tetap terlihat, item terakhir
+  tetap terjangkau di akhir scroll). `body.sidebar-collapsed .sidebar-footer{padding:4px 0}`.
+  Tanpa hex baru (token saja). Mobile tidak disentuh (`.sidebar` tetap `display:none`,
+  `.bottom-nav` tetap 7 item).
+
+### `src/frontend/static/i18n.js`
+- `nav.repo`: EN `"Repository"`, ID `"Repositori"` (satu kunci = satu nilai, sesuai
+  keputusan i18n 2026-09-06).
+
+### `src/frontend/tests/views.test.js` (+115 baris, 8 tes)
+- href persis + `target=_blank` + `rel` noopener/noreferrer; TIDAK punya `data-view`
+  + guard binding `app.js` (regression lock); posisi wrapper (last child `.sidebar`,
+  di luar `<nav>`, 4 `.nav-section` utuh); markup ulang pola nav (ikon + label +
+  aria/title); mode collapsed (label tetap di DOM, disembunyikan CSS); kontrak CSS
+  sticky ( assertion teks rule — jsdom tidak menjalankan layout); ponsel tidak berubah.
+
+**Verifikasi PM:** `node node_modules/.bin/vitest run` → **484 passed (23 file),
+Duration 14.66s**. Backend tidak disentuh (tanpa perubahan `src/backend/**`).
+
+**KOREKSI label (user 2026-09-07, commit menyusul):** teks ditanya user =
+`"aigate Repo"` (sebelumnya EN "Repository" / ID "Repositori"). Diubah di
+`i18n.js` (EN + ID jadi sama — nama produk, bukan string bilingual campur),
+`index.html` (label + `aria-label` + `title`), dan `views.test.js` (3 assertion).
+Cache-buster `i18n.js` → `?v=20260913`. Tes tertarget: views + i18n = **25 passed**.
+
 ## 2026-09-07 — Log cleanup: hapus / retensi / tanda "selesai" (BE T1 + FE T2) — DONE (commit `86c4778` + `45206c0`)
 
 **Permintaan user:** fitur bersihin log — 3 opsi: hapus manual, auto-hapus per umur,

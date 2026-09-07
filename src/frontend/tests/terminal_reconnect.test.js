@@ -79,6 +79,14 @@ document.body.innerHTML =
   '</div></div>';
 
 // Import AFTER mocks + DOM are in place so init() wires up correctly.
+// Force a cache miss so terminal.js's IIFE init() runs against the DOM
+// mounted just above. Under `isolate: false` the module registry is shared
+// across test files, so a plain import can hand back an instance another
+// terminal suite already initialised — with its cached refs (stageEl,
+// tabBarEl, the visibilitychange/resize listeners) bound to THAT suite's
+// detached fixture, which silently breaks any test that drives those
+// bindings. Same remedy terminal_discard/terminal_exit already use.
+vi.resetModules();
 await import("../static/terminal.js");
 
 const T = () => window.aigate.terminal;
