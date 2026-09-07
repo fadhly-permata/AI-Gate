@@ -1620,3 +1620,20 @@ User: "push".
 - Verifikasi remote: blob SHA `README.md` lokal == remote ref `docs/wiki` (`b3a77a42…`).
 - PR bisa dibuat di https://github.com/fadhly-permata/AI-Gate/pull/new/docs/wiki — BELUM gue buat
   (user belum minta). Wiki tetap gak disentuh.
+
+## 2026-09-08 — PR #8 dibuka: `docs/wiki` → `main`
+User: "bikin pr deh biar enak liat yang 'main'".
+- Pre-flight PM: working tree bersih; `origin/main...HEAD` = 0 belakang / 12 depan; daftar 12
+  commit & diff 5 file diperiksa SEMUANYA (bukan cuma commit terakhir); scan secret = 0 token;
+  tidak ada PR terbuka lain (`gh pr list` kosong).
+- **PR #8**: https://github.com/fadhly-permata/AI-Gate/pull/8 — base `main`, head `docs/wiki`,
+  judul `docs(readme): README untuk pembaca awam + aturan PM R39–R42`. Body gaya repo (Ringkasan /
+  README baru / Yang ikut naik / Verifikasi / Catatan review / Belum termasuk). File body temp
+  sudah dihapus (R8).
+- Status GitHub: **mergeable=MERGEABLE, mergeStateStatus=CLEAN**, 12 commit, 5 file
+  (`README.md`, `documents/pm/{OPERATING_RULES,memory-bank,state,status}.md`).
+- **Gak ada perubahan kode** → gate tes tidak dijalankan (tidak relevan); README lama tetap ada di
+  riwayat `main` kalau user mau bandingkan.
+- Commit catatan PR ini **sengaja belum di-push** biar PR tetap persis 12 commit yang sedang lu
+  review. Naik bareng kerjaan wiki berikutnya.
+- Wiki tetap gak disentuh.
