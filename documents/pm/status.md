@@ -1536,3 +1536,26 @@ apapun dulu di wiki. kalo sekedar test aja sih boleh."
   dihapus (R8). **Kesimpulan: jalur auto-commit wiki siap 100%, tinggal dipakai kalau user bilang.**
 - **KENDALA BARU dari user (ikat):** DILARANG menulis/meng-push apa pun ke wiki sampai user
   memberi izin. Boleh: baca, clone, dry-run/probe. Delegasi ke specialist pun kena aturan ini.
+
+## 2026-09-08 — Draf README baru (ceria + emoji, sorot gateway & vibe coding & Termux) — NUNGGU REVIEW USER
+User: "update README.md dulu, tonjolkan fitur gateway AI + vibe coding, lebih ceria (emoji boleh),
+kasual. buatin draf dulu buat gue review. tonjolin juga vibe coding di Termux (pure Termux maupun
+distro Linux)." Wiki di-parker (R40: rencana halaman udah disodorkan, belum di-ACC).
+- **Fakta gue kumpulin dulu (read-only) biar sub-agent gak ngarang:** 24 preset CLI terhitung
+  nyata di `src/backend/cli_presets.py:65-105` (12 agentic + 6 autonomous + 6 chat/shell;
+  `python3 -c` hitung entri = **24**); Self-Heal loop dari `src/backend/selfheal.py:1-30`
+  (branch otomatis → CLI di tab PTY live → loop fix/test dari LogEntry → merge `main` → hapus
+  branch; prompt via file temp = no injection; done-marker di-gate exit code 0); rute install
+  Termux `TERMUX_INSTALL` (`cli_presets.py:237-251`) + `is_termux()` (`paths.py:75-91`) karena
+  npm di Termux lapor `process.platform == "android"`; preset "checked ON THE DEVICE"
+  (`cli_presets.py:152-163`); runner e2e Android (`test:e2e:android`).
+- **Proot TIDAK bisa diklaim terverifikasi:** `command -v proot-distro` = tidak ada di perangkat
+  ini dan gak ada kode yang menanganinya → PM pasang batan keras di handover: boleh disebut
+  sebagai "should work / experimental" + marker `<!-- TODO-VERIFY -->`.
+- **Delegasi (R21):** `business-analyst` (ses_f82315a9affe9u2mFCFS19HgGE) nulis draf ke
+  **`documents/business/README-DRAFT.md`** (146 baris, dalam scope-nya). `README.md` **gak disentuh**,
+  wiki gak disentuh. PM verifikasi: 1 file baru, 0 perubahan lain, angka 24 cocok, klaim
+  on-device cocok sama komentar kode.
+- **3 keputusan yang dibalikin BA ke user:** (1) nama resmi `aigate` (draf, kecil) vs `AIGate`
+  (README lama); (2) kalimat "Contributions and feedback welcome" — dipertahankan/dibuang;
+  (3) tautan `documents/dev/SETUP.md` dihapus dari draf — mau dipasang lagi?
