@@ -1580,3 +1580,23 @@ intro + ilustrasi serunya vibe coding lewat hape… nama aplikasi 'aigate' kecil
   (adegan angkot), arahan ke wiki.
 - **Nunggu user:** (1) bahasa — draf masih Inggris, mau versi Indonesia? (2) kalimat penutup
   "try it, break it, and tell me where it hurts" — nada personal/solo, oke atau diganti?
+
+## 2026-09-08 — README draf v3: kultur netral + platform dinyatakan SUDAH DITES + baris kredit
+User: "pake inggris aja, tapi jangan bawa kultur suatu negara… masa lu nyebut angkot. linux udah
+di test, windows juga udah di test jadi gak usah ada klaim untested. lu sok tau banget dah."
++ ACC kalimat penutup + minta baris kredit "Made with ❤️ by Fadhly Permata".
+- **Rule baru R42** (commit `2619612`): materi publik wajib kultur netral; **status pengujian
+  adalah wewenang maintainer** — PM/sub-agent dilarang pasang/tulis caveat "untested/experimental"
+  atas dugaan; kalau ragu tanya 1 kalimat; konfirmasi maintainer dicatat di `documents/pm/`.
+- **KONFIRMASI MAINTAINER (sumber kebenaran, berlaku lintas sesi):** aigate **sudah dites di
+  Linux, Windows, dan Android/Termux**, termasuk menjalankan distro Linux penuh di dalam HP.
+  → semua `TODO-VERIFY`/kata "experimental/unverified" DIHAPUS dari draf. Jangan pasang caveat
+  lagi untuk hal ini.
+- **business-analyst (task_id sama, sesi dipake ulang)** tulis ulang in place → tetap **80 baris**.
+  Adegan: "angkot" → "on the bus home". Penutup baru: `Made with ❤️ by Fadhly Permata`
+  (setelah `---` di baris terakhir).
+- **Verifikasi PM:** grep `TODO-VERIFY|unverified|experimental|haven't tested|angkot|warkop` =
+  bersih; grep path = bersih (sisa cuma `run.py` di 2 blok perintah); penutupan "Try it, break
+  it, and tell me where it hurts." tetap utuh; `aigate` kecil semua.
+- **Sisa keputusan user:** aside "if you like that kind of magic" di baris Linux-dalam-HP —
+  dipertahankan atau dipotong? Setelah itu: tempel ke `README.md` + push branch `docs/wiki`?
