@@ -93,6 +93,19 @@ document.body.innerHTML =
   '</div></div>';
 
 // Import AFTER mocks + DOM are in place so init() wires up correctly.
+//
+// vi.resetModules() is REQUIRED for self-containment under the shared module
+// registry that vitest.config.js's `isolate: false` enables. terminal.js is an
+// IIFE whose init() caches DOM refs into closure vars (emptyEl, containersEl,
+// ...); updateEmptyState() then toggles THAT cached node. If another terminal
+// test file imported terminal.js first, a plain re-import here is a cache HIT
+// — init() never re-runs, so emptyEl still points at that file's #termEmpty,
+// which our document.body.innerHTML assignment above just detached. The last
+// tab-exit test would then toggle a dead node and read a stale live one. Forcing
+// a cache miss replays init() against THIS file's DOM (same fix terminal_discard
+// uses). document.body is not replaced again during this file's tests, so the
+// refs stay valid for every case.
+vi.resetModules();
 await import("../static/terminal.js");
 
 const T = () => window.aigate.terminal;
