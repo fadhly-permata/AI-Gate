@@ -1600,3 +1600,13 @@ di test, windows juga udah di test jadi gak usah ada klaim untested. lu sok tau 
   it, and tell me where it hurts." tetap utuh; `aigate` kecil semua.
 - **Sisa keputusan user:** aside "if you like that kind of magic" di baris Linux-dalam-HP —
   dipertahankan atau dipotong? Setelah itu: tempel ke `README.md` + push branch `docs/wiki`?
+
+## 2026-09-08 — README BARU PASANG (commit README-only di branch docs/wiki)
+User: "oke pasang".
+- **business-analyst** (handover scope eksplisit dari PM — R3) menimpa `README.md` dengan salinan
+  verbatim draf v3 lalu **menghapus** `documents/business/README-DRAFT.md` (2 salinan = drift).
+- **Verifikasi PM:** SHA-256 `README.md` == SHA-256 draf di HEAD (`ed67124a…`), 80 baris / 3164
+  byte, nol selisih karakter; grep path di README baru = **0**; `git status` cuma 2 file itu.
+- README lama (131 baris, penuh path + instruksi pip/venv/uvicorn/npm + tabel layout) **digantikan**;
+  isinya yang teknis jadi bahan halaman wiki nanti (belum ditulis — wiki masih dikunci user).
+- BELUM di-push (branch `docs/wiki` lokal). User belum bilang push.
