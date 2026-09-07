@@ -547,3 +547,23 @@ Aturan wajib untuk `README.md` (dan materi promosi sejenis):
 4. Nama produk ditulis **`aigate`** — huruf kecil semua, termasuk judul.
 5. Nada ceria/kasual + emoji boleh; kejujuran tetap: klaim belum terverifikasi diberi label.
 6. PM WAJIB masukkan poin 1–5 ke handover sub-agent SEBELUM nulis, bukan setelah dikoreksi.
+
+## R42 — Dokumen publik: kultur netral + status pengujian MILIK MAINTAINER, bukan asumsi PM
+Pelajaran (2026-09-08, user: "jangan bawa kultur suatu negara… masa lu nyebut angkot. linux udah
+di test, windows juga udah di test jadi gak usah ada klaim untested. lu sok tau banget dah"):
+PM menyisipkan caveat "belum diverifikasi" untuk rute Linux/proot dan memakai adegan khas
+Indonesia (angkot) di README publik — dua-duanya keluar dari wewenang PM.
+
+Aturan wajib:
+1. Materi publik pakai **kultur netral/global**. DILARANG rujukan khas satu negara/daerah
+   (angkot, warkop, nama jalan lokal, idiom lokal, contoh mata uang lokal). Pilih gambaran
+   yang dimengerti di mana saja (bus/kereta/kopi di rumah).
+2. **Status pengujian (tested / works on X / verified) adalah keputusan MAINTAINER.** PM dan
+   sub-agent DILARANG menulis "untested / experimental / belum diverifikasi" atas dasar
+   dugaan atau karena mesin kerja PM tidak punya peralatannya. Kalau ragu → **tanya maintainer
+   1 kalimat**, jangan pasang caveat sendiri, jangan hapus klaim sendiri.
+3. Kalau maintainer menyatakan sudah dites → tulis sebagai **sudah dites**, buang marker
+   `TODO-VERIFY`, dan catat sumbernya di `documents/pm/` ("dikonfirmasi maintainer, tanggal")
+   supaya sesi berikutnya tidak memasang caveat lagi.
+4. Sebaliknya: klaim yang belum pernah dikonfirmasi maintainer tetap tidak boleh dilebihkan.
+   Netral = faktual, bukan penuh tanda tanya.
