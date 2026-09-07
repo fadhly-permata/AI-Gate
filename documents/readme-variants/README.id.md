@@ -1,45 +1,45 @@
 # aigate 🚪
 
-Satu pintu buat semua penyedia AI yang lu pakai. Satu tempat main di mana
-agent AI yang ngetik kode buat lu. Dan semuanya bisa lu jalanin dari HP.
+aigate adalah satu pintu untuk semua provider AI yang kamu pakai,
+sekaligus tempat agent AI mengerjakan koding untukmu — dan semuanya bisa
+dijalankan dari HP.
 
-Nggak pakai Docker, nggak pakai akun cloud — aigate itu aplikasi Python
-biasa yang hidup di komputer atau HP Android lu sendiri. API key dan
-riwayat pemakaian nyimpen lokal, di perangkat lu juga.
+Bentuknya aplikasi Python biasa: tanpa Docker, tanpa akun cloud. API key
+dan riwayat pemakaian tersimpan di perangkat sendiri.
 
 [English](../../README.md)
 
-## Bayangin gini ☕
+## Sebelum tidur ☕
 
-Lu lagi di KRL pulang kerja, HP di tangan, browser kebuka. Side project
-lu terus-terusan error. Lu ketik satu kalimat ke agent lu, gas — sebuah
-tab hidup dan mulai benerin error satu per satu: jalanin test, baca
-gagalannya, tambal, ulang. Lu tinggal ngeliatin dari kursi sambil lampu
-kota lewat di jendela. Pas error terakhir beres, semua fix masuk ke
-branch utama dan branch kerjanya hilang sendiri. Semuanya dari HP, di
-tab browser.
+Kamar sudah gelap, HP sudah di tangan, tapi tiba-tiba teringat project
+yang error dari sore. Buka browser, tulis satu perintah singkat, dan
+agent mulai bekerja di satu tab: error diperbaiki satu per satu, dites
+ulang, sampai bersih. Hasilnya masuk ke branch utama dengan sendirinya.
+Kamu tinggal menutup browser dan lanjut tidur — besok paginya kode sudah
+rapi.
 
 ## Yang bikin beda ✨
 
-- **Satu pintu buat semua penyedia AI.** Sambungkan akun penyedia lu
-  sekali, aigate yang ngatur jalur request-nya — kalau salah satu mati
-  atau kuotanya habis, request tetep kejawab, nggak gagal begitu aja.
-- **24 tool AI coding, sekali ketuk.** Jalankan asisten coding AI
-  populer langsung ke tab terminal bawaan aigate. Belum kepasang? Dia
-  ngusulin perintah install yang beneran jalan di perangkat lu.
-- **Loop self-heal yang bisa lu tonton.** Arahin ke error project lu:
-  dia bikin branch, jalanin agent di tab yang keliatan, benerin warning
-  satu per satu, lalu merge balik pas udah lolos. Nggak ada yang
-  disembunyiin — dan dia nggak pernah pura-pura sukses kalau aslinya
-  gagal.
-- **Beneran jalan di HP.** aigate terpasang dan jalan native di Termux
-  Android — tanpa compiler, tanpa build tools, nggak ada yang cuma bisa
-  di desktop.
-- **Privat secara default.** API key dan riwayat lu itu data lokal di
-  perangkat lu. Nggak ada yang ngobrol ke cloud kecuali penyedia AI yang
-  lu pilih sendiri.
-- **Nyaman dipakai.** Tema terang dan gelap, 7 bahasa, dan UI yang tetap
-  enak di layar kecil.
+- **Semua provider lewat satu pintu.** Hubungkan akun-akun provider ke
+  aigate, lalu permintaan kamu diarahkan otomatis. Kalau satu provider
+  sedang mati atau kuotanya habis, permintaan diteruskan ke provider
+  lain.
+- **24 tool AI coding, tinggal ketuk.** Asisten-asisten coding populer
+  dijalankan langsung dari tab terminal bawaan aigate. Kalau salah
+  satunya belum terpasang, aigate menampilkan perintah pasang yang cocok
+  untuk perangkat yang dipakai.
+- **Perbaikan otomatis yang terlihat.** Arahkan ke project yang error:
+  aigate membuat branch, menjalankan agent di tab yang bisa kamu buka
+  kapan saja, memperbaiki error satu per satu, lalu meng-merge hasil
+  yang sudah beres. Sistem ini tidak pernah mengaku sukses kalau
+  pengerjaannya gagal.
+- **Benar-benar jalan di HP.** Di Android, aigate terpasang dan berjalan
+  native di Termux — tanpa compiler, tanpa build tools.
+- **Datamu tetap di perangkat.** API key dan riwayat permintaan disimpan
+  lokal. Yang keluar ke internet hanya permintaan ke provider yang kamu
+  pilih sendiri.
+- **Nyaman di layar kecil.** Tema terang dan gelap, tujuh bahasa, dan
+  tampilan yang enak dipakai dari HP maupun laptop.
 
 ## Coba 60 detik ⏱️
 
@@ -47,10 +47,10 @@ tab browser.
 python run.py
 ```
 
-Buka **http://localhost:8080** — jalan pertama ngambil beberapa paket
-Python yang dibutuhin, langsung nyala.
+Setelah itu buka **http://localhost:8080**. Saat pertama kali dijalankan,
+aigate mengunduh sendiri paket Python yang dibutuhkan.
 
-Port-nya lagi kepake? Pindah aja:
+Kalau port 8080 sudah dipakai:
 
 ```bash
 AIGATE_PORT=9090 python run.py
@@ -58,26 +58,28 @@ AIGATE_PORT=9090 python run.py
 
 ## Jalan di HP 📱
 
-Pasang Termux di Android, taruh aigate di dalamnya, dan jalankan sama
-kayak di laptop. Yang agak tricky di HP itu masang *tool coding*-nya —
-Android ngeresolve paket beda dari desktop — makanya aigate tahu kapan
-dia lagi di Termux dan ngusulin perintah install yang beneran jalan di
-sana, misalnya paket sistem, bukan versi desktop.
+Di Android, aigate berjalan di Termux dengan cara yang sama seperti di
+laptop: jalankan, lalu buka lewat browser. Yang sering bermasalah di HP
+justru tool coding-nya — Android punya aturan pemasangan paket yang
+berbeda dari laptop. aigate mengenali Termux, sehingga perintah pasang
+yang ditampilkan adalah perintah yang benar-benar jalan di perangkat itu.
 
-aigate sudah dites di Linux, Windows, dan Android (Termux) — dan bisa
-pake distro Linux penuh di dalam HP lu, kalau lu suka trik begitu.
+Sudah diuji di Linux, Windows, dan Android (Termux), termasuk untuk
+menjalankan distro Linux penuh di dalam HP.
 
-## Detail teknisnya di mana? 📚
+## Detail teknis ada di wiki 📚
 
-Semua soal API, arsitektur, opsi setup, dan dokumentasi testing ada di
-[wiki](https://github.com/fadhly-permata/AI-Gate/wiki) — README ini tetap
-santai, wiki yang ngomongin detailnya.
+Penjelasan lengkap soal API, arsitektur, pilihan pemasangan, dan
+dokumentasi pengujian ada di
+[wiki](https://github.com/fadhly-permata/AI-Gate/wiki). README ini cukup
+gambaran besarnya saja.
 
 ## Status 📌
 
-aigate adalah tool personal yang lokal-dulu dan masih aktif dikembangin,
-sudah dites di Linux, Windows, dan Android (Termux). Coba aja, oprek
-sepuasnya — kalau ada yang nyangkut, bilang gue di mana encernya.
+aigate adalah proyek personal yang terus dikembangkan dengan prinsip
+semua data di perangkat sendiri, dan sudah diuji di Linux, Windows, serta
+Android (Termux). Silakan dicoba, dibongkar, dan dilaporkan kalau ada
+yang rusak.
 
 ---
 

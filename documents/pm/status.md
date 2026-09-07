@@ -1656,3 +1656,23 @@ cocok buat masing-masing kultur. kerjain satu persatu dulu, biar bisa gw review.
 - **Ditandai BA utk review user:** kata "ngeresolve" (baris 63) agak janggal — kandidat: "Android
   punya aturan sendiri buat ngatur paket". Level kasual varian ini jadi patokan 5 berikutnya.
 - **Nunggu user:** ACC/ubah varian id → baru gue jalanin ru.
+
+## 2026-09-08 — Varian id ditulis ULANG sebagai teks asli Indonesia (bukan terjemahan) — R43
+User: "dih bahasa lu absurd dan ambigu banget… jangan translate dari inggris, boleh beda yang
+penting strukturnya tetep sama."
+- **Rule baru R43** (commit `39192a6`): varian bahasa = tulisan asli dalam bahasa itu; yang sama
+  hanya struktur seksi + urutan; fakta terkunci (24 tool, `aigate` kecil, perintah, URL, daftar
+  platform teruji, kredit); 1 kalimat 1 makna; DILARANG calque & sapaan sok akrab ("lu/gue" →
+  impersonal/"kamu"); PM wajib baca sendiri hasilnya, bukan ngandelin receipt.
+- **business-analyst** tulis ulang in place → **86 baris**. Adegan diganti total (bukan "bus home"):
+  *rebahan sebelum tidur, ingat project error dari sore*. Judul seksi jadi "Sebelum tidur ☕".
+- **Yang hilang dari versi kemarin:** "ngeresolve paket", "request tetep kejawab", "loop self-heal
+  yang bisa lu tonton", "bilang gue di mana encernya", "kalau lu suka trik begitu", sapaan lu/gue.
+- **Verifikasi PM (baca sendiri, R43.5):** calque → 0; sapaan konsisten "kamu"/impersonal; fakta
+  cocok (24 tool, anti-pura-pura-sukses, teruji Linux/Windows/Termux + distro Linux penuh, 7 bahasa,
+  terang/gelap); `run.py` satu-satunya nama file; link balik `[English](../../README.md)` di baris 10;
+  kredit `Dibuat dengan ❤️ oleh Fadhly Permata`; tanpa tabel; emoji hanya di judul.
+- BA juga lapor self-review-nya: 3 kalimat masih berbau terjemahan ("di sebuah tab" → "di satu tab",
+  "termasuk saat menjalankan" → "termasuk untuk menjalankan", "Semua yang lebih dalam —" →
+  "Penjelasan lengkap soal") dan sudah dibenerin SEBELUM receipt.
+- **Nunggu user:** ACC varian id → lanjut **ru** (Rusia).
