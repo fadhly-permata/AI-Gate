@@ -36,6 +36,15 @@
   delegasi re-work ke pemilik scope, baru catat + commit.
 
 ## Progress
+- 2026-09-07 (malam): **Suite tes FE 1,5x lebih cepat — DONE (`618f7d7`, fe-dev).**
+  Akar TERNAKTA bukan parse HTML doang: Termux lapor `os.cpus().length===0` → vitest
+  fallback **8 fork** di HP ter-throttle. Kurva nyata: 1 fork 12.6s · **2 fork 8.3s** ·
+  4 fork 10.4s · 8 fork 12.2s. Fix: `tests/helpers/dom.js` (parse `index.html` sekali per
+  worker), `tests/helpers/quiet.js` sbg `setupFiles` (stop poller log/usage tiap tes —
+  menutup flake yang muncul begitu fork dinaikkan), `maxForks:2`. Gate PM: **484 passed,
+  13.86s** (saat throttle; 8.27s saat tidak) — collect 24.07→6.82s, environment
+  28.63→5.61s, tests 23.82→9.71s. Artefak throwaway `tests_orig/` + `vitest.orig.config.js`
+  dibuang. Open: guard `typeof fetch` di `app.js:1792` selalu lolos → poller nyala saat tes.
 - 2026-09-07 (malam): **Sidebar + tautan Repository sticky — DONE (`86a5ef1`, belum masuk `main`).**
   User minta link repo (`https://github.com/fadhly-permata/AI-Gate`) nempel di dasar menu
   samping. FE-only: `.sidebar-footer` di luar `<nav>` (jaga rule `.nav-section:last-child`),

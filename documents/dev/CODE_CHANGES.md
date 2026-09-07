@@ -1,5 +1,48 @@
 # Code Changes Register (code ↔ docs alignment)
 
+## 2026-09-07 — Suite tes frontend: fixture DOM bersama + poller di-stop + maxForks 2 — DONE (commit `618f7d7`)
+
+**Permintaan user:** "apa sih yang bikin lama? terutama pas jalanin vitest" → lalu
+"ya udah, lu kerjain deh".
+
+### Ukur dulu (R35/R37)
+Sebelum: `484 passed (23 file), Duration 14.66s` dengan `collect 24.07s · tests 23.82s ·
+environment 28.63s · transform 4.05s · prepare 6.06s` (kumulatif antar-worker).
+Akar: (a) 9 file tes masang `readFileSync(index.html 63 KB)` + `new JSDOM(html)`
+masing-masing; (b) 17 file meng-import `app.js`/`terminal.js` yang `init()` jalan saat
+import; (c) Termux melapor `os.cpus().length === 0` → vitest fallback ke
+`availableParallelism()` = **8 fork** di HP yang lagi di-throttle.
+
+### Perubahan (semua di `src/frontend/**`, TIDAK menyentuh kode produksi)
+- `tests/helpers/dom.js` (baru): baca + parse `index.html` **sekali per worker**;
+  file read-only pakai hasil parse bersama, file yang mutasi DOM dapat salinan sendiri.
+  NOTE di file: eksperimen `mountBody()` pakai `<template>`+`cloneNode` **5x lebih lambat**
+  (1146ms vs 214ms) — clone pohon ~1.5k node lebih mahal dari HTML parser-nya.
+- `tests/helpers/quiet.js` (baru, dipasang sebagai `setupFiles`): `afterEach` memanggil
+  `stopLogAutoRefresh()` + `stopUsageAutoRefresh()`. Ini **beban kebenaran**, bukan hiasan:
+  dengan `isolate:false` poller 3 detik itu hidup lintas file dalam worker yang sama dan
+  menyenggol fetch-spy tes sebelah → flake `expected 1 to be +0` +
+  `ReferenceError: fetch is not defined` begitu fork dinaikkan. Setelah: 3 run penuh hijau.
+- `vitest.config.js`: `pool:"forks"`, `maxForks:2`, `minForks:1` (isolate:false tetap).
+  Kurva terukur di box ini: 1 fork 12.6s · **2 fork 8.3s** · 4 fork 10.4s · 8 fork 12.2s.
+  Komentar lama "os.cpus()=0 keeps it sequential" dikoreksi — ternyata TIDAK sekuensial.
+- 11 file tes dimigrasi ke helper. Tidak ada tes yang dihapus / di-skip / dilonggarkan;
+  `vi.resetModules()` di `terminal_exit`/`terminal_discard` TETAP (dibuktikan via run:
+  tiap tes discard memang mensimulasikan reload halaman).
+- Dibuang: `tests_orig/` + `vitest.orig.config.js` (artefak throwaway sesi sebelumnya;
+  isinya salinan HEAD dan config-nya sendiri menulis "Delete after use").
+
+### Angka sesudah
+`collect 24.07s → 6.82s`, `environment 28.63s → 5.61s`, `tests 23.82s → 9.71s`,
+`transform 4.05s → 1.86s`. Wall: **12.23s → 8.27s** saat box tidak di-throttle;
+gate PM barusan **13.86s** saat box di-throttle (484 passed / 23 file).
+
+### Catatan untuk nanti (bukan bug)
+- `maxForks: 2` = tuning per-box. Pindah ke host multi-core sungguhan → naikkan.
+- Guard `if (typeof fetch === "function")` di `app.js:1792` mengasumsikan lingkungan tes
+  headless tanpa `fetch`, padahal Node modern selalu punya global itu → poller selalu nyala
+  di tes. Kandidat penguatan kalau nanti mau dirapikan (keputusan PM/user, belum dikerjakan).
+
 ## 2026-09-07 — Sidebar: tautan Repository nempel di bawah — DONE (commit `86a5ef1`)
 
 **Permintaan user:** "di sidemenu tambahin link repo aigate dong

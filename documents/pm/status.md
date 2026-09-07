@@ -1354,6 +1354,29 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
   SETIAP proses anak. Sudah dilaporkan ke user; rotasi/cypher-store = keputusan user.
 - Rule baru: **R37** (jalur tiap-shell bebas blocking + ukur dulu) & **R38** (handover pendek
   utk task kecil — dipicu protes user "buset, lama amat bikin item baru di sidemenu").
+
+## 2026-09-07 (malam) — Optimasi kecepatan suite FE (fe-dev) + buang artefak throwaway
+- User menyetujui ("ya udah, lu kerjain deh") pekerjaan lanjutan: bikin vitest lebih cepat.
+- **fe-dev DONE (ses_f82f9e100ffeHe6GYitXwzBvIH):** akar sebenarnya bukan cuma parse HTML —
+  Termux lapor `os.cpus().length===0` → vitest fallback **8 fork** di HP ter-throttle.
+  Kurva terukur: 1 fork 12.6s · **2 fork 8.3s** · 4 fork 10.4s · 8 fork 12.2s.
+  Perubahan: `tests/helpers/dom.js` (parse `index.html` sekali per worker),
+  `tests/helpers/quiet.js` dipasang sebagai `setupFiles` (stop poller log/usage tiap tes —
+  ini menutup flake `expected 1 to be +0` + `ReferenceError: fetch is not defined` yang
+  muncul begitu fork dinaikkan, BUKAN sekadar hiasan), `vitest.config.js`
+  `pool:"forks", maxForks:2, minForks:1`. Ditolak/dibatalin: mount via `<template>`+clone
+  (5x lebih lambat), `--pool=threads` (unhandled error di Termux), beforeEach→beforeAll di
+  4 file hot (murah kok; yang mahal re-import + render combobox 200 opsi), maxForks 3/4/6/8.
+- **PM:** gate suite penuh SEKALI (R35) → **484 passed / 23 file, Duration 13.86s**
+  (collect 24.07→6.82s, environment 28.63→5.61s, tests 23.82→9.71s; un-throttled 12.23→8.27s).
+  Membuang artefak throwaway sesi sebelumnya `src/frontend/tests_orig/` +
+  `vitest.orig.config.js` (untracked, isinya salinan HEAD, config-nya sendiri bilang
+  "Delete after use"). **Commit `618f7d7`** (14 file) + CODE_CHANGES.md (R22).
+- Open (laporan fe-dev, belum diputuskan user): guard `typeof fetch === "function"` di
+  `app.js:1792` selalu lolos di Node modern → poller selalu nyala saat tes; kandidat
+  penguatan. `maxForks:2` = tuning per-box, naikkan kalau pindah host multi-core.
+- PR #6 (`refactor/ui` → `main`) sekarang berisi 2 commit: `86a5ef1` (link repo di sidebar)
+  + `618f7d7` (optimasi tes) + docs.
 - PENDING user: restart aigate + hard-refresh (R32) — cache-buster baru `v=20260911`.
   Item yang user TOLAK: verifikasi flag `--model` per CLI (tetap open item, jangan dikerjakan).
 
