@@ -45,6 +45,10 @@ DEFAULT_SETTINGS: dict[str, str] = {
     # extremely-long-orphaned PTYs are cleaned up. Read by
     # backend.terminal.session._grace_seconds().
     "terminal_idle_reap_minutes": "60",
+    # Log cleanup (T1): operational LogEntry rows older than this many days
+    # are purged at startup by logs_router.purge_expired_logs(). Invalid or
+    # non-positive values fall back to 7 (never crash startup).
+    "log_retention_days": "7",
 }
 
 
