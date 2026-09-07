@@ -1676,3 +1676,21 @@ penting strukturnya tetep sama."
   "termasuk saat menjalankan" → "termasuk untuk menjalankan", "Semua yang lebih dalam —" →
   "Penjelasan lengkap soal") dan sudah dibenerin SEBELUM receipt.
 - **Nunggu user:** ACC varian id → lanjut **ru** (Rusia).
+
+## 2026-09-08 — Varian id ronde 3: audit PM baris-per-baris → 11 pola janggal dibenerin
+User: "masih banyak kalimat yang terasa janggal" (tanpa nunjuk baris) → PM gak nanya balik, gue
+audit sendiri, ketemu 11 pola sistemik → **R43 addendum** (commit `5464b96`): pasif tanpa pelaku,
+subjek hilang, reduplikasi palsu ("akun-akun", "Asisten-asisten"), "permintaan" utk *request*,
+diksi salah rasa ("provider mati", "Tema terang dan gelap", "pilihan pemasangan", "dokumentasi
+pengujian"), redundansi ("dengan cara yang sama seperti"), salah maksud ("satu perintah singkat"
+padahal instruksi ke agent), kalimat >2 klausa.
+- **business-analyst** benerin semua (receipt + read-back sendiri: "error diperbaiki… dites ulang"
+  → "dia memperbaiki error satu per satu, mengulang tes"; "perintah pasang yang ditampilkan adalah…"
+  → "perintah pasang yang muncul dijamin benar-benar jalan").
+- **Ronde 4 (PM nemu 4 nit sisa):** pembuka "jadi…jadi…mengerjakan koding" → "Di dalamnya ada agent
+  AI yang nulis kode buat kamu"; "banyak asisten coding" → "24 asisten coding"; "mengunduh sendiri
+  …dibutuhkannya" → "otomatis mengunduh paket Python yang dibutuhkan"; kalimat Status dipecah dua.
+- **Verifikasi PM:** grep pola lama = **0**; 86 baris; fakta terkunci utuh; `run.py` satu-satunya
+  nama file; struktur seksi gak bergeser.
+- **Dibuka ke user:** angka "24" sekarang muncul 2x di satu bullet (judul + badan) — mau dirapikan
+  atau biarin?
