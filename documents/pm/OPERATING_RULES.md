@@ -528,3 +528,22 @@ Aturan wajib:
 2. Baru setelah user ACC daftar halaman → PM dekomposisi & delegasi ke specialist.
 3. Draf ditulis di repo kode (`documents/wiki/**`), wiki cuma **hasil publikasi**; publikasi
    ke wiki hanya terjadi setelah user bilang go (lihat juga larangan menulis wiki dari user).
+
+## R41 — README = untuk orang awam; detail teknis & path file masuk wiki
+Pelajaran (2026-09-08, review user atas draf README: "jangan terlalu teknikal… jangan nyebut-nyebut
+file apapun di readme… konteks yang ingin ditonjolkan kasih di intro, kasih ilustrasi serunya
+nge-vibe coding lewat hape. nama aplikasi 'aigate' (kecil semua)"):
+
+Aturan wajib untuk `README.md` (dan materi promosi sejenis):
+1. Bahasa **manfaat**, bukan spesifikasi. Teknologi disebut **umum & tercerna awam**
+   ("aplikasi Python biasa, jalan tanpa Docker, datanya lokal") — bukan daftar endpoint,
+   bukan nama modul, bukan arsitektur.
+2. **DILARANG menyebut path/nama file apa pun** (`src/backend/selfheal.py`, `documents/...`,
+   `pyproject.toml`, tabel "Repo layout", dsb). Detail teknis = halaman **wiki**.
+   Pengecualian: perintah menjalankan (`python run.py`) — tanpa itu produk tak bisa dicoba;
+   tetap seminimal mungkin.
+3. Konteks/nilai yang mau dijual **wajib muncul di intro** (3–5 baris pertama) **plus ilustrasi
+   adegan** yang bikin pembaca ikut ngerasain (mis. agent benerin kode sambil ditonton dari HP).
+4. Nama produk ditulis **`aigate`** — huruf kecil semua, termasuk judul.
+5. Nada ceria/kasual + emoji boleh; kejujuran tetap: klaim belum terverifikasi diberi label.
+6. PM WAJIB masukkan poin 1–5 ke handover sub-agent SEBELUM nulis, bukan setelah dikoreksi.
