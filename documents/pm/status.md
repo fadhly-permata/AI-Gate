@@ -1610,3 +1610,13 @@ User: "oke pasang".
 - README lama (131 baris, penuh path + instruksi pip/venv/uvicorn/npm + tabel layout) **digantikan**;
   isinya yang teknis jadi bahan halaman wiki nanti (belum ditulis — wiki masih dikunci user).
 - BELUM di-push (branch `docs/wiki` lokal). User belum bilang push.
+
+## 2026-09-08 — PUSH branch `docs/wiki` ke origin (README baru + R39–R42)
+User: "push".
+- Scan secret pada diff `origin/main..HEAD` (5 file): **0 token** (`ghp_/github_pat_/sk-/AKIA/Bearer`
+  tidak ada) — aman ke repo publik.
+- `git push -u origin docs/wiki:docs/wiki` -> **`* [new branch]`**, upstream sekarang
+  `origin/docs/wiki`. 11 commit naik. `main` TIDAK disentuh (`default_branch` tetap `main`).
+- Verifikasi remote: blob SHA `README.md` lokal == remote ref `docs/wiki` (`b3a77a42…`).
+- PR bisa dibuat di https://github.com/fadhly-permata/AI-Gate/pull/new/docs/wiki — BELUM gue buat
+  (user belum minta). Wiki tetap gak disentuh.
