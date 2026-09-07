@@ -1519,3 +1519,20 @@ User: "goblok, kenapa bikin repo baru? gua kan mintanya branch baru."
   sudah terpisah secara bawaan (`<repo>.wiki.git`).
 - Temuan teknis sesi ini TETAP valid & kepakai: fitur Wiki **tidak bisa** diaktifkan via API
   (`PATCH has_wiki` diabaikan) → 1 klik web UI tetap wajib; setelah itu push otomatis penuh.
+
+## 2026-09-08 — Wiki AI-Gate SUDAH HIDUP (user bikin Home.md) + akses push diverifikasi (0 tulisan)
+User: "hapus repo yang lu buat tadi, wiki page udah gua buatin satu tuh. dan jangan nulis
+apapun dulu di wiki. kalo sekedar test aja sih boleh."
+- **Perintah hapus `AI-Gate-docs`: DITOLAK GitHub** — `HTTP 403: Must have admin rights` /
+  token butuh scope **`delete_repo`** (scope sekarang: `repo, workflow, write:packages`).
+  Gue TIDAK coba bypass. User pilih: hapus sendiri di web (Settings → Danger Zone → Delete
+  repository) ATAU tambahin scope `delete_repo` di PAT lalu gue hapus. Repo tetap **kosong,
+  gak disentuh**.
+- **Wiki aktif**: `git ls-remote AI-Gate.wiki.git` -> `refs/heads/master @ 4deaf39`
+  ("Initial Home page", `Home.md` 29 byte = teks bawaan GitHub). Clone pakai token = OK.
+- **Tes izin tulis (TANPA nulis apa pun):** commit kosong lokal → `git push --dry-run`
+  ke ref `pm-probe` → server balas `[new branch] HEAD -> pm-probe` (= bakal diterima),
+  dan `ls-remote` sesudahnya tetap **cuma `master`** → **0 byte masuk ke wiki**. Temp clone
+  dihapus (R8). **Kesimpulan: jalur auto-commit wiki siap 100%, tinggal dipakai kalau user bilang.**
+- **KENDALA BARU dari user (ikat):** DILARANG menulis/meng-push apa pun ke wiki sampai user
+  memberi izin. Boleh: baca, clone, dry-run/probe. Delegasi ke specialist pun kena aturan ini.

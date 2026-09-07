@@ -297,9 +297,14 @@
   BUKAN repo terpisah — user mengoreksi (R39). Wiki GitHub sendiri sudah berupa repo git
   terpisah (`AI-Gate.wiki.git`), jadi file wiki toh gak pernah nyampur sama `src/**`.
 - Kendala terverifikasi: fitur Wiki tidak bisa dinyalakan lewat API (`PATCH has_wiki`
-  diabaikan GitHub) → perlu 1 klik web UI (Settings → Features → Wikis), setelah itu
-  commit/push bisa full otomatis.
-- Rencana tooling: script publisher di `.opencode/tools/docs/wiki/` (idempoten, `--dry-run`),
-  token dari `gh auth token` / `.env` (rule secrets), sumber konten = `.md` di branch ini.
-- Repo `fadhly-permata/AI-Gate-docs` (private) = **artefak salah**, tidak dipakai, menunggu
-  keputusan user (hapus/ biarkan).
+  diabaikan GitHub) → perlu 1 klik web UI (Settings → Features → Wikis). **SUDAH dilakukan
+  user (2026-09-08)** — wiki hidup di branch `master`, halaman awal `Home.md`. Izin tulis
+  diverifikasi lewat `git push --dry-run` (diterima, 0 byte ditulis) → auto-commit siap.
+- **BATAS IKAT dari user:** jangan menulis/meng-push apa pun ke wiki sampai izin turun.
+  Boleh: baca, clone, probe/dry-run.
+- Rencana tooling (belum dikerjakan): script publisher di `.opencode/tools/docs/wiki/`
+  (idempoten, wajib ada `--dry-run`), token dari `gh auth token` / `.env` (rule secrets,
+  gak di-hardcode), sumber konten = `.md` di branch `docs/wiki` ini; wiki = hasil publikasi.
+- Repo `fadhly-permata/AI-Gate-docs` (private) = **artefak salah**, tidak dipakai. User sudah
+  perintahkan hapus, tapi **terblokir**: PAT gak punya scope `delete_repo` (HTTP 403).
+  Menunggu user hapus lewat web atau menambah scope.

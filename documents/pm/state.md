@@ -1,6 +1,6 @@
 mode: running
 delay_seconds: 0
-checkpoint: "KOREKSI USER (R39): kerjaan dokumen wiki = BRANCH baru `docs/wiki` (dari origin/main) di repo AI-Gate, BUKAN repo baru. Repo `AI-Gate-docs` (private) terlanjur gue bikin = SALAH -> tidak diisi, nunggu izin user buat dihapus. Temuan valid: fitur Wiki TIDAK bisa diaktifkan via API (PATCH has_wiki diabaikan) -> wajib 1 klik web UI, sisanya bisa full auto git push. PENDING user: (1) izinin hapus repo AI-Gate-docs, (2) mode paralel/sekuensial (R16), (3) set halaman wiki gelombang pertama."
+checkpoint: "Wiki AI-Gate HIDUP (user bikin Home.md; branch master @4deaf39). Izin tulis ke wiki SUDAH diverifikasi lewat `git push --dry-run` (diterima server, 0 byte ditulis). ATURAN IKAT dari user: DILARANG menulis/push ke wiki sampai izin turun — boleh baca, clone, probe. Repo salah `AI-Gate-docs` BELUM terhapus: token gak punya scope delete_repo (HTTP 403) -> nunggu user (hapus di web / tambah scope). Kerja dokumen jalan di branch `docs/wiki` (commit a5af8db = R39). PENDING user: (1) eksekusi hapus AI-Gate-docs, (2) mode paralel/sekuensial (R16), (3) set halaman gelombang pertama, (4) kapan boleh nulis ke wiki."
 updated: 2026-09-08
 rules_ref: OPERATING_RULES.md (R1–R39 + R29 addendum)
 multiagent_mode: ask   # sesi baru -> WAJIB tanya lagi (R16); belum dijawab user
