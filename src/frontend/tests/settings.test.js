@@ -77,3 +77,65 @@ describe("settings PUT body builder", () => {
     expect(s.dev_mode).toBe("false");
   });
 });
+
+/* ===== Settings locale select is built from the registry =====
+   One file per language means index.html can no longer list the languages by
+   hand: app.js renders the <select> from window.LANGS. These guards pin that
+   down, including the failure mode a 7-locale registry would otherwise create
+   (a stored locale with no <option> -> empty select -> saving wipes the pref). */
+describe("Settings locale select (registry-driven)", () => {
+  let savedLocale;
+
+  beforeEach(() => {
+    document.body.innerHTML = `
+      <form id="settingsForm">
+        <select id="setTheme"><option value="light" selected>Light</option></select>
+        <select id="setLocale">
+          <option value="en" selected>English</option>
+          <option value="id">Indonesian</option>
+        </select>
+      </form>
+    `;
+    // <html data-locale> is shared state under isolate:false — snapshot it so
+    // these tests cannot leak a fake locale into later files.
+    savedLocale = document.documentElement.getAttribute("data-locale");
+    localStorage.removeItem("aigate.locale");
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = "";
+    localStorage.removeItem("aigate.locale");
+    if (savedLocale === null) document.documentElement.removeAttribute("data-locale");
+    else document.documentElement.setAttribute("data-locale", savedLocale);
+  });
+
+  it("offers every registered language, so a new locale needs no HTML edit", () => {
+    window.aigate.populateLocaleOptions();
+    const sel = document.getElementById("setLocale");
+    expect(Array.from(sel.options).map((o) => o.value)).toEqual(window.LANGS.map((l) => l.code));
+    const zhTw = sel.querySelector('option[value="zh-tw"]');
+    expect(zhTw.textContent).toContain("繁體中文");
+    expect(zhTw.textContent).toContain("🇹🇼");
+  });
+
+  it("keeps the active locale selected", () => {
+    document.documentElement.setAttribute("data-locale", "id");
+    window.aigate.populateLocaleOptions();
+    expect(document.getElementById("setLocale").value).toBe("id");
+  });
+
+  it("falls back to the stored preference when no locale is active yet", () => {
+    document.documentElement.removeAttribute("data-locale");
+    localStorage.setItem("aigate.locale", "id");
+    window.aigate.populateLocaleOptions();
+    expect(document.getElementById("setLocale").value).toBe("id");
+  });
+
+  it("never leaves the select empty for an unknown stored locale", () => {
+    document.documentElement.setAttribute("data-locale", "klingon");
+    window.aigate.populateLocaleOptions();
+    const sel = document.getElementById("setLocale");
+    expect(sel.value).not.toBe("");
+    expect(window.aigate.buildSettingsBody().settings.locale).not.toBe("");
+  });
+});

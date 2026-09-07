@@ -44,9 +44,14 @@ describe("kebab action menu + lang dropdown", () => {
   it("updateLangUI renders flag + localized name in trigger and menu", () => {
     document.body.innerHTML = indexBodyHtml();
     window.applyLocale("id");
-    // init already ran at import; call the exposed refresh path via a lang click.
-    // Instead assert the LANGS registry + key presence (dropdown is data-driven).
-    expect(window.LANGS.map((l) => l.code)).toEqual(["en", "id"]);
+    // The dropdown is data-driven: one row per registry entry, so adding a
+    // language never means editing index.html. The registry is the pin here.
+    expect(window.LANGS.map((l) => l.code))
+      .toEqual(["en", "id", "ru", "nl", "ja", "zh", "zh-tw"]);
+    window.LANGS.forEach((l) => {
+      expect(window.I18N.id[l.nameKey], l.code).toBeTruthy();
+      expect(window.I18N.en[l.nameKey], l.code).toBeTruthy();
+    });
     expect(window.I18N.id["lang.id"]).toBe("Bahasa Indonesia");
     expect(window.I18N.en["lang.en"]).toBe("English");
   });

@@ -120,12 +120,21 @@
     btn.setAttribute("aria-expanded", open ? "true" : "false");
   }
 
-  // Translate a key for the active (or given) locale.
+  // Translate a key for the active (or given) locale. Key resolution and the
+  // English fallback live in i18n.js (window.translate) — one implementation
+  // for every caller. The bare-key return below only covers a page where
+  // i18n.js never loaded.
   function getStr(key, loc) {
     loc = loc || document.documentElement.getAttribute("data-locale") || DEFAULT_LOCALE;
-    var d = window.I18N[loc] || window.I18N.en;
-    return d[key] !== undefined ? d[key]
-         : (window.I18N.en[key] !== undefined ? window.I18N.en[key] : key);
+    if (typeof window.translate === "function") return window.translate(key, loc);
+    return key;
+  }
+
+  // Switch the UI to a locale. i18n.js renders it at once (English stands in
+  // while a language file is missing) and re-renders when that file arrives.
+  function switchLocale(loc) {
+    if (typeof window.setLocale === "function") window.setLocale(loc);
+    else if (typeof window.applyLocale === "function") window.applyLocale(loc);
   }
 
   /* Expose theme helper so the Settings panel can apply theme live on save. */
@@ -172,6 +181,28 @@
     if (!m) return;
     m.textContent = text || "";
     m.className = "settings-msg" + (kind ? " settings-msg-" + kind : "");
+  }
+
+  /* ---- Locale options for the Settings select ----
+     Built from the registry (window.LANGS) so adding a language never means
+     editing index.html. Labels are endonyms ("日本語"), the same in every
+     dictionary, so they never need re-rendering when the locale changes. */
+  function populateLocaleOptions() {
+    var sel = document.getElementById("setLocale");
+    var langs = window.LANGS || [];
+    if (!sel || !langs.length) return; // no registry -> keep the shipped markup
+    // Priority: the locale the UI is actually showing (applyLocale sets
+    // data-locale right before this runs at boot), then the stored preference.
+    // The markup value is never authoritative — it is only the no-JS default.
+    var current = document.documentElement.getAttribute("data-locale") ||
+      read(LOCALE_KEY, DEFAULT_LOCALE);
+    sel.innerHTML = langs.map(function (l) {
+      return '<option value="' + escapeHtml(l.code) + '">' +
+        escapeHtml(l.flag + " " + getStr(l.nameKey)) + "</option>";
+    }).join("");
+    sel.value = current;
+    // Unknown stored value -> first option, so a save can never send "".
+    if (sel.selectedIndex === -1) sel.selectedIndex = 0;
   }
 
   // GET /api/settings -> populate fields.
@@ -231,7 +262,7 @@
         // Apply theme + locale live (source of truth now in DB).
         var f = settingsFields();
         window.applyTheme(f.theme.value);
-        window.applyLocale(f.locale.value);
+        switchLocale(f.locale.value);
         // Keep localStorage in sync with the topbar toggle / lang buttons.
         write(THEME_KEY, f.theme.value);
         write(LOCALE_KEY, f.locale.value);
@@ -441,6 +472,8 @@
   window.aigate.fetchJson = fetchJson;
   window.aigate.escapeHtml = escapeHtml;
   window.aigate.getStr = getStr;
+  window.aigate.switchLocale = switchLocale;
+  window.aigate.populateLocaleOptions = populateLocaleOptions;
 
   /* ===== Terminal + Log Window (B3.1) ===== */
   /* Pure helpers (importable + testable via vitest). */
@@ -1562,7 +1595,11 @@
     applyTheme(theme);
     applySidebar(sidebar);
     applyDevice(device);
-    if (window.applyLocale) window.applyLocale(locale);
+    // Same entry point as the picker: renders now, and if the <head> preloader
+    // could not run (blocked storage, CSP) it fetches the dictionary and
+    // re-renders when it lands. Normally the file is already there -> no-op.
+    switchLocale(locale);
+    populateLocaleOptions();
     updateLangUI(locale);
     initRowMenuGlobal();
 
@@ -1591,7 +1628,7 @@
         var item = e.target.closest("[data-lang]");
         if (!item) return;
         var next = item.getAttribute("data-lang");
-        if (window.applyLocale) window.applyLocale(next);
+        switchLocale(next);
         write(LOCALE_KEY, next);
         updateLangUI(next);
         closeLangMenu();

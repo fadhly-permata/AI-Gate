@@ -18,7 +18,9 @@ export default defineConfig({
     // `isolate: false`: they start once per worker at import time and would
     // otherwise leak fetch calls into later files in the same worker.
     // See tests/helpers/quiet.js.
-    setupFiles: ["./tests/helpers/quiet.js"],
+    // i18n-dicts.js mirrors what <script> tags do in the browser: it loads
+    // every static/i18n/<code>.js into window.I18N. See that file.
+    setupFiles: ["./tests/helpers/quiet.js", "./tests/helpers/i18n-dicts.js"],
     // Cap the worker count. Termux reports `os.cpus().length === 0`, so vitest
     // falls back to availableParallelism() = 8 forks and oversubscribes a
     // throttled phone CPU: each fork rebuilds the jsdom environment and the

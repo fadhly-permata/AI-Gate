@@ -1,5 +1,66 @@
 # Code Changes Register (code ↔ docs alignment)
 
+## 2026-09-08 — i18n: satu file per bahasa + 5 bahasa baru (ru, nl, ja, zh, zh-tw) — DONE (`f7beaf9` + `c1477eb`, branch `feat/i18n-locales`)
+
+**Permintaan user:** "buatkan beberapa file bahasa berikut: Rusia, Belanda, Jepang, Cina"
+→ pilih **opsi B (pecah per file)** + "kedua bahasa cina aja" (Simplified **dan** Traditional)
+→ "biar gak kecampur bikin branch baru aja".
+
+### `src/frontend/static/i18n.js` (793 → 150 baris, 34,7 KB → 6,6 KB)
+- Tidak lagi berisi kamus. Jadi **registry 7 locale + loader + helper**
+  (`applyLocale` / `setLocale` / `translate` / `hasLocale` / `ensureLocale`),
+  `FALLBACK_LOCALE = "en"`.
+- `window.LANGS`: en 🇺🇸, id 🇮🇩, ru 🇷🇺, nl 🇳🇱, ja 🇯🇵, zh 🇨🇳, zh-tw 🇹🇼.
+
+### `src/frontend/static/i18n/` (BARU — satu file per bahasa, self-register)
+- `en.js`, `id.js` = **pindah murni**: 379 kunci, nilai & urutan identik dengan sebelumnya
+  (0 perubahan teks), hanya +5 kunci `lang.{ru,nl,ja,zh,zh-tw}`.
+- `ru.js` (24,5 KB), `nl.js` (18,1 KB), `ja.js` (22,0 KB), `zh.js` (17,6 KB),
+  `zh-tw.js` (18,0 KB) — masing-masing **379 kunci sama persis** dengan `en.js`
+  (checker: hilang 0 / thừa 0 / kosong 0).
+- Aturan terjemahan yang dipakai: placeholder `{n}` `{cli}` `%s` utuh; nama produk
+  (`aigate`, `aigate Repo`), akronim (CLI/API/JSON/OAuth/PTY/TUI/HTTP/CSV), path
+  (`/v1/chat/completions`), dan nama provider/model TIDAK diterjemahkan; `lang.<code>`
+  = endonim (Русский, Nederlands, 日本語, 简体中文, 繁體中文).
+- `zh` vs `zh-tw` ditulis sebagai dua varian berbeda (gaya Taiwan: 儲存/伺服器/資料/匯入),
+  bukan konversi mesin.
+
+### `src/frontend/static/index.html`
+- Preloader inline di `<head>`: baca `localStorage["aigate.locale"]` (kunci yang SUDAH
+  dipakai app.js) lalu `document.write` tag `<script src="i18n/<loc>.js?v=20260914">`
+  **sebelum** `i18n.js`/`app.js` → hanya EN + bahasa aktif yang ter-load (opsi i).
+  Kode non-locale (`../etc/passwd`, `</script><script>`, huruf besar, dsb) ditolak regex.
+- Cache-buster `i18n.js` + `app.js` → `?v=20260914`.
+
+### `src/frontend/static/app.js`
+- `getStr()` delegasi ke `window.translate` (satu implementasi fallback, tidak dua sumber).
+- `switchLocale()` + `populateLocaleOptions()`: dropdown bahasa di Settings dibangun dari
+  `window.LANGS` (tambah bahasa baru tidak perlu sentuh app.js lagi).
+
+### Tes
+- `tests/i18n.test.js`: parity guard jadi **glob** (`static/i18n/*.js` wajib punya kunci sama
+  persis dengan `en`) + tes registry, fallback saat kamus belum ada, dan perilaku preloader
+  (4 → 30 tes). `tests/helpers/i18n-dicts.js` (baru) + `vitest.config.js setupFiles` supaya
+  jsdom ikut memuat kamus. `tests/settings.test.js` +4 (opsi locale registry-driven),
+  `tests/row-actions.test.js` pin `["en","id"]` → 7 kode.
+- **Tidak ada tes yang dihapus/di-skip/dilonggarkan.**
+
+### Verifikasi PM
+- `node .opencode/tools/tests/i18n-parity-check.mjs ru nl ja zh zh-tw` → 5× `OK`, 379 kunci.
+- Gate penuh sekali (R35): vitest **519 passed (23 file), Duration 10.60s**.
+- Backend TIDAK diubah: `Setting locale` disimpan apa adanya
+  (`settings_router.put_settings` → `set_setting(key, str(value))`, tanpa allowlist) →
+  `ru/nl/ja/zh/zh-tw` lolos simpan. Static: `StaticFiles(directory=…/static, html=True)`
+  sudah menyajikan subdirektori → `i18n/*.js` terhidrasi tanpa perubahan server.
+
+### Item lanjutan (belum dikerjakan)
+- 7 salinan `getStr` lokal di `combos/selfheal/clitools/analytics/endpoints/proxies/combobox`
+  masih null-safe sendiri → kandidat tugas DRY tersendiri.
+- Auto-detect bahasa browser: tidak diminta (YAGNI).
+- Terjemahan dihasilkan agen — **belum ditinjau penutur asli**; label yang perlu dicek:
+  `nav.group.operations` (zh `运维` vs zh-tw `維運`), `ja selfheal.title` (Latin `Self-Heal`
+  vs katakana `セルフヒール`), `ja common.remove` vs `common.delete` (sama-sama `削除`).
+
 ## 2026-09-07 — Suite tes frontend: fixture DOM bersama + poller di-stop + maxForks 2 — DONE (commit `618f7d7`)
 
 **Permintaan user:** "apa sih yang bikin lama? terutama pas jalanin vitest" → lalu
