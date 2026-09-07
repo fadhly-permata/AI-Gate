@@ -36,6 +36,63 @@
   delegasi re-work ke pemilik scope, baru catat + commit.
 
 ## Progress
+- 2026-09-07 (sesi ini, akhir): **BERES-BERES — semua kerjaan numpuk di-commit rapi + suite hijau.**
+  (1) **Fitur cleanup log** (BE T1 + FE T2, handover `documents/pm/handover-20260907-logs-{be,fe}.md`):
+  `DELETE /api/logs` (severity/before, wipe-all wajib `confirm=all`), retensi startup
+  `log_retention_days` (default 7, fallback aman), kolom `LogEntry.resolved` + migrasi aditif,
+  GET sembunyi resolved kecuali `show_resolved=true`, resolve tunggal+bulk, self-heal
+  `current_issue()/_count_remaining()` skip baris resolved. FE: tombol Clear + modal pemilih
+  lingkup, toggle Show resolved (localStorage), baris resolved redup+badge, tombol resolve
+  per-baris (warning|error saja), Resolve-all (filtered), i18n EN/ID, **cache-buster
+  styles.css/app.js/combobox.js/i18n.js/selfheal.js → v=20260911** (gap yang ketemu PM:
+  aset berubah tapi tanpa `?v=` = jebakan cache terminal.js). DEVIASI tercatat: wipe-all
+  tanpa confirm → 200 `{deleted:0,error}` (bukan 400); id tak dikenal → `{resolved:0}`
+  (bukan 404); FE pakai modal, bukan `window.confirm` (lebih bagus, konsisten app).
+  (2) **Self-heal** (pemilih CLI/model, combobox grouped, gerbang false-done, kualifikasi
+  model) = kerjaan sesi-sesi sebelumnya yang baru di-commit. (3) **Kecepatan tes FE**:
+  `vitest.config.js` `isolate:false` + `vi.resetModules()` di `terminal_exit.test.js`
+  → 32-34s jadi **23.3s** (476 pass). Akar: jsdom dibangun ulang per file (environment
+  84.9s kumulatif) + 1 tes ngandelin cache ref DOM basi — BUKAN bug aplikasi.
+  (4) **PR #4 ternyata SUDAH MERGED** (lihat Decisions) → 4 commit + kerjaan sesi ini
+  sekarang menunggu PR baru ke `main`. ANGKA FINAL: BE **478 passed/1 skip**,
+  FE **476 passed (23 file)**. Item yang user TOLAK kerjakan: verifikasi flag `--model`
+  per CLI lain (tetap open item).
+- 2026-09-07: **PR #4 `refactor/ui` → `main` = MERGED 2026-09-06T21:30:12Z** (merge commit
+  `b278afe`, 59 file, +4574/−722, 14 commit + 1 merge). Catatan lama di Memory Bank
+  ("belum merge") SUDAH TIDAK berlaku. Laporan detail perubahan:
+  `.opencode/reports/20260907/review/1934_pr4-change-detail.md` (dibuat `qa-engineer`).
+  KOREKSI buat PM: angka "73 file via `origin/main...origin/refactor/ui`" basi — setelah
+  merge diff itu cuma menyisakan 4 commit pasca-merge (24 file). Temuan QA: **4 commit di
+  `refactor/ui` belum masuk `main`** (`a17264c`, `0523a05`, `68cc1bd`, `1bc8fda`) dan
+  **tidak ada PR terbuka** → butuh PR susulan. Klaim "duplikat rule R23→R29" tidak
+  terkonfirmasi (nomor R1…R33 rapi, tanpa duplikat). Deviasi kualitas: rule **R24**
+  disisipkan di dalam commit fitur UI `38e3743` (langgar atomicity/R22) — dicatat, tidak dibongkar.
+- 2026-09-07 (now): **BUGFIX Self-Heal false-done (issue-64) — SELESAI (PM proxy be-dev, uncommitted).** User lapor heal "sukses" tapi tidak ada yang diproses. Root cause (terverifikasi): `build_heal_command` manggil TUI default `opencode --model hy3 --prompt ...` (bukan `opencode run`; `run` gak punya `--prompt`, `-m` minta `provider/model`), separator `;` bikin `touch .done` jalan walau CLI gagal (false done), dan `hy3` mentah ambigu (`aigate/hy3` vs `bai/hy3` — dari setting `self_heal_model`, value combobox = `model_id` mentah DB). Fix (scope be-dev saja): (1) opencode -> `opencode run[-m <qualified>] "$(cat file)"`; (2) gate `&& { touch done; echo } || touch failed` + `wait_for_done(failedfile=)` return False seketika; (3) `qualify_opencode_model()` via `opencode models` (unique->pakai; ambigu->prefer `aigate/`; none->omit flag + warning; fail-open). CLI lain tetap bentuk lama (unverified) tapi dapat gating. Verifikasi: pytest backend **458 passed/1 skip** (+7 test baru) + dry-run live shim exit 0/1 (`.done` gak muncul saat gagal ✓). Rule baru **R34**. DEVIASI: sesi ini TIDAK ada Task tool -> PM tidak bisa spawn be-dev; implementasi PM kerjakan sendiri strictly di write scope be-dev (dicatat di status.md). PENDING user: restart aigate (R32); setting lama `self_heal_model='hy3'` sekarang otomatis ter-kualifikasi ke `aigate/hy3` saat run.
+- 2026-09-07 (now): **Self-Heal model list -> group by provider + combo — SELESAI (paralel BE→FE).** User mau grup kayak dialog CLI Tools. be-dev: `list_self_heal_models()` balikin dict `{value,label,group}` (provider=provider.name, combo=sentinel `__combos__`); endpoint `/api/self-heal/models` -> dict. fe-dev: model combo `groupBy:group, subGroupBy:prefix, startExpanded` + pin grup Kombo di atas (lokal "Kombo"/"Combos"); sentinel `__combos__` di-map ke localized. cache-buster `selfheal.js?v=20260910`. Verifikasi PM: BE **451 passed/1 skip**, FE **459 passed (23 file)**. PENDING: restart + hard-refresh (R32). BELUM di-commit.
+- 2026-09-07 (now): **Self-Heal dropdown -> searchable + grouped combobox (match CLI Tools dialog) — SELESAI (fe-dev).** User nyinyir dropdown self-heal cuma native `<select>` (gak search/group) padahal app standar pakai `createCombobox`. fe-dev ganti `selfHealCli`/`selfHealModel` ke `window.aigate.createCombobox`: CLI `searchInside:true, groupBy:none`; model `searchInside:true, groupBy:prefix, startExpanded:true` (family grouping, tanpa BE change). Default "Auto"/"No model" = value "". `combobox.js` di-tweak render opsi tanpa grup + opt `startExpanded`. cache-buster `selfheal.js?v=20260909`. Verifikasi PM: vitest penuh **459 passed (23 file)**. PENDING: restart + hard-refresh (R32). BELUM di-commit.
+- 2026-09-07 (now): **Self-Heal: pilihan agentic-CLI + model + live preview — SELESAI (paralel BE→FE, uncommitted).** User mau pilih CLI & model buat self-heal + lihat preview proses jalan (hipotesis: stuck gara2 tool/model). BE (be-dev): `list_agentic_clis()` + `list_self_heal_models()` (dari `provider_models`), setting `self_heal_cli`/`self_heal_model`, `run_self_heal(cli,model,...)` + `build_heal_command` append `--model` via `CLI_MODEL_FLAGS` (hanya CLI dikenal), state `progress` kaya (phase/cli/model/branch/iteration/current_issue_id/started_at/remaining) di `heal_status()`. Router: `GET /api/self-heal/clis`, `GET /api/self-heal/models`, `POST /api/self-heal/run` terima `{cli,model}`, `GET /api/self-heal/status` +`progress`. FE (fe-dev): dropdown CLI + model (default Auto/No-model), panel preview (progress poll 2.5s + log feed stream dari `/api/logs` filter `source` `backend.selfheal`), i18n +22 key (EN/ID, parity guard lolos), cache-buster `selfheal.js?v=20260908`. Verifikasi PM: **BE 451 passed/1 skip, FE 458 passed (23 file)**, 0 regresi. PENDING: user restart aigate (R32) + hard-refresh. Open: flag `--model` per-CLI lain (claude/opencode/aider sudah `--model`; codex/gemini/goose/amp/qwen/cline/kilo belum diverifikasi ke CLI asli — map bisa dikoreksi).
+- 2026-09-07: **Self-Heal progress terlihat — SELESAI (sekuensial BE→FE, uncommitted).**
+  Root cause: POST /api/self-heal/run sinkron + CLI via subprocess tersembunyi.
+  Fix BE (be-dev): CLI jalan di PTY key `self-heal` (command diketik, prompt file
+  temp anti-injection, donefile poll, timeout 1800s/issue, abort bila tab mati);
+  run async (start_self_heal, 409 already_running) + GET /api/self-heal/status
+  {running, last}. Fix FE (fe-dev): klik Run → buka+fokus tab "Self-Heal" +
+  polling 5s; i18n +2 key. PM: cache-buster v=20260907 (selfheal/terminal/i18n),
+  docs FSD/TSD/BRD sinkron, CODE_CHANGES.md. Verifikasi PM: **BE 438 passed/
+  1 skipped, FE 453 passed (23 files)**. PENDING: user restart aigate + hard-refresh
+  (R32); belum commit (menunggu approve). Open: FE poll max-age cutoff (opsional).
+- 2026-09-07: **Request Log kolom Model/Endpoint kosong — SELESAI + DI-COMMIT
+  `a17264c` + PUSH `origin/refactor/ui`.** Root cause: combo ref → resolver `upstream_model=""` →
+  router nimpa `ctx["model"]` jadi `''` (RequestLog.model kosong utk semua request
+  combo); Endpoint kosong = by-design (model-based, tanpa header
+  `X-Aigate-Endpoint`). Fix: BE `_upgrade_ctx_model` helper (6 situs, upgrade
+  hanya bila non-empty; combo → prefer model member dari envelope upstream,
+  fallback combo ref) + DTO `endpoint_name` (Pydantic v1); FE `orDash`/
+  `reqlogEndpoint` (nama → id → "—") + cache-buster `analytics.js?v=20260906`
+  (pola precedent terminal.js, PM-owned 1 baris). Verifikasi PM: **BE 423 passed/
+  1 skipped, FE 445 passed (23 files)**. Baris lama `model=''` tidak di-backfill.
+  PENDING: user restart aigate (R32) + hard-refresh. Detail:
+  `documents/dev/CODE_CHANGES.md` 2026-09-07.
 - 2026-09-07: **Terminal tab auto-close on shell exit — SELESAI (uncommitted, mode
   sekuensial BE→FE).** Kontrak exit (sumber kebenaran): server kirim TEXT frame
   `{"type":"exit","code":<int>}` (code = exit status; -1 bila tak terbaca) ke view

@@ -6,7 +6,9 @@ Endpoints (contract for fe-dev — shapes are EXACT):
   -> ``{"object": "list", "data": [RequestLog DTO...]}``
   Newest first (id desc). ``limit`` default 50, capped at 500. Bad params ->
   400 OpenAI-style error envelope. Rows exist only while the
-  ``request_log_enabled`` Setting is 'true' (debug gate).
+  ``request_log_enabled`` Setting is 'true' (debug gate). Each DTO row carries
+  ``endpoint_name`` (the bound ``Endpoint.name`` when ``endpoint_id`` is set,
+  ``null`` for model-based requests) so FE shows names, not raw ids.
 * ``GET /api/analytics?range=day|week|month&group_by=provider|model``
   -> the ``backend.usage.analytics()`` dict:
   ``{"object":"analytics","range":...,"group_by":...,"buckets":[...],
@@ -56,10 +58,16 @@ MAX_LIMIT = 500
 # Pydantic v1 DTOs
 # --------------------------------------------------------------------------- #
 class RequestLogDTO(BaseModel):
-    """One request-level debug row (ERD §RequestLog / PRD §2.4.3)."""
+    """One request-level debug row (ERD §RequestLog / PRD §2.4.3).
+
+    ``endpoint_name`` is the bound ``Endpoint.name`` (resolved via the
+    ``endpoint`` relationship inside the same session); ``None`` when the row
+    has no ``endpoint_id`` (model-based gateway request).
+    """
 
     id: int
     endpoint_id: Optional[int]
+    endpoint_name: Optional[str] = None
     model: str
     ts: Optional[str]  # ISO-8601 (naive UTC) or null
     duration_ms: int
@@ -117,9 +125,13 @@ def _validate_choice(
 
 
 def _row_to_dto(row: RequestLog) -> RequestLogDTO:
+    # ``row.endpoint`` lazy-loads INSIDE the caller's active session (the list
+    # endpoint serializes within ``with SessionLocal()``) — safe access here.
+    endpoint_name = row.endpoint.name if row.endpoint is not None else None
     return RequestLogDTO(
         id=row.id,
         endpoint_id=row.endpoint_id,
+        endpoint_name=endpoint_name,
         model=row.model or "",
         ts=row.ts.isoformat() if row.ts is not None else None,
         duration_ms=int(row.duration_ms or 0),

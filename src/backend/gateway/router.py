@@ -268,8 +268,10 @@ async def _handle_chat_completion(request: Request, ctx: dict) -> Union[dict, Re
             400, str(exc), "invalid_request_error", "model_not_found"
         )
 
-    # B5.6: prefer the real upstream model id in the debug row.
-    ctx["model"] = target.upstream_model
+    # B5.6: prefer the real upstream model id in the debug row. A ``combo:``
+    # marker resolves upstream_model="" (members are decided inside
+    # execute_combo) — the requested combo ref stays; the result upgrades it.
+    _upgrade_ctx_model(ctx, target.upstream_model)
 
     # --- SSE streaming (stream:true) ----------------------------------------
     # Decided AFTER resolution so we know the target's format. A ``combo:``
@@ -297,6 +299,8 @@ async def _handle_chat_completion(request: Request, ctx: dict) -> Union[dict, Re
                     context={"combo": combo_name},
                 )
                 raise _streaming_unsupported_error()
+            # B5.6: the debug row carries the streaming member's real model.
+            _upgrade_ctx_model(ctx, member.upstream_model)
             return await _streaming_response(
                 member, payload, None, ctx, endpoint_id=None
             )
@@ -310,6 +314,9 @@ async def _handle_chat_completion(request: Request, ctx: dict) -> Union[dict, Re
         # B5.5: ``execute_combo`` records the UsageRecord itself (it knows which
         # member/account actually succeeded). No endpoint on this path.
         result = await execute_combo(combo_name, payload)
+        # B5.6: prefer the model that actually served (upstream envelope), else
+        # keep the requested combo ref.
+        _upgrade_ctx_model(ctx, result.get("model"))
     else:
         result = await provider_adapter.chat_completion(target, payload)
         # B5.5: persist usage telemetry (fail-open — never breaks the client).
@@ -446,13 +453,16 @@ async def _handle_responses(request: Request, ctx: dict) -> dict:
             400, str(exc), "invalid_request_error", "model_not_found"
         )
 
-    ctx["model"] = target.upstream_model
+    _upgrade_ctx_model(ctx, target.upstream_model)
 
     # Combo strategy routing / plain provider — identical to the chat path so
     # usage recording (B5.5) and savings attribution stay shared.
     if target.combo_used:
         combo_name = model[len("combo:"):]
         chat_result = await execute_combo(combo_name, chat_payload)
+        # B5.6: prefer the model that actually served (upstream envelope), else
+        # keep the requested combo ref.
+        _upgrade_ctx_model(ctx, chat_result.get("model"))
     else:
         chat_result = await provider_adapter.chat_completion(target, chat_payload)
         _record_usage_safe(chat_result, target, endpoint_id=None)
@@ -706,6 +716,21 @@ async def _streaming_response(
 # --------------------------------------------------------------------------- #
 # Request logging (B5.6 / PRD §2.4.3 — debug mode, gated + fail-open)
 # --------------------------------------------------------------------------- #
+def _upgrade_ctx_model(ctx: dict, upstream_model: Optional[str]) -> None:
+    """Upgrade the RequestLog debug model to a concrete upstream id (never empty).
+
+    ``ctx["model"]`` starts as the client-requested model reference (set by
+    ``_handle_chat_completion`` / ``_handle_responses``). As soon as a real
+    upstream model becomes known — resolver target, combo member, endpoint
+    binding, or the upstream response envelope — it is upgraded IN PLACE.
+    An empty/None value (the ``combo:`` resolver marker, an envelope without
+    ``model``) is ignored so the debug row NEVER degrades to ``''``: error
+    paths and combo fallbacks keep the requested model ref.
+    """
+    if upstream_model:
+        ctx["model"] = upstream_model
+
+
 def _request_log_enabled() -> bool:
     """Debug gate: ``Setting`` key ``request_log_enabled`` == 'true'.
 
@@ -1014,7 +1039,7 @@ async def _route_via_endpoint(
                 account_id=account_id,
             )
             # B5.6: the debug row should carry the real upstream model id.
-            ctx["model"] = target.upstream_model
+            _upgrade_ctx_model(ctx, target.upstream_model)
             # SSE streaming: an endpoint-bound provider is treated as OpenAI
             # format (matching the non-stream path, which never translates on
             # this binding), so stream:true is proxied straight through.
@@ -1058,6 +1083,8 @@ async def _route_via_endpoint(
                         context={"endpoint": name},
                     )
                     raise _streaming_unsupported_error()
+                # B5.6: the debug row carries the streaming member's real model.
+                _upgrade_ctx_model(ctx, member.upstream_model)
                 return await _streaming_response(
                     member, payload, proxy_url, ctx, endpoint_id=endpoint.id
                 )
@@ -1071,6 +1098,9 @@ async def _route_via_endpoint(
                 endpoint_id=endpoint.id,
                 saved_tokens_est=_saved_tokens_est(ctx),
             )
+            # B5.6: prefer the model that actually served (upstream envelope),
+            # else keep the requested model ref.
+            _upgrade_ctx_model(ctx, result.get("model"))
             return result
 
         log_warning(

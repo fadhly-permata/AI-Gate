@@ -265,7 +265,8 @@ def test_api_request_logs_shape_newest_first(sf):
     assert [r["id"] for r in body["data"]] == [ids["c"], ids["b"], ids["a"]]
     row = body["data"][0]
     assert set(row.keys()) == {
-        "id", "endpoint_id", "model", "ts", "duration_ms", "request", "response",
+        "id", "endpoint_id", "endpoint_name", "model", "ts", "duration_ms",
+        "request", "response",
     }
     assert row["duration_ms"] == 300
     assert row["ts"].startswith("2026-09-03")

@@ -1,5 +1,239 @@
 # Code Changes Register (code ↔ docs alignment)
 
+## 2026-09-07 — Log cleanup: hapus / retensi / tanda "selesai" (BE T1 + FE T2) — DONE (commit `86c4778` + `45206c0`)
+
+**Permintaan user:** fitur bersihin log — 3 opsi: hapus manual, auto-hapus per umur,
+dan tandai selesai supaya tidak terus nongol di daftar self-heal.
+
+### Backend (`src/backend/config/logs_router.py`, `models.py`, `config/db.py`, `config/settings.py`, `server.py`)
+- `DELETE /api/logs?severity=&before=` — filter severity sama persis dengan GET
+  (ilike substring OR). Wipe-all TANPA filter wajib `confirm=all`; tanpa itu NO-OP
+  `200 {"deleted":0,"error":"confirmation required"}` (DEVIASI dari handover yang
+  minta HTTP 400 — dipilih 200+error supaya FE cuma punya satu bentuk respons).
+  `before` non-ISO → `400 invalid 'before'` (destructive op: tidak pernah diam-diam
+  memperlebar rentang hapus). Audit trail ditulis SETELAH commit
+  (`log_event severity=info source=backend.config.logs_router`, "logs purged: deleted=N scope=…").
+- Retensi: `Setting log_retention_days` (default `"7"`), `purge_expired_logs()`
+  dipanggil di `server.py` lifespan setelah `ensure_seeded()`, dibungkus try/except
+  (startup gak pernah crash), nilai invalid/<=0 → fallback 7 + `log_warning`.
+- Kolom baru `LogEntry.resolved` (Boolean, NOT NULL, default False) + migrasi
+  aditif berpola sama (`_ensure_log_entry_resolved_column`: PRAGMA table_info →
+  guarded `ALTER TABLE`). GET `/api/logs` menyembunyikan baris resolved kecuali
+  `show_resolved=true` (PERUBAHAN default yang disengaja: feed self-heal jadi
+  hanya berisi baris yang masih bisa ditindaklanjuti).
+- `POST /api/logs/{id}/resolve` dan bulk `POST /api/logs/resolve {"ids":[…]}` →
+  `{"resolved":N}`; id tak dikenal → `{"resolved":0}` (DEVIASI dari handover:
+  404 → bentuk idempoten, supaya FE tidak perlu dua cabang error).
+- Integrasi self-heal: `current_issue()` + `_count_remaining()`
+  (`src/backend/selfheal.py`) dapat `.filter(LogEntry.resolved == False)` → baris
+  yang sudah ditandai selesai tidak lagi memblokir jalur "semua selesai → merge".
+  Delete-on-success self-heal TIDAK diubah.
+- Tests: `tests/backend/test_logs_router.py` (baru, 300 baris: delete berfilter,
+  wipe-all+confirm, tanpa confirm, cutoff `before`, `before` invalid, resolve
+  tunggal/bulk, GET default vs `show_resolved`, retensi + fallback Setting) +
+  `tests/backend/test_db_migration.py` (+94: migrasi kolom `resolved` di DB lama,
+  baris lama utuh + terbaca falsy) + `tests/backend/test_selfheal.py` (filter resolved).
+
+### Frontend (`src/frontend/static/app.js`, `index.html`, `styles.css`, `i18n.js`)
+- Tombol **Clear logs** + modal konfirmasi berisi pemilih lingkup
+  (`warning,error` | `all`); `buildClearLogsQuery(severity)` diekspor ke
+  `window.aigate` (wipe-all → `?confirm=all`, selain itu `?severity=<value>`).
+- Tombol **Show resolved** (toggle `aria-pressed`, persist
+  `localStorage aigate.logShowResolved`) → menambah `show_resolved=true` ke query GET.
+- Baris resolved dirender redup (`.log-row-resolved td{opacity:.55}`) + badge
+  `.log-resolved-badge`; tombol resolve per-baris (`.log-resolve-btn`, fa-check)
+  HANYA untuk baris warning|error yang belum resolved; delegasi klik di
+  `#logTableBody` (baris sering di-render ulang). Tombol **Resolve all (filtered)**
+  mengirim id baris unresolved yang sedang tampil.
+- i18n EN/ID lengkap untuk semua key baru (parity guard lolos).
+- Cache-buster (PM-owned): `styles.css`, `app.js`, `combobox.js`, `i18n.js` →
+  `?v=20260911`; `selfheal.js` `20260910` → `20260911`. Alasan: preseden
+  terminal.js — kode yang benar tidak pernah ter-load karena browser pakai salinan lama.
+- Tests: `src/frontend/tests/logwindow.test.js` +328 baris (query builder,
+  render resolved + badge, tombol per-baris, alur clear dengan confirm mock,
+  toggle show_resolved, resolve-all).
+
+**Verifikasi PM:** backend **478 passed / 1 skipped**; frontend **476 passed (23 file)**.
+
+## 2026-09-07 — Self-Heal: pemilih CLI/model + combobox grouped + gerbang false-done — DONE (commit `74fcb9e`)
+
+**Permintaan user:** (a) bisa pilih agentic CLI + model buat self-heal dan lihat prosesnya;
+(b) daftar model harus dikelompokkan per provider + Kombo; (c) dropdown harus bisa
+diketik seperti dialog CLI Tools; (d) bug: heal bilang "issue done" padahal tidak ada
+yang diproses (issue-64).
+
+### Backend (`src/backend/selfheal.py`, `selfheal_router.py`)
+- `build_heal_command()` untuk opencode diubah dari TUI
+  `opencode --model hy3 --prompt "…"` → **`opencode run [-m <provider/model>] "$(cat file)"`**
+  (`opencode run` tidak punya `--prompt`; pesan = argumen posisional).
+- Gerbang marker: `&& { touch .done; echo …; } || touch .failed`;
+  `wait_for_done(..., failedfile=)` return **False seketika** saat `.failed` muncul
+  (sebelumnya `;` → `touch .done` jalan walau CLI exit non-zero = "done" palsu).
+- `qualify_opencode_model()` baru: id mentah di-resolve lewat `opencode models`
+  (unique → dipakai; ambigu → prefer provider `aigate/`; tidak ketemu → flag OMIT +
+  warning; gagal total → fail-open). Setting lama `self_heal_model='hy3'` kini
+  otomatis jadi `aigate/hy3`.
+- `CLI_MODEL_FLAGS`: entri `opencode` dihapus (special-case `run`); entri lain tetap
+  (status **unverified** — item terbuka, sengaja tidak dikerjakan user 2026-09-07).
+- `list_self_heal_models()` → list dict `{value,label,group}` (grup = nama provider;
+  anggota kombo = sentinel `__combos__`), dedup by `(value,group)`;
+  `GET /api/self-heal/models` mengembalikan dict.
+- Tests: `tests/backend/test_selfheal.py` +546 baris (bentuk command, gerbang exit
+  code, kualifikasi model 4 kasus, filter resolved, list models bergrupa).
+
+### Frontend (`src/frontend/static/selfheal.js`, `combobox.js`, `index.html`, `i18n.js`)
+- `selfHealCli` / `selfHealModel` dari `<select>` native → `window.aigate.createCombobox`
+  (CLI: `searchInside`, tanpa grup; model: `groupBy:"group"`, `subGroupBy:"prefix"`,
+  `startExpanded`, grup Kombo di-pin ke atas via `setGroupOrder`).
+- `combobox.js`: render opsi tanpa-grup + opsi `startExpanded`; sentinel `__combos__`
+  dipetakan ke label terlokalisasi ("Kombo"/"Combos").
+- Panel **live preview**: poll progress 2.5s + aliran log dari `/api/logs`
+  (filter source `backend.selfheal`); i18n +22 key EN/ID.
+- Tests: `src/frontend/tests/selfheal.test.js` +179, `tests/frontend/selfheal.test.js`
+  +160 (mirror), i18n parity.
+
+**Verifikasi PM:** backend 478 passed/1 skip; frontend 476 passed; dry-run shim live
+exit 0/1 membuktikan `.done` tidak muncul saat CLI gagal.
+
+## 2026-09-07 — Konfigurasi tes frontend: suite ~2x lebih cepat — DONE (commit `5c2459f`)
+
+**Permintaan user:** "kenapa kalau testing sering lama — ada yang salah di konfigurasi,
+kode, atau aturan?"
+
+### Ukur dulu (bukan tebakan)
+- `src/frontend/vitest.config.js` sebelumnya 4 baris: hanya `environment:"jsdom"`,
+  `globals`, `include`. Efek: 23 file tes masing-masing membangun ulang jsdom →
+  `environment 84.94s` kumulatif vs `tests 25.10s` (wall 32-34s, CPU 2m25s).
+- `--no-isolate` → wall 15.5s, `environment 25.42s` **tapi 1 tes gagal**:
+  `tests/terminal_exit.test.js > DoD 4 > shows #termEmpty…`.
+
+### Akar masalah (murni di sisi tes, BUKAN bug aplikasi)
+`terminal.js` meng-cache referensi DOM di closure saat `init()`
+(`emptyEl = document.getElementById("termEmpty")`). Dengan registry modul yang dibagi
+antar-file, `await import("../static/terminal.js")` = **cache HIT** → `init()` tidak
+jalan ulang → `emptyEl` masih menunjuk node `#termEmpty` milik file tes sebelumnya
+yang sudah jadi detached. `terminal.js` sendiri benar di runtime asli (init sekali
+per page-load), jadi kode produksi TIDAK diubah.
+
+### Perubahan
+- `src/frontend/tests/terminal_exit.test.js`: `vi.resetModules()` sebelum re-import
+  (paksa cache MISS → `init()` jalan terhadap DOM milik file ini) + komentar.
+  Tidak ada tes yang dihapus/di-skip/dilonggarkan.
+- `src/frontend/vitest.config.js`: `test.isolate:false` + komentar alasan, angka
+  terukur, dan catatan "naikkan isolate lagi kalau ada tes yang butuh state segar".
+  `environment`/`globals`/`include` tidak diubah.
+- Ditolak: `poolOptions.threads.isolate` (pool aktif vitest 2.1.9 = forks → tidak
+  ngefek), menaikkan fork/`fileParallelism` (`os.cpus()=0` di Termux; memaksa fork di
+  HP ter-throttle = angka ngaco + membuka kontaminasi silang antar file), reset
+  per-test di `beforeEach` (over-engineering).
+
+**Verifikasi PM:** `node node_modules/.bin/vitest run` → **476 passed (23 file),
+Duration 23.33s** (bandingkan 32-34s sebelumnya di box yang sama; di box tidak
+ter-throttle ≈ 15s).
+
+## 2026-09-07 — Provider test: probe host tak terjangkau jadi WARNING (tanpa traceback) — DONE (commit `f0c4e14`)
+`src/backend/providers_router.py` `_run_provider_test`: cabang timeout & transport
+turun dari `logger.error(..., exc_info=True)` → `logger.warning(...)` dan
+`log_error_exc` → `log_warning_exc` (hasil probe yang diharapkan gagal koneksi bukan
+server fault; traceback 5 frame httpx/httpcore selama ini menutupi log). Cabang
+unexpected-error TETAP `error + exc_info`. Bentuk envelope return tidak diubah.
+`pytest tests/backend/test_providers.py` = 16 passed.
+
+## 2026-09-07 — Self-Heal progress terlihat: CLI jalan di tab terminal + run async — DONE (commit `68cc1bd`)
+
+
+**Root cause:** `POST /api/self-heal/run` dulu SINKRON dan agentic CLI dijalankan via
+`subprocess.run([cli, "--prompt", prompt])` — output tak pernah terlihat user; UI cuma
+"Running…" lalu diam. Request user (2026-09-07): "untuk self heal progress gak jelas.
+jadi buka aja terminal baru (dan fokus) agar progress self heal keliatan".
+
+### Backend (`src/backend/selfheal.py`, `src/backend/selfheal_router.py`)
+- CLI TIDAK lagi di-spawn sebagai subprocess tersembunyi. Orkestrasi jalan di
+  sesi PTY terminal key **`self-heal`** (shell biasa via `get_or_create`; respawn
+  bila mati; tak pernah kill sesi hidup milik user). Per issue: prompt (dari
+  `LogEntry`) ditulis ke file temp `aigate-heal-<uuid>/issue-<id>.prompt`, lalu
+  backend mengetik SATU baris ke PTY:
+  `<cli> --prompt "$(cat '<promptfile>')"; touch '<donefile>'; echo "aigate: issue done"`
+  — tanpa konten log di command line (anti shell-injection). Selesai terdeteksi via
+  poll file `.done` (interval 2s, timeout per issue `HEAL_CLI_TIMEOUT_SECONDS=1800`
+  → lanjut ke test; test yang memutuskan hapus LogEntry). Bila tab/shell mati di
+  tengah jalan → run dihentikan, status `{"ok":true,"merged":false,"remaining":N}`.
+  File temp dibersihkan di `finally`.
+- Run jadi ASYNC: `start_self_heal()` (daemon thread + guard sudah-jalan),
+  `POST /api/self-heal/run` → `200 {"ok":true,"started":true,"tab":"self-heal"}`,
+  `409 {"ok":false,"reason":"already_running","tab":"self-heal"}` bila masih jalan;
+  `run_self_heal()` tetap sync (kontrak & bentuk status lama utuh) sebagai thread
+  target. Endpoint baru `GET /api/self-heal/status` → `{"running": bool, "last":
+  <hasil|null>}`. TerminalTab row (title "Self-Heal") dibuat saat sesi pertama
+  spawn (soft-fail → 0). Log R12 semua transisi (source `backend.selfheal.*`).
+- Tests: `tests/backend/test_selfheal.py` +12 (command shape + anti-injection +
+  cleanup, timeout, abort-on-death, start/status/409/500 lifecycle, DB tab row,
+  registry reuse/drop). **Backend: 438 passed, 1 skipped.**
+
+### Frontend (`src/frontend/static/selfheal.js`, `terminal.js`, `i18n.js`)
+- `runSelfHeal()` async: 200 → pesan `selfheal.started` + buka & fokus tab
+  `openTab("self-heal")` + pindah view terminal (pola precedent clitools launch);
+  409 → pesan `selfheal.already_running` + tetap buka tab; keduanya mulai polling
+  `GET /api/self-heal/status` (langsung sekali lalu tiap 5s, single-handle, berhenti
+  saat `last` non-null + `running=false` → render `renderSelfHealStatus`, re-enable
+  Run kecuali kind "ok"). Poll gagal → pesan sekali, polling lanjut.
+- `terminal.js::tabTitle` → key `self-heal` berjudul tetap "Self-Heal"
+  (`t("selfheal.title")`). i18n +2 key × 2 locale (en/id): `selfheal.started`,
+  `selfheal.already_running` (parity-guard lolos).
+- Tests: `src/frontend/tests/selfheal.test.js` + mirror `tests/frontend/selfheal.test.js`
+  +8. **Frontend: 453 passed (23 files).**
+
+### PM-owned
+- `src/frontend/static/index.html`: cache-buster `selfheal.js?v=20260907`,
+  `terminal.js?v=20260907`, `i18n.js?v=20260907` (pola precedent analytics/terminal).
+
+### Docs sinkron
+- FSD §2.8 (output + process flow Self-Heal: async run, tab `self-heal`, temp-file
+  prompt, donefile poll, status endpoint), TSD §3.5 (Self-Heal: PTY key, async run,
+  status), BRD US-2.8.5 (acceptance (3) tab dibuka+fokus live, (3b) async+polling).
+
+### Catatan operasional
+- BUTuh restart aigate + hard-refresh browser (cache-buster baru) agar berlaku (R32:
+  user yang restart, bukan agent).
+
+
+## 2026-09-07 — Request Log: kolom Model/Endpoint kosong (combo path + endpoint_name) — DONE
+
+**Root cause (BE):** untuk model ref `combo:<name>`, resolver balikin marker
+`ResolvedTarget(upstream_model="", combo_used=True)` (member asli diputuskan di
+dalam `execute_combo`). `gateway/router.py` nimpa `ctx["model"] = target.upstream_model`
+UNCONDITIONAL → `RequestLog.model = ''` untuk semua request combo. Kolom Endpoint
+kosong = by-design (request model-based tanpa header `X-Aigate-Endpoint` →
+`endpoint_id` NULL) — bukan bug, tapi FE merender id mentah (null → sel kosong).
+Bukti DB: baris 21:28–21:29 `model=''` padahal body `"model":"combo:B.AI"`.
+
+**Perubahan (delegasi be-dev → fe-dev, mode sekuensial):**
+- `src/backend/gateway/router.py` — helper `_upgrade_ctx_model(ctx, upstream_model)`:
+  upgrade `ctx["model"]` hanya bila value non-empty (tidak pernah terdegradasi jadi
+  `''`; error path & fallback tetap bawa model ref). Dipakai di 6 situs:
+  chat non-stream combo (upgrade dari envelope upstream `result.get("model")`,
+  fallback combo ref), chat streaming combo (`member.upstream_model` dari
+  `resolve_combo_stream_target`), responses path (identik chat),
+  `_route_via_endpoint` provider binding + combo binding (stream & non-stream).
+- `src/backend/analytics_router.py` — `RequestLogDTO` + field
+  `endpoint_name: Optional[str]` (Pydantic v1); `_row_to_dto` populate dari
+  `row.endpoint.name` di dalam session aktif; docstring kontrak module di-update.
+- `src/frontend/static/analytics.js` — `orDash(v)` (null/undefined/"" → "—") +
+  `reqlogEndpoint(r)` (`endpoint_name || endpoint_id || "—"`); kolom Model &
+  Endpoint memakai fallback, semua value tetap di-`escapeHtml`.
+- `src/frontend/static/index.html` — cache-buster `analytics.js?v=20260906`
+  (pola sama dgn `terminal.js` — cegah stale copy post-update).
+- Tests: `tests/backend/test_request_log.py` (+5: combo non-stream model terisi,
+  envelope tanpa model → fallback combo ref, combo stream, endpoint_name di API,
+  endpoint_name null utk model-based), `tests/backend/test_analytics.py` (DTO
+  shape), `src/frontend/tests/analytics.test.js` (fixture DTO baru +3 test nama/
+  fallback/dash + XSS escape; wiring test tahan `?v=` cache-buster).
+
+**Verifikasi PM (re-run):** backend `pytest tests/backend` = **423 passed,
+1 skipped** (skip = native PTY); frontend vitest = **445 passed (23 files)**.
+Catatan: baris LAMA di DB (`model=''`) tidak di-backfill — hanya entri baru yang
+benar; user perlu restart aigate agar kode BE aktif (R32 — user yang restart).
+
 ## 2026-09-07 — Terminal tab auto-close on shell exit + session-ended toast — DONE
 
 Akar masalah "tab gak nutup": backend tidak pernah memberi tahu frontend saat shell

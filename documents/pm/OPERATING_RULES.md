@@ -398,3 +398,56 @@ Aturan wajib:
    sebelum bikin folder baru — jangan asal bikin.
 (Pelajaran 2026-09-07: folder `pm/` di root dipindah ke `documents/pm/` + semua
 referensi (46 di 13 file) diselaraskan; rule R33 dibuat biar gak keulang.)
+
+## R34 — Self-Heal: WAJIB subcommand non-interaktif CLI + done-marker di-gate exit code
+Pelajaran (2026-09-07, user lapor issue-64 "false done"): `build_heal_command` membangkitkan
+`opencode --model hy3 --prompt "$(cat ...)"; touch <done>; echo done` — tiga bug sekaligus:
+(1) `opencode` default command = TUI interaktif; non-interaktif itu `opencode run [message..]`
+(yang TIDAK punya `--prompt`; message = positional). (2) separator `;` bikin `touch .done`
+jalan TANPA SYARAT walau CLI gagal/print help → self-heal menandai issue DONE palsu.
+(3) model id mentah (`hy3`) dari DB aigate ditolak opencode yang minta format
+`provider/model` (dan `hy3` ambigu: ada `aigate/hy3` + `bai/hy3`).
+
+Aturan wajib untuk perintah yang di-generate orchestrator:
+1. CLI agentic dipanggil lewat **subcommand non-interaktif** yang sudah diverifikasi dari
+   `--help` CLI terpasang (opencode 1.18.x: `opencode run -m provider/model "<msg>"`),
+   BUKAN default/TUI command.
+2. Marker sukses (`.done`) **hanya** dibuat kalau CLI exit 0 (`&&`); exit non-zero wajib
+   membuat marker `.failed` (`||`) dan `wait_for_done` harus return False SEGERA saat
+   `.failed` muncul (bukan burn timeout 30 menit).
+3. Model id di-**kualifikasi dulu** sebelum spawn: sudah `provider/model` → lolos; mentah →
+   resolve via `opencode models` (unique menang; ambigu → prefer provider `aigate` sendiri;
+   tidak ketemu → OMIT flag + warning, JANGAN spawn dengan model yang pasti ditolak).
+4. Perubahan bentuk command wajib diuji **live** (shim CLI exit 0/1 di temp dir) — bukan
+   cuma assertion string — dan `--help` CLI asli dibaca sebelum klaim flag.
+
+## R35 — Verifikasi hemat: tes tertarget saat iterasi, suite penuh SEKALI sebelum commit
+Pelajaran (2026-09-07, user protes "kok lama amat" lalu "kenapa testing sering lama"):
+PM menjalankan **suite penuh 2x dalam satu sesi** — yang kedua hanya untuk mengubah
+baris cache-buster di HTML (tidak ada satu pun tes yang menyentuhnya). Pemborosan ini
+berasal dari kebiasaan lama "Verifikasi PM (re-run sendiri) = suite penuh".
+
+Aturan wajib untuk PM dan semua sub-agent:
+1. Saat iterasi: jalankan **hanya file tes yang relevan** dengan perubahan
+   (`pytest tests/backend/test_x.py`, `node node_modules/.bin/vitest run tests/x.test.js`).
+2. Suite penuh **satu kali**, tepat sebelum commit, sebagai gate.
+3. Perubahan yang TIDAK mungkin dites (markup/label/cache-buster/komentar/dokumen)
+   → **tidak** perlu menjalankan suite; cukup verifikasi grep/visual.
+4. Klaim kecepatan/kinerja wajib dari **pengukuran nyata** (`time`, angka `Duration`
+   vitest, `--durations=10` pytest) — bukan perasaan. Kalau angka tidak bisa
+   dibandingkan antar-sesi (Termux throttling), sebutkan eksplisit.
+5. Konfigurasi tes ikut diaudit sebagai bagian "rapihin": `src/frontend/vitest.config.js`
+   kini `isolate:false` (jsdom dibangun sekali, bukan 23x) → 32-34s jadi ~23s.
+   Properti permanen ini dicatat di CODE_CHANGES 2026-09-07; kalau nanti ada tes baru
+   yang butuh state segar, kasih `vi.resetModules()` + re-import (lihat
+   `tests/terminal_exit.test.js`) JANGAN langsung naikkan isolate lagi.
+
+## R36 — Commit per subtask (R19) dipecah per FITUR, bukan per lapisan; file bersama di-split per hunk
+Pelajaran (2026-09-07): kerjaan 4 sesi numpuk uncommitted (23 file) dan 2 fitur
+(self-heal + cleanup log) berbagi `index.html`, `i18n.js`, `settings.py`.
+Cara yang jalan: `git add <file>` untuk file milik satu fitur, dan **split hunk**
+untuk file bersama (`git diff -U3 -- <file>` → pilih hunk → `git apply --cached`),
+lalu **urutan commit disusun supaya yang menambah kolom/API dulu, yang memakainya
+belakang** (logs-BE → self-heal → logs-FE) supaya tiap commit antara tetap konsisten.
+Dilarang: `git add -A` sekali jalan untuk kerjaan beda fitur (R19 dilanggar dua kali:
+"checkpoint" dan mega-commit).

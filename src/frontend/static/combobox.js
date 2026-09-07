@@ -115,6 +115,11 @@
     // subGroup:false (e.g. combo items stay flat). null = no sub-grouping.
     var subGroupBy = opts.subGroupBy === "prefix" || opts.subGroupBy === "group"
       ? opts.subGroupBy : null;
+    // startExpanded (bool, default false): when true, groups are NOT collapsed
+    // on first appearance (the legacy default collapses new groups). Toggling
+    // a group still works either way. Used by the Self-Heal model picker, which
+    // wants its family groups visible without a click.
+    var startExpanded = !!opts.startExpanded;
 
     var options = [];   // [{value,label,_group}] as supplied
     var visible = [];   // options after the current filter (selectable only)
@@ -261,7 +266,12 @@
     function renderOptionsHtml() {
       if (lastNoMatch || groupBy === "none") return visible.map(optionHtml).join("");
       var searching = queryNonEmpty();
-      return orderedGroupNames().map(function (name) {
+      // Group-less options (e.g. a "" default option) have no _group, so they
+      // can't ride a group header — render them flat at the top before any
+      // grouped section. No other picker emits group-less options, so this is
+      // additive for the existing prefix/group callers.
+      var groupless = visible.filter(function (o) { return o._group == null || o._group === ""; });
+      var groupHtml = orderedGroupNames().map(function (name) {
         // Header shows only if the group has at least one option at all.
         var hasAny = options.some(function (o) {
           return (o._group == null ? "" : String(o._group)) === name;
@@ -301,6 +311,7 @@
         });
         return html;
       }).join("");
+      return groupless.map(optionHtml).join("") + groupHtml;
     }
 
     function createSearchLi() {
@@ -682,10 +693,14 @@
         // `tracked` is separate from `collapsed` so an expanded (removed-from-
         // collapsed) group is still remembered and not re-collapsed on refresh.
         if (groupBy !== "none" && collapsed && tracked) {
-          options.forEach(function (o) {
-            var g = o._group == null ? "" : String(o._group);
-            if (g !== "" && !tracked.has(g)) { tracked.add(g); collapsed.add(g); }
-          });
+          // Legacy behavior: new groups start collapsed (the user expands them).
+          // When startExpanded, leave them expanded so options are visible at once.
+          if (!startExpanded) {
+            options.forEach(function (o) {
+              var g = o._group == null ? "" : String(o._group);
+              if (g !== "" && !tracked.has(g)) { tracked.add(g); collapsed.add(g); }
+            });
+          }
         }
         // Seed sub-group collapse state — mirror of the main-group seeding, keyed
         // by the composite "group\u0001sub" so each (provider, family) pair is

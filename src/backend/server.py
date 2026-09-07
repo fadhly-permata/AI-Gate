@@ -67,6 +67,25 @@ async def lifespan(_app: FastAPI):
             "lifespan: seed_cli_tools failed during startup",
             source="backend.server.lifespan",
         )
+    # Log cleanup (T1): purge LogEntry rows older than log_retention_days.
+    # Idempotent + best-effort — startup must never crash on it.
+    try:
+        from backend.config.logs_router import purge_expired_logs
+
+        purged = purge_expired_logs()
+        from backend.log import log_event
+
+        log_event(
+            "info",
+            f"retention purge removed {purged} entries",
+            source="backend.server.lifespan",
+        )
+    except Exception:  # noqa: BLE001 — startup must not crash on purge failure
+        log_exception(
+            SEVERITY_ERROR,
+            "lifespan: retention purge failed during startup",
+            source="backend.server.lifespan",
+        )
     # Terminal PTY reaper: sweeps sessions whose PTY exited or that stayed
     # detached + idle beyond the grace period. PTYs deliberately OUTLIVE
     # their WebSocket (a dropped WS must never kill a running shell), so the

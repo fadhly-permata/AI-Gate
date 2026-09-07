@@ -27,6 +27,8 @@ import backend.gateway.resolver as resolver
 import backend.gateway.router as gateway_router
 from backend.config.db import Base
 from backend.models import (
+    Combo,
+    ComboMember,
     Endpoint,
     EndpointBinding,
     LogEntry,
@@ -51,6 +53,13 @@ CANNED_RESPONSE = {
     ],
     "usage": {"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3},
 }
+
+# Minimal SSE body (single delta + [DONE]) for combo-streaming log tests.
+SSE_BODY = (
+    b'data: {"id":"c1","object":"chat.completion.chunk","choices":'
+    b'[{"index":0,"delta":{"role":"assistant","content":"hi"}}]}\n\n'
+    b"data: [DONE]\n\n"
+)
 
 
 def _make_sessionmaker() -> sessionmaker:
@@ -101,6 +110,39 @@ def _seed_provider(sf, name="p", base_url=None) -> int:
         session.add(ProviderModel(provider_id=p.id, model_id="gpt-4o", model_name="GPT-4o"))
         session.commit()
         return p.id
+
+
+def _seed_combo(sf, name="cb", provider_name="p", base_url=None) -> int:
+    """Seed a fallback combo with one OpenAI-format member; returns combo id."""
+    pid = _seed_provider(sf, provider_name, base_url)
+    with sf() as session:
+        combo = Combo(name=name, strategy="fallback", enabled=True)
+        session.add(combo)
+        session.flush()
+        session.add(
+            ComboMember(
+                combo_id=combo.id,
+                provider_id=pid,
+                provider_model="gpt-4o",
+                priority=0,
+                weight=1.0,
+            )
+        )
+        session.commit()
+        return combo.id
+
+
+def _seed_endpoint(sf, name: str, bind_type: str, bind_id: int) -> int:
+    """Seed an Endpoint + binding; returns the endpoint id."""
+    with sf() as session:
+        ep = Endpoint(name=name, listen_host="127.0.0.1", listen_port=9999)
+        session.add(ep)
+        session.flush()
+        session.add(
+            EndpointBinding(endpoint_id=ep.id, bind_type=bind_type, bind_id=bind_id)
+        )
+        session.commit()
+        return ep.id
 
 
 def _post_completion(client: TestClient, model="provider:p:gpt-4o", **kw):
@@ -226,6 +268,115 @@ def test_request_log_endpoint_attribution(sf):
         row = session.query(RequestLog).one()
     assert row.endpoint_id == ep_id
     assert row.model == "gpt-4o"
+
+
+# --------------------------------------------------------------------------- #
+# Combo paths: Model column never empty (handover contract)
+# --------------------------------------------------------------------------- #
+@respx.mock
+def test_request_log_combo_non_stream_model_filled(sf):
+    """Combo ref non-streaming: Model = member yang melayani (envelope model)."""
+    _seed_combo(sf, name="cb1", provider_name="p", base_url="http://rlc1.test/v1")
+    _enable_request_log(sf)
+    respx.post("http://rlc1.test/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json=CANNED_RESPONSE)
+    )
+    client = TestClient(app)
+    resp = _post_completion(client, model="combo:cb1")
+    assert resp.status_code == 200
+    with sf() as session:
+        row = session.query(RequestLog).one()
+    # The member that actually served (from the upstream envelope), NOT ''.
+    assert row.model == "gpt-4o"
+
+
+@respx.mock
+def test_request_log_combo_non_stream_envelope_without_model(sf):
+    """Envelope tanpa field 'model': fallback ke combo ref (bukan '')."""
+    _seed_combo(sf, name="cb2", provider_name="p", base_url="http://rlc2.test/v1")
+    _enable_request_log(sf)
+    bare = {k: v for k, v in CANNED_RESPONSE.items() if k != "model"}
+    respx.post("http://rlc2.test/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json=bare)
+    )
+    client = TestClient(app)
+    resp = _post_completion(client, model="combo:cb2")
+    assert resp.status_code == 200
+    with sf() as session:
+        row = session.query(RequestLog).one()
+    assert row.model == "combo:cb2"
+
+
+@respx.mock
+def test_request_log_combo_stream_model_filled(sf, monkeypatch):
+    """Combo streaming: Model = upstream_model member (resolve_combo_stream_target)."""
+    _seed_combo(sf, name="cb3", provider_name="p", base_url="http://rlc3.test/v1")
+    _enable_request_log(sf)
+    respx.post("http://rlc3.test/v1/chat/completions").mock(
+        return_value=httpx.Response(
+            200, content=SSE_BODY, headers={"Content-Type": "text/event-stream"}
+        )
+    )
+    client = TestClient(app)
+    resp = client.post(
+        "/v1/chat/completions",
+        json={
+            "model": "combo:cb3",
+            "messages": [{"role": "user", "content": "x"}],
+            "stream": True,
+        },
+    )
+    assert resp.status_code == 200
+    with sf() as session:
+        row = session.query(RequestLog).one()
+    # The streaming member's real upstream model, NOT '' or the combo ref.
+    assert row.model == "gpt-4o"
+
+
+# --------------------------------------------------------------------------- #
+# endpoint_name di DTO / API (handover contract)
+# --------------------------------------------------------------------------- #
+@respx.mock
+def test_request_logs_api_includes_endpoint_name(sf):
+    """Request via X-Aigate-Endpoint: API response carries endpoint_name."""
+    pid = _seed_provider(sf, "p", base_url="http://rlc5.test/v1")
+    ep_id = _seed_endpoint(sf, "ep-api", "provider", pid)
+    _enable_request_log(sf)
+    respx.post("http://rlc5.test/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json=CANNED_RESPONSE)
+    )
+    client = TestClient(app)
+    resp = client.post(
+        "/v1/chat/completions",
+        json={"model": "gpt-4o", "messages": [{"role": "user", "content": "x"}]},
+        headers={"X-Aigate-Endpoint": "ep-api"},
+    )
+    assert resp.status_code == 200
+    api = client.get("/api/request-logs")
+    assert api.status_code == 200
+    rows = api.json()["data"]
+    assert len(rows) == 1
+    assert rows[0]["endpoint_id"] == ep_id
+    assert rows[0]["endpoint_name"] == "ep-api"
+
+
+@respx.mock
+def test_request_logs_api_endpoint_name_null_without_endpoint(sf):
+    """Model-based path (no header): endpoint_name = None, model tetap upstream."""
+    _seed_provider(sf, "p", base_url="http://rlc6.test/v1")
+    _enable_request_log(sf)
+    respx.post("http://rlc6.test/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json=CANNED_RESPONSE)
+    )
+    client = TestClient(app)
+    assert _post_completion(client, model="provider:p:gpt-4o").status_code == 200
+    api = client.get("/api/request-logs")
+    assert api.status_code == 200
+    rows = api.json()["data"]
+    assert len(rows) == 1
+    assert rows[0]["endpoint_id"] is None
+    assert rows[0]["endpoint_name"] is None
+    assert rows[0]["model"] == "gpt-4o"  # regresi: provider path = upstream_model
 
 
 # --------------------------------------------------------------------------- #

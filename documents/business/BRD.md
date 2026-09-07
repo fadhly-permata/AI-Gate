@@ -215,7 +215,7 @@ Sebagai Developer, saya ingin SETIAP method (frontend & backend) menulis log sev
 
 **US-2.8.5 — Self-Heal (menu CLI-Tool)** *(Must-have)*
 Sebagai Developer, saya ingin fitur Self-Heal di menu CLI-Tool yang membuat branch, menjalankan agentic CLI terinstall, lalu fix/test loop dari log warning/error.
-- *Acceptance:* (1) Klik Self-Heal → `git init` bila belum ada repo, buat branch `aigate/self-heal-*`. (2) Bila tidak ada agentic CLI terinstall → popup "Self-Heal tidak bisa jalan: tidak ada agentic CLI terinstall". (3) Ambil log warning+error, jalankan agentic CLI di tab terminal, loop fix→test sampai sehat atau batas iterasi. (4) Setelah issue selesai dikerjakan, baris `LogEntry` terkait dihapus agar tidak di-fix ulang. (5) Setelah seluruh issue terbukti pass, lakukan merge branch
+- *Acceptance:* (1) Klik Self-Heal → `git init` bila belum ada repo, buat branch `aigate/self-heal-*`. (2) Bila tidak ada agentic CLI terinstall → popup "Self-Heal tidak bisa jalan: tidak ada agentic CLI terinstall". (3) Ambil log warning+error, jalankan agentic CLI di tab terminal `self-heal` yang OTOMATIS dibuka & difokuskan (progress fix terlihat live di tab), loop fix→test sampai sehat atau batas iterasi. (3b) Run asinkron: klik Run langsung dibalas "started" + status akhir muncul via polling (`/api/self-heal/status`). (4) Setelah issue selesai dikerjakan, baris `LogEntry` terkait dihapus agar tidak di-fix ulang. (5) Setelah seluruh issue terbukti pass, lakukan merge branch
   self-heal ke `main`, pindah ke `main`, dan hapus branch fixing — run berikutnya
   pakai versi latest.
 

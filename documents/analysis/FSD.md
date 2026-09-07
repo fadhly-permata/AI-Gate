@@ -344,8 +344,9 @@ catch); (e) Self-Heal dari menu CLI-Tool (git branch + agentic CLI + fix/test lo
 **Output**
 - Server listen di port pilihan; mode developer mengaktifkan panel UI ekstra.
 - Log Window menampilkan `LogEntry` (filter severity) dari DB, auto-refresh.
-- Self-Heal: branch git baru, agentic CLI jalan di tab terminal, loop sampai log
-  warning/error habis (atau batas iterasi); bila tak ada agentic CLI → popup.
+ - Self-Heal: branch git baru, agentic CLI jalan di tab terminal `self-heal`
+   yang OTOMATIS dibuka & difokuskan di UI (progress live terlihat), loop sampai
+   log warning/error habis (atau batas iterasi); bila tak ada agentic CLI → popup.
 
 **Process flow — Logging (wajib)**
 1. Tiap method panggil logger dengan level (info/warning/error).
@@ -361,8 +362,16 @@ catch); (e) Self-Heal dari menu CLI-Tool (git branch + agentic CLI + fix/test lo
 3. Bila ada → pastikan git repo (`git init` bila belum), buat branch
    `aigate/self-heal-<ts>`.
 4. Ambil `LogEntry` severity warning & error (ORDER BY timestamp).
-5. Buka tab terminal, jalankan agentic CLI dengan prompt perbaiki issue berdasar
-   log. Agent menjalankan fix & test.
+5. Run = ASYNC: `POST /api/self-heal/run` langsung balas
+   `{"ok":true,"started":true,"tab":"self-heal"}` (409 bila masih jalan). UI buka
+   & fokus tab terminal `self-heal` (shell; session key tetap, respawn bila mati).
+   Backend mengetik command agentic CLI ke PTY itu — prompt perbaiki issue diambil
+   dari log, ditulis ke file temp (anti shell-injection); selesai ditandai file
+   `.done` (poll per ~2s, timeout per issue 1800s → lanjut ke test). Agent
+   menjalankan fix & test; keluar CLI/isi progress LIVE terlihat di tab.
+   Bila tab/shell mati di tengah jalan → run dihentikan (remaining tetap dihitung).
+5b. `GET /api/self-heal/status` → `{"running": bool, "last": <hasil|null>}` untuk
+   polling UI (5s) dan status akhir (merged/partial/no_agentic_cli).
 6. Loop: setelah test, cek ulang log warning/error; bila masih ada → ulangi (5);
    bila kosong → "sembuh" (optional commit). Batas iterasi (mis. 10) cegah hang.
 6b. Setelah satu issue spesifik (warning/error tertentu) berhasil di-fix & test

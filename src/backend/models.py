@@ -410,6 +410,10 @@ class LogEntry(Base):
     source: Mapped[str] = mapped_column(String, nullable=False, default="")
     message: Mapped[str] = mapped_column(String, nullable=False, default="")
     stacktrace: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Log cleanup (T1): a warning/error row marked resolved no longer blocks
+    # the self-heal "fully healed → merge" path and is hidden from GET /api/logs
+    # unless show_resolved=true. Additive-only migration in db.py.
+    resolved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
 class Setting(Base):

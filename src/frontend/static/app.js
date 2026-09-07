@@ -465,13 +465,15 @@
       source: entry.source || "",
       message: entry.message || "",
       stacktrace: (entry.stacktrace != null && entry.stacktrace !== "")
-        ? entry.stacktrace : null
+        ? entry.stacktrace : null,
+      resolved: entry.resolved === true
     };
   }
 
   // Build the querystring for GET /api/logs.
-  // severity "all"/empty => omitted; limit omitted unless a positive number.
-  function buildLogsQuery(severity, limit) {
+  // severity "all"/empty => omitted; limit omitted unless a positive number;
+  // showResolved=true => resolved rows are included too (backend default false).
+  function buildLogsQuery(severity, limit, showResolved) {
     var params = [];
     if (severity && severity !== "all") {
       params.push("severity=" + encodeURIComponent(severity));
@@ -479,12 +481,25 @@
     if (limit != null && limit !== "" && !isNaN(Number(limit)) && Number(limit) > 0) {
       params.push("limit=" + Number(limit));
     }
+    if (showResolved === true) {
+      params.push("show_resolved=true");
+    }
     return params.length ? "?" + params.join("&") : "";
+  }
+
+  // Build the querystring for DELETE /api/logs (T2 log cleanup).
+  // The clear-dialog scope maps directly: "all" => wipe-all, which requires
+  // the explicit confirm=all param; anything else (e.g. "warning,error") is
+  // sent as the severity filter. Same encoding style as above.
+  function buildClearLogsQuery(severity) {
+    if (!severity || severity === "all") return "?confirm=all";
+    return "?severity=" + encodeURIComponent(severity);
   }
 
   window.aigate.severityClass = severityClass;
   window.aigate.formatLogRow = formatLogRow;
   window.aigate.buildLogsQuery = buildLogsQuery;
+  window.aigate.buildClearLogsQuery = buildClearLogsQuery;
 
   /* Log Window (global) helpers — exposed for tests + external control. */
   window.aigate.applyLogVisible = applyLogVisible;
@@ -492,6 +507,15 @@
   window.aigate.isLogVisible = isLogVisible;
   window.aigate.measureLogHeight = measureLogHeight;
   window.aigate.loadLogs = loadLogs;
+  window.aigate.renderLogs = renderLogs;
+  window.aigate.clearLogs = clearLogs;
+  window.aigate.confirmClearLogs = confirmClearLogs;
+  window.aigate.cancelClearLogs = cancelClearLogs;
+  window.aigate.resolveLog = resolveLog;
+  window.aigate.resolveAllLogs = resolveAllLogs;
+  window.aigate.applyShowResolved = applyShowResolved;
+  window.aigate.toggleShowResolved = toggleShowResolved;
+  window.aigate.isShowResolved = readShowResolved;
   window.aigate.startLogAutoRefresh = startLogAutoRefresh;
   window.aigate.stopLogAutoRefresh = stopLogAutoRefresh;
 
@@ -1253,40 +1277,152 @@
     m.className = "settings-msg" + (kind ? " settings-msg-" + kind : "");
   }
 
+  /* ---- T2 log cleanup state ---- */
+  var LOG_SHOW_RESOLVED_KEY = "aigate.logShowResolved";
+  // Last rendered (normalized) rows — resolve-all operates on these.
+  var lastLogRows = [];
+
+  function isResolvableSeverity(sev) {
+    var s = (sev || "").toString().toLowerCase();
+    return s === "warning" || s === "error";
+  }
+
+  function readShowResolved() {
+    return read(LOG_SHOW_RESOLVED_KEY, "0") === "1";
+  }
+
+  // Sync the toggle button state (aria-pressed + label) from localStorage.
+  function applyShowResolved() {
+    var on = readShowResolved();
+    var btn = logEl("logShowResolvedBtn");
+    if (btn) {
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+      var label = getStr("log.show_resolved");
+      btn.setAttribute("title", label);
+      btn.setAttribute("aria-label", label);
+    }
+    return on;
+  }
+
+  function toggleShowResolved() {
+    write(LOG_SHOW_RESOLVED_KEY, readShowResolved() ? "0" : "1");
+    applyShowResolved();
+  }
+
   function renderLogs(list) {
     var body = logEl("logTableBody");
     if (!body) return;
     list = list || [];
-    if (!list.length) {
+    lastLogRows = list.map(function (raw) { return formatLogRow(raw); });
+    if (!lastLogRows.length) {
       body.innerHTML = '<tr><td colspan="4" class="empty-cell">' +
         escapeHtml(getStr("term.no_logs")) + "</td></tr>";
       return;
     }
-    body.innerHTML = list.map(function (raw) {
-      var row = formatLogRow(raw);
+    body.innerHTML = lastLogRows.map(function (row) {
       var sev = severityClass(row.severity);
       var badge = '<span class="badge ' + sev + '">' + escapeHtml(row.severity) + "</span>";
+      if (row.resolved) {
+        badge += '<span class="badge sev-info log-resolved-badge">' +
+          escapeHtml(getStr("log.resolved")) + "</span>";
+      }
       var stack = (row.stacktrace != null && row.stacktrace !== "")
         ? '<details class="log-stack"><summary>' + escapeHtml(getStr("term.stacktrace")) +
           '</summary><pre>' + escapeHtml(row.stacktrace) + "</pre></details>"
         : "";
-      return "<tr>" +
-        "<td class=\"log-time\">" + escapeHtml(row.timestamp) + "</td>" +
+      // Per-row resolve: only for unresolved warning|error rows.
+      var resolveBtn = (!row.resolved && isResolvableSeverity(row.severity))
+        ? '<button type="button" class="log-resolve-btn" data-id="' +
+          escapeHtml(row.id) + '" title="' + escapeHtml(getStr("log.resolve")) +
+          '" aria-label="' + escapeHtml(getStr("log.resolve")) + '">' +
+          '<i class="fa fa-check"></i></button>'
+        : "";
+      return "<tr" + (row.resolved ? ' class="log-row-resolved"' : "") + ">" +
+        '<td class="log-time">' + escapeHtml(row.timestamp) + "</td>" +
         "<td>" + badge + "</td>" +
         "<td>" + escapeHtml(row.source) + "</td>" +
-        "<td>" + escapeHtml(row.message) + (stack ? "<br>" + stack : "") + "</td>" +
+        "<td>" + escapeHtml(row.message) + (stack ? "<br>" + stack : "") + resolveBtn + "</td>" +
       "</tr>";
     }).join("");
   }
 
-  function loadLogs() {
+  // Optional (msg, kind): status shown after the reload lands — lets action
+  // handlers (clear/resolve) keep their success message visible post-refresh.
+  function loadLogs(successMsg, successKind) {
     var sevSel = logEl("logSeverity");
     var severity = sevSel ? sevSel.value : "all";
-    var query = buildLogsQuery(severity, 200);
+    var query = buildLogsQuery(severity, 200, readShowResolved());
     fetchJson(LOGS_API + query).then(function (data) {
       var list = (data && data.data) ? data.data : [];
       renderLogs(list);
-      setLogMsg("");
+      setLogMsg(successMsg || "", successKind);
+    }).catch(function (err) {
+      setLogMsg(getStr("term.logs_error") + " (" + err.message + ")", "error");
+    });
+  }
+
+  /* ---- T2 log cleanup ---- */
+
+  var LOG_CLEAR_MODAL = "logClearModal";
+  var LOG_CLEAR_SCOPE = "logClearScope";
+
+  // Irreversible delete -> ALWAYS confirm via the dialog first. The scope
+  // (severity choice) lives in the dialog, NOT the filter select: default is
+  // "Warnings + Errors" (?severity=warning,error); "All logs" wipes every
+  // entry and therefore sends the backend's explicit ?confirm=all.
+  // Cancel / backdrop => no request.
+  function clearLogs() {
+    var modal = logEl(LOG_CLEAR_MODAL);
+    if (!modal) return;
+    var scope = logEl(LOG_CLEAR_SCOPE);
+    if (scope) scope.value = "warning,error"; // safe default, every open
+    modal.hidden = false;
+  }
+
+  function cancelClearLogs() {
+    var modal = logEl(LOG_CLEAR_MODAL);
+    if (modal) modal.hidden = true;
+  }
+
+  function confirmClearLogs() {
+    cancelClearLogs(); // close first; the request fires right after either way
+    var scope = logEl(LOG_CLEAR_SCOPE);
+    var value = scope ? scope.value : "warning,error";
+    var query = buildClearLogsQuery(value);
+    fetchJson(LOGS_API + query, { method: "DELETE" }).then(function (data) {
+      var deleted = (data && data.deleted != null) ? data.deleted : 0;
+      loadLogs(getStr("log.cleared").replace("{n}", String(deleted)), "ok");
+    }).catch(function (err) {
+      setLogMsg(getStr("term.logs_error") + " (" + err.message + ")", "error");
+    });
+  }
+
+  // Resolve a single row: POST /api/logs/{id}/resolve -> {"resolved": N}.
+  function resolveLog(id) {
+    fetchJson(LOGS_API + "/" + encodeURIComponent(id) + "/resolve", { method: "POST" })
+      .then(function (data) {
+        var n = (data && data.resolved != null) ? data.resolved : 1;
+        lastLogRows.forEach(function (r) { if (r.id === id) r.resolved = true; });
+        loadLogs(getStr("log.resolved_n").replace("{n}", String(n)), "ok");
+      }).catch(function (err) {
+        setLogMsg(getStr("term.logs_error") + " (" + err.message + ")", "error");
+      });
+  }
+
+  // Resolve every currently rendered unresolved warning|error row (non-destructive,
+  // no confirm). POST /api/logs/resolve {"ids":[...]} -> {"resolved": N}.
+  function resolveAllLogs() {
+    var ids = lastLogRows
+      .filter(function (r) { return !r.resolved && isResolvableSeverity(r.severity); })
+      .map(function (r) { return r.id; });
+    if (!ids.length) return;
+    fetchJson(LOGS_API + "/resolve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: ids })
+    }).then(function (data) {
+      var n = (data && data.resolved != null) ? data.resolved : ids.length;
+      loadLogs(getStr("log.resolved_n").replace("{n}", String(n)), "ok");
     }).catch(function (err) {
       setLogMsg(getStr("term.logs_error") + " (" + err.message + ")", "error");
     });
@@ -1614,9 +1750,37 @@
     var logWindowToggle = document.getElementById("logWindowToggle");
     if (logWindowToggle) logWindowToggle.addEventListener("click", toggleLogVisible);
 
+    // --- T2 log cleanup: clear (confirm-first), show-resolved toggle, resolve-all ---
+    var logClearBtn = document.getElementById("logClearBtn");
+    if (logClearBtn) logClearBtn.addEventListener("click", clearLogs);
+    var logClearConfirmBtn = document.getElementById("logClearConfirmBtn");
+    if (logClearConfirmBtn) logClearConfirmBtn.addEventListener("click", confirmClearLogs);
+    var logClearCancelBtn = document.getElementById("logClearCancelBtn");
+    if (logClearCancelBtn) logClearCancelBtn.addEventListener("click", cancelClearLogs);
+    var logClearModal = document.getElementById("logClearModal");
+    if (logClearModal) logClearModal.addEventListener("click", function (e) {
+      if (e.target === logClearModal) cancelClearLogs(); // click backdrop closes
+    });
+    var logShowResolvedBtn = document.getElementById("logShowResolvedBtn");
+    if (logShowResolvedBtn) {
+      logShowResolvedBtn.addEventListener("click", function () {
+        toggleShowResolved();
+        loadLogs();
+      });
+    }
+    var logResolveAllBtn = document.getElementById("logResolveAllBtn");
+    if (logResolveAllBtn) logResolveAllBtn.addEventListener("click", resolveAllLogs);
+    // Rows re-render often -> delegate resolve clicks on the tbody.
+    var logTableBody = document.getElementById("logTableBody");
+    if (logTableBody) logTableBody.addEventListener("click", function (e) {
+      var btn = e.target.closest ? e.target.closest(".log-resolve-btn") : null;
+      if (btn && btn.getAttribute("data-id")) resolveLog(btn.getAttribute("data-id"));
+    });
+
     // --- Global Log Window: restore show/hide + start auto-refresh once ---
     var logVisible = read(LOG_VISIBLE_KEY, "1") !== "0";
     applyLogVisible(logVisible);
+    applyShowResolved();
     observeLogWindow();
     // Start auto-refresh globally (runs across all view switches). Guarded so
     // headless test envs without fetch() don't error on import.

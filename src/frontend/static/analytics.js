@@ -9,10 +9,13 @@
      buckets are chronological asc and CONTINUOUS (empty periods = zeros).
      day -> 24 hourly ("YYYY-MM-DD HH:00"), week -> 7 daily, month -> 30 daily.
    - GET /api/request-logs?endpoint_id=&limit=50 (newest first, limit cap 500) ->
-     {object:"list", data:[{id,endpoint_id,model,ts,duration_ms,
-                            request:"<JSON string>", response:"<JSON string>"}]}
-     request/response arrive with secret headers redacted SERVER-side; display
-     as-is (R11/ADR-007). May carry a "...[truncated N chars]" marker.
+      {object:"list", data:[{id,endpoint_id,endpoint_name,model,ts,duration_ms,
+                             request:"<JSON string>", response:"<JSON string>"}]}
+      endpoint_name = Endpoint.name when routed via an endpoint; null for
+      model-based requests (no endpoint involved). Old DB rows may still have
+      model:"" (never backfilled) — render both with "—" fallbacks.
+      request/response arrive with secret headers redacted SERVER-side; display
+      as-is (R11/ADR-007). May carry a "...[truncated N chars]" marker.
    - Enable/disable debug logging: PUT /api/settings
      {"key":"request_log_enabled","value":"true"|"false"};
      read current via GET /api/settings (flat settings object).
@@ -297,6 +300,17 @@
     return url;
   }
 
+  // Empty/absent scalar (null / undefined / "") -> visible placeholder "—",
+  // so legacy rows never render blank cells (same literal as usage.js/endpoints.js).
+  function orDash(v) {
+    return (v === null || v === undefined || v === "") ? "\u2014" : v;
+  }
+
+  // Endpoint display: NAME (new DTO) -> raw id (old responses) -> "—".
+  function reqlogEndpoint(r) {
+    return orDash(r.endpoint_name || r.endpoint_id);
+  }
+
   function renderRequestLogs(list) {
     var body = el("reqlogTableBody");
     if (!body) return;
@@ -327,8 +341,8 @@
         "</details>";
       return '<tr class="reqlog-row" data-id="' + escapeHtml(r.id) + '">' +
         '<td class="usage-ts">' + escapeHtml(formatTs(r.ts)) + "</td>" +
-        "<td>" + escapeHtml(r.model) + "</td>" +
-        "<td>" + escapeHtml(r.endpoint_id) + "</td>" +
+        "<td>" + escapeHtml(orDash(r.model)) + "</td>" +
+        "<td>" + escapeHtml(reqlogEndpoint(r)) + "</td>" +
         '<td class="reqlog-duration">' +
           escapeHtml(formatNumber(r.duration_ms) + " ms") + "</td>" +
         "<td>" + details + "</td>" +

@@ -186,6 +186,35 @@ def _ensure_usage_record_saved_tokens_column(engine) -> None:
         logger.warning("skipping usage_records.saved_tokens_est migration: %s", exc)
 
 
+def _ensure_log_entry_resolved_column(engine) -> None:
+    """Self-heal ``log_entries.resolved`` on pre-existing DBs (T1).
+
+    ``create_all`` never alters existing tables, so a DB created before the
+    column existed (e.g. the live ``~/.aigate/aigate.db`` with thousands of
+    rows) lacks it and every INSERT/SELECT on LogEntry 500s. Additive-only and
+    idempotent: a PRAGMA check guards the ALTER, and only the specific
+    ``OperationalError`` is swallowed (R12 — no bare ``except``).
+    """
+    try:
+        with engine.connect() as conn:
+            existing = {
+                row[1]
+                for row in conn.execute(
+                    text("PRAGMA table_info(log_entries)")
+                ).fetchall()
+            }
+            if "resolved" not in existing:
+                conn.execute(
+                    text(
+                        "ALTER TABLE log_entries "
+                        "ADD COLUMN resolved BOOLEAN NOT NULL DEFAULT 0"
+                    )
+                )
+                conn.commit()
+    except OperationalError as exc:  # e.g. table missing on a bare/empty engine
+        logger.warning("skipping log_entries.resolved migration: %s", exc)
+
+
 def init_db() -> None:
     """Create all tables declared on ``Base.metadata`` (idempotent).
 
@@ -203,3 +232,4 @@ def init_db() -> None:
     _ensure_provider_quota_columns(engine)
     _ensure_endpoint_token_saver_column(engine)
     _ensure_usage_record_saved_tokens_column(engine)
+    _ensure_log_entry_resolved_column(engine)
