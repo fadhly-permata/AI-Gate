@@ -1729,3 +1729,21 @@ link untuk semua bahasa di semua file readme".
 - RISIKO DILAPORKAN ke user: 5 link (ru, nl, ja, zh, zh-tw) masih MATI karena filenya belum ada
   -> PR #9 jangan di-merge sebelum 6 varian dibuat. Konvensi baris bahasa dicatat di memory-bank
   supaya varian berikutnya otomatis ikut.
+
+## 2026-09-08 — Bahasa ke-8 utk README: Hindi (varian + baris bahasa) — khusus README
+User: "tambahin satu bahasa lagi buat readme, bahasa india" → setelah diklarifikasi: **Hindi**,
+**README saja**, aplikasi nanti di branch lain.
+- Kode `hi`, endonym **हिन्दी**, bendera 🇮🇳. README sekarang 8 bahasa; registry aplikasi TETAP 7
+  (perbedaan ini disengaja & dicatat di memory-bank).
+- `business-analyst`: (1) ujung baris bahasa di `README.md` + `README.id.md` ditambah `· [हिन्दी](...)`;
+  (2) file baru **`documents/readme-variants/README.hi.md`** 83 baris — teks asli Devanagari,
+  register "आप" (grep `तुम` = 0), adegan "रात की चाय" (larut malam + chai), bukan terjemahan.
+- **Verifikasi PM (struktural):** 83 baris; baris bahasa persis spesifikasi + **हिन्दी** tebal tanpa
+  link; satu-satunya nama file = `run.py` (2x, di blok perintah) + nama file di baris bahasa; URL
+  wiki utuh; angka "24" 1x; kredit `Fadhly Permata ने ❤️ के साथ इसे बनाया है` (nama tetap latin);
+  tanpa tabel; emoji hanya di judul.
+- **Nit ketemu & dibenerin:** judul seksi terakhir masih `## Status 📌` → jadi `## हालत 📌`
+  (BA menolak "स्थिति" karena kedengeran birokratis) + "personal project" → "निजी प्रोजेक्ट".
+- **BATAS JUJUR gue:** gue (dan user) bukan penutur asli Hindi — kualitas rasa bahasanya belum
+  ada yang ngecek. Struktur & fakta udah diverifikasi, tapi perlu mata penutur Hindi sebelum
+  dianggap final.
