@@ -1559,3 +1559,24 @@ distro Linux)." Wiki di-parker (R40: rencana halaman udah disodorkan, belum di-A
 - **3 keputusan yang dibalikin BA ke user:** (1) nama resmi `aigate` (draf, kecil) vs `AIGate`
   (README lama); (2) kalimat "Contributions and feedback welcome" — dipertahankan/dibuang;
   (3) tautan `documents/dev/SETUP.md` dihapus dari draf — mau dipasang lagi?
+
+## 2026-09-08 — Revisi README sesuai review user → draf v2 (80 baris, bahasa awam, tanpa path file)
+User: "jangan terlalu teknikal… jangan nyebut-nyebut file apapun… konteks yang ditonjolkan di
+intro + ilustrasi serunya vibe coding lewat hape… nama aplikasi 'aigate' kecil semua".
+- **Rule baru R41** (commit `dcb46a3`): README = manfaat & tercerna awam; DILARANG sebut
+  path/nama file (pengecualian perintah `python run.py`); nilai jual wajib di intro + ilustrasi
+  adegan; nama produk `aigate` huruf kecil; detail teknis ke wiki; PM wajib masukkan poin ini ke
+  handover SEBELUM nulis.
+- **business-analyst (sesi dilanjutkan, task_id sama)** tulis ulang in place
+  `documents/business/README-DRAFT.md` → **80 baris**. `README.md` tetap gak disentuh.
+- **Verifikasi PM:** grep path → sisa cuma `run.py` di 2 blok perintah (diizinkan); grep
+  `AIGate` kapital → 0 (judul & badan semua `aigate`); angka "24 tools" cocok hitungan preset;
+  klaim proot tetap berlabel belum dites + marker `TODO-VERIFY`; link wiki 1 buah (URL repo
+  emang `AI-Gate`, bukan penyebutan file).
+- **Dibuang dari draf v1:** daftar endpoint, seksi Gateway API, nama modul, istilah SQLite/
+  FastAPI/WebSocket PTY/ADR-012, blok `PW_EXECUTABLE`, instruksi pip/venv/uvicorn/npm, seksi
+  Testing, tabel Repo layout.
+- **Ditambah:** intro 4 baris (3 nilai jual + "plain Python app"), seksi "Picture this ☕"
+  (adegan angkot), arahan ke wiki.
+- **Nunggu user:** (1) bahasa — draf masih Inggris, mau versi Indonesia? (2) kalimat penutup
+  "try it, break it, and tell me where it hurts" — nada personal/solo, oke atau diganti?

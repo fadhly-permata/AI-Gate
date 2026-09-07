@@ -1,146 +1,80 @@
 # aigate 🚪
 
-Your own local AI gateway + management console — one endpoint in front of all your providers, one tab in front of all your coding CLIs.
+One door for every AI provider you use. One playground where AI coding
+agents do the typing for you. And the whole thing can run from your phone.
 
-Point any OpenAI-compatible client at `http://localhost:8080/v1` and let aigate handle providers, fallbacks, quotas, and logs. No Docker. No cloud account. Runs on your laptop — or literally on your phone.
+No Docker, no cloud account — aigate is just a plain Python app that lives
+on your own laptop or Android device, and your API keys and history stay
+right there with it.
 
-## What you get ✨
+## Picture this ☕
 
-- **OpenAI-compatible gateway** — `POST /v1/chat/completions`, `POST /v1/responses` (non-streaming bridge), `GET /v1/models`, streaming, consistent error shapes.
-- **Provider management** — model discovery, provider accounts, OAuth/token refresh, quota & usage tracking.
-- **Combos** — fallback, load balancing, routing by latency/cost, tiered strategies across providers.
-- **Endpoint routing** — access control per endpoint + proxy-pool binding.
-- **Observability** — request logs, analytics, CSV export, local settings backup/restore.
-- **In-app terminal** — WebSocket PTY, multi-tab, auto-closes when the shell exits. POSIX/Termux use `ptyprocess`, Windows uses `pywinpty`.
-- **Zero-setup launcher** — Python deps install themselves on first run.
-- **Polished UI** — responsive, light/dark, 7 languages (EN, ID, RU, NL, JA, ZH, ZH-TW), searchable model picker, device simulation in developer mode.
+You're squeezed into an angkot on the way home, phone out, browser open.
+Your side project keeps throwing errors. You type one sentence to your
+agent and hit go — a tab comes alive and starts fixing the errors one by
+one: run the test, read the failure, patch it, repeat. You just watch it
+work while the city goes by. When the last error clears, the fixes land
+back on your main branch and the scratch branch quietly disappears. All of
+that from a phone, in a browser tab.
 
-Stack: Python 3.10+ · FastAPI · vanilla JS (no build step) · SQLite. Config and data live in `~/.aigate/`.
+## What makes it different ✨
 
-## Vibe coding 😎
+- **One door for all your AI providers.** Connect your provider accounts
+  once and aigate routes your requests through them — when one is down or
+  out of quota, the request still gets answered instead of failing.
+- **24 AI coding tools, one tap.** Launch the popular AI coding assistants
+  straight into aigate's built-in terminal tabs. Missing one? It suggests
+  an install command that actually works on your device.
+- **A self-heal loop you can watch.** Point it at your project's errors:
+  it makes a branch, runs an agent in a live tab, fixes warning after
+  warning, and merges back when things pass. Nothing hidden — and it never
+  pretends a failed run succeeded.
+- **It really runs on a phone.** aigate installs and runs natively in
+  Termux on Android — no compilers, no build tools, nothing desktop-only.
+- **Private by default.** Your API keys and history are local data on
+  your device. Nothing talks to the cloud except the AI providers you
+  chose yourself.
+- **Comfortable to use.** Light and dark themes, seven languages, and a
+  UI that behaves on a small screen.
 
-Two things built to work together:
-
-### 1. CLI tool launcher — 24 AI coding tools, one click
-
-Launch any preset straight into an in-app terminal tab (`src/backend/cli_presets.py`):
-
-| Group | Tools |
-|---|---|
-| Agentic Coding Assistants | claude, opencode, codex, gemini, antigravity, phi, aider, goose, amp, qwen, cline, kilo |
-| Autonomous Software Agents | openhands, swe-agent, open-interpreter, autogpt, gpt-researcher, crewai |
-| Chat & Shell Assistants | llm, sgpt, mods, oterm, gptme, aichat |
-
-Missing tool? The launcher shows an install command that actually works on your platform (see Termux below).
-
-### 2. Self-Heal loop — watch your agent fix the code
-
-The full loop (`src/backend/selfheal.py`):
-
-1. Creates a git branch automatically.
-2. Runs an agentic CLI in a **visible live PTY tab** — not a hidden subprocess. You watch it work.
-3. Fix/test loop driven by warning/error log lines; resolved lines get cleared as it goes.
-4. Merges to `main`, deletes the branch.
-
-Safety built in: the CLI prompt is read from a temp file (never interpolated into a shell command — no injection), the "done" marker only counts on exit code 0 (failure leaves a `<prompt>.failed` file, never a silent fake success), and a missing binary shows a clean status instead of crashing.
-
-## Runs on your phone 📱 (Termux)
-
-Yes, really — aigate is a first-class Termux citizen:
-
-- **Pure Python, no Rust compile** (ADR-012). Every core dependency installs and runs natively on Android Termux — and on any platform missing Rust wheels.
-- **Per-platform install routes.** In Termux, npm reports `process.platform == "android"`, so `*-linux-arm64` packages never resolve. aigate has a `TERMUX_INSTALL` override plus `is_termux()` detection (`cli_presets.py`, `paths.py`) so the install command it suggests is one that actually works — e.g. `pkg install aichat`.
-- **Presets verified on-device.** CLI presets are checked directly on Termux/aarch64 hardware, not from memory.
-- **E2E testing on Android** too:
-
-```bash
-PW_EXECUTABLE=/path/to/chromium PW_NO_SANDBOX=1 npm run test:e2e:android
-```
-
-**Beyond Termux:** proot Linux distros (proot-distro Ubuntu/Debian on Termux) *should* work — same pure-Python stack — but this is not yet verified on-device, so consider it experimental.
-
-<!-- TODO-VERIFY: belum dites di proot-distro -->
-
-## Quick start 🚀
-
-Zero-setup — installs missing Python deps, then serves:
+## Try it in 60 seconds ⏱️
 
 ```bash
 python run.py
 ```
 
-Open <http://localhost:8080>.
+Open **http://localhost:8080** — the first run grabs the few Python
+packages it needs, then starts.
+
+Port busy? Pick another one:
 
 ```bash
-AIGATE_PORT=9090 python run.py   # different port
-AIGATE_DEV=1 python run.py       # developer mode
+AIGATE_PORT=9090 python run.py
 ```
 
-Prefer a proper install?
+## Runs on your phone 📱
 
-```bash
-python -m venv .venv
-. .venv/bin/activate
-python -m pip install -e .
-aigate --port 8080
-```
+Install Termux on Android, get aigate in there, and start it the same way
+as on a laptop. The trickier part of phone life is installing the *coding
+tools* themselves — Android resolves packages differently than desktops —
+so aigate knows when it's on Termux and suggests the install command that
+actually works there, like a system package instead of the desktop one.
 
-Or run uvicorn manually:
+Feeling adventurous and want to run a full Linux distro inside your phone
+(proot)? It *should* work — same plain Python app — but we haven't tested
+that route on a device yet, so treat it as experimental for now.
 
-```bash
-python -m uvicorn backend.server:app --host 0.0.0.0 --port 8080
-```
+<!-- TODO-VERIFY: belum dites di proot-distro -->
 
-No container required — by design.
+## Want the technical details? 📚
 
-## Gateway API 🔌
-
-Use aigate as the base URL for any OpenAI-compatible client:
-
-```text
-http://localhost:8080/v1
-```
-
-Endpoints: `POST /v1/chat/completions` (streaming supported), `POST /v1/responses` (non-streaming bridge), `GET /v1/models`. Full contract: [`documents/api/OPENAI_COMPATIBLE_CONTRACT.md`](documents/api/OPENAI_COMPATIBLE_CONTRACT.md).
-
-## Configuration & data 🗂️
-
-Everything lives in `~/.aigate/` — SQLite database, settings, generated launcher config.
-
-> 🔑 **API keys are local data. Never commit them.** Local `.env`, DB files, coverage output, and generated launcher config are Git-ignored.
-
-Environment variables: `AIGATE_PORT` (server port), `AIGATE_DEV=1` (developer features).
-
-## Testing 🧪
-
-Backend:
-
-```bash
-python -m pip install -e '.[dev]'
-pytest
-```
-
-Frontend:
-
-```bash
-cd src/frontend
-npm install
-npm test
-npm run test:e2e
-```
-
-## Repo layout 🗺️
-
-```text
-src/backend/    FastAPI server, gateway, routing, providers, terminal, CLI tools
-src/frontend/   Static vanilla JS UI and browser tests
-tests/          Backend and project-level tests
-documents/      Product, architecture, API, setup, UX, and QA docs
-documents/pm/   Project-manager memory and progress records
-run.py          Zero-setup launcher
-pyproject.toml  Python package and test configuration
-```
+The API, architecture, setup options, and testing docs all live in the
+[wiki](https://github.com/fadhly-permata/AI-Gate/wiki) — this README
+stays friendly, the wiki goes deep.
 
 ## Status 📌
 
-Working local-first tool, developed actively. The gateway, console, terminal, and Termux paths are the tested core; the proot-distro route above is the one unverified claim. Contributions and feedback welcome — open an issue first for anything big.
+aigate is a personal, local-first tool under active development. The
+gateway, console, and the phone path are the tested core; the proot route
+above is the one unverified claim. Try it, break it, and tell me where it
+hurts.
