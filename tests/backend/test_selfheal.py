@@ -20,6 +20,7 @@ import subprocess
 import tempfile
 import threading
 import time
+from datetime import datetime
 import types
 from pathlib import Path
 from typing import List
@@ -244,15 +245,17 @@ def test_start_self_heal_no_cli_records_result(
     monkeypatch, mem_session_factory
 ):
     """Async path: even 'no_agentic_cli' ends up as status.last once the
-    background thread finishes."""
+    background thread finishes, with a 'skipped' progress snapshot."""
     monkeypatch.setattr(selfheal.shutil, "which", lambda name: None)
     outcome = selfheal.start_self_heal(max_iter=1)
     assert outcome == {"started": True, "tab": "self-heal"}
     assert _wait_until(
-        lambda: selfheal.heal_status() == {
-            "running": False,
-            "last": {"ok": False, "reason": "no_agentic_cli"},
-        }
+        lambda: (
+            selfheal.heal_status().get("running") is False
+            and selfheal.heal_status().get("last")
+            == {"ok": False, "reason": "no_agentic_cli"}
+            and selfheal.heal_status().get("progress", {}).get("phase") == "skipped"
+        )
     )
 
 
@@ -307,8 +310,10 @@ def test_run_self_heal_types_command_into_pty(
     command = fake.writes[0]
     assert command.endswith("\n")
     assert "\n" not in command[:-1]
-    # CLI + promptfile indirection + donefile sentinel present.
-    assert command.startswith("opencode --prompt \"$(cat '")
+    # CLI + promptfile indirection + donefile sentinel present. opencode must
+    # use the non-interactive `run` subcommand (never the TUI, no --prompt).
+    assert command.startswith("opencode run \"$(cat '")
+    assert "--prompt" not in command
     assert "touch '" in command
     assert "aigate: issue done" in command
     # Shell-injection guard: no LogEntry content may leak into the command.
@@ -405,6 +410,34 @@ def test_wait_for_done_polls_until_sentinel(monkeypatch, tmp_path):
     assert probes  # at least one liveness probe happened
 
 
+def test_wait_for_done_failed_sentinel_returns_false_fast(
+    tmp_path, mute_heal_logs
+):
+    """A ``.failed`` sentinel (CLI exited non-zero) ends the wait immediately
+    with False — the issue is NOT marked done and we do not burn the timeout."""
+    donefile = tmp_path / "x.prompt.done"
+    failedfile = tmp_path / "x.prompt.failed"
+    failedfile.write_text("", encoding="utf-8")
+    start = time.monotonic()
+    ok = selfheal.wait_for_done(
+        donefile, object(), timeout=30.0, poll=0.01, failedfile=failedfile
+    )
+    assert ok is False
+    assert time.monotonic() - start < 1.0  # returned at once, not on timeout
+    assert not donefile.exists()
+
+
+def test_wait_for_done_done_wins_over_failed(tmp_path):
+    """If both sentinels exist, success (done) takes precedence."""
+    donefile = tmp_path / "x.prompt.done"
+    failedfile = tmp_path / "x.prompt.failed"
+    donefile.write_text("", encoding="utf-8")
+    failedfile.write_text("", encoding="utf-8")
+    assert selfheal.wait_for_done(
+        donefile, object(), timeout=1.0, poll=0.01, failedfile=failedfile
+    )
+
+
 # --------------------------------------------------------------------------- #
 # 6. Async run: start_self_heal / heal_status / router contract
 # --------------------------------------------------------------------------- #
@@ -418,7 +451,7 @@ def test_start_self_heal_starts_thread_and_status_flips(
     started = threading.Event()
     release = threading.Event()
 
-    def slow_run(max_iter: int = 5) -> dict:
+    def slow_run(cli=None, model=None, max_iter: int = 5) -> dict:
         started.set()
         release.wait(3.0)
         return {"ok": True, "merged": False, "remaining": 0}
@@ -446,7 +479,10 @@ def test_start_self_heal_rejects_second_run(monkeypatch):
         monkeypatch.setattr(
             selfheal,
             "run_self_heal",
-            lambda max_iter=5: (release.wait(3.0), {"ok": True, "merged": False})[1],
+            lambda cli=None, model=None, max_iter=5: (
+                release.wait(3.0),
+                {"ok": True, "merged": False},
+            )[1],
         )
         first = selfheal.start_self_heal()
         second = selfheal.start_self_heal()
@@ -464,7 +500,10 @@ def test_router_run_200_then_409(monkeypatch, client):
         monkeypatch.setattr(
             selfheal,
             "run_self_heal",
-            lambda max_iter=5: (release.wait(3.0), {"ok": True, "merged": False})[1],
+            lambda cli=None, model=None, max_iter=5: (
+                release.wait(3.0),
+                {"ok": True, "merged": False},
+            )[1],
         )
         resp = client.post("/api/self-heal/run")
         assert resp.status_code == 200
@@ -484,7 +523,7 @@ def test_router_run_200_then_409(monkeypatch, client):
 
 def test_router_run_500_envelope(monkeypatch, client):
     """start_self_heal raising -> structured self_heal_failed envelope."""
-    def boom():
+    def boom(cli=None, model=None):
         raise RuntimeError("kaboom")
 
     monkeypatch.setattr(selfheal_router, "start_self_heal", boom)
@@ -496,30 +535,52 @@ def test_router_run_500_envelope(monkeypatch, client):
 
 
 def test_router_status_running_and_last(monkeypatch, client):
-    """GET /status mirrors heal_status(): idle-null and running+last shapes."""
+    """GET /status mirrors heal_status(): idle-null and running+last shapes,
+    plus a 'progress' snapshot with all required keys."""
     # Idle: nothing running, no last result.
     selfheal.reset_self_heal_state()
     resp = client.get("/api/self-heal/status")
     assert resp.status_code == 200
-    assert resp.json() == {"running": False, "last": None}
+    body = resp.json()
+    assert body["running"] is False
+    assert body["last"] is None
+    assert body["progress"] == {
+        "phase": "idle",
+        "cli": None,
+        "model": None,
+        "branch": None,
+        "iteration": 0,
+        "total_iterations": 0,
+        "current_issue_id": None,
+        "started_at": None,
+        "remaining": None,
+    }
 
     release = threading.Event()
     try:
         monkeypatch.setattr(
             selfheal,
             "run_self_heal",
-            lambda max_iter=5: (release.wait(3.0), {"ok": False, "reason": "x"})[1],
+            lambda cli=None, model=None, max_iter=5: (
+                release.wait(3.0),
+                {"ok": False, "reason": "x"},
+            )[1],
         )
         assert selfheal.start_self_heal()["started"] is True
         assert _wait_until(lambda: selfheal.heal_status()["running"] is True)
         resp = client.get("/api/self-heal/status")
         assert resp.status_code == 200
-        assert resp.json() == {"running": True, "last": None}
+        body = resp.json()
+        assert body["running"] is True
+        assert body["last"] is None
+        assert "progress" in body  # phase advances during the run
 
         release.set()
         assert _wait_until(lambda: not selfheal.heal_status()["running"])
         resp = client.get("/api/self-heal/status")
-        assert resp.json() == {"running": False, "last": {"ok": False, "reason": "x"}}
+        body = resp.json()
+        assert body["running"] is False
+        assert body["last"] == {"ok": False, "reason": "x"}
     finally:
         release.set()
 
@@ -598,11 +659,460 @@ def test_create_heal_db_tab_failure_is_soft(monkeypatch, mem_session_factory):
 
 
 def test_build_heal_command_shape(tmp_path):
-    """Command is one \\n-terminated line embedding only controlled paths."""
+    """Command is one \n-terminated line embedding only controlled paths."""
     promptfile = tmp_path / "aigate-heal-x.prompt"
     donefile = Path(str(promptfile) + ".done")
     command = selfheal.build_heal_command("opencode", promptfile, donefile)
     assert command.endswith("\n")
     assert "\n" not in command[:-1]
-    assert command.startswith("opencode --prompt \"$(cat '")
+    assert command.startswith("opencode run \"$(cat '")
     assert str(promptfile) in command and str(donefile) in command
+
+
+def test_build_heal_command_gates_done_on_success(tmp_path):
+    """``.done`` is touched ONLY via ``&&``; a non-zero exit touches ``.failed``.
+
+    Regression guard for the issue-64 false-done bug: the old line used ``;``
+    separators, so ``touch done`` ran even when the CLI printed help and died.
+    """
+    promptfile = tmp_path / "x.prompt"
+    donefile = Path(str(promptfile) + ".done")
+    failedfile = Path(str(promptfile).removesuffix(".prompt") + ".prompt.failed")
+    command = selfheal.build_heal_command("opencode", promptfile, donefile)
+    assert f"&& {{ touch '{donefile}'" in command
+    assert f"|| touch '{failedfile}'" in command
+    # done-sentinel must be the FIRST touch (PTY test double regexes it out).
+    assert command.index(str(donefile)) < command.index(str(failedfile))
+
+
+# --------------------------------------------------------------------------- #
+# 7. CLI / model selection: discovery, persistence, override, progress
+# --------------------------------------------------------------------------- #
+def test_list_agentic_clis_finds_all_on_path(monkeypatch):
+    """list_agentic_clis returns every preset CLI present on PATH (order kept)."""
+    present = {"opencode", "aider", "codex"}
+
+    def fake_which(name):
+        return f"/bin/{name}" if name in present else None
+
+    monkeypatch.setattr(selfheal.shutil, "which", fake_which)
+    assert selfheal.list_agentic_clis() == ["opencode", "aider", "codex"]
+
+
+def test_list_agentic_clis_empty(monkeypatch):
+    monkeypatch.setattr(selfheal.shutil, "which", lambda name: None)
+    assert selfheal.list_agentic_clis() == []
+
+
+def test_list_self_heal_models_grouped(
+    mem_session_factory, monkeypatch
+):
+    """list_self_heal_models returns grouped dicts: provider models under their
+    provider name, combo members under the '__combos__' sentinel.
+
+    Provider models with the same model_id but different providers are both
+    kept (different group). Duplicates within the same group are deduped.
+    """
+    from backend.models import (
+        Combo,
+        ComboMember,
+        Provider,
+        ProviderModel,
+    )
+
+    # Point the discovery query at the in-memory factory.
+    monkeypatch.setattr(db_module, "SessionLocal", mem_session_factory)
+    with mem_session_factory() as s:
+        p1 = Provider(name="B.AI", type="openai", base_url="http://x", api_key="k")
+        p2 = Provider(name="deepseek", type="openai", base_url="http://y", api_key="k")
+        s.add_all([p1, p2])
+        s.flush()
+        s.add_all(
+            [
+                # Two providers both expose model_id "gpt-4" -> kept separately.
+                ProviderModel(provider_id=p1.id, model_id="gpt-4", model_name="gpt-4"),
+                ProviderModel(provider_id=p2.id, model_id="gpt-4", model_name="gpt-4"),
+                # Same provider + same model_id twice -> deduped (first wins).
+                ProviderModel(provider_id=p1.id, model_id="a", model_name="a"),
+                ProviderModel(provider_id=p1.id, model_id="a", model_name="a"),
+                ProviderModel(provider_id=p1.id, model_id="claude", model_name="claude"),
+            ]
+        )
+        combo = Combo(name="c1", strategy="fallback", enabled=True)
+        s.add(combo)
+        s.flush()
+        s.add_all(
+            [
+                ComboMember(
+                    combo_id=combo.id, provider_id=p1.id, provider_model="gpt-4"
+                ),
+                ComboMember(
+                    combo_id=combo.id, provider_id=p2.id, provider_model="deepseek-coder"
+                ),
+                # Duplicates the provider entry's (value, group) only across
+                # groups, which is fine; an exact dup within combos is deduped.
+                ComboMember(
+                    combo_id=combo.id, provider_id=p1.id, provider_model="gpt-4"
+                ),
+            ]
+        )
+        s.commit()
+
+    result = selfheal.list_self_heal_models()
+    # Order: provider models (by id) first, then combo members (by id).
+    assert result == [
+        {"value": "gpt-4", "label": "gpt-4", "group": "B.AI"},
+        {"value": "gpt-4", "label": "gpt-4", "group": "deepseek"},
+        {"value": "a", "label": "a", "group": "B.AI"},
+        {"value": "claude", "label": "claude", "group": "B.AI"},
+        {"value": "gpt-4", "label": "gpt-4", "group": "__combos__"},
+        {"value": "deepseek-coder", "label": "deepseek-coder", "group": "__combos__"},
+    ]
+
+
+def test_list_self_heal_models_empty(mem_session_factory, monkeypatch):
+    monkeypatch.setattr(db_module, "SessionLocal", mem_session_factory)
+    assert selfheal.list_self_heal_models() == []
+
+
+def test_build_heal_command_model_flag(tmp_path):
+    """opencode -> ``run -m <model>``; other known CLIs -> ``--model``; unknown
+    -> omitted."""
+    promptfile = tmp_path / "x.prompt"
+    donefile = Path(str(promptfile) + ".done")
+
+    with_model = selfheal.build_heal_command(
+        "opencode", promptfile, donefile, model="openrouter/gpt-4"
+    )
+    assert with_model.startswith("opencode run -m openrouter/gpt-4 \"$(cat ")
+    assert "--prompt" not in with_model
+
+    # Other known CLI keeps the generic --model/--prompt shape (unverified).
+    claude = selfheal.build_heal_command(
+        "claude", promptfile, donefile, model="claude-x"
+    )
+    assert claude.startswith("claude --model claude-x --prompt")
+
+    # Unknown CLI -> no model flag even when a model is supplied.
+    unknown = selfheal.build_heal_command(
+        "mystery-cli", promptfile, donefile, model="gpt-4"
+    )
+    assert "--model" not in unknown
+
+    # No model -> no flag.
+    no_model = selfheal.build_heal_command("opencode", promptfile, donefile)
+    assert "-m " not in no_model
+
+
+def test_qualify_opencode_model(mute_heal_logs):
+    """Bare ids resolve via the available list; qualified pass through; empty
+    and no-match resolve to None (flag omitted, never a doomed spawn)."""
+    avail = ["aigate/hy3", "bai/hy3", "aigate/combo:B.AI", "openai/gpt-4o"]
+    # Already qualified -> untouched (explicit user choice).
+    assert selfheal.qualify_opencode_model("bai/hy3", avail) == "bai/hy3"
+    assert selfheal.qualify_opencode_model("aigate/combo:B.AI", avail) == (
+        "aigate/combo:B.AI"
+    )
+    # Unique bare match -> qualified.
+    assert selfheal.qualify_opencode_model("gpt-4o", avail) == "openai/gpt-4o"
+    # Ambiguous bare match -> aigate wins.
+    assert selfheal.qualify_opencode_model("hy3", avail) == "aigate/hy3"
+    # Ambiguous WITHOUT an aigate candidate -> None (omit flag).
+    assert selfheal.qualify_opencode_model("hy3", ["bai/hy3", "x/hy3"]) is None
+    # No match at all -> None.
+    assert selfheal.qualify_opencode_model("nope", avail) is None
+    # Empty/None -> None.
+    assert selfheal.qualify_opencode_model("", avail) is None
+    assert selfheal.qualify_opencode_model(None, avail) is None
+
+
+def test_qualify_opencode_model_uses_opencode_models_when_not_given(
+    monkeypatch, mute_heal_logs
+):
+    """Without an explicit list, the resolver consults `opencode models`."""
+    monkeypatch.setattr(
+        selfheal, "_opencode_models", lambda: ["aigate/hy3", "bai/hy3"]
+    )
+    assert selfheal.qualify_opencode_model("hy3") == "aigate/hy3"
+
+
+def test_run_self_heal_cli_model_override(
+    monkeypatch, mem_session_factory, spy_run
+):
+    """cli+model override drives the CLI with a qualified ``-m`` flag and
+    records them in the progress snapshot (settings are bypassed via param)."""
+    # Force detect to fail so the param path is the only way to get a CLI.
+    monkeypatch.setattr(selfheal.shutil, "which", lambda name: None)
+    monkeypatch.setattr(db_module, "SessionLocal", mem_session_factory)
+    monkeypatch.setattr(selfheal, "get_self_heal_cli_setting", lambda: "")
+    monkeypatch.setattr(selfheal, "get_self_heal_model_setting", lambda: "")
+    # No real `opencode models` subprocess in tests: bare "gpt-4" resolves here.
+    monkeypatch.setattr(
+        selfheal, "_opencode_models", lambda: ["openrouter/gpt-4"]
+    )
+
+    fake = FakeHealSession(touch_done=True)
+    monkeypatch.setattr(selfheal, "_ensure_heal_session", lambda: fake)
+
+    with mem_session_factory() as seed:
+        seed.add(LogEntry(severity="error", source="t", message="boom"))
+        seed.commit()
+
+    result = selfheal.run_self_heal(cli="opencode", model="gpt-4", max_iter=1)
+    assert result["ok"] is True and result["merged"] is True
+    assert len(fake.writes) == 1
+    assert "opencode run -m openrouter/gpt-4" in fake.writes[0]
+
+    # Progress records the resolved cli/model (qualified form).
+    progress = selfheal.heal_status()["progress"]
+    assert progress["cli"] == "opencode"
+    assert progress["model"] == "openrouter/gpt-4"
+    assert progress["phase"] in ("done", "merging")
+    assert progress["started_at"] is not None
+
+
+def test_run_self_heal_opencode_ambiguous_model_prefers_aigate(
+    monkeypatch, mem_session_factory, spy_run, mute_heal_logs
+):
+    """Bare id served by several opencode providers -> aigate/ wins (the
+    project's own gateway); the run drives with the qualified model."""
+    monkeypatch.setattr(selfheal.shutil, "which", lambda name: None)
+    monkeypatch.setattr(db_module, "SessionLocal", mem_session_factory)
+    monkeypatch.setattr(
+        selfheal,
+        "_opencode_models",
+        lambda: ["bai/hy3", "aigate/hy3", "aigate/other"],
+    )
+    fake = FakeHealSession(touch_done=True)
+    monkeypatch.setattr(selfheal, "_ensure_heal_session", lambda: fake)
+    with mem_session_factory() as seed:
+        seed.add(LogEntry(severity="error", source="t", message="boom"))
+        seed.commit()
+
+    result = selfheal.run_self_heal(cli="opencode", model="hy3", max_iter=1)
+    assert result["ok"] is True
+    assert "opencode run -m aigate/hy3" in fake.writes[0]
+
+
+def test_run_self_heal_opencode_unresolvable_model_omits_flag(
+    monkeypatch, mem_session_factory, spy_run, mute_heal_logs
+):
+    """Model absent from `opencode models` -> heal proceeds WITHOUT -m (opencode
+    default) instead of spawning a doomed run."""
+    monkeypatch.setattr(selfheal.shutil, "which", lambda name: None)
+    monkeypatch.setattr(db_module, "SessionLocal", mem_session_factory)
+    monkeypatch.setattr(selfheal, "_opencode_models", lambda: ["x/other"])
+    fake = FakeHealSession(touch_done=True)
+    monkeypatch.setattr(selfheal, "_ensure_heal_session", lambda: fake)
+    with mem_session_factory() as seed:
+        seed.add(LogEntry(severity="error", source="t", message="boom"))
+        seed.commit()
+
+    result = selfheal.run_self_heal(cli="opencode", model="zzz", max_iter=1)
+    assert result["ok"] is True
+    assert " -m " not in fake.writes[0]
+    assert fake.writes[0].startswith("opencode run \"$(cat ")
+    assert selfheal.heal_status()["progress"]["model"] is None
+
+
+def test_run_self_heal_setting_override(monkeypatch, mem_session_factory, spy_run):
+    """When no cli param is passed, the persisted setting is used."""
+    monkeypatch.setattr(selfheal.shutil, "which", lambda name: None)
+    monkeypatch.setattr(db_module, "SessionLocal", mem_session_factory)
+    monkeypatch.setattr(
+        selfheal, "get_self_heal_cli_setting", lambda: "claude"
+    )
+    monkeypatch.setattr(selfheal, "get_self_heal_model_setting", lambda: "")
+    fake = FakeHealSession(touch_done=True)
+    monkeypatch.setattr(selfheal, "_ensure_heal_session", lambda: fake)
+    with mem_session_factory() as seed:
+        seed.add(LogEntry(severity="error", source="t", message="boom"))
+        seed.commit()
+
+    result = selfheal.run_self_heal(max_iter=1)
+    assert result["ok"] is True and result["merged"] is True
+    assert fake.writes[0].startswith("claude --prompt")
+    assert selfheal.heal_status()["progress"]["cli"] == "claude"
+
+
+def test_run_self_heal_progress_phases(
+    monkeypatch, mem_session_factory, spy_run
+):
+    """Phase advances to 'driving' during an issue and ends 'done'/'merging'."""
+    monkeypatch.setattr(selfheal.shutil, "which", lambda name: "opencode")
+    monkeypatch.setattr(db_module, "SessionLocal", mem_session_factory)
+    captured: dict = {}
+
+    class PhaseSpy(FakeHealSession):
+        def write_text(self, text):
+            captured["phase_at_drive"] = selfheal.heal_status()["progress"][
+                "phase"
+            ]
+            super().write_text(text)
+
+    monkeypatch.setattr(
+        selfheal, "_ensure_heal_session", lambda: PhaseSpy(touch_done=True)
+    )
+    with mem_session_factory() as seed:
+        seed.add(LogEntry(severity="error", source="t", message="boom"))
+        seed.commit()
+
+    result = selfheal.run_self_heal(max_iter=1)
+    assert result["ok"] is True
+    # Issue was being driven when the CLI command was typed into the PTY.
+    assert captured.get("phase_at_drive") == "driving"
+    progress = selfheal.heal_status()["progress"]
+    assert progress["phase"] in ("done", "merging")
+    assert progress["branch"] is not None
+    assert progress["iteration"] == 1
+
+
+def test_heal_status_progress_has_all_keys():
+    """Idle progress snapshot always carries every required key."""
+    selfheal.reset_self_heal_state()
+    progress = selfheal.heal_status()["progress"]
+    assert set(progress.keys()) == {
+        "phase",
+        "cli",
+        "model",
+        "branch",
+        "iteration",
+        "total_iterations",
+        "current_issue_id",
+        "started_at",
+        "remaining",
+    }
+    assert progress["phase"] == "idle"
+    assert progress["iteration"] == 0
+    assert progress["total_iterations"] == 0
+
+
+# --------------------------------------------------------------------------- #
+# 8. Router: new selection endpoints + run accepts cli/model body
+# --------------------------------------------------------------------------- #
+def test_router_clis_endpoint(monkeypatch, client):
+    monkeypatch.setattr(
+        selfheal_router, "list_agentic_clis", lambda: ["opencode", "aider"]
+    )
+    monkeypatch.setattr(
+        selfheal_router, "get_self_heal_cli_setting", lambda: "opencode"
+    )
+    resp = client.get("/api/self-heal/clis")
+    assert resp.status_code == 200
+    assert resp.json() == {"clis": ["opencode", "aider"], "selected": "opencode"}
+
+
+def test_router_models_endpoint(monkeypatch, client):
+    monkeypatch.setattr(
+        selfheal_router,
+        "list_self_heal_models",
+        lambda: [
+            {"value": "gpt-4", "label": "gpt-4", "group": "B.AI"},
+            {"value": "gpt-4", "label": "gpt-4", "group": "__combos__"},
+        ],
+    )
+    monkeypatch.setattr(
+        selfheal_router, "get_self_heal_model_setting", lambda: "gpt-4"
+    )
+    resp = client.get("/api/self-heal/models")
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "models": [
+            {"value": "gpt-4", "label": "gpt-4", "group": "B.AI"},
+            {"value": "gpt-4", "label": "gpt-4", "group": "__combos__"},
+        ],
+        "selected": "gpt-4",
+    }
+
+
+def test_router_run_accepts_cli_model_body(monkeypatch, client):
+    """POST /run persists cli+model then starts; both may be empty."""
+    captured = {}
+
+    def fake_set_cli(v):
+        captured["cli"] = v
+
+    def fake_set_model(v):
+        captured["model"] = v
+
+    monkeypatch.setattr(selfheal_router, "set_self_heal_cli_setting", fake_set_cli)
+    monkeypatch.setattr(
+        selfheal_router, "set_self_heal_model_setting", fake_set_model
+    )
+    monkeypatch.setattr(
+        selfheal_router,
+        "start_self_heal",
+        lambda cli=None, model=None, max_iter=5: {
+            "started": True,
+            "tab": "self-heal",
+        },
+    )
+
+    resp = client.post(
+        "/api/self-heal/run", json={"cli": "opencode", "model": "gpt-4"}
+    )
+    assert resp.status_code == 200
+    assert resp.json() == {"ok": True, "started": True, "tab": "self-heal"}
+    assert captured["cli"] == "opencode"
+    assert captured["model"] == "gpt-4"
+
+    # Empty body still accepts (no override); "" is persisted (not absent).
+    captured.clear()
+    resp2 = client.post("/api/self-heal/run", json={})
+    assert resp2.status_code == 200
+    assert captured == {"cli": "", "model": ""}
+
+
+def test_router_status_includes_progress(monkeypatch, client):
+    selfheal.reset_self_heal_state()
+    resp = client.get("/api/self-heal/status")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "progress" in body
+    assert body["progress"]["phase"] == "idle"
+
+
+# --------------------------------------------------------------------------- #
+# 9. Resolved-row filtering (log cleanup T1)
+# --------------------------------------------------------------------------- #
+def test_current_issue_and_count_skip_resolved_rows(mem_session_factory):
+    """A resolved warning/error row is invisible to issue scanning: not
+    returned by current_issue() and not counted by _count_remaining().
+    Unresolved rows are still picked up. Delete-on-success is untouched."""
+    with mem_session_factory() as s:
+        s.add(LogEntry(severity="warning", source="t", message="resolved one", resolved=True))
+        s.add(LogEntry(severity="error", source="t", message="open one", resolved=False))
+        s.commit()
+
+        issue = selfheal.current_issue(s)
+        assert issue is not None
+        assert issue.message == "open one"
+        assert selfheal._count_remaining(s) == 1
+
+        # Resolve it -> nothing remains; the "fully healed → merge" path
+        # must not be blocked by resolved rows.
+        issue.resolved = True
+        s.commit()
+        assert selfheal.current_issue(s) is None
+        assert selfheal._count_remaining(s) == 0
+
+
+def test_current_issue_ordering_still_oldest_first(mem_session_factory):
+    """Filter must not disturb the (timestamp asc, id asc) ordering."""
+    old = LogEntry(
+        severity="error",
+        source="t",
+        message="oldest",
+        timestamp=datetime(2026, 1, 1),
+    )
+    new = LogEntry(
+        severity="error",
+        source="t",
+        message="newest",
+        timestamp=datetime(2026, 6, 1),
+    )
+    with mem_session_factory() as s:
+        s.add(new)
+        s.add(old)
+        s.commit()
+        assert selfheal.current_issue(s).message == "oldest"

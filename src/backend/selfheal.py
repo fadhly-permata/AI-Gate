@@ -10,7 +10,12 @@ session registered under the tab key ``"self-heal"`` (FSD §2.8 / TSD §3.5).
 The orchestrator types one shell line per issue into that PTY — the CLI reads
 its prompt from a backend-controlled temp file, so no LogEntry content is ever
 embedded in the command line (no shell injection). Completion of one issue is
-detected by polling a ``<prompt>.done`` sentinel file the command touches.
+detected by polling a ``<prompt>.done`` sentinel file the command touches —
+but ONLY on a zero exit code (``&&``); a non-zero exit touches
+``<prompt>.failed`` instead, so a CLI that fails can never be silently marked
+done. For opencode the line uses the non-interactive ``opencode run``
+subcommand (the default ``opencode`` command is the interactive TUI and has
+different flags), and the model is qualified to ``provider/model`` first.
 The ``PtySession`` registry (not this module) owns the PTY lifetime; the run
 aborts cleanly if the session dies mid-issue (user closed the tab).
 
@@ -60,6 +65,29 @@ AGENTIC_CLIS = [
     "kilo",
 ]
 
+# Setting keys persisted in the ``Setting`` table (ADR-010). "" = unset/auto.
+SELF_HEAL_CLI_KEY = "self_heal_cli"
+SELF_HEAL_MODEL_KEY = "self_heal_model"
+
+# Model-flag map for the GENERIC command shape (``<cli> --model <m> --prompt ...``).
+# Unknown CLIs omit the flag (the orchestrator never guesses a flag for an
+# unrecognized binary). NOTE: ``opencode`` is special-cased in
+# :func:`build_heal_command` (non-interactive ``opencode run -m provider/model
+# "<message>"`` — the default ``opencode`` command is the interactive TUI and
+# ``run`` has no ``--prompt``), so it is deliberately NOT listed here.
+# The other entries are unverified against their real CLIs (open item).
+CLI_MODEL_FLAGS = {
+    "claude": "--model",
+    "aider": "--model",
+    "codex": "--model",
+    "gemini": "--model",
+    "goose": "--model",
+    "amp": "--model",
+    "qwen": "--model",
+    "cline": "--model",
+    "kilo": "--model",
+}
+
 # Workspace root = the git repo (repo is two levels above this file:
 # src/backend/selfheal.py -> /src/backend -> /src -> /repo).
 REPO_DIR: Path = Path(__file__).resolve().parents[2]
@@ -89,6 +117,150 @@ def detect_agentic_cli() -> Optional[str]:
         if shutil.which(cli):
             return cli
     return None
+
+
+# --------------------------------------------------------------------------- #
+# Selection persistence (Setting table) + discovery helpers
+# --------------------------------------------------------------------------- #
+def get_self_heal_cli_setting() -> str:
+    """Persisted CLI choice; ``""`` when unset (caller falls back to detect)."""
+    try:
+        from backend.config import settings as config_settings
+
+        value = config_settings.get(SELF_HEAL_CLI_KEY, default="")
+        return value or ""
+    except Exception as exc:  # noqa: BLE001 - settings store must not break heal
+        log_error_exc(
+            "self-heal: read self_heal_cli setting failed",
+            source=LOG_SOURCE,
+            exc=exc,
+        )
+        return ""
+
+
+def set_self_heal_cli_setting(value: str) -> None:
+    """Persist CLI choice (``""`` clears it back to auto-detect)."""
+    try:
+        from backend.config import settings as config_settings
+
+        config_settings.set(SELF_HEAL_CLI_KEY, value or "")
+        log_info(
+            f"self-heal: cli setting -> '{value or ''}'",
+            source=LOG_SOURCE,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log_error_exc(
+            "self-heal: write self_heal_cli setting failed",
+            source=LOG_SOURCE,
+            exc=exc,
+        )
+
+
+def get_self_heal_model_setting() -> str:
+    """Persisted model choice; ``""`` when unset (no ``--model`` flag)."""
+    try:
+        from backend.config import settings as config_settings
+
+        value = config_settings.get(SELF_HEAL_MODEL_KEY, default="")
+        return value or ""
+    except Exception as exc:  # noqa: BLE001
+        log_error_exc(
+            "self-heal: read self_heal_model setting failed",
+            source=LOG_SOURCE,
+            exc=exc,
+        )
+        return ""
+
+
+def set_self_heal_model_setting(value: str) -> None:
+    """Persist model choice (``""`` clears it)."""
+    try:
+        from backend.config import settings as config_settings
+
+        config_settings.set(SELF_HEAL_MODEL_KEY, value or "")
+        log_info(
+            f"self-heal: model setting -> '{value or ''}'",
+            source=LOG_SOURCE,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log_error_exc(
+            "self-heal: write self_heal_model setting failed",
+            source=LOG_SOURCE,
+            exc=exc,
+        )
+
+
+def list_agentic_clis() -> list[str]:
+    """All agentic CLI binaries from ``AGENTIC_CLIS`` found on PATH (not just
+    the first). Order follows ``AGENTIC_CLIS``."""
+    found: list[str] = []
+    for cli in AGENTIC_CLIS:
+        if shutil.which(cli):
+            found.append(cli)
+    return found
+
+
+def list_self_heal_models() -> list[dict]:
+    """Structured + grouped model list (mirrors the CLI Tools dialog).
+
+    Each entry is ``{"value": str, "label": str, "group": str}``:
+    - Provider models (join ``Provider``): value/label = ``pm.model_id``,
+      group = ``provider.name`` (the group label).
+    - Combo members (join ``Combo``): value/label = ``member.provider_model``,
+      group = the ``"__combos__"`` sentinel (frontend localizes it).
+
+    Dedupe by ``(value, group)`` (first wins). Returns ``[]`` when nothing is
+    readable (fail-open per R12). Provider models come before combo members.
+    """
+    try:
+        from backend.models import ComboMember, Provider, ProviderModel
+
+        out: list[dict] = []
+        seen: set[tuple[str, str]] = set()
+        with _db.SessionLocal() as session:
+            # Provider models grouped under their provider name.
+            pms = (
+                session.query(ProviderModel)
+                .join(ProviderModel.provider)
+                .order_by(ProviderModel.id)
+                .all()
+            )
+            for pm in pms:
+                value = pm.model_id
+                if not value or not pm.provider:
+                    continue
+                key = (value, pm.provider.name)
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(
+                    {"value": value, "label": value, "group": pm.provider.name}
+                )
+            # Combo members grouped under the "__combos__" sentinel.
+            members = (
+                session.query(ComboMember)
+                .join(ComboMember.combo)
+                .order_by(ComboMember.id)
+                .all()
+            )
+            for member in members:
+                value = member.provider_model
+                if not value:
+                    continue
+                key = (value, "__combos__")
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(
+                    {"value": value, "label": value, "group": "__combos__"}
+                )
+        return out
+    except Exception as exc:  # noqa: BLE001 - discovery must not break heal
+        log_warning(
+            f"self-heal: list_self_heal_models failed: {exc!r}",
+            source=LOG_SOURCE,
+        )
+        return []
 
 
 def git(*args: str, cwd: Path = REPO_DIR) -> subprocess.CompletedProcess:
@@ -219,17 +391,129 @@ def _ensure_heal_session() -> Any:
     return session
 
 
-def build_heal_command(cli: str, promptfile: Path, donefile: Path) -> str:
-    """One shell line that runs the CLI visibly and signals completion.
+# --------------------------------------------------------------------------- #
+# opencode model qualification — ``opencode run -m`` needs provider/model
+# --------------------------------------------------------------------------- #
+# Provider opencode uses to reach aigate itself (see repo opencode.json). When
+# a bare model id matches several opencode providers, this one wins.
+OPENCODE_PREFERRED_PROVIDER = "aigate"
+
+
+def _opencode_models() -> list[str]:
+    """``opencode models`` output as ``provider/model`` strings; ``[]`` on any
+    failure (missing binary / non-zero exit / timeout) — fail-open per R12."""
+    try:
+        result = subprocess.run(
+            ["opencode", "models"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        log_warning(
+            f"self-heal: 'opencode models' failed: {exc!r}",
+            source=LOG_SOURCE,
+        )
+        return []
+    if result.returncode != 0:
+        log_warning(
+            f"self-heal: 'opencode models' exited {result.returncode}",
+            source=LOG_SOURCE,
+        )
+        return []
+    return [
+        line.strip()
+        for line in (result.stdout or "").splitlines()
+        if "/" in line
+    ]
+
+
+def qualify_opencode_model(
+    model: Optional[str],
+    available: Optional[list[str]] = None,
+) -> Optional[str]:
+    """Resolve a heal model to opencode's ``provider/model`` form.
+
+    ``opencode run -m`` rejects bare ids (e.g. ``hy3``), so:
+    - empty/None -> ``None`` (no ``-m`` flag; opencode uses its own default);
+    - already contains ``/`` -> returned unchanged (explicit user choice);
+    - bare id -> matched against ``available`` (default:
+      :func:`_opencode_models`): a unique match wins; several matches prefer
+      :data:`OPENCODE_PREFERRED_PROVIDER`; no match -> ``None`` (flag omitted —
+      never spawn a run with a model opencode would reject).
+    """
+    if not model:
+        return None
+    if "/" in model:
+        return model
+    if available is None:
+        available = _opencode_models()
+    candidates = [m for m in available if m.split("/", 1)[-1] == model]
+    if not candidates:
+        log_warning(
+            f"self-heal: model '{model}' not found in 'opencode models'; "
+            "running without the -m flag",
+            source=LOG_SOURCE,
+        )
+        return None
+    if len(candidates) == 1:
+        return candidates[0]
+    preferred = f"{OPENCODE_PREFERRED_PROVIDER}/{model}"
+    if preferred in candidates:
+        return preferred
+    log_warning(
+        f"self-heal: model '{model}' is ambiguous in 'opencode models' "
+        f"({', '.join(sorted(candidates))}); running without the -m flag",
+        source=LOG_SOURCE,
+    )
+    return None
+
+
+def _failed_sentinel(donefile: Path) -> Path:
+    """Sibling ``.failed`` path for a ``.done`` sentinel (``x.prompt.done`` ->
+    ``x.prompt.failed``; a sentinel without the suffix gets ``.failed`` appended)."""
+    name = donefile.name
+    if name.endswith(".done"):
+        return donefile.with_name(name[: -len(".done")] + ".failed")
+    return donefile.with_name(name + ".failed")
+
+
+def build_heal_command(
+    cli: str, promptfile: Path, donefile: Path, model: Optional[str] = None
+) -> str:
+    """One shell line that runs the CLI non-interactively and signals outcome.
 
     Only backend-controlled paths appear in the command — the prompt text
     (arbitrary LogEntry content) never touches the shell, so no injection is
-    possible. ``touch`` + ``echo`` give the user a visible end marker.
+    possible. The done-sentinel is touched ONLY when the CLI exits 0 (``&&``);
+    a non-zero exit touches the sibling ``.failed`` sentinel instead, so a
+    failing CLI is never silently recorded as a healed issue.
+
+    ``opencode`` uses the non-interactive ``opencode run`` subcommand with
+    ``-m <provider/model>`` and the prompt as the positional message (verified
+    against opencode 1.18.x: ``run`` has no ``--prompt``; the default
+    ``opencode`` command is the interactive TUI). Other known CLIs keep the
+    generic ``--model``/``--prompt`` shape (unverified — open item); unknown
+    CLIs omit the model flag entirely.
     """
+    failedfile = _failed_sentinel(donefile)
+    if cli == "opencode":
+        model_flag = f" -m {model}" if model else ""
+        invocation = f"opencode run{model_flag} \"$(cat '{promptfile}')\""
+    else:
+        model_flag = ""
+        if model:
+            flag = CLI_MODEL_FLAGS.get(cli)
+            if flag:
+                model_flag = f" {flag} {model}"
+        invocation = (
+            f"{cli}{model_flag} --prompt \"$(cat '{promptfile}')\""
+        )
     return (
-        f"{cli} --prompt \"$(cat '{promptfile}')\"; "
-        f"touch '{donefile}'; "
-        f"echo \"aigate: issue done\"\n"
+        f"{invocation} && {{ touch '{donefile}'; "
+        f'echo "aigate: issue done"; }} '
+        f"|| touch '{failedfile}'\n"
     )
 
 
@@ -238,6 +522,7 @@ def wait_for_done(
     session: Any,
     timeout: Optional[float] = None,
     poll: Optional[float] = None,
+    failedfile: Optional[Path] = None,
 ) -> bool:
     """Poll for the CLI's done-sentinel file; abort early on session death.
 
@@ -245,6 +530,8 @@ def wait_for_done(
     (not def time), so tests can monkeypatch ``HEAL_CLI_TIMEOUT_SECONDS``.
     Returns ``True`` when the sentinel appeared, ``False`` on timeout or when
     the terminal session died mid-issue (user closed the tab / shell exited).
+    When ``failedfile`` is given, its appearance (the CLI exited non-zero) also
+    returns ``False`` immediately — no need to burn the whole timeout.
     """
     if timeout is None:
         timeout = HEAL_CLI_TIMEOUT_SECONDS
@@ -254,6 +541,13 @@ def wait_for_done(
     while True:
         if donefile.exists():
             return True
+        if failedfile is not None and failedfile.exists():
+            log_warning(
+                "self-heal: agentic cli exited non-zero "
+                f"(failed sentinel={failedfile.name}); issue NOT marked done",
+                source=LOG_SOURCE,
+            )
+            return False
         if not _session_alive(session):
             log_warning(
                 "self-heal: terminal session died while CLI was running "
@@ -277,27 +571,30 @@ def _drive_cli_in_terminal(
     issue_id: int,
     prompt: str,
     session: Any,
+    model: Optional[str] = None,
 ) -> bool:
     """Run one issue's CLI pass inside the terminal PTY; ``True`` on donefile.
 
     Writes the prompt to a unique backend-controlled temp file, types the
     one-line command into the PTY (visible to the user), then waits for the
-    done sentinel. Temp files are always cleaned up. ``False`` means timeout
-    or a dead session — the caller proceeds to ``run_tests`` either way.
+    done sentinel. Temp files are always cleaned up. ``False`` means the CLI
+    exited non-zero (failed sentinel), timed out, or the session died — the
+    caller proceeds to ``run_tests`` either way.
     """
     tmpdir = Path(tempfile.mkdtemp(prefix="aigate-heal-"))
     promptfile = tmpdir / f"issue-{issue_id}.prompt"
     donefile = Path(str(promptfile) + ".done")
+    failedfile = _failed_sentinel(donefile)
     try:
         promptfile.write_text(prompt, encoding="utf-8")
-        command = build_heal_command(cli, promptfile, donefile)
+        command = build_heal_command(cli, promptfile, donefile, model=model)
         log_info(
             f"self-heal: typing cli command into terminal tab='{HEAL_TAB_KEY}' "
             f"for issue id={issue_id}",
             source=LOG_SOURCE,
         )
         session.write_text(command)
-        if wait_for_done(donefile, session):
+        if wait_for_done(donefile, session, failedfile=failedfile):
             log_info(
                 f"self-heal: cli finished for issue id={issue_id}",
                 source=LOG_SOURCE,
@@ -323,19 +620,34 @@ _state_lock = threading.Lock()
 _running = False
 _last_result: Optional[dict] = None
 
+# Richer live progress snapshot for the frontend preview. Always a full dict so
+# consumers can rely on every key existing (null/0/"idle" defaults when idle).
+_progress: dict = {
+    "phase": "idle",
+    "cli": None,
+    "model": None,
+    "branch": None,
+    "iteration": 0,
+    "total_iterations": 0,
+    "current_issue_id": None,
+    "started_at": None,
+    "remaining": None,
+}
+
 
 def heal_status() -> dict:
     """Snapshot for ``GET /api/self-heal/status`` (thread-safe copy)."""
     with _state_lock:
         last = dict(_last_result) if _last_result is not None else None
-        return {"running": _running, "last": last}
+        progress = dict(_progress)
+        return {"running": _running, "last": last, "progress": progress}
 
 
-def _run_thread_target(max_iter: int) -> None:
+def _run_thread_target(cli: Optional[str], model: Optional[str], max_iter: int) -> None:
     """Thread body: run the sync loop once, then record + clear state."""
     global _running, _last_result
     try:
-        result = run_self_heal(max_iter=max_iter)
+        result = run_self_heal(cli=cli, model=model, max_iter=max_iter)
     except Exception as exc:  # noqa: BLE001 - a thread must never die loudly
         log_error_exc(
             "self-heal: background run crashed",
@@ -352,11 +664,16 @@ def _run_thread_target(max_iter: int) -> None:
     )
 
 
-def start_self_heal(max_iter: int = 5) -> dict:
+def start_self_heal(
+    cli: Optional[str] = None,
+    model: Optional[str] = None,
+    max_iter: int = 5,
+) -> dict:
     """Start the orchestration in a daemon thread; never blocks the caller.
 
-    Returns ``{"started": True, "tab": "self-heal"}`` or
-    ``{"started": False, "reason": "already_running"}``. The global state is
+    ``cli``/``model`` are optional overrides (resolved in :func:`run_self_heal`
+    against settings/defaults). Returns ``{"started": True, "tab": "self-heal"}``
+    or ``{"started": False, "reason": "already_running"}``. The global state is
     flipped under one lock so two concurrent POSTs cannot double-start.
     """
     global _running
@@ -366,7 +683,7 @@ def start_self_heal(max_iter: int = 5) -> dict:
         _running = True
     thread = threading.Thread(
         target=_run_thread_target,
-        args=(max_iter,),
+        args=(cli, model, max_iter),
         daemon=True,
         name="self-heal-run",
     )
@@ -381,20 +698,36 @@ def start_self_heal(max_iter: int = 5) -> dict:
 
 def reset_self_heal_state() -> None:
     """Test hook: zero the async state between tests (not used in prod)."""
-    global _running, _last_result
+    global _running, _last_result, _progress
     with _state_lock:
         _running = False
         _last_result = None
+        _progress = {
+            "phase": "idle",
+            "cli": None,
+            "model": None,
+            "branch": None,
+            "iteration": 0,
+            "total_iterations": 0,
+            "current_issue_id": None,
+            "started_at": None,
+            "remaining": None,
+        }
 
 
 # --------------------------------------------------------------------------- #
 # LogEntry access
 # --------------------------------------------------------------------------- #
 def current_issue(session: Session) -> Optional[LogEntry]:
-    """First warning/error ``LogEntry`` ordered by (timestamp asc, id asc)."""
+    """First warning/error ``LogEntry`` ordered by (timestamp asc, id asc).
+
+    Resolved rows are skipped: marking an issue resolved (log cleanup T1)
+    must not block the "fully healed → merge" path.
+    """
     return (
         session.query(LogEntry)
         .filter(LogEntry.severity.in_(("warning", "error")))
+        .filter(LogEntry.resolved == False)  # noqa: E712 - SQL filter
         .order_by(LogEntry.timestamp.asc(), LogEntry.id.asc())
         .first()
     )
@@ -409,10 +742,11 @@ def delete_log_entry(session: Session, entry_id: int) -> None:
 
 
 def _count_remaining(session: Session) -> int:
-    """Count warning/error ``LogEntry`` rows."""
+    """Count warning/error ``LogEntry`` rows (resolved rows excluded — T1)."""
     return (
         session.query(LogEntry)
         .filter(LogEntry.severity.in_(("warning", "error")))
+        .filter(LogEntry.resolved == False)  # noqa: E712 - SQL filter
         .count()
     )
 
@@ -454,12 +788,21 @@ def _remaining_safe(session: Session) -> int:
         return -1
 
 
-def run_self_heal(max_iter: int = 5) -> dict:
+def run_self_heal(
+    cli: Optional[str] = None,
+    model: Optional[str] = None,
+    max_iter: int = 5,
+) -> dict:
     """Orchestrate the self-heal loop. Always returns a status ``dict``.
 
     Synchronous by contract (the async entry point is :func:`start_self_heal`,
     which calls this from a daemon thread). The agentic CLI runs inside the
     live ``self-heal`` terminal tab, so the user watches the fix happen.
+
+    ``cli``/``model`` resolve as: explicit param -> persisted setting ->
+    auto-detect (cli only; model "" = none). The chosen values are stored in
+    the module-level ``_progress`` snapshot so the frontend can render a live
+    preview of the run.
 
     Status shapes:
     - ``{"ok": False, "reason": "no_agentic_cli"}``
@@ -468,18 +811,57 @@ def run_self_heal(max_iter: int = 5) -> dict:
     - ``{"ok": True, "merged": False, "remaining": int}`` (also the
       abort-on-session-death shape; ``remaining=-1`` when the count fails)
     """
-    # 1. Detect agentic CLI.
-    cli = detect_agentic_cli()
+    global _progress
+
+    # 1. Resolve agentic CLI: param -> setting -> detect.
+    if not cli:
+        cli = get_self_heal_cli_setting() or None
+    if not cli:
+        cli = detect_agentic_cli()
+    if not model:
+        model = get_self_heal_model_setting() or None
+
+    # opencode needs ``provider/model``: resolve bare ids (e.g. "hy3") BEFORE
+    # spawning, so the CLI is never launched with a model it would reject.
+    if cli == "opencode" and model:
+        qualified = qualify_opencode_model(model)
+        if qualified != model:
+            log_info(
+                f"self-heal: opencode model '{model}' resolved to "
+                f"'{qualified or '(-m flag omitted)'}'",
+                source=LOG_SOURCE,
+            )
+        model = qualified
+
+    # Record the (resolved) selection in progress; mark the run started.
+    with _state_lock:
+        _progress = {
+            "phase": "detecting",
+            "cli": cli,
+            "model": model or None,
+            "branch": None,
+            "iteration": 0,
+            "total_iterations": max(0, max_iter),
+            "current_issue_id": None,
+            "started_at": datetime.now().isoformat(),
+            "remaining": None,
+        }
+
     if cli is None:
         log_info(
             "self-heal skipped: no agentic CLI installed",
             source=LOG_SOURCE,
         )
+        with _state_lock:
+            _progress["phase"] = "skipped"
         return {"ok": False, "reason": "no_agentic_cli"}
 
     # 2. Create the heal branch.
     try:
         branch = create_heal_branch()
+        with _state_lock:
+            _progress["phase"] = "branching"
+            _progress["branch"] = branch
         log_info(f"self-heal: created branch '{branch}'", source=LOG_SOURCE)
     except Exception as exc:  # git missing / not a repo
         log_error_exc(
@@ -487,6 +869,8 @@ def run_self_heal(max_iter: int = 5) -> dict:
             source=LOG_SOURCE,
             exc=exc,
         )
+        with _state_lock:
+            _progress["phase"] = "aborted"
         return {"ok": False, "reason": "git_failed", "detail": str(exc)}
 
     # 3. Heal loop. Own session; closed in ``finally``.
@@ -510,6 +894,11 @@ def run_self_heal(max_iter: int = 5) -> dict:
 
             # Only count iterations that actually process an issue.
             iterations += 1
+            with _state_lock:
+                _progress["phase"] = "driving"
+                _progress["iteration"] = iterations
+                _progress["current_issue_id"] = issue.id
+                _progress["remaining"] = _remaining_safe(db_session)
 
             prompt = (
                 "Fix this issue in the aigate codebase based on this log:\n"
@@ -529,6 +918,8 @@ def run_self_heal(max_iter: int = 5) -> dict:
                     source=LOG_SOURCE,
                     exc=exc,
                 )
+                with _state_lock:
+                    _progress["phase"] = "aborted"
                 return {
                     "ok": False,
                     "reason": "terminal_unavailable",
@@ -536,11 +927,14 @@ def run_self_heal(max_iter: int = 5) -> dict:
                 }
 
             log_info(
-                f"self-heal: running agentic cli '{cli}' in terminal tab "
+                f"self-heal: running agentic cli '{cli}' "
+                f"(model='{model or ''}') in terminal tab "
                 f"'{HEAL_TAB_KEY}' for issue id={issue.id}",
                 source=LOG_SOURCE,
             )
-            cli_done = _drive_cli_in_terminal(cli, issue.id, prompt, term)
+            cli_done = _drive_cli_in_terminal(
+                cli, issue.id, prompt, term, model=model
+            )
             if not cli_done and not _session_alive(term):
                 # Tab closed / shell died mid-issue (timeout keeps going, but
                 # a dead session cannot run the next command): abort the run,
@@ -551,8 +945,13 @@ def run_self_heal(max_iter: int = 5) -> dict:
                     f"remaining={remaining}",
                     source=LOG_SOURCE,
                 )
+                with _state_lock:
+                    _progress["phase"] = "aborted"
+                    _progress["remaining"] = remaining
                 return {"ok": True, "merged": False, "remaining": remaining}
 
+            with _state_lock:
+                _progress["phase"] = "testing"
             if run_tests():
                 try:
                     delete_log_entry(db_session, issue.id)
@@ -566,6 +965,8 @@ def run_self_heal(max_iter: int = 5) -> dict:
                         source=LOG_SOURCE,
                         exc=exc,
                     )
+                    with _state_lock:
+                        _progress["phase"] = "aborted"
                     break
             else:
                 log_warning(
@@ -573,6 +974,8 @@ def run_self_heal(max_iter: int = 5) -> dict:
                     f"id={issue.id}",
                     source=LOG_SOURCE,
                 )
+                with _state_lock:
+                    _progress["phase"] = "aborted"
                 break
 
         # 4. After the loop: merge if fully healed, else leave the branch.
@@ -580,9 +983,13 @@ def run_self_heal(max_iter: int = 5) -> dict:
 
         if remaining == 0:
             try:
+                with _state_lock:
+                    _progress["phase"] = "merging"
                 git("checkout", "main")
                 git("merge", branch)
                 git("branch", "-d", branch)
+                with _state_lock:
+                    _progress["phase"] = "done"
                 return {"ok": True, "merged": True, "iterations": iterations}
             except Exception as exc:
                 log_error_exc(
@@ -590,11 +997,16 @@ def run_self_heal(max_iter: int = 5) -> dict:
                     source=LOG_SOURCE,
                     exc=exc,
                 )
+                with _state_lock:
+                    _progress["phase"] = "aborted"
                 return {
                     "ok": False,
                     "reason": "git_failed",
                     "detail": str(exc),
                 }
+        with _state_lock:
+            _progress["phase"] = "done"
+            _progress["remaining"] = remaining
         return {"ok": True, "merged": False, "remaining": remaining}
     finally:
         db_session.close()
@@ -602,20 +1014,31 @@ def run_self_heal(max_iter: int = 5) -> dict:
 
 __all__ = [
     "AGENTIC_CLIS",
+    "CLI_MODEL_FLAGS",
     "DONE_POLL_INTERVAL_SECONDS",
     "HEAL_CLI_TIMEOUT_SECONDS",
     "HEAL_TAB_KEY",
+    "OPENCODE_PREFERRED_PROVIDER",
     "REPO_DIR",
+    "SELF_HEAL_CLI_KEY",
+    "SELF_HEAL_MODEL_KEY",
     "build_heal_command",
     "create_heal_branch",
     "current_issue",
     "delete_log_entry",
     "detect_agentic_cli",
+    "get_self_heal_cli_setting",
+    "get_self_heal_model_setting",
     "git",
     "heal_status",
+    "list_agentic_clis",
+    "list_self_heal_models",
+    "qualify_opencode_model",
     "reset_self_heal_state",
     "run_self_heal",
     "run_tests",
+    "set_self_heal_cli_setting",
+    "set_self_heal_model_setting",
     "start_self_heal",
     "wait_for_done",
 ]

@@ -27,7 +27,17 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from backend.log import log_error_exc, log_info
-from backend.selfheal import detect_agentic_cli, heal_status, start_self_heal
+from backend.selfheal import (
+    detect_agentic_cli,
+    get_self_heal_cli_setting,
+    get_self_heal_model_setting,
+    heal_status,
+    list_agentic_clis,
+    list_self_heal_models,
+    set_self_heal_cli_setting,
+    set_self_heal_model_setting,
+    start_self_heal,
+)
 
 LOG_SOURCE = "backend.selfheal.router"
 
@@ -76,6 +86,16 @@ class StatusDTO(BaseModel):
     # shape must survive verbatim (RunResultDTO above documents that schema;
     # DTO-serializing would inject null keys and alter the shapes).
     last: Optional[dict] = None
+    # Richer live progress snapshot for the frontend preview.
+    progress: Optional[dict] = None
+
+    class Config:
+        pass
+
+
+class RunRequestBody(BaseModel):
+    cli: str = ""
+    model: str = ""
 
     class Config:
         pass
@@ -95,12 +115,54 @@ def agentic_cli() -> dict:
     return AgenticCliDTO(available=cli is not None, cli=cli).dict()
 
 
+@router.get("/api/self-heal/clis")
+def clis() -> dict:
+    """List every agentic CLI found on PATH plus the persisted selection."""
+    found = list_agentic_clis()
+    selected = get_self_heal_cli_setting()
+    log_info(
+        f"self-heal clis: found={found} selected={selected!r}",
+        source=LOG_SOURCE,
+    )
+    return {"clis": found, "selected": selected}
+
+
+@router.get("/api/self-heal/models")
+def models() -> dict:
+    """List models grouped by provider/combo (dict list) plus the selection.
+
+    Each entry is ``{"value", "label", "group"}``; ``group`` is the provider
+    name or the ``"__combos__"`` sentinel. ``selected`` stays the stored bare
+    model-name value.
+    """
+    found = list_self_heal_models()
+    selected = get_self_heal_model_setting()
+    log_info(
+        f"self-heal models: count={len(found)} selected={selected!r}",
+        source=LOG_SOURCE,
+    )
+    return {"models": found, "selected": selected}
+
+
 @router.post("/api/self-heal/run")
-def run() -> dict:
-    """Start a self-heal run asynchronously (visible in the self-heal tab)."""
-    log_info("self-heal run requested", source=LOG_SOURCE)
+def run(body: Optional[RunRequestBody] = None) -> dict:
+    """Start a self-heal run asynchronously (visible in the self-heal tab).
+
+    Accepts an optional ``{"cli": str, "model": str}`` body (both may be "" to
+    use the persisted setting / auto-detect). When the body is absent, empty
+    values are used (no override). The chosen cli+model are persisted to
+    settings before the run starts.
+    """
+    cli = body.cli if body else ""
+    model = body.model if body else ""
+    log_info(
+        f"self-heal run requested cli={cli!r} model={model!r}",
+        source=LOG_SOURCE,
+    )
     try:
-        outcome = start_self_heal()
+        set_self_heal_cli_setting(cli or "")
+        set_self_heal_model_setting(model or "")
+        outcome = start_self_heal(cli=cli or None, model=model or None)
     except Exception as exc:  # never crash the endpoint
         log_error_exc(
             "self-heal run unexpected failure",
@@ -151,6 +213,7 @@ def status() -> dict:
     return StatusDTO(
         running=bool(snap.get("running")),
         last=snap.get("last"),
+        progress=snap.get("progress"),
     ).dict()
 
 

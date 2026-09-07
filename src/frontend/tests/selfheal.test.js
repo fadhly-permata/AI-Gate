@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 // Mirror of tests/frontend/selfheal.test.js at the npm-test discoverable path
 // (src/frontend/tests). Imports the helper from the frontend static module.
 import "../static/i18n.js";
+import "../static/combobox.js";
 import "../static/selfheal.js";
 
 const renderSelfHealStatus = window.aigate.renderSelfHealStatus;
@@ -122,6 +123,14 @@ function mountSelfHealDom() {
   document.body.innerHTML =
     '<p id="selfHealCheckMsg" role="status"></p>' +
     '<div id="selfHealResult" role="status" aria-live="polite"></div>' +
+    '<input type="text" id="selfHealCliInput" />' +
+    '<ul id="selfHealCliList" role="listbox" hidden></ul>' +
+    '<input type="text" id="selfHealModelInput" />' +
+    '<ul id="selfHealModelList" role="listbox" hidden></ul>' +
+    '<div id="selfHealPreview" hidden>' +
+      '<div id="selfHealProgress"></div>' +
+      '<div id="selfHealLogFeed"></div>' +
+    '</div>' +
     '<button id="selfHealRunBtn" type="button">Run</button>' +
     '<nav><a class="nav-item" data-view="terminal" href="#"></a></nav>';
 }
@@ -131,6 +140,23 @@ async function freshSelfHeal() {
   vi.resetModules();
   await import("../static/selfheal.js");
   return window.aigate.selfHeal;
+}
+
+/* Spy on createCombobox so a test can capture the raw option list the module
+ * passes to setOptions (the {value,label,group} dicts after loadModels maps
+ * the backend response). Delegates to the real controller so getValue/setValue
+ * keep working. Returns { opts, restore }. */
+function spyCreateCombobox() {
+  const real = window.aigate.createCombobox;
+  const cap = { opts: null };
+  window.aigate.createCombobox = function (cfg) {
+    const ctl = real(cfg);
+    const orig = ctl.setOptions.bind(ctl);
+    ctl.setOptions = (models) => { cap.opts = models; return orig(models); };
+    return ctl;
+  };
+  cap.restore = () => { window.aigate.createCombobox = real; };
+  return cap;
 }
 
 /* fetch stub with realistic HTTP statuses.
@@ -189,9 +215,25 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-/* Run the real flow: fresh module -> CLI check passes -> Run button click. */
-async function clickRun(routes) {
+/* Run the real flow: fresh module -> CLI check passes -> Run button click.
+ * Optional selectedCli / selectedModel preselect the dropdowns before Run. */
+async function clickRun(routes, selectedCli, selectedModel) {
   routes["/api/self-heal/agentic-cli GET"] = CLI_OK;
+  // Ensure dropdown endpoints exist so the chosen value round-trips through the
+  // <select> options (loadClis/loadModels populate before we set .value).
+  if (!routes["/api/self-heal/clis GET"]) {
+    routes["/api/self-heal/clis GET"] = {
+      clis: selectedCli ? [selectedCli, "claude"] : [], selected: selectedCli || ""
+    };
+  }
+  if (!routes["/api/self-heal/models GET"]) {
+    routes["/api/self-heal/models GET"] = {
+      models: selectedModel
+        ? [{ value: selectedModel, label: selectedModel, group: "provider" }]
+        : [],
+      selected: selectedModel || ""
+    };
+  }
   const fetchMock = stubFetch(routes);
   global.fetch = fetchMock;
   mockTerminalManager();
@@ -199,6 +241,8 @@ async function clickRun(routes) {
   SH.checkAgenticCli();
   await vi.advanceTimersByTimeAsync(0); // flush microtasks (no interval fires)
   expect(runBtnEl().disabled).toBe(false); // CLI present -> Run armed
+  if (selectedCli != null) document.getElementById("selfHealCliInput").value = selectedCli;
+  if (selectedModel != null) document.getElementById("selfHealModelInput").value = selectedModel;
   runBtnEl().click();
   await vi.advanceTimersByTimeAsync(0); // flush microtasks (no interval fires)
   return fetchMock;
@@ -227,17 +271,17 @@ describe("runSelfHeal — async started flow (200 {started:true})", () => {
       "/api/self-heal/status GET": { running: true, last: null }
     });
     expect(statusCalls(fm)).toBe(1); // immediate first poll
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(2500);
     expect(statusCalls(fm)).toBe(2);
     // Backend finishes: merged:true -> ok render, Run stays disabled.
     fm.routes["/api/self-heal/status GET"] =
       { running: false, last: { ok: true, merged: true, iterations: 2 } };
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(2500);
     expect(statusCalls(fm)).toBe(3);
     expect(runResultEl().textContent).toContain("2 iterations");
     expect(runResultEl().className).toContain("selfheal-result-ok");
     expect(runBtnEl().disabled).toBe(true);
-    await vi.advanceTimersByTimeAsync(15000);
+    await vi.advanceTimersByTimeAsync(7500);
     expect(statusCalls(fm)).toBe(3); // poller stopped — no further fetches
   });
 
@@ -276,7 +320,7 @@ describe("runSelfHeal — 409 already_running", () => {
     expect(window.aigate.terminalManager.openTab).toHaveBeenCalledWith("self-heal");
     expect(navClicks).toBe(1);
     expect(statusCalls(fm)).toBe(1); // immediate poll
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(2500);
     expect(statusCalls(fm)).toBe(2); // poller runs in the 409 path too
   });
 });
@@ -294,9 +338,9 @@ describe("runSelfHeal — poller robustness", () => {
     runBtnEl().click();
     await vi.advanceTimersByTimeAsync(0);
     expect(statusCalls(fm)).toBe(2); // restart polls immediately ONCE more
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(2500);
     expect(statusCalls(fm)).toBe(3); // exactly ONE interval remains
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(2500);
     expect(statusCalls(fm)).toBe(4);
   });
 
@@ -312,7 +356,7 @@ describe("runSelfHeal — poller robustness", () => {
     // Retarget to a healthy status: the poller must still be alive.
     global.fetch.routes["/api/self-heal/status GET"] =
       { running: false, last: { ok: true, merged: true, iterations: 2 } };
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(2500);
     expect(runResultEl().textContent).toContain("2 iterations");
   });
 });
@@ -331,5 +375,122 @@ describe("i18n — selfheal async keys (all locales)", () => {
       .toBe("Self-Heal is already running — watch the terminal tab.");
     expect(window.I18N.id["selfheal.already_running"])
       .toBe("Self-Heal masih jalan — lihat tab terminal.");
+  });
+});
+
+/* =====================================================================
+ * B4.3 — CLI / model dropdowns + live preview panel (progress + log feed).
+ * mountSelfHealDom (beforeEach) now includes the two <select>s and the
+ * preview panel; fetch is stubbed per-test for the /clis + /models routes.
+ * ===================================================================== */
+describe("selfheal dropdowns + live preview (B4.3)", () => {
+  it("populates CLI dropdown from /clis (Auto default + preselect)", async () => {
+    global.fetch = stubFetch({
+      "/api/self-heal/clis GET": { clis: ["claude", "aider"], selected: "aider" },
+      "/api/self-heal/models GET": { models: ["opus"], selected: "" }
+    });
+    SH = await freshSelfHeal();
+    await vi.advanceTimersByTimeAsync(0); // flush loadOptions microtasks
+    const input = document.getElementById("selfHealCliInput");
+    const list = document.getElementById("selfHealCliList");
+    const opts = Array.from(list.querySelectorAll('li[role="option"]'));
+    expect(opts.map((o) => o.getAttribute("data-value")))
+      .toEqual(["", "claude", "aider"]);
+    expect(input.value).toBe("aider");
+    expect(opts[0].textContent).toBe(window.I18N.en["selfheal.cli_auto"]);
+  });
+
+  it("populates model dropdown from /models (None default + preselect)", async () => {
+    const cap = spyCreateCombobox();
+    global.fetch = stubFetch({
+      "/api/self-heal/clis GET": { clis: [], selected: "" },
+      "/api/self-heal/models GET": {
+        models: [
+          { value: "opus", label: "opus", group: "openai" },
+          { value: "sonnet", label: "sonnet", group: "anthropic" }
+        ], selected: "sonnet"
+      }
+    });
+    SH = await freshSelfHeal();
+    await vi.advanceTimersByTimeAsync(0);
+    const input = document.getElementById("selfHealModelInput");
+    // Values round-trip through the option list the module built.
+    expect(cap.opts.map((o) => o.value)).toEqual(["", "opus", "sonnet"]);
+    expect(cap.opts[0].label).toBe(window.I18N.en["selfheal.model_none"]);
+    expect(input.value).toBe("sonnet"); // preselected value applied
+    cap.restore();
+  });
+
+  it("model dropdown groups by provider + combo, pinning the localized combo group on top", async () => {
+    const cap = spyCreateCombobox();
+    global.fetch = stubFetch({
+      "/api/self-heal/clis GET": { clis: [], selected: "" },
+      "/api/self-heal/models GET": {
+        models: [
+          { value: "openai:gpt-4o", label: "gpt-4o", group: "openai" },
+          { value: "deepseek:deepseek-v1", label: "deepseek-v1", group: "deepseek" },
+          { value: "combo:best", label: "best", group: "__combos__" }
+        ], selected: ""
+      }
+    });
+    SH = await freshSelfHeal();
+    await vi.advanceTimersByTimeAsync(0);
+    // The options carry the right group: combo sentinel localized, providers raw.
+    expect(cap.opts[0].value).toBe("");
+    expect(cap.opts[0].group).toBeUndefined();
+    const combo = cap.opts.find((o) => o.value === "combo:best");
+    expect(combo.group).toBe(window.I18N.en["combobox.group_combos"]);
+    expect(combo.group).not.toBe("__combos__");
+    const prov = cap.opts.find((o) => o.value === "openai:gpt-4o");
+    expect(prov.group).toBe("openai");
+    // combo member stays flat (no sub-group) — mirrors the CLI Tools picker.
+    expect(combo.subGroup).toBe(false);
+    // DOM group headers: localized combo group pinned on top, providers follow.
+    const list = document.getElementById("selfHealModelList");
+    const groups = Array.from(list.querySelectorAll('li.aigate-combo-group'))
+      .map((g) => g.textContent);
+    expect(groups[0]).toBe(window.I18N.en["combobox.group_combos"]);
+    expect(groups).toContain("openai");
+    expect(groups).toContain("deepseek");
+    cap.restore();
+  });
+
+  it("Run POST sends chosen cli + model in the request body", async () => {
+    const fm = await clickRun({
+      "/api/self-heal/run POST": RUN_STARTED,
+      "/api/self-heal/status GET": { running: true, last: null }
+    }, "aider", "opus");
+    const call = fm.mock.calls.find((c) => c[0] === "/api/self-heal/run");
+    expect(call).toBeTruthy();
+    const body = JSON.parse(call[1].body);
+    expect(body).toEqual({ cli: "aider", model: "opus" });
+  });
+
+  it("progress panel renders phase + cli + model labels and reveals preview", async () => {
+    SH = await freshSelfHeal();
+    SH._test.renderProgress({
+      phase: "detecting", cli: "claude", model: "opus",
+      branch: "heal/1", iteration: 1, total_iterations: 5,
+      current_issue_id: 7, remaining: 3, started_at: "2026-09-07T00:00:00Z"
+    });
+    const box = document.getElementById("selfHealProgress");
+    expect(box.textContent).toContain(window.I18N.en["selfheal.phase.detecting"]);
+    expect(box.textContent).toContain("claude");
+    expect(box.textContent).toContain("opus");
+    expect(document.getElementById("selfHealPreview").hidden).toBe(false);
+  });
+
+  it("log feed filters to backend.selfheal source, newest first", async () => {
+    SH = await freshSelfHeal();
+    SH._test.renderLogFeed({ data: [
+      { id: 1, timestamp: "2026-09-07T00:01:00Z", severity: "info", source: "backend.selfheal.drive", message: "first" },
+      { id: 2, timestamp: "2026-09-07T00:02:00Z", severity: "info", source: "backend.selfheal.drive", message: "second" },
+      { id: 3, timestamp: "2026-09-07T00:00:30Z", severity: "info", source: "backend.other", message: "ignore" }
+    ] });
+    const feed = document.getElementById("selfHealLogFeed");
+    const lines = Array.from(feed.children).map((c) => c.textContent);
+    expect(lines.length).toBe(2); // only the two selfheal rows
+    expect(lines[0]).toBe("2026-09-07T00:02:00Z — second"); // newest first
+    expect(lines[1]).toBe("2026-09-07T00:01:00Z — first");
   });
 });

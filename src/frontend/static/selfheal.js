@@ -209,7 +209,8 @@
   /* POST /api/self-heal/run is ASYNC: the agentic CLI runs in a live PTY
      registered under the tab key "self-heal" (watch it in the terminal view),
      while the final result lands on GET /api/self-heal/status (status.last). */
-  var STATUS_POLL_MS = 5000;   // status polling cadence while a run is active
+  var STATUS_POLL_MS = 2500;   // progress + status polling cadence while a run is active
+  var LOGS_API = "/api/logs?limit=60"; // selfheal-filtered log feed source
   var SELF_HEAL_TAB = "self-heal"; // backend PTY tab key for the run terminal
 
   /* Open (or focus) the terminal tab bound to the backend's "self-heal" PTY
@@ -236,15 +237,206 @@
     }
   }
 
+  /* ---------------------------------------------------------------
+   * Option dropdowns (CLI + model) — searchable/groups comboboxes
+   * (combobox.js, mirrors the CLI Tools dialog). Populated on init from
+   * the backend's /clis and /models endpoints. Empty value "" == default
+   * ("Auto-detect" for CLI, "No model flag" for model).
+   *   * CLI    combo: searchInside + groupBy:"none" (~10 presets, searchable)
+   *   * Model  combo: searchInside + groupBy:"group", subGroupBy:"prefix"
+   *                (provider groups; localized combo group pinned on top —
+   *                 mirrors the CLI Tools model picker exactly)
+   * Controllers are created LAZILY (first use) and resolve elements by id,
+   * so they survive DOM rebuilds (tests replace body.innerHTML).
+   * --------------------------------------------------------------- */
+  var cliCombo = null;
+  function cliComboCtl() {
+    if (!cliCombo && typeof window.aigate !== "undefined" &&
+        typeof window.aigate.createCombobox === "function") {
+      cliCombo = window.aigate.createCombobox({
+        inputId: "selfHealCliInput",
+        listId: "selfHealCliList",
+        searchInside: true,
+        groupBy: "none"
+      });
+    }
+    return cliCombo;
+  }
+
+  /* Localized combo-group label. Reuses combobox.group_combos (no new key). */
+  function comboGroupName() {
+    return t("combobox.group_combos", currentLoc());
+  }
+
+  var modelCombo = null;
+  function modelComboCtl() {
+    if (!modelCombo && typeof window.aigate !== "undefined" &&
+        typeof window.aigate.createCombobox === "function") {
+      modelCombo = window.aigate.createCombobox({
+        inputId: "selfHealModelInput",
+        listId: "selfHealModelList",
+        searchInside: true,
+        groupBy: "group",
+        subGroupBy: "prefix",
+        startExpanded: true
+      });
+      // Pin the localized combo group on top, mirroring the CLI Tools picker.
+      if (modelCombo && typeof modelCombo.setGroupOrder === "function") {
+        modelCombo.setGroupOrder([comboGroupName()]);
+      }
+    }
+    return modelCombo;
+  }
+
+  /* Build [{value,label}] from a plain string list, prepending the default
+     option (value "" with a localized label). */
+  function buildOptions(list, defaultLabel) {
+    var opts = [{ value: "", label: defaultLabel != null ? defaultLabel : "" }];
+    (list || []).forEach(function (s) { opts.push({ value: s, label: s }); });
+    return opts;
+  }
+
+  function loadClis() {
+    if (!el("selfHealCliInput")) return; // no DOM (e.g. pure-helper import path)
+    if (typeof fetch === "undefined") return; // no fetch available (some test envs)
+    fetchJson(SELF_HEAL_API + "/clis").then(function (data) {
+      data = data || {};
+      var ctl = cliComboCtl();
+      if (!ctl) return; // combobox.js absent -> dropdown stays default
+      ctl.setOptions(buildOptions(data.clis, t("selfheal.cli_auto", currentLoc())));
+      if (data.selected) ctl.setValue(data.selected);
+    }).catch(function () { /* non-fatal: dropdown stays default */ });
+  }
+
+  function loadModels() {
+    if (!el("selfHealModelInput")) return;
+    if (typeof fetch === "undefined") return;
+    fetchJson(SELF_HEAL_API + "/models").then(function (data) {
+      data = data || {};
+      var ctl = modelComboCtl();
+      if (!ctl) return;
+      var comboGroup = comboGroupName(); // localized "Combos"/"Kombo"
+      // "No model flag" default option first (value "", group-less).
+      var opts = [{ value: "", label: t("selfheal.model_none", currentLoc()) }];
+      (data.models || []).forEach(function (m) {
+        if (!m) return;
+        // The backend sends a "__combos__" sentinel; localize it here (no new
+        // i18n key — reuse combobox.group_combos) so the combo group label
+        // matches the CLI Tools dialog. Provider models keep raw provider name.
+        if (m.group === "__combos__") {
+          // Combo members stay FLAT under the combo group (explicitly opt out
+          // of sub-grouping) — mirrors the CLI Tools model picker exactly.
+          opts.push({ value: m.value, label: m.label, group: comboGroup, subGroup: false });
+        } else {
+          opts.push({ value: m.value, label: m.label, group: m.group });
+        }
+      });
+      ctl.setOptions(opts);
+      if (data.selected) ctl.setValue(data.selected);
+    }).catch(function () { /* non-fatal */ });
+  }
+
+  function loadOptions() { loadClis(); loadModels(); }
+
+  /* Read the committed value from the combobox controller (input value).
+     Returns "" for the default option. Falls back to the raw input so the
+     getters still work before the controller is created. */
+  function getSelectedCli() {
+    var ctl = cliComboCtl();
+    if (ctl) return ctl.getValue();
+    var i = el("selfHealCliInput");
+    return i ? String(i.value || "").trim() : "";
+  }
+
+  function getSelectedModel() {
+    var ctl = modelComboCtl();
+    if (ctl) return ctl.getValue();
+    var i = el("selfHealModelInput");
+    return i ? String(i.value || "").trim() : "";
+  }
+
+  /* ---------------------------------------------------------------
+   * Live preview — progress block + streaming log feed
+   * --------------------------------------------------------------- */
+  function addField(box, labelKey, value) {
+    var row = document.createElement("div");
+    row.className = "selfheal-progress-row";
+    var k = document.createElement("span");
+    k.className = "selfheal-progress-key";
+    k.textContent = t(labelKey, currentLoc());
+    var v = document.createElement("span");
+    v.className = "selfheal-progress-val";
+    v.textContent = value;
+    row.appendChild(k);
+    row.appendChild(v);
+    box.appendChild(row);
+  }
+
+  function renderProgress(p) {
+    p = p || {};
+    var panel = el("selfHealPreview");
+    if (panel) panel.hidden = false; // visible during/after a run
+    var box = el("selfHealProgress");
+    if (!box) return;
+    box.textContent = "";
+    var phaseKey = "selfheal.phase." + (p.phase || "idle");
+    var phaseLabel = t(phaseKey, currentLoc());
+    if (phaseLabel === phaseKey) phaseLabel = (p.phase || "idle"); // unknown -> raw
+    addField(box, "selfheal.phase_label", phaseLabel);
+    if (p.cli != null) addField(box, "selfheal.field.cli", p.cli);
+    if (p.model != null) addField(box, "selfheal.field.model", p.model);
+    if (p.branch != null) addField(box, "selfheal.field.branch", p.branch);
+    if (p.iteration != null || p.total_iterations != null) {
+      addField(box, "selfheal.field.iteration",
+        (p.iteration != null ? p.iteration : "?") + "/" +
+        (p.total_iterations != null ? p.total_iterations : "?"));
+    }
+    if (p.current_issue_id != null) addField(box, "selfheal.field.issue", String(p.current_issue_id));
+    if (p.remaining != null) addField(box, "selfheal.field.remaining", String(p.remaining));
+    if (p.started_at != null) addField(box, "selfheal.field.started", p.started_at);
+  }
+
+  function renderLogFeed(payload) {
+    var feed = el("selfHealLogFeed");
+    if (!feed) return;
+    var rows = (payload && payload.data) || [];
+    var filtered = rows.filter(function (r) {
+      return r && typeof r.source === "string" &&
+        r.source.indexOf("backend.selfheal") === 0;
+    }).sort(function (a, b) {
+      return (b.timestamp || "").localeCompare(a.timestamp || ""); // newest first
+    });
+    feed.textContent = "";
+    filtered.forEach(function (r) {
+      var line = document.createElement("div");
+      line.className = "selfheal-log-line";
+      var ts = r.timestamp || "";
+      var msg = (r.message != null ? r.message : "").toString();
+      line.textContent = ts + " — " + msg; // stacktrace omitted from preview
+      feed.appendChild(line);
+    });
+    feed.scrollTop = 0; // newest is first -> keep newest in view
+  }
+
+  function fetchLogs() {
+    fetchJson(LOGS_API).then(renderLogFeed).catch(function () { /* non-fatal */ });
+  }
+
   function pollStatusOnce() {
     fetchJson(SELF_HEAL_API + "/status").then(function (data) {
       data = data || {};
-      if (data.running === true || !data.last) return; // still running (or no result yet)
-      stopStatusPolling();
-      var view = renderSelfHealStatus(data.last, currentLoc());
-      setResult(view.message, view.kind);
-      // Keep run enabled only if a CLI is still present (partial keeps it usable).
-      setRunEnabled(view.kind !== "ok");
+      if (data.progress) renderProgress(data.progress);
+      if (data.running === false && data.last) {
+        stopStatusPolling();
+        var view = renderSelfHealStatus(data.last, currentLoc());
+        setResult(view.message, view.kind);
+        // Keep run enabled only if a CLI is still present (partial keeps it usable).
+        setRunEnabled(view.kind !== "ok");
+        fetchLogs(); // final log fetch
+        return;
+      }
+      // still running (or no result yet) -> keep polling + stream logs
+      fetchLogs();
     }).catch(function (err) {
       // A missed poll must never crash the page: surface once in the result
       // area and keep polling — the run may still finish and self-report.
@@ -267,10 +459,16 @@
     }
     setResult(t("selfheal.running"), "info");
     setRunEnabled(false);
-    fetchJson(SELF_HEAL_API + "/run", { method: "POST" }).then(function (data) {
+    fetchJson(SELF_HEAL_API + "/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cli: getSelectedCli(), model: getSelectedModel() })
+    }).then(function (data) {
       data = data || {};
       if (data.started === true) {
         setResult(t("selfheal.started"), "info");
+        var pv = el("selfHealPreview");
+        if (pv) pv.hidden = false;     // reveal live preview on run start
         openSelfHealTab();
         startStatusPolling();
         return;                        // final result arrives via status.last
@@ -284,6 +482,8 @@
         // already_running: fetchJson throws on non-2xx (body carries no error
         // envelope), so the reason rides on the status. Still open the tab.
         setResult(t("selfheal.already_running"), "warn");
+        var pv = el("selfHealPreview");
+        if (pv) pv.hidden = false;
         openSelfHealTab();
         startStatusPolling();
         return;
@@ -295,6 +495,7 @@
   }
 
   function init() {
+    loadOptions(); // populate CLI + model dropdowns from the backend
     var checkBtn = el("selfHealCheckBtn");
     if (checkBtn) checkBtn.addEventListener("click", checkAgenticCli);
     var runBtn = el("selfHealRunBtn");
@@ -308,7 +509,7 @@
   }
 
   window.aigate.selfHeal = {
-    onShow: checkAgenticCli,
+    onShow: function () { checkAgenticCli(); loadOptions(); },
     checkAgenticCli: checkAgenticCli,
     runSelfHeal: runSelfHeal,
     _test: {
@@ -317,6 +518,15 @@
       pollStatusOnce: pollStatusOnce,
       startStatusPolling: startStatusPolling,
       stopStatusPolling: stopStatusPolling,
+      loadClis: loadClis,
+      loadModels: loadModels,
+      loadOptions: loadOptions,
+      getSelectedCli: getSelectedCli,
+      getSelectedModel: getSelectedModel,
+      cliCombo: cliComboCtl,
+      modelCombo: modelComboCtl,
+      renderProgress: renderProgress,
+      renderLogFeed: renderLogFeed,
       _STATUS_POLL_MS: STATUS_POLL_MS
     }
   };

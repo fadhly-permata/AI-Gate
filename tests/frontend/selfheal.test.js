@@ -186,6 +186,7 @@ afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   delete window.aigate.terminalManager;
+  delete window.aigate.createCombobox; // drop any fake combobox from model tests
   delete global.fetch;
   document.body.innerHTML = "";
 });
@@ -332,5 +333,164 @@ describe("i18n — selfheal async keys (all locales)", () => {
       .toBe("Self-Heal is already running — watch the terminal tab.");
     expect(window.I18N.id["selfheal.already_running"])
       .toBe("Self-Heal masih jalan — lihat tab terminal.");
+  });
+});
+
+/* =====================================================================
+ * Model combobox grouping (mirrors the CLI Tools model picker).
+ * The backend GET /api/self-heal/models now returns
+ *   { models:[{value,label,group}], selected }
+ * where provider models carry group = <provider name> and combo members
+ * carry the sentinel group "__combos__" (localized to combobox.group_combos).
+ * The picker groups by provider, pins the localized combo group on top, and
+ * keeps the "No model flag" default (value "") as a group-less first option.
+ * ===================================================================== */
+function mountModelDom() {
+  document.body.innerHTML =
+    '<input id="selfHealModelInput" type="text">' +
+    '<ul id="selfHealModelList"></ul>' +
+    '<input id="selfHealCliInput" type="text">' +
+    '<ul id="selfHealCliList"></ul>';
+}
+
+/* Fake combobox that records what the module hands to setOptions / pin order. */
+function installFakeCombobox() {
+  const cap = { options: null, groupOrder: null, value: "" };
+  window.aigate.createCombobox = function () {
+    return {
+      setOptions(opts) { cap.options = opts; },
+      setValue(v) { cap.value = v; },
+      setGroupOrder(names) { cap.groupOrder = names; },
+      getValue() { return cap.value; }
+    };
+  };
+  return cap;
+}
+
+function stubModelsFetch(models, selected, cap) {
+  global.fetch = vi.fn(function (url) {
+    if (url === "/api/self-heal/models") {
+      return Promise.resolve({
+        ok: true, status: 200,
+        headers: { get: () => "application/json" },
+        json: () => Promise.resolve({ models: models, selected: selected })
+      });
+    }
+    return Promise.resolve({
+      ok: true, status: 200,
+      headers: { get: () => "application/json" },
+      json: () => Promise.resolve({})
+    });
+  });
+  return global.fetch;
+}
+
+describe("model combobox — grouped by provider + combo (CLI-Tools parity)", () => {
+  it("maps BE models into grouped options, localizing + pinning the combo group", async () => {
+    vi.resetModules();
+    mountModelDom();
+    document.documentElement.setAttribute("data-locale", "en");
+    const cap = installFakeCombobox();
+    stubModelsFetch([
+      { value: "openai:gpt-4o", label: "gpt-4o", group: "openai" },
+      { value: "deepseek:deepseek-v1", label: "deepseek-v1", group: "deepseek" },
+      { value: "combo:best", label: "best", group: "__combos__" }
+    ], "combo:best", cap);
+    await import("../../src/frontend/static/selfheal.js");
+    const SH = window.aigate.selfHeal;
+    SH._test.loadModels();
+    await vi.advanceTimersByTimeAsync(0); // flush fetch microtasks
+
+    // First option = localized "No model flag" default, group-less.
+    expect(cap.options[0].value).toBe("");
+    expect(cap.options[0].group).toBeUndefined();
+
+    // Combo model: sentinel localized, NOT passed through.
+    const combo = cap.options.find((o) => o.value === "combo:best");
+    expect(combo.group).toBe(window.I18N.en["combobox.group_combos"]);
+    expect(combo.group).not.toBe("__combos__");
+
+    // Provider models keep their raw provider group name.
+    const prov = cap.options.find((o) => o.value === "openai:gpt-4o");
+    expect(prov.group).toBe("openai");
+    const prov2 = cap.options.find((o) => o.value === "deepseek:deepseek-v1");
+    expect(prov2.group).toBe("deepseek");
+
+    // The localized combo group is pinned to the top via setGroupOrder.
+    expect(cap.groupOrder).toEqual([window.I18N.en["combobox.group_combos"]]);
+  });
+
+  it("localizes the combo group label per locale (id -> Kombo)", async () => {
+    vi.resetModules();
+    mountModelDom();
+    document.documentElement.setAttribute("data-locale", "id");
+    const cap = installFakeCombobox();
+    stubModelsFetch([
+      { value: "combo:best", label: "best", group: "__combos__" }
+    ], "", cap);
+    await import("../../src/frontend/static/selfheal.js");
+    window.aigate.selfHeal._test.loadModels();
+    await vi.advanceTimersByTimeAsync(0);
+    const combo = cap.options.find((o) => o.value === "combo:best");
+    expect(combo.group).toBe(window.I18N.id["combobox.group_combos"]);
+  });
+
+  it("runSelfHeal POSTs {cli, model} with the chosen model value", async () => {
+    const fm = await clickRun({
+      "/api/self-heal/run POST": RUN_STARTED,
+      "/api/self-heal/status GET": { running: true, last: null }
+    });
+    const runCall = fm.mock.calls.find(
+      (c) => c[0] === "/api/self-heal/run" && c[1] && c[1].method === "POST");
+    expect(runCall).toBeTruthy();
+    const body = JSON.parse(runCall[1].body);
+    expect(body).toHaveProperty("cli");
+    expect(body).toHaveProperty("model"); // "" when no model flag selected
+  });
+});
+
+/* =====================================================================
+ * Live preview coverage: progress block rendering + log feed filtering
+ * (backend.selfheal source only).
+ * ===================================================================== */
+describe("self-heal live preview — progress + log feed", () => {
+  function mountPreviewDom() {
+    document.body.innerHTML =
+      '<div id="selfHealPreview" hidden></div>' +
+      '<div id="selfHealProgress"></div>' +
+      '<div id="selfHealLogFeed"></div>';
+  }
+
+  it("renderProgress writes phase + fields and reveals the preview panel", () => {
+    mountPreviewDom();
+    window.aigate.selfHeal._test.renderProgress({
+      phase: "heal", cli: "claude", model: "combo:best",
+      branch: "main", iteration: 1, total_iterations: 3,
+      current_issue_id: 5, remaining: 2, started_at: "t0"
+    });
+    const box = document.getElementById("selfHealProgress");
+    expect(box.textContent).toContain("claude");
+    expect(box.textContent).toContain("combo:best");
+    expect(box.textContent).toContain("main");
+    expect(document.getElementById("selfHealPreview").hidden).toBe(false);
+  });
+
+  it("renderLogFeed keeps only backend.selfheal rows, newest first", () => {
+    mountPreviewDom();
+    window.aigate.selfHeal._test.renderLogFeed({
+      data: [
+        { source: "backend.selfheal.run", timestamp: "2024-01-01T00:00:01Z", message: "a" },
+        { source: "frontend.ui", timestamp: "2024-01-01T00:00:02Z", message: "x" },
+        { source: "backend.selfheal.ok", timestamp: "2024-01-01T00:00:03Z", message: "b" }
+      ]
+    });
+    const feed = document.getElementById("selfHealLogFeed");
+    const lines = feed.querySelectorAll(".selfheal-log-line");
+    expect(lines.length).toBe(2);
+    expect(feed.textContent).toContain("backend.selfheal.ok");
+    expect(feed.textContent).toContain("backend.selfheal.run");
+    expect(feed.textContent).not.toContain("frontend.ui");
+    // newest (t03) is first in document order.
+    expect(lines[0].textContent.indexOf("backend.selfheal.ok")).toBeGreaterThan(-1);
   });
 });

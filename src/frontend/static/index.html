@@ -714,12 +714,44 @@
         <div class="card cli-card selfheal-card">
           <h2 class="cli-title" data-i18n="selfheal.title">Self-Heal</h2>
           <p class="settings-msg" id="selfHealCheckMsg" role="status" aria-live="polite"></p>
+          <div class="selfheal-fields">
+            <label class="selfheal-field">
+              <span data-i18n="selfheal.cli_label">Agentic CLI</span>
+              <!-- Searchable combobox (combobox.js): text input + custom <ul>
+                   panel (type-to-filter). Replaces the native <select> to match
+                   the CLI Tools dialog. The input value IS the cli string. -->
+              <div class="aigate-combo">
+                <input class="form-input" type="text" id="selfHealCliInput"
+                       autocomplete="off" placeholder="Auto-detect (default)"
+                       role="combobox" aria-expanded="false" aria-controls="selfHealCliList"
+                       aria-autocomplete="list" />
+                <ul class="aigate-combo-list" id="selfHealCliList" role="listbox" hidden></ul>
+              </div>
+            </label>
+            <label class="selfheal-field">
+              <span data-i18n="selfheal.model_label">Model</span>
+              <!-- Searchable + grouped combobox (combobox.js): groupBy="prefix"
+                   groups models by family (e.g. claude-3-opus -> Claude). -->
+              <div class="aigate-combo">
+                <input class="form-input" type="text" id="selfHealModelInput"
+                       autocomplete="off" placeholder="No model flag (default)"
+                       role="combobox" aria-expanded="false" aria-controls="selfHealModelList"
+                       aria-autocomplete="list" />
+                <ul class="aigate-combo-list" id="selfHealModelList" role="listbox" hidden></ul>
+              </div>
+            </label>
+          </div>
           <div class="selfheal-actions">
             <button class="btn" id="selfHealCheckBtn" type="button" data-i18n="selfheal.check">Check</button>
             <button class="btn btn-primary" id="selfHealRunBtn" type="button"
                     data-i18n="selfheal.run" disabled>Run Self-Heal</button>
           </div>
           <div class="selfheal-result" id="selfHealResult" role="status" aria-live="polite"></div>
+          <div class="selfheal-preview" id="selfHealPreview" hidden>
+            <h3 class="selfheal-preview-title" data-i18n="selfheal.preview">Live preview</h3>
+            <div class="selfheal-progress" id="selfHealProgress"></div>
+            <div class="selfheal-logfeed" id="selfHealLogFeed" aria-live="polite"></div>
+          </div>
         </div>
       </section>
 
