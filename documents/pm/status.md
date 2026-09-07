@@ -1171,7 +1171,9 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
   docs sinkron FSD §2.8 / TSD §3.5 / BRD US-2.8.5; CODE_CHANGES.md 2026-09-07.
 - **Verifikasi PM (re-run sendiri):** pytest tests/backend = **438 passed / 1 skipped**;
   vitest = **453 passed (23 files)**. 0 regresi.
-- PENDING (user): restart aigate + hard-refresh (R32). Belum di-commit (menunggu
-  approve user).
+- PENDING (user): restart aigate + hard-refresh (R32). **DI-COMMIT `68cc1bd`**
+  (15 file, +1499/−65) **+ PUSH `origin/refactor/ui`** (0523a05..68cc1bd) — approve
+  user. Bonus: branch sisa `aigate/self-heal-20260907-061908` (lokasi & remote)
+  dihapus — isinya identik 0523a05, gak ada divergensi.
 - Open (belum dikerjakan): max-age cutoff polling FE (e.g. 30 menit) bila run
   tak pernah report; `status.last` untuk no_agentic_cli hanya terlihat lewat poll.
