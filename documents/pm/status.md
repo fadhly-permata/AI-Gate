@@ -1334,6 +1334,26 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
 - **PR #5 dibuat: https://github.com/fadhly-permata/AI-Gate/pull/5** (`refactor/ui` → `main`,
   10 commit / 44 file / +5837 −153) — mencakup 4 commit menggantung pasca-PR #4 + 5 commit
   sesi ini. BELUM di-merge (menunggu user; dan user perlu restart+refresh setelah merge).
+  → **sudah MERGED oleh user (`0e290ae`)**, tapi sebelum commit sidebar `86a5ef1` masuk,
+  jadi commit itu dibawa ke **PR #6**.
+
+## 2026-09-07 (malam) — PERBAIKAN LINGKUNGAN: semua perintah shell lambat (R37)
+- User: "kerja lu lama bangg kalo udah manggil/jalankan perintah bash/shell. perbaiki dong".
+- Ukur dulu (bukan nebak): `time true` 0,000s · `time bash -c true` 0,041s ·
+  **`time bash -ic true` 1,452s** · `python3 -c pass` 0,090s · `node -e 0` 0,302s ·
+  `git status` 0,030s. Lalu `time termux-wake-lock` = **1,208s** → ketemu pelakunya:
+  `~/.bashrc` memanggilnya di SETIAP shell interaktif (Termux: tiap panggilan tool = shell baru).
+- Fix (di luar repo, `~/.bashrc`): state-file `~/.termux-wake-lock.ts` + refresh maks
+  1x/6 jam + dijalankan di background `( … & )`; komentar di file menjelaskan angka & alasannya.
+- Verifikasi: `bash -ic true` **1,452s → 0,047s** (≈25x); state-file ketulis;
+  `termux-wake-lock` dipanggil manual tetap exit 0 (fitur anti-doze aigate tidak hilang).
+- Tidak disentuh: fungsi `opencode()` di `.bashrc` (manggil `sync-bai-models.sh` = jaringan
+  tiap opencode mulai) — dilaporkan ke user sebagai opsi, belum diubah.
+- **CATATAN KESELAMATAN yang dilihat PM di file yang sama:** `GH_TOKEN` / `GITHUB_TOKEN`
+  (PAT GitHub) dan `CONTEXT7_API_KEY` tersimpan **plaintext di `~/.bashrc`** dan diekspor ke
+  SETIAP proses anak. Sudah dilaporkan ke user; rotasi/cypher-store = keputusan user.
+- Rule baru: **R37** (jalur tiap-shell bebas blocking + ukur dulu) & **R38** (handover pendek
+  utk task kecil — dipicu protes user "buset, lama amat bikin item baru di sidemenu").
 - PENDING user: restart aigate + hard-refresh (R32) — cache-buster baru `v=20260911`.
   Item yang user TOLAK: verifikasi flag `--model` per CLI (tetap open item, jangan dikerjakan).
 

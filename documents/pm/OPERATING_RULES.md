@@ -451,3 +451,37 @@ lalu **urutan commit disusun supaya yang menambah kolom/API dulu, yang memakainy
 belakang** (logs-BE → self-heal → logs-FE) supaya tiap commit antara tetap konsisten.
 Dilarang: `git add -A` sekali jalan untuk kerjaan beda fitur (R19 dilanggar dua kali:
 "checkpoint" dan mega-commit).
+
+## R37 — Jalur "tiap shell" wajib bebas perintah blocking; ukur startup shell duluan
+Pelajaran (2026-09-07, user: "kerja lu lama bangg kalo udah manggil/jalankan perintah
+bash/shell. perbaiki dong"): akar masalahnya BUKAN di tes atau di repo, tapi
+`~/.bashrc` memanggil `termux-wake-lock` **di setiap shell interaktif** = **1,2 detik**
+dibayar sebelum perintah apa pun mulai jalan (Termux: tiap panggilan tool = shell baru).
+Angka nyata sebelum/sesudah: `time bash -ic true` = **1,452s → 0,047s** (≈25x).
+
+Aturan wajib:
+1. Kalau user komplain "lama" dan penyebabnya perintah shell: **ukur dulu**
+   (`time true`, `time bash -c true`, `time bash -ic true`, lalu `--durations=10` /
+   angka `Duration` vitest). Jangan tebak.
+2. DILARANG ada panggilan blocking (API Termux, jaringan, install, `sleep`) di jalur yang
+   jalan **tiap shell** (`~/.bashrc`, `~/.profile`, `PROMPT_COMMAND`, hook tool).
+   Kebutuhan yang harus tetap hidup (wake lock) → **cache state-file + interval +
+   jalankan di background** (`( cmd >/dev/null 2>&1 & )`), bukan di depan tiap shell.
+3. Perubahan environment di luar repo (`~/.bashrc` dll) wajib: (a) dikomentari alasan +
+   angka ukurnya di file itu, (b) dicatat di Memory Bank bagian Tooling, (c) diverifikasi
+   fungsinya masih jalan (bukan cuma jadi cepat).
+4. Sumber lambat lain yang sudah diketahui di box ini: `npx` shebang rusak (pakai
+   `node node_modules/.bin/<bin>`), `os.cpus()=0` bikin vitest 1 fork (sekuensial),
+   throttling Android (angka antar-run bisa beda 1,5–2x — sebutkan bila membandingkan).
+
+## R38 — Right-size handover: task kecil = handover pendek, tanpa dokumen tambahan
+Pelajaran (2026-09-07, user: "buset, lama amat bikin item baru di sidemenu" — spawn
+pertama untuk fitur 1 tautan gue cancel karena handover-nya 60+ baris):
+1. Task ≤ 5 file / satu lapisan → handover **<= 25 baris**: permintaan user apa adanya,
+   peta file + nomor baris, daftar pekerjaan, batasan, definition of done. Tanpa latar
+   belakang panjang, tanpa template laporan.
+2. PM tetap WAJIB kasih peta kode (R28: path + baris) supaya sub-agent gak eksplorasi buta —
+   itu yang bikin cepat, bukan kalimat panjang.
+3. Jangan minta sub-agent menulis file laporan `.md` untuk task kecil; laporan hanya untuk
+   task besar/audit (aturan `.opencode/reports/**` tetap berlaku kalau memang ada laporan).
+4. Gate tes mengikuti R35: sub-agent hanya tes tertarget; suite penuh sekali oleh PM.

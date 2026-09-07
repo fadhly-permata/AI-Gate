@@ -239,6 +239,17 @@
    Python; tak kasih PTY utk CLI). Lihat TSD ADR-002.
 
 ## Tooling
+- 2026-09-07: **Kecepatan shell (lingkungan, di luar repo).** User komplain semua perintah
+  bash lama. Akar: `~/.bashrc` manggil `termux-wake-lock` di SETIAP shell interaktif
+  (Termux = tiap panggilan tool bikin shell baru) → **+1,2 detik per perintah**.
+  Fix: cache state-file `~/.termux-wake-lock.ts` + refresh maks 1x/6 jam + jalan di
+  BACKGROUND. Ukur: `time bash -ic true` **1,452s → 0,047s** (≈25x); fungsi wake lock
+  tetap jalan (`termux-wake-lock` exit 0). Rule baru **R37** (jalur tiap-shell wajib bebas
+  blocking + ukur dulu) dan **R38** (handover pendek utk task kecil — user juga protes
+  soal itu). Laten lain yang diketahui: `npx` shebang rusak (pakai
+  `node node_modules/.bin/…`), `os.cpus()=0` → vitest 1 fork, throttling Android bikin
+  angka antar-run beda 1,5–2x, dan fungsi `opencode()` di `.bashrc` manggil
+  `sync-bai-models.sh` (jaringan) tiap opencode dimulai.
 - 2026-09-06: **codegraph = colbymchenry/codegraph (BUKAN xnuinside)**. User rujuk repo
   https://github.com/colbymchenry/codegraph. PM sempat salah pakai xnuinside/codegraph
   (v1.2.0 pip, se-nama) → di-uninstall & diganti yang benar (R27).
