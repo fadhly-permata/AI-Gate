@@ -1177,3 +1177,156 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
   dihapus — isinya identik 0523a05, gak ada divergensi.
 - Open (belum dikerjakan): max-age cutoff polling FE (e.g. 30 menit) bila run
   tak pernah report; `status.last` untuk no_agentic_cli hanya terlihat lewat poll.
+
+## 2026-09-07 — Self-Heal: pilihan agentic-CLI + model + live preview — SELESAI (paralel BE↔FE)
+- User request: "bantu gua buatin preview untuk proses berjalannya self heal" + dropdown
+  pilih agentic CLI tools & model (hipotesis: stuck gara2 tool/model). Mode PARALEL
+  (kontrak API ditetapkan PM dulu, scope BE/FE gak tumpang-tindih).
+- **be-dev DONE (ses_f8567428effeO69ecqA2kXO2Xi):** selfheal.py — `list_agentic_clis()`
+  (semua preset di PATH), `list_self_heal_models()` (distinct `model_name` dr
+  `provider_models`), setting `self_heal_cli`/`self_heal_model`, `run_self_heal(cli,model,...)`
+  + `build_heal_command` append `--model` via `CLI_MODEL_FLAGS` (hanya CLI dikenal),
+  state `progress` kaya (phase/cli/model/branch/iteration/current_issue_id/started_at/
+  remaining) di `heal_status()`. router: `GET /api/self-heal/clis`, `GET /api/self-heal/models`,
+  `POST /api/self-heal/run` terima `{cli,model}`, `GET /api/self-heal/status` +`progress`.
+- **fe-dev DONE (ses_f85670eb5ffeHHX4SCh7yEDvYv):** selfheal.js + index.html — dropdown
+  CLI & model (default Auto/No-model), panel preview (progress poll 2.5s + log feed stream
+  dr `/api/logs` filter `source` `backend.selfheal`), i18n +22 key (en/id, parity guard lolos),
+  cache-buster `selfheal.js?v=20260908`. test +5 B4.3 + parity.
+- **Verifikasi PM (re-run sendiri):** pytest tests/backend = **451 passed / 1 skipped**;
+  vitest penuh = **458 passed (23 files)**. 0 regresi.
+- PENDING (user): restart aigate + hard-refresh (R32). BELUM di-commit (user belum minta).
+- Open: flag `--model` per-CLI lain (claude/opencode/aider sudah `--model`; codex/gemini/
+  goose/amp/qwen/cline/kilo belum diverifikasi ke CLI asli — map bisa dikoreksi). User bisa
+  pilih CLI/model beda buat ngetes hipotesis "stuck" — lihat preview live (phase + log feed).
+
+## 2026-09-07 — Self-Heal dropdown -> searchable+grouped combobox — SELESAI (fe-dev)
+- User nyinyir: dropdown self-heal cuma native `<select>` (gak bisa search/group) padahal
+  dialog CLI Tools pakai `createCombobox` (searchable + grouped). Akar: PM under-spec
+  kontrak ("dropdown" umum) -> fe-dev pakai `<select>` termudah.
+- **fe-dev DONE (ses_f8535ea19ffeoXO44OeMUvFbpy):** index.html `selfHealCli`/`selfHealModel`
+  `<select>` -> markup combobox (input + ul); selfheal.js pakai `createCombobox`:
+  CLI `searchInside:true, groupBy:none`; model `searchInside:true, groupBy:prefix,
+  startExpanded:true` (family grouping, no BE change). Default "Auto"/"No model" = "".
+  `combobox.js` tweak: render opsi tanpa-grup + opt `startExpanded`. cache-buster
+  `selfheal.js?v=20260909`. test selfheal +29, i18n parity lolos, regresi clitools/
+  combobox/combos 94 passed.
+- **Verifikasi PM (re-run sendiri):** vitest penuh = **459 passed (23 files)**. 0 regresi.
+- PENDING (user): restart aigate + hard-refresh (R32). BELUM di-commit.
+
+## 2026-09-07 — Self-Heal model list -> group by provider + combo — SELESAI (paralel BE↔FE)
+- User: "kenapa daftar model gak di-group berdasarkan provider dan combo?" Akar: BE
+  `list_self_heal_models()` cuma balikin string polos (nama model) -> FE cuma bisa
+  group by prefix. Butuh info grup dari BE.
+- **be-dev DONE (ses_f8523b907ffeFYjtlyCDTO0KBK):** `list_self_heal_models()` balikin
+  list dict `{value,label,group}`: provider models group=provider.name; combo members
+  group="__combos__" (sentinel, FE localize). Dedupe (value,group). Endpoint
+  `/api/self-heal/models` -> `{"models":[dict...],"selected":...}`. selected tetap bare
+  model name (value `--model`). 451 passed/1 skip.
+- **fe-dev DONE (ses_f852399b5ffe8QqRmC5MdglTSD):** model combo `groupBy:"group",
+  subGroupBy:"prefix", startExpanded:true` + `setGroupOrder([comboGroupName()])` (pin
+  grup Kombo di atas, lokal "Kombo"/"Combos"). Map sentinel `__combos__` -> localized.
+  Combo members `subGroup:false` (flat, parity CLI Tools). cache-buster `?v=20260910`.
+  test 33 passed (29 selfheal + 4 i18n).
+- **Verifikasi PM (re-run sendiri):** pytest backend **451 passed/1 skip**; vitest penuh
+  **459 passed (23 files)**. 0 regresi.
+- PENDING (user): restart aigate + hard-refresh (R32). BELUM di-commit.
+
+## 2026-09-07 — BUGFIX Self-Heal false-done (issue-64) — SELESAI (PM proxy be-dev)
+- User lapor: heal print help opencode lalu "aigate: issue done" tanpa memproses apa pun.
+- Investigasi (PM, read-only): bug di `src/backend/selfheal.py` `build_heal_command()`
+  (dulu L385-407): TUI default command + `--prompt` (bukan `opencode run`), `;` ->
+  `touch .done` tanpa syarat (false done), model `hy3` mentah dari setting DB (ambigu:
+  `aigate/hy3` + `bai/hy3` di `opencode models`). Dikonfirmasi live: `opencode run --help`
+  (1.18.22: `-m provider/model`, tanpa `--prompt`), `opencode --model hy3 --prompt x`
+  menggantung (TUI), DB `~/.aigate/aigate.db` settings `self_heal_model='hy3'`.
+- **DEVIASI R21 (dicatat eksplisit):** sesi ini tidak punya Task tool -> spawn be-dev
+  mustahil. PM proxy-implementasi STRICTLY dalam write scope be-dev:
+  `src/backend/selfheal.py` + `tests/backend/test_selfheal.py`. Router/FE/DB tidak disentuh.
+- Fix: (1) opencode -> `opencode run[-m <m>] "$(cat file)"`; (2) `&& { touch done; echo }
+  || touch failed` + `wait_for_done(failedfile=)` False seketika saat `.failed`;
+  (3) `qualify_opencode_model()` (unique->pakai, ambigu->prefer `aigate/`, none->omit+warning,
+  fail-open); (4) `CLI_MODEL_FLAGS` opencode dihapus (special-case; entri lain = open item
+  unverified). Handover record: `documents/pm/handovers/2026-09-07-be-dev-selfheal-opencode-run-fix.md`.
+- Verifikasi: pytest backend **458 passed / 1 skipped** (+7 test baru, 0 regresi); dry-run
+  live shim exit 0/1: `.done` hanya saat rc=0, `.failed` saat rc!=0, prompt multi-line +
+  `$`/backtick aman satu argumen; `qualify_opencode_model('hy3')` real -> `aigate/hy3` ✓.
+- Rule baru: **R34** (non-interaktif subcommand + gate done-marker + kualifikasi model).
+- PENDING user: restart aigate (R32). BELUM di-commit (user belum minta).
+
+## 2026-09-07 — BUGFIX noisy traceback di provider-test probe — SELESAI (PM proxy be-dev)
+- User lapor (via runtime log): `provider test failed: transport error` + 5-frame
+  httpx/httpcore traceback tiap kali host provider gak reachable (mis. port 9).
+  Itu EXPECTED outcome dari probe konektivitas, bukan server fault -> log scary salah.
+- Investigasi (PM, read-only): akar = `logger.error(..., exc_info=True)` di
+  `src/backend/providers_router.py` `_run_provider_test` (branch `httpx.TimeoutException`
+  L307 dan `httpx.HTTPError` L316). `exc_info=True` yg nge-print traceback ke stderr.
+  `log_error_exc(...)` terpisah TIDAK nge-print (cuma persist LogEntry ke DB) -> envelope
+  return tetap benar & `test_provider_test_network_error` sudah hijau.
+  `_short_transport_error` memetakan `ConnectError` -> "Connection refused" (sudah benar).
+- **DEVIASI R21 (sama spt Self-Heal issue-64):** sesi ini gak punya Task tool ->
+  spawn be-dev mustahil. PM proxy-implementasi STRICTLY dlm write scope be-dev:
+  `src/backend/providers_router.py` (gak sentuh FE/test/DB).
+- Fix (minimal):
+  - Import `log_warning_exc` ditambah (L28).
+  - Timeout & transport branch: `logger.error(..., exc_info=True)` ->
+    `logger.warning(...)` (tanpa exc_info) + `log_error_exc` ->
+    `log_warning_exc` (severity DB jadi WARNING, cocok "expected, not a fault").
+  - Unexpected-error branch (L325) TETAP `logger.error`+`exc_info=True` (itu genuine fault).
+  - Return dict `{"ok": False, "error": ...}` TIDAK diubah -> envelope & kontrak utuh.
+- Verifikasi PM (re-run sendiri): `pytest tests/backend/test_providers.py` =
+  **16 passed** (termasuk `test_provider_test_network_error` -> 200 +
+  `error=="Connection refused"`). Endpoint `/api/providers/test` tetap selalu 200.
+- BELUM di-commit (user belum minta).
+
+## 2026-09-07 (sore–malam) — Sesi "rapihin semuanya": PR #4 audit + commit pecah + optimasi kecepatan tes
+- Permintaan user: "rapihin semuanya deh kecuali nomor 4 [verifikasi flag `--model` per CLI].
+  Tapi dahulukan ini: nomor 5 — Gua udah suka desain saat ini, cek dulu dan sampaikan
+  detail perubahan pada PR #4." Lalu: "kenapa kalo melakukan testing sering lama ya?
+  apakah ada yang salah dengan konfigurasi, kode, prompt/command/skill/rule?"
+- **Temuan #1 (PR #4):** `gh pr view 4` = **MERGED** 2026-09-06T21:30:12Z, merge commit
+  `b278afe`, 59 file / +4574 / −722, 14 commit. Memory Bank lama bilang "belum merge" ->
+  SUDAH diperbaiki. **4 commit `refactor/ui` belum masuk `main`** (`a17264c`, `0523a05`,
+  `68cc1bd`, `1bc8fda`) + `gh pr list --state open` = KOSONG -> butuh PR susulan (keputusan user).
+- **qa-engineer DONE (ses_f842dee4bffef8k0q0gQIM0Slp):** laporan detail perubahan PR #4 ->
+  `.opencode/reports/20260907/review/1934_pr4-change-detail.md` (261 baris, read-only,
+  0 git-write). KOREKSI utk PM: angka "73 file `origin/main...origin/refactor/ui`" basi
+  (kini 24 file = sisa pasca-merge); angka PR #4 yang benar 59/+4574/−722
+  (direproduksi `git diff --shortstat b278afe^1 b278afe`). Temuan QA lain: klaim duplikat
+  rule R23→R29 TIDAK terkonfirmasi; rule R24 nyelip di dalam commit fitur UI `38e3743`.
+- **Audit fitur cleanup log (T1 BE + T2 FE, handover `documents/pm/handover-20260907-logs-{be,fe}.md`):**
+  kode SUDAH mendarat penuh (sebelumnya tercatat tanpa receipt di status.md). PM cek per butir:
+  DELETE+confirm=all, retensi startup `log_retention_days`, kolom `resolved` + migrasi,
+  GET `show_resolved`, resolve tunggal/bulk, filter resolved di `current_issue()`/
+  `_count_remaining()`, FE controls + i18n EN/ID + styles. **3 DEVIASI dicatat:**
+  (a) wipe-all tanpa confirm -> 200 `{deleted:0,error}` bukan 400; (b) id tak dikenal ->
+  `{resolved:0}` bukan 404; (c) FE pakai modal konfirmasi + pemilih lingkup, bukan
+  `window.confirm` (lebih baik, konsisten dengan app). **GAP yang PM temuin & benerin:**
+  `app.js`, `styles.css`, `combobox.js` berubah TANPA cache-buster (jebakan yang sama
+  dengan bug terminal.js) -> PM pasang `?v=20260911` (+ bump `i18n.js`, `selfheal.js`).
+- **Commit (R19/R36, dipecah per fitur, file bersama di-split per hunk):**
+  `86c4778` feat(logs) BE → `74fcb9e` feat(selfheal) BE+FE → `45206c0` feat(ui) FE controls
+  → `5c2459f` test(frontend) kecepatan. Urutan dipilih supaya kolom/API (`86c4778`) lahir
+  sebelum dipakai filter self-heal (`74fcb9e`) -> tiap commit antara tetap konsisten.
+- **fe-dev DONE (ses_f83fb59f0ffesOK5ePaVMyOPLv):** optimasi kecepatan suite FE.
+  Akar: `vitest.config.js` gak punya opsi pool -> jsdom dibangun ulang 23x
+  (`environment 84.94s` kumulatif vs `tests 25.10s`). Solusi: `test.isolate:false` +
+  `vi.resetModules()` di `tests/terminal_exit.test.js` (akar kegagalannya = **cache ref DOM
+  basi** `emptyEl` di closure `terminal.js` saat registry modul dibagi antar file —
+  BUKAN bug aplikasi; `terminal.js` benar di runtime asli). Ditolak: `poolOptions.threads`
+  (pool aktif = forks), naikkan fork/`fileParallelism` (`os.cpus()=0` Termux), reset
+  per-test di `beforeEach`. **Tidak ada tes yang dihapus/skip/dilonggarkan.**
+- **Diagnosa "kenapa tes lama" (semua dari pengukuran):** BE 478 tes = 43s, tes terlama
+  2.64s, collect cuma 3.85s -> backend sehat, bukan masalah. FE 34.6s -> 23.3s.
+  Penyebab proses: PM re-run suite penuh 2x dalam sesi (yang kedua cuma utk edit
+  cache-buster HTML) -> **rule baru R35** (tes tertarget saat iterasi, suite penuh sekali
+  sebelum commit; klaim kinerja wajib diukur). **Rule baru R36** (commit per fitur +
+  split hunk file bersama + urutan commit konsisten).
+- **Verifikasi PM (gate pra-commit, sekali):** pytest tests/backend = **478 passed / 1 skipped**;
+  vitest = **476 passed (23 file), Duration 23.33s**. 0 regresi, 0 skip baru.
+- **Branch:** kerjaan di-commit di `aigate/self-heal-20260907-170338` (artefak self-heal,
+  isinya = `refactor/ui` + `f0c4e14`) lalu `refactor/ui` di-fast-forward ke situ.
+  Sisa branch `aigate/self-heal-*` lokal+remote dibersihkan HANYA kalau sudah terbukti
+  fully merged (lihat commit berikutnya).
+- PENDING user: restart aigate + hard-refresh (R32) — cache-buster baru `v=20260911`.
+  Item yang user TOLAK: verifikasi flag `--model` per CLI (tetap open item, jangan dikerjakan).

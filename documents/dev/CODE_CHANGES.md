@@ -1,6 +1,146 @@
 # Code Changes Register (code ↔ docs alignment)
 
-## 2026-09-07 — Self-Heal progress terlihat: CLI jalan di tab terminal + run async — DONE
+## 2026-09-07 — Log cleanup: hapus / retensi / tanda "selesai" (BE T1 + FE T2) — DONE (commit `86c4778` + `45206c0`)
+
+**Permintaan user:** fitur bersihin log — 3 opsi: hapus manual, auto-hapus per umur,
+dan tandai selesai supaya tidak terus nongol di daftar self-heal.
+
+### Backend (`src/backend/config/logs_router.py`, `models.py`, `config/db.py`, `config/settings.py`, `server.py`)
+- `DELETE /api/logs?severity=&before=` — filter severity sama persis dengan GET
+  (ilike substring OR). Wipe-all TANPA filter wajib `confirm=all`; tanpa itu NO-OP
+  `200 {"deleted":0,"error":"confirmation required"}` (DEVIASI dari handover yang
+  minta HTTP 400 — dipilih 200+error supaya FE cuma punya satu bentuk respons).
+  `before` non-ISO → `400 invalid 'before'` (destructive op: tidak pernah diam-diam
+  memperlebar rentang hapus). Audit trail ditulis SETELAH commit
+  (`log_event severity=info source=backend.config.logs_router`, "logs purged: deleted=N scope=…").
+- Retensi: `Setting log_retention_days` (default `"7"`), `purge_expired_logs()`
+  dipanggil di `server.py` lifespan setelah `ensure_seeded()`, dibungkus try/except
+  (startup gak pernah crash), nilai invalid/<=0 → fallback 7 + `log_warning`.
+- Kolom baru `LogEntry.resolved` (Boolean, NOT NULL, default False) + migrasi
+  aditif berpola sama (`_ensure_log_entry_resolved_column`: PRAGMA table_info →
+  guarded `ALTER TABLE`). GET `/api/logs` menyembunyikan baris resolved kecuali
+  `show_resolved=true` (PERUBAHAN default yang disengaja: feed self-heal jadi
+  hanya berisi baris yang masih bisa ditindaklanjuti).
+- `POST /api/logs/{id}/resolve` dan bulk `POST /api/logs/resolve {"ids":[…]}` →
+  `{"resolved":N}`; id tak dikenal → `{"resolved":0}` (DEVIASI dari handover:
+  404 → bentuk idempoten, supaya FE tidak perlu dua cabang error).
+- Integrasi self-heal: `current_issue()` + `_count_remaining()`
+  (`src/backend/selfheal.py`) dapat `.filter(LogEntry.resolved == False)` → baris
+  yang sudah ditandai selesai tidak lagi memblokir jalur "semua selesai → merge".
+  Delete-on-success self-heal TIDAK diubah.
+- Tests: `tests/backend/test_logs_router.py` (baru, 300 baris: delete berfilter,
+  wipe-all+confirm, tanpa confirm, cutoff `before`, `before` invalid, resolve
+  tunggal/bulk, GET default vs `show_resolved`, retensi + fallback Setting) +
+  `tests/backend/test_db_migration.py` (+94: migrasi kolom `resolved` di DB lama,
+  baris lama utuh + terbaca falsy) + `tests/backend/test_selfheal.py` (filter resolved).
+
+### Frontend (`src/frontend/static/app.js`, `index.html`, `styles.css`, `i18n.js`)
+- Tombol **Clear logs** + modal konfirmasi berisi pemilih lingkup
+  (`warning,error` | `all`); `buildClearLogsQuery(severity)` diekspor ke
+  `window.aigate` (wipe-all → `?confirm=all`, selain itu `?severity=<value>`).
+- Tombol **Show resolved** (toggle `aria-pressed`, persist
+  `localStorage aigate.logShowResolved`) → menambah `show_resolved=true` ke query GET.
+- Baris resolved dirender redup (`.log-row-resolved td{opacity:.55}`) + badge
+  `.log-resolved-badge`; tombol resolve per-baris (`.log-resolve-btn`, fa-check)
+  HANYA untuk baris warning|error yang belum resolved; delegasi klik di
+  `#logTableBody` (baris sering di-render ulang). Tombol **Resolve all (filtered)**
+  mengirim id baris unresolved yang sedang tampil.
+- i18n EN/ID lengkap untuk semua key baru (parity guard lolos).
+- Cache-buster (PM-owned): `styles.css`, `app.js`, `combobox.js`, `i18n.js` →
+  `?v=20260911`; `selfheal.js` `20260910` → `20260911`. Alasan: preseden
+  terminal.js — kode yang benar tidak pernah ter-load karena browser pakai salinan lama.
+- Tests: `src/frontend/tests/logwindow.test.js` +328 baris (query builder,
+  render resolved + badge, tombol per-baris, alur clear dengan confirm mock,
+  toggle show_resolved, resolve-all).
+
+**Verifikasi PM:** backend **478 passed / 1 skipped**; frontend **476 passed (23 file)**.
+
+## 2026-09-07 — Self-Heal: pemilih CLI/model + combobox grouped + gerbang false-done — DONE (commit `74fcb9e`)
+
+**Permintaan user:** (a) bisa pilih agentic CLI + model buat self-heal dan lihat prosesnya;
+(b) daftar model harus dikelompokkan per provider + Kombo; (c) dropdown harus bisa
+diketik seperti dialog CLI Tools; (d) bug: heal bilang "issue done" padahal tidak ada
+yang diproses (issue-64).
+
+### Backend (`src/backend/selfheal.py`, `selfheal_router.py`)
+- `build_heal_command()` untuk opencode diubah dari TUI
+  `opencode --model hy3 --prompt "…"` → **`opencode run [-m <provider/model>] "$(cat file)"`**
+  (`opencode run` tidak punya `--prompt`; pesan = argumen posisional).
+- Gerbang marker: `&& { touch .done; echo …; } || touch .failed`;
+  `wait_for_done(..., failedfile=)` return **False seketika** saat `.failed` muncul
+  (sebelumnya `;` → `touch .done` jalan walau CLI exit non-zero = "done" palsu).
+- `qualify_opencode_model()` baru: id mentah di-resolve lewat `opencode models`
+  (unique → dipakai; ambigu → prefer provider `aigate/`; tidak ketemu → flag OMIT +
+  warning; gagal total → fail-open). Setting lama `self_heal_model='hy3'` kini
+  otomatis jadi `aigate/hy3`.
+- `CLI_MODEL_FLAGS`: entri `opencode` dihapus (special-case `run`); entri lain tetap
+  (status **unverified** — item terbuka, sengaja tidak dikerjakan user 2026-09-07).
+- `list_self_heal_models()` → list dict `{value,label,group}` (grup = nama provider;
+  anggota kombo = sentinel `__combos__`), dedup by `(value,group)`;
+  `GET /api/self-heal/models` mengembalikan dict.
+- Tests: `tests/backend/test_selfheal.py` +546 baris (bentuk command, gerbang exit
+  code, kualifikasi model 4 kasus, filter resolved, list models bergrupa).
+
+### Frontend (`src/frontend/static/selfheal.js`, `combobox.js`, `index.html`, `i18n.js`)
+- `selfHealCli` / `selfHealModel` dari `<select>` native → `window.aigate.createCombobox`
+  (CLI: `searchInside`, tanpa grup; model: `groupBy:"group"`, `subGroupBy:"prefix"`,
+  `startExpanded`, grup Kombo di-pin ke atas via `setGroupOrder`).
+- `combobox.js`: render opsi tanpa-grup + opsi `startExpanded`; sentinel `__combos__`
+  dipetakan ke label terlokalisasi ("Kombo"/"Combos").
+- Panel **live preview**: poll progress 2.5s + aliran log dari `/api/logs`
+  (filter source `backend.selfheal`); i18n +22 key EN/ID.
+- Tests: `src/frontend/tests/selfheal.test.js` +179, `tests/frontend/selfheal.test.js`
+  +160 (mirror), i18n parity.
+
+**Verifikasi PM:** backend 478 passed/1 skip; frontend 476 passed; dry-run shim live
+exit 0/1 membuktikan `.done` tidak muncul saat CLI gagal.
+
+## 2026-09-07 — Konfigurasi tes frontend: suite ~2x lebih cepat — DONE (commit `5c2459f`)
+
+**Permintaan user:** "kenapa kalau testing sering lama — ada yang salah di konfigurasi,
+kode, atau aturan?"
+
+### Ukur dulu (bukan tebakan)
+- `src/frontend/vitest.config.js` sebelumnya 4 baris: hanya `environment:"jsdom"`,
+  `globals`, `include`. Efek: 23 file tes masing-masing membangun ulang jsdom →
+  `environment 84.94s` kumulatif vs `tests 25.10s` (wall 32-34s, CPU 2m25s).
+- `--no-isolate` → wall 15.5s, `environment 25.42s` **tapi 1 tes gagal**:
+  `tests/terminal_exit.test.js > DoD 4 > shows #termEmpty…`.
+
+### Akar masalah (murni di sisi tes, BUKAN bug aplikasi)
+`terminal.js` meng-cache referensi DOM di closure saat `init()`
+(`emptyEl = document.getElementById("termEmpty")`). Dengan registry modul yang dibagi
+antar-file, `await import("../static/terminal.js")` = **cache HIT** → `init()` tidak
+jalan ulang → `emptyEl` masih menunjuk node `#termEmpty` milik file tes sebelumnya
+yang sudah jadi detached. `terminal.js` sendiri benar di runtime asli (init sekali
+per page-load), jadi kode produksi TIDAK diubah.
+
+### Perubahan
+- `src/frontend/tests/terminal_exit.test.js`: `vi.resetModules()` sebelum re-import
+  (paksa cache MISS → `init()` jalan terhadap DOM milik file ini) + komentar.
+  Tidak ada tes yang dihapus/di-skip/dilonggarkan.
+- `src/frontend/vitest.config.js`: `test.isolate:false` + komentar alasan, angka
+  terukur, dan catatan "naikkan isolate lagi kalau ada tes yang butuh state segar".
+  `environment`/`globals`/`include` tidak diubah.
+- Ditolak: `poolOptions.threads.isolate` (pool aktif vitest 2.1.9 = forks → tidak
+  ngefek), menaikkan fork/`fileParallelism` (`os.cpus()=0` di Termux; memaksa fork di
+  HP ter-throttle = angka ngaco + membuka kontaminasi silang antar file), reset
+  per-test di `beforeEach` (over-engineering).
+
+**Verifikasi PM:** `node node_modules/.bin/vitest run` → **476 passed (23 file),
+Duration 23.33s** (bandingkan 32-34s sebelumnya di box yang sama; di box tidak
+ter-throttle ≈ 15s).
+
+## 2026-09-07 — Provider test: probe host tak terjangkau jadi WARNING (tanpa traceback) — DONE (commit `f0c4e14`)
+`src/backend/providers_router.py` `_run_provider_test`: cabang timeout & transport
+turun dari `logger.error(..., exc_info=True)` → `logger.warning(...)` dan
+`log_error_exc` → `log_warning_exc` (hasil probe yang diharapkan gagal koneksi bukan
+server fault; traceback 5 frame httpx/httpcore selama ini menutupi log). Cabang
+unexpected-error TETAP `error + exc_info`. Bentuk envelope return tidak diubah.
+`pytest tests/backend/test_providers.py` = 16 passed.
+
+## 2026-09-07 — Self-Heal progress terlihat: CLI jalan di tab terminal + run async — DONE (commit `68cc1bd`)
+
 
 **Root cause:** `POST /api/self-heal/run` dulu SINKRON dan agentic CLI dijalankan via
 `subprocess.run([cli, "--prompt", prompt])` — output tak pernah terlihat user; UI cuma
