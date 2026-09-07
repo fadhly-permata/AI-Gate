@@ -13,6 +13,16 @@ const html = readFileSync(join(__dirname, "..", "static", "index.html"), "utf8")
 const dom = new JSDOM(html);
 const doc = dom.window.document;
 
+// CSS source assertions (same approach as terminal_layout.test.js): the sticky
+// behaviour lives entirely in the stylesheet, so jsdom cannot exercise it and
+// the rule text is the contract.
+const cssRaw = readFileSync(join(__dirname, "..", "static", "styles.css"), "utf8");
+const css = cssRaw.replace(/\/\*[\s\S]*?\*\//g, "");
+function ruleBlock(selectorRe) {
+  const m = css.match(selectorRe);
+  return m ? m[0] : null;
+}
+
 describe("index.html structure — missing views + global Log Window", () => {
   it("groups sidebar items by user need without changing data-view values", () => {
     const groups = [
@@ -141,6 +151,111 @@ describe("terminal container chrome removed — flattened view (regression guard
     const id = Object.keys(window.I18N.id);
     expect(en.filter((k) => !id.includes(k))).toEqual([]);
     expect(id.filter((k) => !en.includes(k))).toEqual([]);
+  });
+});
+
+/* ===== Sidebar footer: link to the aigate repository, pinned to the bottom =====
+   Contract: an external <a> (never a view switch), wrapped in .sidebar-footer so
+   it can stick to the panel bottom, styled off the existing .nav-item rules,
+   localized through nav.repo, and inert on phones (sidebar stays hidden). */
+describe("sidebar Repository link — sticky footer", () => {
+  const REPO_URL = "https://github.com/fadhly-permata/AI-Gate";
+  const repoLink = () => doc.querySelector(".sidebar-footer a.nav-item");
+
+  it("is a real external anchor with safe target/rel", () => {
+    const link = repoLink();
+    expect(link, ".sidebar-footer a.nav-item present").not.toBeNull();
+    expect(link.tagName).toBe("A");
+    expect(link.getAttribute("href")).toBe(REPO_URL);
+    expect(link.getAttribute("target")).toBe("_blank");
+    const rel = (link.getAttribute("rel") || "").split(/\s+/);
+    expect(rel).toContain("noopener");
+    expect(rel).toContain("noreferrer");
+  });
+
+  it("carries no data-view, and app.js only hijacks data-view items", () => {
+    // data-view is what the view-switching handler keys on; without it the
+    // browser keeps native link behaviour (a preventDefault() here would kill
+    // the repo link — regression guard on the app.js binding).
+    expect(repoLink().hasAttribute("data-view")).toBe(false);
+    const appSrc = readFileSync(join(__dirname, "..", "static", "app.js"), "utf8");
+    const binding = appSrc.match(
+      /querySelectorAll\("\.nav-item, \.bn-item"\)\.forEach\(function \(item\) \{[\s\S]*?\n    \}\);/
+    );
+    expect(binding, "nav click binding present").not.toBeNull();
+    expect(binding[0]).toMatch(/hasAttribute\("data-view"\)/);
+    expect(binding[0].indexOf("data-view")).toBeLessThan(binding[0].indexOf("addEventListener"));
+  });
+
+  it("wrapper is the last child of .sidebar and outside <nav>", () => {
+    const sidebar = doc.querySelector("aside.sidebar");
+    const footer = sidebar.querySelector(":scope > .sidebar-footer");
+    expect(footer, ".sidebar-footer is a direct child of .sidebar").not.toBeNull();
+    expect(sidebar.lastElementChild).toBe(footer);
+    // Outside <nav> on purpose: .nav's last child must stay a .nav-section so
+    // `.nav-section:last-child { border-bottom: 0 }` keeps its original meaning.
+    expect(footer.closest("nav")).toBeNull();
+    const sections = doc.querySelectorAll(".nav-section");
+    expect(sections).toHaveLength(4);
+    expect(sections[3].nextElementSibling).toBeNull();
+    // Not part of any group -> the grouping test above is unaffected.
+    expect(repoLink().closest(".nav-section")).toBeNull();
+  });
+
+  it("reuses the nav markup: icon + localized label + readable when collapsed", () => {
+    const link = repoLink();
+    expect(link.querySelector("i.nav-icon.fa-github")).not.toBeNull();
+    const label = link.querySelector("span.nav-label");
+    expect(label.getAttribute("data-i18n")).toBe("nav.repo");
+    // Collapsed mode hides .nav-label via CSS only, so aria-label/title carry it.
+    expect(link.getAttribute("data-i18n-aria")).toBe("nav.repo");
+    expect((link.getAttribute("aria-label") || "").trim()).toBeTruthy();
+    expect((link.getAttribute("title") || "").trim()).toBeTruthy();
+  });
+
+  it("nav.repo is present in EN and ID, one value each (no bilingual string)", () => {
+    expect(window.I18N.en["nav.repo"]).toBe("Repository");
+    expect(window.I18N.id["nav.repo"]).toBe("Repositori");
+    // Decision 2026-09-06: one key = one value, never "Repositori/Repository".
+    expect(window.I18N.en["nav.repo"]).not.toMatch(/\/|Repositori/);
+    expect(window.I18N.id["nav.repo"]).not.toMatch(/\/|Repository/);
+  });
+
+  it("collapsed mode keeps the label in the DOM (hidden by CSS, not markup)", () => {
+    const label = repoLink().querySelector(".nav-label");
+    expect(label.textContent).toBe("Repository");
+    expect(label.hasAttribute("hidden")).toBe(false);
+    expect(label.getAttribute("style")).toBeNull();
+    // The collapse rules still target the shared classes the footer uses.
+    expect(ruleBlock(/(^|\n)body\.sidebar-collapsed \.nav-label[^{]*\{[^}]*\}/))
+      .toMatch(/display:\s*none/);
+    expect(ruleBlock(/(^|\n)body\.sidebar-collapsed \.sidebar-footer[^{]*\{[^}]*\}/))
+      .toBeTruthy();
+  });
+
+  it("CSS pins the footer to the panel bottom with existing tokens", () => {
+    const footer = ruleBlock(/(^|\n)\.sidebar-footer\s*\{[^}]*\}/);
+    expect(footer, ".sidebar-footer rule present").not.toBeNull();
+    expect(footer).toMatch(/position:\s*sticky/);   // stays visible while .nav scrolls
+    expect(footer).toMatch(/bottom:\s*0/);
+    expect(footer).toMatch(/margin-top:\s*auto/);   // sits at the bottom when menu is short
+    expect(footer).toMatch(/flex:\s*0 0 auto/);     // never squished by the flex line
+    expect(footer).toMatch(/background:\s*var\(--sidebar-bg\)/); // opaque: menu scrolls under
+    expect(footer).not.toMatch(/#[0-9a-fA-F]{3,8}/); // no new hex — design tokens only
+    // margin-top:auto needs .sidebar to be a flex column.
+    const sidebar = ruleBlock(/(^|\n)\.sidebar\s*\{[^}]*\}/);
+    expect(sidebar).toMatch(/display:\s*flex/);
+    expect(sidebar).toMatch(/flex-direction:\s*column/);
+    expect(sidebar).toMatch(/overflow-y:\s*auto/);  // still the scroll container
+  });
+
+  it("phones are unchanged: sidebar stays hidden, no repo item in .bottom-nav", () => {
+    expect(css).toMatch(/@media \(max-width: 600px\)[\s\S]{0,400}\.sidebar\s*\{\s*display:\s*none/);
+    expect(ruleBlock(/(^|\n)body\[data-device="phone"\] \.sidebar\s*\{[^}]*\}/))
+      .toMatch(/display:\s*none/);
+    expect(doc.querySelector('.bottom-nav a[href*="github"]')).toBeNull();
+    // 7 = current bottom-nav items; guards that the repo link was NOT added here.
+    expect(doc.querySelectorAll(".bottom-nav .bn-item")).toHaveLength(7);
   });
 });
 

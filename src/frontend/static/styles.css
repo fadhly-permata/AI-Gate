@@ -290,8 +290,16 @@ body.sidebar-collapsed .layout {
 [data-theme="dark"] .row-menu-item.is-danger { color: #ff6b6b; }
 [data-theme="dark"] .row-menu-item.is-danger:hover { background: #c0392b; color: #fff; }
 
-/* ===== Sidebar ===== */
+/* ===== Sidebar =====
+   Flex column so the Repository footer (.sidebar-footer below) can be pinned to
+   the panel bottom: margin-top:auto pushes it down when the menu is short, and
+   position:sticky keeps it in view when the menu is long enough to scroll. The
+   mobile `display:none` rules later in this file still win (same specificity,
+   later source order; the phone-simulation one is more specific), so this does
+   not resurrect the sidebar on phones. */
 .sidebar {
+  display: flex;
+  flex-direction: column;
   grid-row: 2;
   grid-column: 1;
   background: var(--sidebar-bg);
@@ -302,6 +310,10 @@ body.sidebar-collapsed .layout {
   transition: width var(--transition);
 }
 
+/* .nav is left alone on purpose: as a column flex item its automatic minimum
+   size (min-height:auto, valid because its overflow is visible) equals its
+   content height, so a long menu never squishes the items — it overflows and
+   .sidebar scrolls instead. */
 .nav { display: flex; flex-direction: column; }
 
 .nav-section {
@@ -357,6 +369,27 @@ body.sidebar-collapsed .layout {
   transition: opacity var(--transition);
 }
 
+/* ---- Sidebar footer: the Repository link ----
+   Sticky-at-bottom. Two mechanisms, both needed:
+   - margin-top:auto  -> sits at the panel bottom when the menu is SHORT
+     (absorbs the free space .nav leaves).
+   - position:sticky + bottom:0 -> stays visible at the panel bottom when the
+     menu is LONG and .sidebar scrolls (auto margins collapse to 0 there).
+   Opaque background + z-index so the menu scrolls UNDER it instead of through
+   it; the divider reuses the same rgba the .nav-section borders already use.
+   At max scroll the footer settles into its natural place after .nav, so the
+   last menu item is always reachable — nothing is permanently covered. */
+.sidebar-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  flex: 0 0 auto;
+  margin-top: auto;
+  padding: 6px 0;
+  background: var(--sidebar-bg);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 /* Collapsed: icons only */
 body.sidebar-collapsed .nav-label,
 body.sidebar-collapsed .nav-section-heading {
@@ -367,6 +400,9 @@ body.sidebar-collapsed .nav-section {
   padding: 4px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
+
+/* The footer tightens with the rest of the menu, and stays at the bottom. */
+body.sidebar-collapsed .sidebar-footer { padding: 4px 0; }
 
 body.sidebar-collapsed .nav-item {
   justify-content: center;

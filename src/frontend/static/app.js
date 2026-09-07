@@ -1673,6 +1673,10 @@
     }
 
     document.querySelectorAll(".nav-item, .bn-item").forEach(function (item) {
+      // Only in-app views are driven by data-view. Items without it are plain
+      // links (the sidebar Repository link to GitHub) — registering the handler
+      // there would preventDefault() and kill the navigation.
+      if (!item.hasAttribute("data-view")) return;
       item.addEventListener("click", function (e) {
         e.preventDefault();
         handleNav(item);
