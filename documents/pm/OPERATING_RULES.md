@@ -589,3 +589,21 @@ Aturan wajib (berlaku utk SEMUA varian bahasa: id, ru, nl, ja, zh, zh-tw):
    minta eksplisit.
 5. PM WAJIB menuliskan poin 1–4 di handover SEBELUM sub-agent menulis, dan **membaca hasil akhirnya
    sendiri** — bukan cuma ngandelin receipt — sebelum ditampilkan ke user.
+
+### R43 addendum (2026-09-08, user: "masih banyak kalimat yang terasa janggal")
+Hasil audit PM baris-per-baris atas varian id. Pola janggal yang HARUS dihindari di semua varian
+bahasa (bukan cuma Indonesia):
+1. **Pasif kaku** ("dijalankan", "diarahkan", "diteruskan", "dilaporkan") → ganti aktif + subjek
+   jelas: "aigate menjalankan…", "kamu kirim…".
+2. **Subjek hilang** ("Sudah diuji di Linux…", "Arahkan ke project yang error:") → sebut siapa.
+3. **Reduplikasi palsu** ("akun-akun provider", "Asisten-asisten coding") → pakai bentuk tunggal
+   atau kata penghitung ("banyak asisten coding", "semua akun provider").
+4. **Nominalisasi kaku**: "pemasangan"→"pasang/install", "pengujian"→"tes", "pengerjaannya"→
+   "prosesnya", "riwayat pemakaian"→"riwayat pemakaian" boleh tapi "permintaan" utk *request*
+   JANGAN (pakai "request" — itu yang dipakai developer Indonesia).
+5. **Diksi salah rasa**: "provider mati" → "provider sedang bermasalah/down"; "Tema terang dan
+   gelap" → "mode terang dan gelap"; "terpasang dan berjalan native" → "bisa dipasang dan jalan".
+6. **Redundansi**: "dengan cara yang sama seperti" → "sama seperti".
+7. **Kata yang salah maksud**: "tulis satu perintah singkat" padahal yang ditulis itu instruksi ke
+   agent → "tulis satu instruksi singkat".
+8. Kalimat panjang >2 klausa + banyak "yang" bertumpuk → pecah jadi 2 kalimat.
