@@ -567,3 +567,25 @@ Aturan wajib:
    supaya sesi berikutnya tidak memasang caveat lagi.
 4. Sebaliknya: klaim yang belum pernah dikonfirmasi maintainer tetap tidak boleh dilebihkan.
    Netral = faktual, bukan penuh tanda tanya.
+
+## R43 — Varian bahasa = TULISAN ASLI dalam bahasa itu, bukan hasil terjemahan; kalimat wajib jelas
+Pelajaran (2026-09-08, user soal varian README id: "dih bahasa lu absurd dan ambigu banget.
+benerin dong kalimatnya, tapi tetep dengan nada kasual. btw, lu jangan translate dari inggris,
+boleh beda yang penting strukturnya tetep sama"):
+Sub-agent menulis `README.id.md` sebagai calque dari versi Inggris → muncul "ngeresolve",
+"request tetep kejawab", "bilang gue di mana encernya", "kalau lu suka trik begitu" — kasual tapi
+absurd dan ambigu.
+
+Aturan wajib (berlaku utk SEMUA varian bahasa: id, ru, nl, ja, zh, zh-tw):
+1. **DILARANG menerjemahkan kalimat per kalimat.** Tulis materi **asli** dalam bahasa target yang
+   kebetulan menyampaikan produk yang sama. Contoh, idiom, dan adegan **boleh berbeda** — yang
+   **sama hanya struktur seksi dan urutan informasi**.
+2. Yang tetap identik lintas bahasa: **fakta** (jumlah tool, nama produk `aigate`, perintah
+   menjalankan, URL wiki, daftar platform yang sudah dites, baris kredit). Yang bebas: kalimat,
+   metafora, adegan, penutup.
+3. **Satu kalimat = satu makna yang langsung kebaca.** Dilarang: calque struktur Inggris, kata
+   campur bahasa yang gak perlu, sapaan sok akrab, kiasan yang gantung. Kasual ≠ berantakan.
+4. Sapaan default: **impersonal atau "kamu"** untuk dokumen publik; "lu/gue" hanya kalau user
+   minta eksplisit.
+5. PM WAJIB menuliskan poin 1–4 di handover SEBELUM sub-agent menulis, dan **membaca hasil akhirnya
+   sendiri** — bukan cuma ngandelin receipt — sebelum ditampilkan ke user.
