@@ -1747,3 +1747,27 @@ User: "tambahin satu bahasa lagi buat readme, bahasa india" → setelah diklarif
 - **BATAS JUJUR gue:** gue (dan user) bukan penutur asli Hindi — kualitas rasa bahasanya belum
   ada yang ngecek. Struktur & fakta udah diverifikasi, tapi perlu mata penutur Hindi sebelum
   dianggap final.
+
+## 2026-09-08 — 5 varian README sisanya (ru, nl, ja, zh, zh-tw) — PARALEL, lalu audit silang PM
+User: "lanjut ke semua bahasa lain, toh gw juga gak ngerti jadi gak bisa review" → alasan
+sekuensial (review per biji) hilang, dan tiap bahasa = file sendiri (scope gak tumpang tindih) →
+PM pindah ke **paralel** (5 spawn `business-analyst` sekaligus). `state.md: multiagent_mode` dicatat.
+- **1 spawn GAGAL** (zh, HTTP 429 upstream) → diulang, berhasil. Catatan: kegagalan paralel =
+  cuma 1 file, tidak nyentuh hasil agen lain.
+- **5 micro-fix hasil keputusan PM** atas keraguan yang dilaporkan penulisnya: ru «Даёте aigate
+  проект…» → «Указываете aigate проект, в котором сыпятся ошибки…»; ru «local-first» → «всё
+  локально»; nl "doet zich nooit voor als geslaagd" → "doet nooit alsof het gelukt is"; ja baris 71
+  kembali ke ます調; zh-tw «不會多連一台伺服器» → «不會有任何東西連到雲端» (+ nuansa "yang kamu pilih
+  sendiri" dipertegas 你自己選的).
+- **Audit silang PM atas 8 file README** (bukan ngandelin receipt):
+  jumlah baris 79–89; **semua** punya tepat 1 baris `🌐` dengan 7 pemisah `·` dan bahasa sendiri
+  ditebalkan tanpa link; **0 link mati** (semua target file ada); klaim "sudah diuji Linux/Windows/
+  Termux" ada di 8/8; **0 kata hedge** (unverified/experimental/未検証/未验证/未驗證/niet getest/
+  экспериментальн/eksperimental); angka "24" **1x per file**; kalimat "daftar tool masih
+  berkembang" ada di 8/8; satu-satunya nama file = `run.py`; kredit baris terakhir 8/8 (nama tetap
+  latin); 0 tabel; **zh 0 karakter Tradisional** dan **zh-tw 0 karakter Sederhana** di prosa
+  (muncul cuma di label bahasa, itu wajib).
+- **Diputuskan PM (bukan ditanya balik):** zh «你负责看» dipertahankan (tajam & natural, bukan
+  kalka); ru «Попробуйте» vs «Попробуй» → agen benar, register «вы» dijaga konsisten.
+- **BATAS JUJUR:** kualitas rasa 5 bahasa non-Latin ini belum diperiksa penutur asli — sama seperti
+  kamus aplikasi. Yang gue jamin = struktur, fakta, tautan, dan tidak adanya klaim palsu.
