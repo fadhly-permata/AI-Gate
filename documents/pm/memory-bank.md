@@ -319,3 +319,12 @@
   wiki → https://github.com/fadhly-permata/AI-Gate/wiki
 - Kalimat penutup README yang di-ACC user: "Try it, break it, and tell me where it hurts."
   + baris kredit terakhir: "Made with ❤️ by Fadhly Permata".
+
+### Fakta wajib soal daftar CLI tool (berlaku README + semua varian + halaman wiki)
+- Jumlah preset saat ini **24** (dihitung dari `src/backend/cli_presets.py`: 12 agentic +
+  6 autonomous + 6 chat/shell). Sebut angkanya **cukup satu kali** per dokumen.
+- **Daftarnya masih dikembangkan** — wajib ditulis sebagai catatan: versi berikutnya bisa
+  menambah/mengubah tool (sebagian preset belum punya jalur install di semua platform).
+  EN: "The list is still growing — future versions may add or change tools."
+  ID: "Daftarnya masih terus dikembangkan — versi berikutnya bisa menambah atau mengubah tool
+  yang tersedia."

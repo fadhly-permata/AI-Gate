@@ -1694,3 +1694,15 @@ padahal instruksi ke agent), kalimat >2 klausa.
   nama file; struktur seksi gak bergeser.
 - **Dibuka ke user:** angka "24" sekarang muncul 2x di satu bullet (judul + badan) — mau dirapikan
   atau biarin?
+
+## 2026-09-08 — Daftar CLI tool diberi catatan "masih dikembangkan" (README EN + varian id)
+User: "soal 24 tools itu, infokan aja kalo masih dalam tahap pengembangan; versi berikutnya bisa
+jadi ada update daftar cli tools".
+- **business-analyst** (handover scope: `README.md` + `documents/readme-variants/README.id.md`)
+  nambah 1 kalimat catatan di bullet yang sama + **hapus angka "24" yang kedua** (sebelumnya muncul
+  2x di varian id) → sekarang **1x per file** (grep `24` = 1 dan 1).
+- README.md 80→81 baris, varian id 86→87 baris. Bagian lain gak tersentuh.
+- Fakta ini dipindah ke `memory-bank.md` sebagai **aturan lintas dokumen**: angka cukup sekali +
+  wajib ada catatan "daftar masih dikembangkan" (alasan nyata: sebagian preset belum punya jalur
+  install di semua platform — lihat `cli_presets.py` `NO_INSTALL` + `TERMUX_INSTALL`).
+- **Push** → PR #8 ikut ke-update (README + varian id).

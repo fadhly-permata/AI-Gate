@@ -22,9 +22,10 @@ phone, in a browser tab.
 - **One door for all your AI providers.** Connect your provider accounts
   once and aigate routes your requests through them — when one is down or
   out of quota, the request still gets answered instead of failing.
-- **24 AI coding tools, one tap.** Launch the popular AI coding assistants
-  straight into aigate's built-in terminal tabs. Missing one? It suggests
-  an install command that actually works on your device.
+- **24 AI coding tools, one tap.** aigate runs them straight in its
+  built-in terminal tabs. Missing one? It shows an install command that
+  works on your device. The list is still growing — future versions may
+  add or change tools.
 - **A self-heal loop you can watch.** Point it at your project's errors:
   it makes a branch, runs an agent in a live tab, fixes warning after
   warning, and merges back when things pass. Nothing hidden — and it never

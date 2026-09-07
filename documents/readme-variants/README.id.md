@@ -24,10 +24,11 @@ paginya kode sudah rapi.
   aigate, lalu aigate mengarahkan request kamu secara otomatis. Kalau
   satu provider sedang bermasalah atau kuotanya habis, aigate mengirim
   request ke provider lain.
-- **24 tool AI coding, tinggal ketuk.** aigate menjalankan 24 asisten
-  coding populer langsung di tab terminal bawaannya. Kalau salah satunya
-  belum terpasang, aigate menampilkan perintah pasang yang cocok untuk
-  perangkat itu.
+- **24 tool AI coding, tinggal ketuk.** aigate menjalankannya langsung
+  di tab terminal bawaannya. Kalau salah satunya belum terpasang, aigate
+  menampilkan perintah pasang yang cocok untuk perangkat itu. Daftarnya
+  masih terus dikembangkan — versi berikutnya bisa menambah atau
+  mengubah tool yang tersedia.
 - **Perbaikan otomatis yang terlihat.** Arahkan aigate ke project kamu
   yang lagi error. Dia membuat branch, menjalankan agent di tab yang
   bisa kamu buka kapan saja, memperbaiki error satu per satu, lalu
