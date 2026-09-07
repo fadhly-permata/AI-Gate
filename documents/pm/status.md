@@ -1154,3 +1154,24 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
 - **Verifikasi PM (re-run sendiri):** `pytest tests/backend` = **423 passed / 1 skipped** (skip native PTY); vitest penuh = **445 passed / 23 files**. 0 regresi.
 - PENDING (user): restart aigate agar BE aktif (R32 — user yang restart); hard-refresh halaman. Baris lama (`model=''`) tidak di-backfill.
 - **DI-COMMIT `a17264c`** (13 file, +457/−25) **+ PUSH `origin/refactor/ui`** (1165bc1..a17264c) — approve user.
+
+## 2026-09-07 — Self-Heal progress terlihat (tab terminal + async run) — SELESAI
+- User request: "untuk self heal progress gak jelas. jadi buka aja terminal baru
+  (dan fokus) agar progress self heal keliatan". Mode SEKUENSIAL (pilihan user).
+- **be-dev DONE (ses_f86f34fbaffeFPUBeIPHr3kPEw):** selfheal.py — CLI diketik ke PTY
+  key `self-heal` (prompt file temp anti-injection, donefile poll 2s, timeout/issue
+  1800s, abort-on-session-death, temp cleanup); start_self_heal() async thread +
+  guard; router: POST /run → 200 started / 409 already_running; GET /status →
+  {running, last}; TerminalTab row "Self-Heal". run_self_heal sync tetap (kontrak utuh).
+- **fe-dev DONE (ses_f86de0203ffeg6fwA07i1yoTb6):** selfheal.js — 200→started + buka/
+  fokus tab openTab("self-heal") + nav click; 409→warn + tetap buka tab; polling
+  status 5s single-handle; terminal.js tabTitle("self-heal")="Self-Heal"; i18n +2 key
+  (en/id) parity OK; test +8 + mirror.
+- **PM-owned:** cache-buster index.html (selfheal/terminal/i18n → v=20260907);
+  docs sinkron FSD §2.8 / TSD §3.5 / BRD US-2.8.5; CODE_CHANGES.md 2026-09-07.
+- **Verifikasi PM (re-run sendiri):** pytest tests/backend = **438 passed / 1 skipped**;
+  vitest = **453 passed (23 files)**. 0 regresi.
+- PENDING (user): restart aigate + hard-refresh (R32). Belum di-commit (menunggu
+  approve user).
+- Open (belum dikerjakan): max-age cutoff polling FE (e.g. 30 menit) bila run
+  tak pernah report; `status.last` untuk no_agentic_cli hanya terlihat lewat poll.

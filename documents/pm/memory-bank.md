@@ -36,6 +36,16 @@
   delegasi re-work ke pemilik scope, baru catat + commit.
 
 ## Progress
+- 2026-09-07: **Self-Heal progress terlihat — SELESAI (sekuensial BE→FE, uncommitted).**
+  Root cause: POST /api/self-heal/run sinkron + CLI via subprocess tersembunyi.
+  Fix BE (be-dev): CLI jalan di PTY key `self-heal` (command diketik, prompt file
+  temp anti-injection, donefile poll, timeout 1800s/issue, abort bila tab mati);
+  run async (start_self_heal, 409 already_running) + GET /api/self-heal/status
+  {running, last}. Fix FE (fe-dev): klik Run → buka+fokus tab "Self-Heal" +
+  polling 5s; i18n +2 key. PM: cache-buster v=20260907 (selfheal/terminal/i18n),
+  docs FSD/TSD/BRD sinkron, CODE_CHANGES.md. Verifikasi PM: **BE 438 passed/
+  1 skipped, FE 453 passed (23 files)**. PENDING: user restart aigate + hard-refresh
+  (R32); belum commit (menunggu approve). Open: FE poll max-age cutoff (opsional).
 - 2026-09-07: **Request Log kolom Model/Endpoint kosong — SELESAI + DI-COMMIT
   `a17264c` + PUSH `origin/refactor/ui`.** Root cause: combo ref → resolver `upstream_model=""` →
   router nimpa `ctx["model"]` jadi `''` (RequestLog.model kosong utk semua request

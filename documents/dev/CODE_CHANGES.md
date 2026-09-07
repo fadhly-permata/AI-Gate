@@ -1,5 +1,62 @@
 # Code Changes Register (code ↔ docs alignment)
 
+## 2026-09-07 — Self-Heal progress terlihat: CLI jalan di tab terminal + run async — DONE
+
+**Root cause:** `POST /api/self-heal/run` dulu SINKRON dan agentic CLI dijalankan via
+`subprocess.run([cli, "--prompt", prompt])` — output tak pernah terlihat user; UI cuma
+"Running…" lalu diam. Request user (2026-09-07): "untuk self heal progress gak jelas.
+jadi buka aja terminal baru (dan fokus) agar progress self heal keliatan".
+
+### Backend (`src/backend/selfheal.py`, `src/backend/selfheal_router.py`)
+- CLI TIDAK lagi di-spawn sebagai subprocess tersembunyi. Orkestrasi jalan di
+  sesi PTY terminal key **`self-heal`** (shell biasa via `get_or_create`; respawn
+  bila mati; tak pernah kill sesi hidup milik user). Per issue: prompt (dari
+  `LogEntry`) ditulis ke file temp `aigate-heal-<uuid>/issue-<id>.prompt`, lalu
+  backend mengetik SATU baris ke PTY:
+  `<cli> --prompt "$(cat '<promptfile>')"; touch '<donefile>'; echo "aigate: issue done"`
+  — tanpa konten log di command line (anti shell-injection). Selesai terdeteksi via
+  poll file `.done` (interval 2s, timeout per issue `HEAL_CLI_TIMEOUT_SECONDS=1800`
+  → lanjut ke test; test yang memutuskan hapus LogEntry). Bila tab/shell mati di
+  tengah jalan → run dihentikan, status `{"ok":true,"merged":false,"remaining":N}`.
+  File temp dibersihkan di `finally`.
+- Run jadi ASYNC: `start_self_heal()` (daemon thread + guard sudah-jalan),
+  `POST /api/self-heal/run` → `200 {"ok":true,"started":true,"tab":"self-heal"}`,
+  `409 {"ok":false,"reason":"already_running","tab":"self-heal"}` bila masih jalan;
+  `run_self_heal()` tetap sync (kontrak & bentuk status lama utuh) sebagai thread
+  target. Endpoint baru `GET /api/self-heal/status` → `{"running": bool, "last":
+  <hasil|null>}`. TerminalTab row (title "Self-Heal") dibuat saat sesi pertama
+  spawn (soft-fail → 0). Log R12 semua transisi (source `backend.selfheal.*`).
+- Tests: `tests/backend/test_selfheal.py` +12 (command shape + anti-injection +
+  cleanup, timeout, abort-on-death, start/status/409/500 lifecycle, DB tab row,
+  registry reuse/drop). **Backend: 438 passed, 1 skipped.**
+
+### Frontend (`src/frontend/static/selfheal.js`, `terminal.js`, `i18n.js`)
+- `runSelfHeal()` async: 200 → pesan `selfheal.started` + buka & fokus tab
+  `openTab("self-heal")` + pindah view terminal (pola precedent clitools launch);
+  409 → pesan `selfheal.already_running` + tetap buka tab; keduanya mulai polling
+  `GET /api/self-heal/status` (langsung sekali lalu tiap 5s, single-handle, berhenti
+  saat `last` non-null + `running=false` → render `renderSelfHealStatus`, re-enable
+  Run kecuali kind "ok"). Poll gagal → pesan sekali, polling lanjut.
+- `terminal.js::tabTitle` → key `self-heal` berjudul tetap "Self-Heal"
+  (`t("selfheal.title")`). i18n +2 key × 2 locale (en/id): `selfheal.started`,
+  `selfheal.already_running` (parity-guard lolos).
+- Tests: `src/frontend/tests/selfheal.test.js` + mirror `tests/frontend/selfheal.test.js`
+  +8. **Frontend: 453 passed (23 files).**
+
+### PM-owned
+- `src/frontend/static/index.html`: cache-buster `selfheal.js?v=20260907`,
+  `terminal.js?v=20260907`, `i18n.js?v=20260907` (pola precedent analytics/terminal).
+
+### Docs sinkron
+- FSD §2.8 (output + process flow Self-Heal: async run, tab `self-heal`, temp-file
+  prompt, donefile poll, status endpoint), TSD §3.5 (Self-Heal: PTY key, async run,
+  status), BRD US-2.8.5 (acceptance (3) tab dibuka+fokus live, (3b) async+polling).
+
+### Catatan operasional
+- BUTuh restart aigate + hard-refresh browser (cache-buster baru) agar berlaku (R32:
+  user yang restart, bukan agent).
+
+
 ## 2026-09-07 — Request Log: kolom Model/Endpoint kosong (combo path + endpoint_name) — DONE
 
 **Root cause (BE):** untuk model ref `combo:<name>`, resolver balikin marker

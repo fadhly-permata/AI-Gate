@@ -19,9 +19,11 @@
     return proto + "://" + location.host + "/ws/terminal/" + encodeURIComponent(tabId);
   }
 
-  // Short display title for a tab from its (uuid) id.
+  // Short display title for a tab from its (uuid) id. Well-known backend
+  // tab keys get a human label (e.g. the "self-heal" run terminal).
   function tabTitle(id) {
     if (!id) return "term";
+    if (id === "self-heal") return t("selfheal.title");
     return String(id).slice(0, 8);
   }
 

@@ -206,7 +206,58 @@
     });
   }
 
-  /* POST /api/self-heal/run */
+  /* POST /api/self-heal/run is ASYNC: the agentic CLI runs in a live PTY
+     registered under the tab key "self-heal" (watch it in the terminal view),
+     while the final result lands on GET /api/self-heal/status (status.last). */
+  var STATUS_POLL_MS = 5000;   // status polling cadence while a run is active
+  var SELF_HEAL_TAB = "self-heal"; // backend PTY tab key for the run terminal
+
+  /* Open (or focus) the terminal tab bound to the backend's "self-heal" PTY
+     key and switch to the terminal view (clitools.js launch precedent).
+     openTab may fire before the backend session exists — fine: the server
+     spawns a plain shell for that key and types the CLI command into it.
+     Best-effort: without the terminal manager the result area stays as-is. */
+  function openSelfHealTab() {
+    var tm = window.aigate && window.aigate.terminalManager;
+    if (!tm || typeof tm.openTab !== "function") return;
+    try { tm.openTab(SELF_HEAL_TAB); } catch (e) { return; }
+    var termNav = document.querySelector('.nav-item[data-view="terminal"]');
+    if (termNav) termNav.click();
+  }
+
+  /* Shared status poller. One fetch + one interval handle at a time; a new
+     runSelfHeal() (e.g. the 409 path) restarts it instead of stacking. */
+  var statusPollTimer = null;
+
+  function stopStatusPolling() {
+    if (statusPollTimer !== null) {
+      clearInterval(statusPollTimer);
+      statusPollTimer = null;
+    }
+  }
+
+  function pollStatusOnce() {
+    fetchJson(SELF_HEAL_API + "/status").then(function (data) {
+      data = data || {};
+      if (data.running === true || !data.last) return; // still running (or no result yet)
+      stopStatusPolling();
+      var view = renderSelfHealStatus(data.last, currentLoc());
+      setResult(view.message, view.kind);
+      // Keep run enabled only if a CLI is still present (partial keeps it usable).
+      setRunEnabled(view.kind !== "ok");
+    }).catch(function (err) {
+      // A missed poll must never crash the page: surface once in the result
+      // area and keep polling — the run may still finish and self-report.
+      setResult(t("selfheal.status") + ": " + err.message, "warn");
+    });
+  }
+
+  function startStatusPolling() {
+    stopStatusPolling();
+    pollStatusOnce();                    // catch a fast no_agentic_cli abort
+    statusPollTimer = setInterval(pollStatusOnce, STATUS_POLL_MS);
+  }
+
   function runSelfHeal() {
     if (!agenticCliAvailable) {
       var msg = t("selfheal.no_cli");
@@ -217,11 +268,26 @@
     setResult(t("selfheal.running"), "info");
     setRunEnabled(false);
     fetchJson(SELF_HEAL_API + "/run", { method: "POST" }).then(function (data) {
-      var view = renderSelfHealStatus(data || {}, currentLoc());
+      data = data || {};
+      if (data.started === true) {
+        setResult(t("selfheal.started"), "info");
+        openSelfHealTab();
+        startStatusPolling();
+        return;                        // final result arrives via status.last
+      }
+      // Unexpected 2xx envelope (e.g. a legacy sync body) -> error render.
+      var view = renderSelfHealStatus(data, currentLoc());
       setResult(view.message, view.kind);
-      // Keep run enabled only if a CLI is still present (partial keeps it usable).
       setRunEnabled(view.kind !== "ok");
     }).catch(function (err) {
+      if (err && err.status === 409) {
+        // already_running: fetchJson throws on non-2xx (body carries no error
+        // envelope), so the reason rides on the status. Still open the tab.
+        setResult(t("selfheal.already_running"), "warn");
+        openSelfHealTab();
+        startStatusPolling();
+        return;
+      }
       var view = renderSelfHealStatus({ _networkError: true }, currentLoc());
       setResult(view.message + " (" + err.message + ")", "error");
       setRunEnabled(true);
@@ -245,7 +311,14 @@
     onShow: checkAgenticCli,
     checkAgenticCli: checkAgenticCli,
     runSelfHeal: runSelfHeal,
-    _test: { renderSelfHealStatus: renderSelfHealStatus, renderAgenticCheck: renderAgenticCheck }
+    _test: {
+      renderSelfHealStatus: renderSelfHealStatus,
+      renderAgenticCheck: renderAgenticCheck,
+      pollStatusOnce: pollStatusOnce,
+      startStatusPolling: startStatusPolling,
+      stopStatusPolling: stopStatusPolling,
+      _STATUS_POLL_MS: STATUS_POLL_MS
+    }
   };
 
   if (typeof document !== "undefined") {
