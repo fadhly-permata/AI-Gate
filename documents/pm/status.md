@@ -1637,3 +1637,22 @@ User: "bikin pr deh biar enak liat yang 'main'".
 - Commit catatan PR ini **sengaja belum di-push** biar PR tetap persis 12 commit yang sedang lu
   review. Naik bareng kerjaan wiki berikutnya.
 - Wiki tetap gak disentuh.
+
+## 2026-09-08 — README multi-bahasa: cara A, folder `documents/readme-variants/`, SEKUENSIAL (1/6: id)
+User: "pake cara A. varian ditaro di `documents/readme-variants`. boleh pake istilah/cerita yang
+cocok buat masing-masing kultur. kerjain satu persatu dulu, biar bisa gw review."
+- **Keputusan tercatat:** cara A (baris bahasa + file varian), lokasi `documents/readme-variants/**`
+  (izin eksplisit — R33 aman, root tetap ramping), pendekatan **transcreation** (adegan & idiom
+  lokal per bahasa, bukan terjemahan kaku), mode **sekuensial** (`state.md: multiagent_mode:
+  sequential`). Urutan: id → ru → nl → ja → zh → zh-tw. **Baris bahasa di `README.md` dipasang
+  PALING AKHIR** setelah 6 varian ACC (biar gak ada link mati di tengah jalan).
+- **Delegasi:** `business-analyst` (task_id sama, sesi dipake ulang biar suara tulisannya konsisten)
+  → `documents/readme-variants/README.id.md`, **84 baris**.
+- **Verifikasi PM:** fakta cocok sama README EN (24 tool, self-heal, sudah dites Linux/Windows/
+  Termux, 7 bahasa, kredit diterjemahkan); grep hedge = bersih; grep path = bersih (sisa `run.py`
+  di perintah + link balik); tautan balik `../../README.md` = benar secara relatif; emoji per judul.
+- **Pilihan lokal BA:** adegan KRL pulang kerja; "gas"; "tambal, ulang"; penutup "oprek sepuasnya —
+  kalau ada yang nyangkut, bilang gue di mana encernya"; sapaan "lu/gue" konsisten.
+- **Ditandai BA utk review user:** kata "ngeresolve" (baris 63) agak janggal — kandidat: "Android
+  punya aturan sendiri buat ngatur paket". Level kasual varian ini jadi patokan 5 berikutnya.
+- **Nunggu user:** ACC/ubah varian id → baru gue jalanin ru.
