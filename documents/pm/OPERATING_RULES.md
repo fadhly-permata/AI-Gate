@@ -509,3 +509,22 @@ Aturan wajib:
 5. Fakta teknis yang bikin repo baru makin tidak perlu: **wiki tiap repo GitHub sudah berupa
    repo git terpisah** (`<owner>/<repo>.wiki.git`) — file wiki tidak pernah tercampur dengan
    `src/**`. Jadi "gak kecampur" sudah terjamin tanpa repo baru.
+
+### R39 addendum (2026-09-08, user mengulang keluhan: "goblok sih lu, pake bikin repo baru segala")
+- Keluhan yang SAMA diulang = aturan belum cukup kuat. Penguatan: **PM DILARANG menafsirkan
+  kata "repo/bikin baru" secara harfiah.** Sebelum membuat resource eksternal apa pun, PM
+  wajib menyebut **bentuknya** (branch / folder / repo) dalam 1 kalimat dan tunggu jawaban.
+- Repo `AI-Gate-docs` sudah **dihapus oleh user** (PAT PM tidak punya scope `delete_repo`).
+  Jangan pernah meninggalkan resource eksternal hasil salah-tafsir tanpa dilaporkan.
+
+## R40 — Sebelum bikin wiki/dokumentasi massal: WAJIB sajikan rencana daftar halaman dulu
+Pelajaran (2026-09-08, user: "sebelum bikin wiki, jelasin dulu rencana lu, page apa aja"):
+PM siap mendelegasi penerbitan wiki tanpa menampilkan rencana halaman → user berhentiin.
+
+Aturan wajib:
+1. Untuk pekerjaan yang menghasilkan **banyak halaman/dokumen sekaligus** (wiki, docs site,
+   API reference), PM WAJIB tampilkan dulu: **daftar halaman (judul + isi ringkas + sumber
+   file)**, **yang TIDAK ikut dipublikasi**, **bahasa**, dan **titik publikasi**.
+2. Baru setelah user ACC daftar halaman → PM dekomposisi & delegasi ke specialist.
+3. Draf ditulis di repo kode (`documents/wiki/**`), wiki cuma **hasil publikasi**; publikasi
+   ke wiki hanya terjadi setelah user bilang go (lihat juga larangan menulis wiki dari user).
