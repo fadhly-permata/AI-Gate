@@ -291,3 +291,15 @@
 - RULE BARU **R28**: baca kode HARUS lewat codegraph dulu (dapet path + line) baru baca
   file yg bersangkutan — hemat token, hindari broad grep/Explore. Reinit via
   `codegraph init` kalau index usang. Berlaku utk PM + semua sub-agent.
+
+## Dokumen wiki — keputusan (2026-09-08)
+- Kerja dokumen wiki jalan di **branch `docs/wiki`** (basis `origin/main`) di repo ini.
+  BUKAN repo terpisah — user mengoreksi (R39). Wiki GitHub sendiri sudah berupa repo git
+  terpisah (`AI-Gate.wiki.git`), jadi file wiki toh gak pernah nyampur sama `src/**`.
+- Kendala terverifikasi: fitur Wiki tidak bisa dinyalakan lewat API (`PATCH has_wiki`
+  diabaikan GitHub) → perlu 1 klik web UI (Settings → Features → Wikis), setelah itu
+  commit/push bisa full otomatis.
+- Rencana tooling: script publisher di `.opencode/tools/docs/wiki/` (idempoten, `--dry-run`),
+  token dari `gh auth token` / `.env` (rule secrets), sumber konten = `.md` di branch ini.
+- Repo `fadhly-permata/AI-Gate-docs` (private) = **artefak salah**, tidak dipakai, menunggu
+  keputusan user (hapus/ biarkan).

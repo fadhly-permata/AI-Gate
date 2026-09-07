@@ -485,3 +485,27 @@ pertama untuk fitur 1 tautan gue cancel karena handover-nya 60+ baris):
 3. Jangan minta sub-agent menulis file laporan `.md` untuk task kecil; laporan hanya untuk
    task besar/audit (aturan `.opencode/reports/**` tetap berlaku kalau memang ada laporan).
 4. Gate tes mengikuti R35: sub-agent hanya tes tertarget; suite penuh sekali oleh PM.
+
+## R39 — "Biar gak kecampur" = BRANCH baru, BUKAN repo baru; resource eksternal wajib dikonfirmasi bentuknya
+Pelajaran (2026-09-08, user: "goblok, kenapa bikin repo baru? gua kan mintanya branch baru"):
+user minta bikin dokumen wiki "biar gak kecampur" → PM menafsirkan "repo baru" secara harfiah
+dan LANGSUNG bikin `AI-Gate-docs` (private) di GitHub + tes push wiki. Yang user mau = branch
+baru di repo yang sudah ada. Akibat: resource publik/bernama tetap muncul tanpa perlu + perlu
+cleanup manual.
+
+Aturan wajib:
+1. Niat "pemisahan" ("biar gak kecampur", "jangan campur sama kode", "bikin tempat sendiri",
+   "buat versi lain") → **DEFAULT = branch baru di repo yang sudah ada** (`docs/<topik>`,
+   `feat/<topik>`, `refactor/<topik>`). Repo baru BUKAN default, walau user ketik kata "repo".
+2. R9 (implementasi tanpa konfirmasi) hanya berlaku untuk keputusan **di dalam** repo/lingkungan
+   kerja. Aksi yang **membuat resource eksternal di luar workspace** — repo GitHub, organisasi,
+   package registry, release, domain, akun, webhook — WAJIB diklarifikasi **bentuknya** dulu,
+   cukup 1 kalimat ("repo baru atau branch saja?"). Salah bikin = jejak publik + penghapusan
+   manual.
+3. Kata user ambigu vs tafsir termurah: ambil tafsir yang **paling murah dibatalkan**
+   (branch → tinggal hapus lokal; repo → harus dihapus di GitHub). Kalau ragu, tanya.
+4. Kalau terlanjur bikin resource eksternal yang SALAH: **JANGAN langsung dihapus**
+   (destruktif/ireversibel) — laporkan ke user + minta izin hapus, dan jangan dipakai/diisi.
+5. Fakta teknis yang bikin repo baru makin tidak perlu: **wiki tiap repo GitHub sudah berupa
+   repo git terpisah** (`<owner>/<repo>.wiki.git`) — file wiki tidak pernah tercampur dengan
+   `src/**`. Jadi "gak kecampur" sudah terjamin tanpa repo baru.

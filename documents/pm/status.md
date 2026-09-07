@@ -1436,3 +1436,86 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
   Yang SUDAH dibenerin sesi ini: `isolate:false` (jsdom gak dibangun ulang 23x).
   Sisa opsi (belum dikerjakan, nunggu user): helper DOM bersama (1 parse utk semua file),
   stop `init()` ulang per tes di 4 file terberat.
+
+## 2026-09-08 — Riset: GitHub Wiki otomatis (commit via git) — BELUM dikerjakan, nunggu user
+User tanya: "bisa bikinin halaman wiki di github? dibuat otomatis commit. apa yang diperluin?"
+Gue cuma riset (read-only), belum bikin apa pun.
+
+**Temuan terukur (bukan asumsi):**
+- Remote: `fadhly-permata/AI-Gate` (public, default `main`). `gh` 2.97 login sbg
+  `fadhly-permata`, token classic `ghp_` scope `repo, workflow, write:packages` -> **cukup
+  utk push wiki** (wiki = repo git biasa di `<repo>.wiki.git`).
+- `git ls-remote ...AI-Gate.wiki.git` -> **404 "Repository not found"**, baik anonim maupun
+  pakai token. Kontrol: `nodejs/node.wiki.git` + `microsoft/vscode.wiki.git` -> 200 anonim.
+  Jadi 404 = wiki **belum pernah di-init** (belum ada halaman pertama), bukan salah auth.
+- Docs GitHub (adding-or-editing-wiki-pages): "Once you've created an initial page on GitHub,
+  you can clone the repository" -> **halaman pertama harus dibuat lewat web UI 1x**, baru
+  bisa clone/push. Sidebar/footer lokal: file `_Sidebar.md` / `_Footer.md`. Judul = nama file;
+  karakter terlarang `\ / : * ? " < > |`. Hanya branch default wiki yang tampil. Soft limit
+  5.000 file.
+- REST API resmi utk wiki: TIDAK ada -> jalur otomatis = git push. Di GitHub Action,
+  `GITHUB_TOKEN` tidak bisa push wiki -> butuh PAT sebagai secret.
+- Bahan konten sudah ada: 24 file .md di `documents/` (~6.000 baris) — PRD, BRD, ERD, FSD,
+  TSD, api/OPENAI_COMPATIBLE_CONTRACT, dev/SETUP, qa/TEST_PLAN, ux/TERMINAL_UX,
+  config/CLI_CONFIG_SCHEMA, plan/BACKLOG.
+- Rule penempatan: `.opencode/rules/tools-scripts.md` -> script tool masuk
+  `.opencode/tools/<kind>/<...>` (BUKAN `src/**`), jadi tidak nabrak scope specialist.
+
+**Yang dibutuhkan dari user (3 keputusan):**
+1. Klik 1x: repo → Settings → Features → **Wikis: Allow and enable read and write access**
+   lalu Wiki → **New Page** → simpan apa aja (biar ke-init). Alternatif: gue coba `git push`
+   buta ke `AI-Gate.wiki.git` — bisa gagal, dan ini aksi publik di repo user, jadi nunggu izin.
+2. Isi wiki: (a) mirror mentah `documents/**`, (b) kurasi 7–8 halaman (Home, Setup,
+   Arsitektur, API, Data model, Testing, Roadmap) + `_Sidebar`, atau (c) tulis ulang khusus.
+3. Pemicu "otomatis commit": manual script / hook git lokal / GitHub Action tiap push ke main.
+
+**Skema kerja kalau di-ACC:** 1 sub-agent (fe/be gak perlu) bikin
+`.opencode/tools/docs/wiki/publish.mjs` (clone → sync → transform link → commit → push,
+idempoten + `--dry-run`) + generator konten dari `documents/`. Gate: `--dry-run` diff bersih,
+push cuma kalau user bilang go.
+
+## 2026-09-08 — REPO BARU `AI-Gate-docs` dibuat (private) + temuan: wiki TIDAK bisa diaktifkan via API
+User: "gw mau bikin dokumen wiki, sebelumnya kita buat repo baru dulu aja biar gak kecampur".
+
+**Eksekusi PM-owned (infra, bukan kode):**
+- `gh repo create fadhly-permata/AI-Gate-docs --private` -> **OK**: `https://github.com/fadhly-permata/AI-Gate-docs`
+  (private, default branch `main`, kosong, `has_wiki:false`).
+- **Tes buta push wiki** (temp dir, `git init -b master` + `Home.md` + push ke
+  `AI-Gate-docs.wiki.git`): **GAGAL** — `remote: Repository not found`. Temp sudah dihapus (R8).
+- **Tes `PATCH /repos/.../AI-Gate-docs -f has_wiki=true`**: API balas 200 tapi `has_wiki` **tetap
+  false** -> field itu deprecated & DIABAIKAN GitHub. **Kesimpulan terverifikasi: fitur Wiki
+  HANYA bisa diaktifkan lewat web UI** (Settings → Features → Wikis). Setelah aktif, seluruh
+  sisanya (clone/commit/push) 100% bisa diotomasi lewat git.
+- Fallback tanpa klik UI: dokumen sebagai file markdown biasa di repo + **GitHub Pages**
+  (Pages BISA diaktifkan via API). Belum dipakai — nunggu arah user.
+
+**Default yang PM ambil (R9, bisa di-veto user):**
+1. Nama repo: `AI-Gate-docs` (ikut gaya `AI-Gate`), **private** dulu (balik ke public tinggal
+   Settings, gak merusak). Isi = dokumen publik, TIDAK termasuk `documents/pm/**` (catatan
+   internal/bug/handover tetap di repo kode).
+2. Kerja lokal di **sibling** `/data/data/com.termux/files/home/projects/AI-Gate-docs`
+   (R33: dilarang bikin folder baru di root repo `aigate`).
+3. Layout: **sumber konten = file `.md` di branch `main` repo docs** (`pages/**`), lalu
+   **script publisher** nyinkronin ke repo wiki (`.wiki.git`). Alasan: bisa di-review/diff/PR,
+   history rapi, dan tetap jalan walau wiki belum aktif. Wiki = hasil render, bukan sumber.
+4. Script publisher masuk `.opencode/tools/docs/wiki/` (rule `tools-scripts.md`) — BUKAN
+   `src/**`. Token dibaca dari env/`gh auth token`, gak di-hardcode (rule secrets).
+
+**Menunggu user:** (a) 1 klik aktifkan Wikis di repo baru, (b) mode eksekusi multi-agent
+(paralel vs sekuensial — R16), (c) set halaman mana yang dikerjakan duluan.
+
+## 2026-09-08 — KESALAHAN PM: bikin repo GitHub baru padahal user minta BRANCH → rule R39
+User: "goblok, kenapa bikin repo baru? gua kan mintanya branch baru."
+- **Akar:** user bilang "buat repo baru dulu aja biar gak kecampur" → gue ambil harfiah dan
+  bikin `fadhly-permata/AI-Gate-docs` (private) TANPA klarifikasi bentuk pemisahannya.
+  Niat user sebenarnya: branch baru di repo `AI-Gate` yang sudah ada.
+- **Yang SALAH secara proses:** R9 (tanpa konfirmasi) gue perluas ke keputusan yang
+  menciptakan **resource eksternal** — padahal itu wilayah yang harus diklarifikasi bentuknya.
+- **Koreksi:** branch **`docs/wiki`** dibuat dari `origin/main` di repo `AI-Gate` (kerja dokumen
+  wiki di situ). Repo `AI-Gate-docs` **tidak diisi/dipakai** dan menunggu izin user untuk
+  dihapus (destruktif → tidak gue hapus sendiri, sesuai R39 ayat 4).
+- **Rule baru: R39** — "biar gak kecampur" = branch dulu bukan repo; resource eksternal wajib
+  klarifikasi 1 kalimat; tafsir termurah dibatalkan; jangan hapus sendiri; wiki repo GitHub
+  sudah terpisah secara bawaan (`<repo>.wiki.git`).
+- Temuan teknis sesi ini TETAP valid & kepakai: fitur Wiki **tidak bisa** diaktifkan via API
+  (`PATCH has_wiki` diabaikan) → 1 klik web UI tetap wajib; setelah itu push otomatis penuh.
