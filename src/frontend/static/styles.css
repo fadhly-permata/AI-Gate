@@ -1468,6 +1468,34 @@ body.log-visible .workspace {
 
 .log-time { white-space: nowrap; font-variant-numeric: tabular-nums; }
 
+/* T2 log cleanup: resolved rows are dimmed; resolved badge sits next to the
+   severity badge; resolve button is a small ghost icon button (icon-btn family). */
+.log-row-resolved td { opacity: 0.55; }
+
+.log-resolved-badge { margin-left: 6px; }
+
+.log-resolve-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8px;
+  padding: 2px 6px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.log-resolve-btn:hover {
+  color: var(--accent-contrast);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
 .log-stack { margin-top: 4px; }
 .log-stack pre {
   margin: 4px 0 0;

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 // i18n dict so window.I18N (and getStr resolution) is available — the show/hide
 // tests exercise applyLogVisible/toggleLogVisible which read i18n labels.
@@ -44,7 +44,8 @@ describe("formatLogRow (B3.1)", () => {
       severity: "error",
       source: "gateway",
       message: "boom",
-      stacktrace: "Traceback..."
+      stacktrace: "Traceback...",
+      resolved: false
     });
   });
 
@@ -55,7 +56,8 @@ describe("formatLogRow (B3.1)", () => {
       severity: "info",
       source: "",
       message: "",
-      stacktrace: null
+      stacktrace: null,
+      resolved: false
     });
     expect(window.aigate.formatLogRow(null).severity).toBe("info");
   });
@@ -63,6 +65,13 @@ describe("formatLogRow (B3.1)", () => {
   it("converts empty stacktrace to null", () => {
     const row = window.aigate.formatLogRow({ stacktrace: "" });
     expect(row.stacktrace).toBeNull();
+  });
+
+  it("normalizes resolved: missing/undefined -> false, true passes through (T2)", () => {
+    expect(window.aigate.formatLogRow({}).resolved).toBe(false);
+    expect(window.aigate.formatLogRow({ resolved: undefined }).resolved).toBe(false);
+    expect(window.aigate.formatLogRow({ resolved: false }).resolved).toBe(false);
+    expect(window.aigate.formatLogRow({ resolved: true }).resolved).toBe(true);
   });
 });
 
@@ -181,6 +190,319 @@ describe("Log Window is global + show/hide (B3.1 rework)", () => {
     expect(typeof window.aigate.stopLogAutoRefresh).toBe("function");
     // No timer running -> stop is a no-op and must not throw.
     expect(() => window.aigate.stopLogAutoRefresh()).not.toThrow();
+  });
+});
+
+/* ===== T2 log cleanup ===== */
+
+// DOM fixture mirroring the logwindow-controls block + clear dialog + body
+// from index.html.
+function setupLogDom() {
+  document.body.innerHTML =
+    '<div class="logwindow" id="logWindow">' +
+      '<div class="logwindow-head">' +
+        '<select id="logSeverity">' +
+          '<option value="all">All</option>' +
+          '<option value="info">Info</option>' +
+          '<option value="warning">Warning</option>' +
+          '<option value="error">Error</option>' +
+        "</select>" +
+        '<button id="logRefreshBtn" type="button"></button>' +
+        '<button id="logClearBtn" type="button"></button>' +
+        '<button id="logShowResolvedBtn" type="button" aria-pressed="false"></button>' +
+        '<button id="logResolveAllBtn" type="button"></button>' +
+      "</div>" +
+      '<div class="logwindow-body">' +
+        '<p id="logMsg"></p>' +
+        '<table id="logTable"><tbody id="logTableBody"></tbody></table>' +
+      "</div>" +
+    "</div>" +
+    // Clear-confirm dialog (scope lives here, not in the filter select).
+    '<div class="modal-overlay" id="logClearModal" hidden>' +
+      '<div class="modal">' +
+        '<select id="logClearScope">' +
+          '<option value="warning,error" selected></option>' +
+          '<option value="all"></option>' +
+        "</select>" +
+        '<button id="logClearConfirmBtn" type="button"></button>' +
+        '<button id="logClearCancelBtn" type="button"></button>' +
+      "</div>" +
+    "</div>";
+}
+
+// Stub global fetch: routes to handler by (method, url); records calls.
+function stubFetch(route) {
+  const calls = [];
+  const fn = vi.fn(function (url, opts) {
+    opts = opts || {};
+    const method = (opts.method || "GET").toUpperCase();
+    calls.push({ method: method, url: String(url), opts: opts });
+    const handler = route ? route(method, String(url)) : null;
+    if (!handler) {
+      return Promise.resolve({ ok: true, headers: { get: () => "application/json" }, json: () => Promise.resolve({ data: [] }) });
+    }
+    // { __error: true, status, body } -> non-2xx response (error-path tests).
+    if (handler.__error) {
+      return Promise.resolve({
+        ok: false,
+        status: handler.status || 500,
+        headers: { get: () => "application/json" },
+        json: () => Promise.resolve(handler.body || {})
+      });
+    }
+    return Promise.resolve({
+      ok: true,
+      headers: { get: () => "application/json" },
+      json: () => Promise.resolve(handler)
+    });
+  });
+  vi.stubGlobal("fetch", fn);
+  return calls;
+}
+
+function flush() {
+  return new Promise((res) => setTimeout(res, 0));
+}
+
+describe("buildClearLogsQuery (T2)", () => {
+  it("wipe-all -> ?confirm=all", () => {
+    expect(window.aigate.buildClearLogsQuery("all")).toBe("?confirm=all");
+  });
+
+  it("filtered -> ?severity=<value> (comma list URL-encoded)", () => {
+    expect(window.aigate.buildClearLogsQuery("warning,error"))
+      .toBe("?severity=warning%2Cerror");
+  });
+});
+
+describe("renderLogs resolved rendering (T2)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    setupLogDom();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("resolved rows get .log-row-resolved + resolved badge", () => {
+    window.aigate.renderLogs([
+      { id: "r1", severity: "error", message: "boom", resolved: true }
+    ]);
+    const tr = document.querySelector("#logTableBody tr");
+    expect(tr.className).toBe("log-row-resolved");
+    const badges = Array.from(tr.querySelectorAll("td:nth-child(2) .badge"));
+    expect(badges.some((b) => b.classList.contains("log-resolved-badge"))).toBe(true);
+    expect(badges.find((b) => b.classList.contains("log-resolved-badge")).textContent)
+      .toBe(window.I18N.en["log.resolved"]);
+    // Resolved rows get NO resolve button.
+    expect(tr.querySelector(".log-resolve-btn")).toBeNull();
+  });
+
+  it("unresolved warning row gets a .log-resolve-btn; info row does not", () => {
+    window.aigate.renderLogs([
+      { id: "w1", severity: "warning", message: "meh" },
+      { id: "i1", severity: "info", message: "fyi" }
+    ]);
+    const rows = Array.from(document.querySelectorAll("#logTableBody tr"));
+    expect(rows[0].querySelector(".log-resolve-btn")).not.toBeNull();
+    expect(rows[0].querySelector(".log-resolve-btn").getAttribute("data-id")).toBe("w1");
+    expect(rows[1].querySelector(".log-resolve-btn")).toBeNull();
+    // Case-insensitive severity: ERROR is resolvable too.
+    window.aigate.renderLogs([{ id: "e1", severity: "ERROR", message: "x" }]);
+    expect(document.querySelector("#logTableBody tr .log-resolve-btn")).not.toBeNull();
+  });
+});
+
+describe("clearLogs dialog flow (T2)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    setupLogDom();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("clearLogs() opens dialog with 'Warnings + Errors' preselected; no request yet", () => {
+    const calls = stubFetch();
+    window.aigate.clearLogs();
+    const modal = document.getElementById("logClearModal");
+    expect(modal.hidden).toBe(false);
+    expect(document.getElementById("logClearScope").value).toBe("warning,error");
+    expect(calls.length).toBe(0);
+  });
+
+  it("confirm (default scope) -> DELETE ?severity=warning,error + 'Deleted N' + reload", async () => {
+    const calls = stubFetch((method, url) => {
+      if (method === "DELETE" && url === "/api/logs?severity=warning%2Cerror") return { deleted: 7 };
+      if (method === "GET" && url.startsWith("/api/logs")) return { data: [] };
+      return null;
+    });
+    window.aigate.clearLogs();
+    window.aigate.confirmClearLogs();
+    await flush();
+    const modal = document.getElementById("logClearModal");
+    expect(modal.hidden).toBe(true); // dialog closed before/while deleting
+    const del = calls.find((c) => c.method === "DELETE");
+    expect(del).toBeTruthy();
+    expect(del.url).toBe("/api/logs?severity=warning%2Cerror");
+    expect(document.getElementById("logMsg").textContent)
+      .toBe(window.I18N.en["log.cleared"].replace("{n}", "7"));
+    // loadLogs() re-fetch followed the delete.
+    expect(calls.some((c) => c.method === "GET" && c.url.startsWith("/api/logs"))).toBe(true);
+  });
+
+  it("scope=all -> DELETE ?confirm=all (backend wipe-all guard)", async () => {
+    const calls = stubFetch((method, url) => {
+      if (method === "DELETE" && url === "/api/logs?confirm=all") return { deleted: 42 };
+      if (method === "GET" && url.startsWith("/api/logs")) return { data: [] };
+      return null;
+    });
+    window.aigate.clearLogs();
+    document.getElementById("logClearScope").value = "all";
+    window.aigate.confirmClearLogs();
+    await flush();
+    const del = calls.find((c) => c.method === "DELETE");
+    expect(del.url).toBe("/api/logs?confirm=all");
+    expect(document.getElementById("logMsg").textContent)
+      .toBe(window.I18N.en["log.cleared"].replace("{n}", "42"));
+  });
+
+  it("cancel -> dialog closes, no request", async () => {
+    const calls = stubFetch();
+    window.aigate.clearLogs();
+    window.aigate.cancelClearLogs();
+    await flush();
+    expect(document.getElementById("logClearModal").hidden).toBe(true);
+    expect(calls.length).toBe(0);
+    expect(document.getElementById("logMsg").textContent).toBe("");
+  });
+
+  it("missing dialog DOM -> clearLogs is a no-op (no request)", async () => {
+    document.getElementById("logClearModal").remove();
+    const calls = stubFetch();
+    expect(() => window.aigate.clearLogs()).not.toThrow();
+    await flush();
+    expect(calls.length).toBe(0);
+  });
+
+  it("DELETE failure -> error message via existing error pattern", async () => {
+    stubFetch((method, url) => {
+      if (method === "DELETE" && url === "/api/logs?severity=warning%2Cerror") {
+        return { __error: true, status: 500, body: { error: { message: "boom" } } };
+      }
+      if (method === "GET" && url.startsWith("/api/logs")) return { data: [] };
+      return null;
+    });
+    window.aigate.clearLogs();
+    window.aigate.confirmClearLogs();
+    await flush();
+    expect(document.getElementById("logMsg").textContent).toContain("boom");
+    expect(document.getElementById("logMsg").className).toContain("settings-msg-error");
+  });
+});
+
+describe("show-resolved toggle (T2)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    setupLogDom();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("default off; toggling flips aria-pressed + persists", () => {
+    expect(window.aigate.isShowResolved()).toBe(false);
+    expect(document.getElementById("logShowResolvedBtn").getAttribute("aria-pressed")).toBe("false");
+    window.aigate.toggleShowResolved();
+    expect(window.aigate.isShowResolved()).toBe(true);
+    expect(localStorage.getItem("aigate.logShowResolved")).toBe("1");
+    expect(document.getElementById("logShowResolvedBtn").getAttribute("aria-pressed")).toBe("true");
+    expect(document.getElementById("logShowResolvedBtn").getAttribute("aria-label"))
+      .toBe(window.I18N.en["log.show_resolved"]);
+    window.aigate.toggleShowResolved();
+    expect(window.aigate.isShowResolved()).toBe(false);
+    expect(localStorage.getItem("aigate.logShowResolved")).toBe("0");
+  });
+
+  it("on -> next GET URL carries show_resolved=true", async () => {
+    window.aigate.toggleShowResolved();
+    const calls = stubFetch((method) => {
+      if (method === "GET") return { data: [] };
+      return null;
+    });
+    window.aigate.loadLogs();
+    await flush();
+    const get = calls.find((c) => c.method === "GET");
+    expect(get.url).toContain("show_resolved=true");
+  });
+
+  it("off -> GET URL omits show_resolved", async () => {
+    const calls = stubFetch((method) => {
+      if (method === "GET") return { data: [] };
+      return null;
+    });
+    window.aigate.loadLogs();
+    await flush();
+    const get = calls.find((c) => c.method === "GET");
+    expect(get.url).not.toContain("show_resolved");
+  });
+});
+
+describe("resolve flows (T2)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    setupLogDom();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("resolve-all POSTs ids of rendered unresolved warning/error rows only", async () => {
+    window.aigate.renderLogs([
+      { id: "w1", severity: "warning" },
+      { id: "e1", severity: "error" },
+      { id: "i1", severity: "info" },
+      { id: "w2", severity: "warning", resolved: true }
+    ]);
+    const calls = stubFetch((method, url) => {
+      if (method === "POST" && url === "/api/logs/resolve") return { resolved: 2 };
+      if (method === "GET" && url.startsWith("/api/logs")) return { data: [] };
+      return null;
+    });
+    window.aigate.resolveAllLogs();
+    await flush();
+    const post = calls.find((c) => c.method === "POST");
+    expect(post).toBeTruthy();
+    expect(post.url).toBe("/api/logs/resolve");
+    expect(JSON.parse(post.opts.body)).toEqual({ ids: ["w1", "e1"] });
+    expect(document.getElementById("logMsg").textContent)
+      .toBe(window.I18N.en["log.resolved_n"].replace("{n}", "2"));
+  });
+
+  it("resolve-all with no candidates -> no request", async () => {
+    window.aigate.renderLogs([{ id: "i1", severity: "info" }]);
+    const calls = stubFetch();
+    window.aigate.resolveAllLogs();
+    await flush();
+    expect(calls.length).toBe(0);
+  });
+
+  it("resolveLog POSTs /api/logs/{id}/resolve + reloads", async () => {
+    window.aigate.renderLogs([{ id: "w1", severity: "warning" }]);
+    const calls = stubFetch((method, url) => {
+      if (method === "POST" && url === "/api/logs/w1/resolve") return { resolved: 1 };
+      if (method === "GET" && url.startsWith("/api/logs")) return { data: [] };
+      return null;
+    });
+    window.aigate.resolveLog("w1");
+    await flush();
+    const post = calls.find((c) => c.method === "POST");
+    expect(post.url).toBe("/api/logs/w1/resolve");
+    expect(calls.some((c) => c.method === "GET")).toBe(true);
   });
 });
 
