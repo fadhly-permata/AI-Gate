@@ -36,6 +36,18 @@
   delegasi re-work ke pemilik scope, baru catat + commit.
 
 ## Progress
+- 2026-09-08: **i18n 7 bahasa — DONE di branch `feat/i18n-locales` (`f7beaf9` + `c1477eb`).**
+  User minta Rusia/Belanda/Jepang/Cina, pilih **opsi B = satu file per bahasa**, dan Cina
+  **kedua varian** (zh Simplified + zh-tw Traditional). Hasil: `i18n.js` jadi registry+loader
+  (793→150 baris), kamus pindah ke `static/i18n/{en,id}.js` (pindah murni, 379 kunci),
+  +5 kamus baru (ru/nl/ja/zh/zh-tw, 379 kunci masing-masing), preloader `<head>` cuma
+  meng-load EN + bahasa aktif, dropdown bahasa dibangun dari `window.LANGS`, parity guard
+  jadi glob. **Pola delegasi: 1 task refactor (file bersama) → lalu 5 task PARALEL,
+  masing-masing cuma nulis 1 file kamus** (nol tabrakan scope + hemat waktu). Gate PM:
+  vitest **519 passed, 10.60s**; checker cepat
+  `.opencode/tools/tests/i18n-parity-check.mjs <kode>` dipakai agen biar gak pada nyalain
+  vitest barengan di HP. Backend gak perlu diubah (setting `locale` tanpa allowlist;
+  StaticFiles sudah menyajikan subdirektori). **Terjemahan belum ditinjau penutur asli.**
 - 2026-09-07 (malam): **Suite tes FE 1,5x lebih cepat — DONE (`618f7d7`, fe-dev).**
   Akar TERNAKTA bukan parse HTML doang: Termux lapor `os.cpus().length===0` → vitest
   fallback **8 fork** di HP ter-throttle. Kurva nyata: 1 fork 12.6s · **2 fork 8.3s** ·

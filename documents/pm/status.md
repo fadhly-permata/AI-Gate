@@ -1377,6 +1377,37 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
   penguatan. `maxForks:2` = tuning per-box, naikkan kalau pindah host multi-core.
 - PR #6 (`refactor/ui` → `main`) sekarang berisi 2 commit: `86a5ef1` (link repo di sidebar)
   + `618f7d7` (optimasi tes) + docs.
+
+## 2026-09-08 — i18n 7 bahasa (branch baru `feat/i18n-locales`, mode: 1 sekuensial + 5 paralel)
+- User: "buatkan beberapa file bahasa berikut: Rusia, Belanda, Jepang, Cina" →
+  "1. opsi B" (satu file per bahasa) · "2. kedua bahasa cina aja" (zh + zh-tw) ·
+  "biar gak kecampur bikin branch baru aja. dan kerjaan sekarang commit dan push dulu".
+  → tree sudah bersih/ter-push (`34f1c58`), branch `feat/i18n-locales` dibuat + di-push.
+- **fe-dev DONE (ses_f82cf0ae8ffeXlUpVpF74nVm0j) — TUGAS 1 (refactor, file bersama):**
+  `i18n.js` 793→150 baris jadi registry 7 locale + loader; kamus pindah ke
+  `static/i18n/{en,id}.js` (dibuktikan pindah murni: 0 nilai berubah, 0 kunci hilang);
+  preloader inline di `<head>` (hanya EN + locale aktif, `document.write` sinkron →
+  tidak ada race `getStr`, tidak ada flash); `app.js`: `getStr`→`window.translate`,
+  `switchLocale()`, `populateLocaleOptions()` dari `window.LANGS`; parity guard jadi glob;
+  `tests/helpers/i18n-dicts.js` + `setupFiles`. Gate sendiri: **514 passed**. → commit `f7beaf9`.
+- **PM jawab 2 open question fe-dev (tanpa spawn be-dev):** (a) `settings_router.put_settings`
+  = `set_setting(key, str(value))`, TIDAK ada allowlist → simpan `ru/nl/ja/zh/zh-tw` aman;
+  (b) `server.py` mount `StaticFiles(directory=…/static, html=True)` → subdirektori `i18n/`
+  otomatis terhidrasi. (c) PM bikin tool cepat `.opencode/tools/tests/i18n-parity-check.mjs`
+  supaya 5 agen paralel gak pada nyalain vitest di HP yang sama.
+- **5× fe-dev PARALEL (satu agen = satu file kamus, nol tumpang tindih scope):**
+  `ru` ses_f82b6314affeTr8surw6l118Zm · `nl` ses_f82b618c0ffe44FxcwqPGzS0P8 ·
+  `ja` ses_f82b5fe3dffeC7StATG0zooYJd · `zh` ses_f82b5e51cffeoD4nayt0QbFBdv ·
+  `zh-tw` ses_f82b5c8b2ffeVLmHJNSLGGQhOr. Semua laporkan checker `OK`, 379 kunci,
+  placeholder utuh, `lang.<code>` endonim, `nav.repo` = "aigate Repo". → commit `c1477eb`.
+- **Gate PM (sekali, R35):** checker 5 locale = 5× OK · vitest penuh **519 passed (23 file),
+  Duration 10.60s**. 0 tes dihapus/dilonggarkan.
+- Catatan kualitas (untuk user): terjemahan hasil agen, **belum ditinjau penutur asli**;
+  yang paling perlu dilihat: `nav.group.operations` (zh `运维` / zh-tw `維運`),
+  `ja selfheal.title` (Latin `Self-Heal` vs katakana), `ja common.remove` vs `common.delete`
+  (sama-sama `削除`), gaya NL `je/jij`.
+- Open: 7 salinan `getStr` lokal di modul lain masih duplikat (kandidat tugas DRY);
+  auto-detect bahasa browser tidak diminta.
 - PENDING user: restart aigate + hard-refresh (R32) — cache-buster baru `v=20260911`.
   Item yang user TOLAK: verifikasi flag `--model` per CLI (tetap open item, jangan dikerjakan).
 
