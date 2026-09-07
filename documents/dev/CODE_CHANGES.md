@@ -85,6 +85,12 @@ gate PM barusan **13.86s** saat box di-throttle (484 passed / 23 file).
 **Verifikasi PM:** `node node_modules/.bin/vitest run` → **484 passed (23 file),
 Duration 14.66s**. Backend tidak disentuh (tanpa perubahan `src/backend/**`).
 
+**KOREKSI label (user 2026-09-07, commit menyusul):** teks ditanya user =
+`"aigate Repo"` (sebelumnya EN "Repository" / ID "Repositori"). Diubah di
+`i18n.js` (EN + ID jadi sama — nama produk, bukan string bilingual campur),
+`index.html` (label + `aria-label` + `title`), dan `views.test.js` (3 assertion).
+Cache-buster `i18n.js` → `?v=20260913`. Tes tertarget: views + i18n = **25 passed**.
+
 ## 2026-09-07 — Log cleanup: hapus / retensi / tanda "selesai" (BE T1 + FE T2) — DONE (commit `86c4778` + `45206c0`)
 
 **Permintaan user:** fitur bersihin log — 3 opsi: hapus manual, auto-hapus per umur,

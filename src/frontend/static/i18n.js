@@ -20,7 +20,7 @@ window.I18N = {
     "nav.terminal": "Terminal",
     "nav.cli": "CLI Tools",
     "nav.settings": "Settings",
-    "nav.repo": "Repository",
+    "nav.repo": "aigate Repo",
     "settings.port": "Port",
     "settings.dev_mode": "Developer Mode",
     "settings.theme": "Theme",
@@ -396,7 +396,9 @@ window.I18N = {
     "nav.terminal": "Terminal",
     "nav.cli": "Alat CLI",
     "nav.settings": "Pengaturan",
-    "nav.repo": "Repositori",
+    // "aigate Repo" = nama produk/tautan eksternal, sengaja SAMA dengan EN
+    // (bukan string bilingual campur — tetap satu kunci satu nilai per locale).
+    "nav.repo": "aigate Repo",
     "settings.port": "Port",
     "settings.dev_mode": "Mode Pengembang",
     "settings.theme": "Tema",

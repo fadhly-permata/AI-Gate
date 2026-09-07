@@ -209,8 +209,9 @@ describe("sidebar Repository link — sticky footer", () => {
   });
 
   it("nav.repo is present in EN and ID, one value each (no bilingual string)", () => {
-    expect(window.I18N.en["nav.repo"]).toBe("Repository");
-    expect(window.I18N.id["nav.repo"]).toBe("Repositori");
+    // Label diminta user 2026-09-07: "aigate Repo" — nama produk, jadi SAMA di EN & ID.
+    expect(window.I18N.en["nav.repo"]).toBe("aigate Repo");
+    expect(window.I18N.id["nav.repo"]).toBe("aigate Repo");
     // Decision 2026-09-06: one key = one value, never "Repositori/Repository".
     expect(window.I18N.en["nav.repo"]).not.toMatch(/\/|Repositori/);
     expect(window.I18N.id["nav.repo"]).not.toMatch(/\/|Repository/);
@@ -218,7 +219,7 @@ describe("sidebar Repository link — sticky footer", () => {
 
   it("collapsed mode keeps the label in the DOM (hidden by CSS, not markup)", () => {
     const label = repoLink().querySelector(".nav-label");
-    expect(label.textContent).toBe("Repository");
+    expect(label.textContent).toBe("aigate Repo");
     expect(label.hasAttribute("hidden")).toBe(false);
     expect(label.getAttribute("style")).toBeNull();
     // The collapse rules still target the shared classes the footer uses.
