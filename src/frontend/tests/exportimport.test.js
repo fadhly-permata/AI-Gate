@@ -1,8 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import { JSDOM } from "jsdom";
+import { indexDocument } from "./helpers/dom.js";
 
 // i18n dict (window.I18N) so getStr() resolves labels during render.
 import "../static/i18n.js";
@@ -10,7 +7,6 @@ import "../static/i18n.js";
 // renderImportResult (B5.7 Backup & Restore).
 import "../static/app.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Let async .then chains resolve on real timers.
 const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -267,9 +263,7 @@ describe("renderImportResult (pure)", () => {
 });
 
 describe("index.html wiring (B5.7 structure)", () => {
-  const html = readFileSync(join(__dirname, "..", "static", "index.html"), "utf8");
-  const dom = new JSDOM(html);
-  const doc = dom.window.document;
+  const doc = indexDocument();
 
   it("settings view carries the Backup & Restore section + controls", () => {
     const view = doc.querySelector('.view[data-view="settings"]');

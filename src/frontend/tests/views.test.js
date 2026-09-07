@@ -1,23 +1,18 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import { JSDOM } from "jsdom";
+
+import { indexDocument, stylesCss, staticSource } from "./helpers/dom.js";
 
 // i18n.js is a side-effect module: attaches window.I18N (no document access at
 // load). Imported so the collapse-key regression guard can read the dicts.
 import "../static/i18n.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const html = readFileSync(join(__dirname, "..", "static", "index.html"), "utf8");
-const dom = new JSDOM(html);
-const doc = dom.window.document;
+// Shared cached parse of the shipped page (READ-ONLY — see helpers/dom.js).
+const doc = indexDocument();
 
 // CSS source assertions (same approach as terminal_layout.test.js): the sticky
 // behaviour lives entirely in the stylesheet, so jsdom cannot exercise it and
 // the rule text is the contract.
-const cssRaw = readFileSync(join(__dirname, "..", "static", "styles.css"), "utf8");
-const css = cssRaw.replace(/\/\*[\s\S]*?\*\//g, "");
+const css = stylesCss();
 function ruleBlock(selectorRe) {
   const m = css.match(selectorRe);
   return m ? m[0] : null;
@@ -178,7 +173,7 @@ describe("sidebar Repository link — sticky footer", () => {
     // browser keeps native link behaviour (a preventDefault() here would kill
     // the repo link — regression guard on the app.js binding).
     expect(repoLink().hasAttribute("data-view")).toBe(false);
-    const appSrc = readFileSync(join(__dirname, "..", "static", "app.js"), "utf8");
+    const appSrc = staticSource("app.js");
     const binding = appSrc.match(
       /querySelectorAll\("\.nav-item, \.bn-item"\)\.forEach\(function \(item\) \{[\s\S]*?\n    \}\);/
     );

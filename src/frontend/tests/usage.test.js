@@ -1,8 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { readFileSync } from "fs";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
-import { JSDOM } from "jsdom";
+import { indexDocument } from "./helpers/dom.js";
 
 // i18n dict (window.I18N) so getStr() resolves labels during render.
 import "../static/i18n.js";
@@ -11,7 +8,6 @@ import "../static/app.js";
 // The Usage module registers window.aigate.usage + render/load/format helpers.
 import "../static/usage.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Let async .then chains resolve.
 const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -330,9 +326,7 @@ describe("auto-refresh lifecycle (Log Window pattern)", () => {
 });
 
 describe("index.html wiring (B5.5 structure)", () => {
-  const html = readFileSync(join(__dirname, "..", "static", "index.html"), "utf8");
-  const dom = new JSDOM(html);
-  const doc = dom.window.document;
+  const doc = indexDocument();
 
   it("sidebar nav has the Usage & Quota item", () => {
     const item = doc.querySelector('.nav-item[data-view="usage"]');
