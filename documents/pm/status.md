@@ -1325,8 +1325,14 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
 - **Verifikasi PM (gate pra-commit, sekali):** pytest tests/backend = **478 passed / 1 skipped**;
   vitest = **476 passed (23 file), Duration 23.33s**. 0 regresi, 0 skip baru.
 - **Branch:** kerjaan di-commit di `aigate/self-heal-20260907-170338` (artefak self-heal,
-  isinya = `refactor/ui` + `f0c4e14`) lalu `refactor/ui` di-fast-forward ke situ.
-  Sisa branch `aigate/self-heal-*` lokal+remote dibersihkan HANYA kalau sudah terbukti
-  fully merged (lihat commit berikutnya).
+  isinya = `refactor/ui` + `f0c4e14`) lalu `refactor/ui` di-fast-forward ke situ (a80f603)
+  dan di-push. 9 branch sisa self-heal LOKAL (termasuk `self-heal-test`) + 3 REMOTE
+  (`aigate/self-heal-20260903-150316`, `-20260905-162251`, `-20260907-170338`) DIHAPUS
+  setelah terbukti semua ancestor HEAD (`git merge-base --is-ancestor`). Yang TIDAK disentuh:
+  `main`, `master`, `docs/readme-main` (remote) — sudah merged tapi bukan artefak bot;
+  user belum minta hapus.
+- **PR #5 dibuat: https://github.com/fadhly-permata/AI-Gate/pull/5** (`refactor/ui` → `main`,
+  10 commit / 44 file / +5837 −153) — mencakup 4 commit menggantung pasca-PR #4 + 5 commit
+  sesi ini. BELUM di-merge (menunggu user; dan user perlu restart+refresh setelah merge).
 - PENDING user: restart aigate + hard-refresh (R32) — cache-buster baru `v=20260911`.
   Item yang user TOLAK: verifikasi flag `--model` per CLI (tetap open item, jangan dikerjakan).
