@@ -1717,3 +1717,15 @@ jadi ada update daftar cli tools".
   sengaja BELUM di-push biar PR tetap persis seperti yang lu review.
 - Konfirmasi penting: catatan "daftar tool masih dikembangkan" **belum** ada di `main` (baru di
   PR #9) — grep di `origin/main:README.md` = 0.
+
+## 2026-09-08 — Baris pemilih bahasa dipasang di semua file README yang ada
+User: "harusnya tambahin link ke setiap bahasa readme. kalo gak ada link nya user mana tau. buat
+link untuk semua bahasa di semua file readme".
+- Diambil dari registry aplikasi (`src/frontend/static/i18n.js` `LANGS`) biar daftar bahasa README
+  sama dengan daftar bahasa di dalam aplikasi; endonym tidak diterjemahkan.
+- `README.md` baris 10 + `README.id.md` baris 10 (mengganti tautan `[English](../../README.md)`
+  yang tunggal). Bahasa sendiri ditebalkan tanpa link. Diff +3/-1, nol baris lain berubah
+  (verifikasi PM: `git diff --stat` + baca langsung + cek tidak berubah jadi bullet list).
+- RISIKO DILAPORKAN ke user: 5 link (ru, nl, ja, zh, zh-tw) masih MATI karena filenya belum ada
+  -> PR #9 jangan di-merge sebelum 6 varian dibuat. Konvensi baris bahasa dicatat di memory-bank
+  supaya varian berikutnya otomatis ikut.

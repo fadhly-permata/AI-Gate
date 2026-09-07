@@ -328,3 +328,13 @@
   EN: "The list is still growing — future versions may add or change tools."
   ID: "Daftarnya masih terus dikembangkan — versi berikutnya bisa menambah atau mengubah tool
   yang tersedia."
+
+### Baris bahasa di README (konvensi lintas varian)
+- Sumber daftar bahasa = registry aplikasi: `src/frontend/static/i18n.js` (`LANGS`) — 7 kode:
+  `en id ru nl ja zh zh-tw` dengan bendera 🇺🇸🇮🇩🇷🇺🇳🇱🇯🇵🇨🇳🇹🇼 dan **endonym** (English,
+  Bahasa Indonesia, Русский, Nederlands, 日本語, 简体中文, 繁體中文) yang TIDAK diterjemahkan.
+- Setiap file README (root + semua varian) wajib punya 1 baris `🌐 …` tepat setelah intro;
+  bahasa dokumen itu sendiri ditebalkan tanpa link.
+- Path relatif: dari root → `documents/readme-variants/README.<kode>.md`; antar varian → cukup
+  `README.<kode>.md`; dari varian ke root → `../../README.md`.
+- Varian yang belum dibuat = link mati → PR jangan di-merge sampai 6 varian ada.
