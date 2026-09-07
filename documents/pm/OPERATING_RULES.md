@@ -485,3 +485,85 @@ pertama untuk fitur 1 tautan gue cancel karena handover-nya 60+ baris):
 3. Jangan minta sub-agent menulis file laporan `.md` untuk task kecil; laporan hanya untuk
    task besar/audit (aturan `.opencode/reports/**` tetap berlaku kalau memang ada laporan).
 4. Gate tes mengikuti R35: sub-agent hanya tes tertarget; suite penuh sekali oleh PM.
+
+## R39 — "Biar gak kecampur" = BRANCH baru, BUKAN repo baru; resource eksternal wajib dikonfirmasi bentuknya
+Pelajaran (2026-09-08, user: "goblok, kenapa bikin repo baru? gua kan mintanya branch baru"):
+user minta bikin dokumen wiki "biar gak kecampur" → PM menafsirkan "repo baru" secara harfiah
+dan LANGSUNG bikin `AI-Gate-docs` (private) di GitHub + tes push wiki. Yang user mau = branch
+baru di repo yang sudah ada. Akibat: resource publik/bernama tetap muncul tanpa perlu + perlu
+cleanup manual.
+
+Aturan wajib:
+1. Niat "pemisahan" ("biar gak kecampur", "jangan campur sama kode", "bikin tempat sendiri",
+   "buat versi lain") → **DEFAULT = branch baru di repo yang sudah ada** (`docs/<topik>`,
+   `feat/<topik>`, `refactor/<topik>`). Repo baru BUKAN default, walau user ketik kata "repo".
+2. R9 (implementasi tanpa konfirmasi) hanya berlaku untuk keputusan **di dalam** repo/lingkungan
+   kerja. Aksi yang **membuat resource eksternal di luar workspace** — repo GitHub, organisasi,
+   package registry, release, domain, akun, webhook — WAJIB diklarifikasi **bentuknya** dulu,
+   cukup 1 kalimat ("repo baru atau branch saja?"). Salah bikin = jejak publik + penghapusan
+   manual.
+3. Kata user ambigu vs tafsir termurah: ambil tafsir yang **paling murah dibatalkan**
+   (branch → tinggal hapus lokal; repo → harus dihapus di GitHub). Kalau ragu, tanya.
+4. Kalau terlanjur bikin resource eksternal yang SALAH: **JANGAN langsung dihapus**
+   (destruktif/ireversibel) — laporkan ke user + minta izin hapus, dan jangan dipakai/diisi.
+5. Fakta teknis yang bikin repo baru makin tidak perlu: **wiki tiap repo GitHub sudah berupa
+   repo git terpisah** (`<owner>/<repo>.wiki.git`) — file wiki tidak pernah tercampur dengan
+   `src/**`. Jadi "gak kecampur" sudah terjamin tanpa repo baru.
+
+### R39 addendum (2026-09-08, user mengulang keluhan: "goblok sih lu, pake bikin repo baru segala")
+- Keluhan yang SAMA diulang = aturan belum cukup kuat. Penguatan: **PM DILARANG menafsirkan
+  kata "repo/bikin baru" secara harfiah.** Sebelum membuat resource eksternal apa pun, PM
+  wajib menyebut **bentuknya** (branch / folder / repo) dalam 1 kalimat dan tunggu jawaban.
+- Repo `AI-Gate-docs` sudah **dihapus oleh user** (PAT PM tidak punya scope `delete_repo`).
+  Jangan pernah meninggalkan resource eksternal hasil salah-tafsir tanpa dilaporkan.
+
+## R40 — Sebelum bikin wiki/dokumentasi massal: WAJIB sajikan rencana daftar halaman dulu
+Pelajaran (2026-09-08, user: "sebelum bikin wiki, jelasin dulu rencana lu, page apa aja"):
+PM siap mendelegasi penerbitan wiki tanpa menampilkan rencana halaman → user berhentiin.
+
+Aturan wajib:
+1. Untuk pekerjaan yang menghasilkan **banyak halaman/dokumen sekaligus** (wiki, docs site,
+   API reference), PM WAJIB tampilkan dulu: **daftar halaman (judul + isi ringkas + sumber
+   file)**, **yang TIDAK ikut dipublikasi**, **bahasa**, dan **titik publikasi**.
+2. Baru setelah user ACC daftar halaman → PM dekomposisi & delegasi ke specialist.
+3. Draf ditulis di repo kode (`documents/wiki/**`), wiki cuma **hasil publikasi**; publikasi
+   ke wiki hanya terjadi setelah user bilang go (lihat juga larangan menulis wiki dari user).
+
+## R41 — README = untuk orang awam; detail teknis & path file masuk wiki
+Pelajaran (2026-09-08, review user atas draf README: "jangan terlalu teknikal… jangan nyebut-nyebut
+file apapun di readme… konteks yang ingin ditonjolkan kasih di intro, kasih ilustrasi serunya
+nge-vibe coding lewat hape. nama aplikasi 'aigate' (kecil semua)"):
+
+Aturan wajib untuk `README.md` (dan materi promosi sejenis):
+1. Bahasa **manfaat**, bukan spesifikasi. Teknologi disebut **umum & tercerna awam**
+   ("aplikasi Python biasa, jalan tanpa Docker, datanya lokal") — bukan daftar endpoint,
+   bukan nama modul, bukan arsitektur.
+2. **DILARANG menyebut path/nama file apa pun** (`src/backend/selfheal.py`, `documents/...`,
+   `pyproject.toml`, tabel "Repo layout", dsb). Detail teknis = halaman **wiki**.
+   Pengecualian: perintah menjalankan (`python run.py`) — tanpa itu produk tak bisa dicoba;
+   tetap seminimal mungkin.
+3. Konteks/nilai yang mau dijual **wajib muncul di intro** (3–5 baris pertama) **plus ilustrasi
+   adegan** yang bikin pembaca ikut ngerasain (mis. agent benerin kode sambil ditonton dari HP).
+4. Nama produk ditulis **`aigate`** — huruf kecil semua, termasuk judul.
+5. Nada ceria/kasual + emoji boleh; kejujuran tetap: klaim belum terverifikasi diberi label.
+6. PM WAJIB masukkan poin 1–5 ke handover sub-agent SEBELUM nulis, bukan setelah dikoreksi.
+
+## R42 — Dokumen publik: kultur netral + status pengujian MILIK MAINTAINER, bukan asumsi PM
+Pelajaran (2026-09-08, user: "jangan bawa kultur suatu negara… masa lu nyebut angkot. linux udah
+di test, windows juga udah di test jadi gak usah ada klaim untested. lu sok tau banget dah"):
+PM menyisipkan caveat "belum diverifikasi" untuk rute Linux/proot dan memakai adegan khas
+Indonesia (angkot) di README publik — dua-duanya keluar dari wewenang PM.
+
+Aturan wajib:
+1. Materi publik pakai **kultur netral/global**. DILARANG rujukan khas satu negara/daerah
+   (angkot, warkop, nama jalan lokal, idiom lokal, contoh mata uang lokal). Pilih gambaran
+   yang dimengerti di mana saja (bus/kereta/kopi di rumah).
+2. **Status pengujian (tested / works on X / verified) adalah keputusan MAINTAINER.** PM dan
+   sub-agent DILARANG menulis "untested / experimental / belum diverifikasi" atas dasar
+   dugaan atau karena mesin kerja PM tidak punya peralatannya. Kalau ragu → **tanya maintainer
+   1 kalimat**, jangan pasang caveat sendiri, jangan hapus klaim sendiri.
+3. Kalau maintainer menyatakan sudah dites → tulis sebagai **sudah dites**, buang marker
+   `TODO-VERIFY`, dan catat sumbernya di `documents/pm/` ("dikonfirmasi maintainer, tanggal")
+   supaya sesi berikutnya tidak memasang caveat lagi.
+4. Sebaliknya: klaim yang belum pernah dikonfirmasi maintainer tetap tidak boleh dilebihkan.
+   Netral = faktual, bukan penuh tanda tanya.

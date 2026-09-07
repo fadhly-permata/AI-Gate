@@ -1436,3 +1436,187 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
   Yang SUDAH dibenerin sesi ini: `isolate:false` (jsdom gak dibangun ulang 23x).
   Sisa opsi (belum dikerjakan, nunggu user): helper DOM bersama (1 parse utk semua file),
   stop `init()` ulang per tes di 4 file terberat.
+
+## 2026-09-08 — Riset: GitHub Wiki otomatis (commit via git) — BELUM dikerjakan, nunggu user
+User tanya: "bisa bikinin halaman wiki di github? dibuat otomatis commit. apa yang diperluin?"
+Gue cuma riset (read-only), belum bikin apa pun.
+
+**Temuan terukur (bukan asumsi):**
+- Remote: `fadhly-permata/AI-Gate` (public, default `main`). `gh` 2.97 login sbg
+  `fadhly-permata`, token classic `ghp_` scope `repo, workflow, write:packages` -> **cukup
+  utk push wiki** (wiki = repo git biasa di `<repo>.wiki.git`).
+- `git ls-remote ...AI-Gate.wiki.git` -> **404 "Repository not found"**, baik anonim maupun
+  pakai token. Kontrol: `nodejs/node.wiki.git` + `microsoft/vscode.wiki.git` -> 200 anonim.
+  Jadi 404 = wiki **belum pernah di-init** (belum ada halaman pertama), bukan salah auth.
+- Docs GitHub (adding-or-editing-wiki-pages): "Once you've created an initial page on GitHub,
+  you can clone the repository" -> **halaman pertama harus dibuat lewat web UI 1x**, baru
+  bisa clone/push. Sidebar/footer lokal: file `_Sidebar.md` / `_Footer.md`. Judul = nama file;
+  karakter terlarang `\ / : * ? " < > |`. Hanya branch default wiki yang tampil. Soft limit
+  5.000 file.
+- REST API resmi utk wiki: TIDAK ada -> jalur otomatis = git push. Di GitHub Action,
+  `GITHUB_TOKEN` tidak bisa push wiki -> butuh PAT sebagai secret.
+- Bahan konten sudah ada: 24 file .md di `documents/` (~6.000 baris) — PRD, BRD, ERD, FSD,
+  TSD, api/OPENAI_COMPATIBLE_CONTRACT, dev/SETUP, qa/TEST_PLAN, ux/TERMINAL_UX,
+  config/CLI_CONFIG_SCHEMA, plan/BACKLOG.
+- Rule penempatan: `.opencode/rules/tools-scripts.md` -> script tool masuk
+  `.opencode/tools/<kind>/<...>` (BUKAN `src/**`), jadi tidak nabrak scope specialist.
+
+**Yang dibutuhkan dari user (3 keputusan):**
+1. Klik 1x: repo → Settings → Features → **Wikis: Allow and enable read and write access**
+   lalu Wiki → **New Page** → simpan apa aja (biar ke-init). Alternatif: gue coba `git push`
+   buta ke `AI-Gate.wiki.git` — bisa gagal, dan ini aksi publik di repo user, jadi nunggu izin.
+2. Isi wiki: (a) mirror mentah `documents/**`, (b) kurasi 7–8 halaman (Home, Setup,
+   Arsitektur, API, Data model, Testing, Roadmap) + `_Sidebar`, atau (c) tulis ulang khusus.
+3. Pemicu "otomatis commit": manual script / hook git lokal / GitHub Action tiap push ke main.
+
+**Skema kerja kalau di-ACC:** 1 sub-agent (fe/be gak perlu) bikin
+`.opencode/tools/docs/wiki/publish.mjs` (clone → sync → transform link → commit → push,
+idempoten + `--dry-run`) + generator konten dari `documents/`. Gate: `--dry-run` diff bersih,
+push cuma kalau user bilang go.
+
+## 2026-09-08 — REPO BARU `AI-Gate-docs` dibuat (private) + temuan: wiki TIDAK bisa diaktifkan via API
+User: "gw mau bikin dokumen wiki, sebelumnya kita buat repo baru dulu aja biar gak kecampur".
+
+**Eksekusi PM-owned (infra, bukan kode):**
+- `gh repo create fadhly-permata/AI-Gate-docs --private` -> **OK**: `https://github.com/fadhly-permata/AI-Gate-docs`
+  (private, default branch `main`, kosong, `has_wiki:false`).
+- **Tes buta push wiki** (temp dir, `git init -b master` + `Home.md` + push ke
+  `AI-Gate-docs.wiki.git`): **GAGAL** — `remote: Repository not found`. Temp sudah dihapus (R8).
+- **Tes `PATCH /repos/.../AI-Gate-docs -f has_wiki=true`**: API balas 200 tapi `has_wiki` **tetap
+  false** -> field itu deprecated & DIABAIKAN GitHub. **Kesimpulan terverifikasi: fitur Wiki
+  HANYA bisa diaktifkan lewat web UI** (Settings → Features → Wikis). Setelah aktif, seluruh
+  sisanya (clone/commit/push) 100% bisa diotomasi lewat git.
+- Fallback tanpa klik UI: dokumen sebagai file markdown biasa di repo + **GitHub Pages**
+  (Pages BISA diaktifkan via API). Belum dipakai — nunggu arah user.
+
+**Default yang PM ambil (R9, bisa di-veto user):**
+1. Nama repo: `AI-Gate-docs` (ikut gaya `AI-Gate`), **private** dulu (balik ke public tinggal
+   Settings, gak merusak). Isi = dokumen publik, TIDAK termasuk `documents/pm/**` (catatan
+   internal/bug/handover tetap di repo kode).
+2. Kerja lokal di **sibling** `/data/data/com.termux/files/home/projects/AI-Gate-docs`
+   (R33: dilarang bikin folder baru di root repo `aigate`).
+3. Layout: **sumber konten = file `.md` di branch `main` repo docs** (`pages/**`), lalu
+   **script publisher** nyinkronin ke repo wiki (`.wiki.git`). Alasan: bisa di-review/diff/PR,
+   history rapi, dan tetap jalan walau wiki belum aktif. Wiki = hasil render, bukan sumber.
+4. Script publisher masuk `.opencode/tools/docs/wiki/` (rule `tools-scripts.md`) — BUKAN
+   `src/**`. Token dibaca dari env/`gh auth token`, gak di-hardcode (rule secrets).
+
+**Menunggu user:** (a) 1 klik aktifkan Wikis di repo baru, (b) mode eksekusi multi-agent
+(paralel vs sekuensial — R16), (c) set halaman mana yang dikerjakan duluan.
+
+## 2026-09-08 — KESALAHAN PM: bikin repo GitHub baru padahal user minta BRANCH → rule R39
+User: "goblok, kenapa bikin repo baru? gua kan mintanya branch baru."
+- **Akar:** user bilang "buat repo baru dulu aja biar gak kecampur" → gue ambil harfiah dan
+  bikin `fadhly-permata/AI-Gate-docs` (private) TANPA klarifikasi bentuk pemisahannya.
+  Niat user sebenarnya: branch baru di repo `AI-Gate` yang sudah ada.
+- **Yang SALAH secara proses:** R9 (tanpa konfirmasi) gue perluas ke keputusan yang
+  menciptakan **resource eksternal** — padahal itu wilayah yang harus diklarifikasi bentuknya.
+- **Koreksi:** branch **`docs/wiki`** dibuat dari `origin/main` di repo `AI-Gate` (kerja dokumen
+  wiki di situ). Repo `AI-Gate-docs` **tidak diisi/dipakai** dan menunggu izin user untuk
+  dihapus (destruktif → tidak gue hapus sendiri, sesuai R39 ayat 4).
+- **Rule baru: R39** — "biar gak kecampur" = branch dulu bukan repo; resource eksternal wajib
+  klarifikasi 1 kalimat; tafsir termurah dibatalkan; jangan hapus sendiri; wiki repo GitHub
+  sudah terpisah secara bawaan (`<repo>.wiki.git`).
+- Temuan teknis sesi ini TETAP valid & kepakai: fitur Wiki **tidak bisa** diaktifkan via API
+  (`PATCH has_wiki` diabaikan) → 1 klik web UI tetap wajib; setelah itu push otomatis penuh.
+
+## 2026-09-08 — Wiki AI-Gate SUDAH HIDUP (user bikin Home.md) + akses push diverifikasi (0 tulisan)
+User: "hapus repo yang lu buat tadi, wiki page udah gua buatin satu tuh. dan jangan nulis
+apapun dulu di wiki. kalo sekedar test aja sih boleh."
+- **Perintah hapus `AI-Gate-docs`: DITOLAK GitHub** — `HTTP 403: Must have admin rights` /
+  token butuh scope **`delete_repo`** (scope sekarang: `repo, workflow, write:packages`).
+  Gue TIDAK coba bypass. User pilih: hapus sendiri di web (Settings → Danger Zone → Delete
+  repository) ATAU tambahin scope `delete_repo` di PAT lalu gue hapus. Repo tetap **kosong,
+  gak disentuh**.
+- **Wiki aktif**: `git ls-remote AI-Gate.wiki.git` -> `refs/heads/master @ 4deaf39`
+  ("Initial Home page", `Home.md` 29 byte = teks bawaan GitHub). Clone pakai token = OK.
+- **Tes izin tulis (TANPA nulis apa pun):** commit kosong lokal → `git push --dry-run`
+  ke ref `pm-probe` → server balas `[new branch] HEAD -> pm-probe` (= bakal diterima),
+  dan `ls-remote` sesudahnya tetap **cuma `master`** → **0 byte masuk ke wiki**. Temp clone
+  dihapus (R8). **Kesimpulan: jalur auto-commit wiki siap 100%, tinggal dipakai kalau user bilang.**
+- **KENDALA BARU dari user (ikat):** DILARANG menulis/meng-push apa pun ke wiki sampai user
+  memberi izin. Boleh: baca, clone, dry-run/probe. Delegasi ke specialist pun kena aturan ini.
+
+## 2026-09-08 — Draf README baru (ceria + emoji, sorot gateway & vibe coding & Termux) — NUNGGU REVIEW USER
+User: "update README.md dulu, tonjolkan fitur gateway AI + vibe coding, lebih ceria (emoji boleh),
+kasual. buatin draf dulu buat gue review. tonjolin juga vibe coding di Termux (pure Termux maupun
+distro Linux)." Wiki di-parker (R40: rencana halaman udah disodorkan, belum di-ACC).
+- **Fakta gue kumpulin dulu (read-only) biar sub-agent gak ngarang:** 24 preset CLI terhitung
+  nyata di `src/backend/cli_presets.py:65-105` (12 agentic + 6 autonomous + 6 chat/shell;
+  `python3 -c` hitung entri = **24**); Self-Heal loop dari `src/backend/selfheal.py:1-30`
+  (branch otomatis → CLI di tab PTY live → loop fix/test dari LogEntry → merge `main` → hapus
+  branch; prompt via file temp = no injection; done-marker di-gate exit code 0); rute install
+  Termux `TERMUX_INSTALL` (`cli_presets.py:237-251`) + `is_termux()` (`paths.py:75-91`) karena
+  npm di Termux lapor `process.platform == "android"`; preset "checked ON THE DEVICE"
+  (`cli_presets.py:152-163`); runner e2e Android (`test:e2e:android`).
+- **Proot TIDAK bisa diklaim terverifikasi:** `command -v proot-distro` = tidak ada di perangkat
+  ini dan gak ada kode yang menanganinya → PM pasang batan keras di handover: boleh disebut
+  sebagai "should work / experimental" + marker `<!-- TODO-VERIFY -->`.
+- **Delegasi (R21):** `business-analyst` (ses_f82315a9affe9u2mFCFS19HgGE) nulis draf ke
+  **`documents/business/README-DRAFT.md`** (146 baris, dalam scope-nya). `README.md` **gak disentuh**,
+  wiki gak disentuh. PM verifikasi: 1 file baru, 0 perubahan lain, angka 24 cocok, klaim
+  on-device cocok sama komentar kode.
+- **3 keputusan yang dibalikin BA ke user:** (1) nama resmi `aigate` (draf, kecil) vs `AIGate`
+  (README lama); (2) kalimat "Contributions and feedback welcome" — dipertahankan/dibuang;
+  (3) tautan `documents/dev/SETUP.md` dihapus dari draf — mau dipasang lagi?
+
+## 2026-09-08 — Revisi README sesuai review user → draf v2 (80 baris, bahasa awam, tanpa path file)
+User: "jangan terlalu teknikal… jangan nyebut-nyebut file apapun… konteks yang ditonjolkan di
+intro + ilustrasi serunya vibe coding lewat hape… nama aplikasi 'aigate' kecil semua".
+- **Rule baru R41** (commit `dcb46a3`): README = manfaat & tercerna awam; DILARANG sebut
+  path/nama file (pengecualian perintah `python run.py`); nilai jual wajib di intro + ilustrasi
+  adegan; nama produk `aigate` huruf kecil; detail teknis ke wiki; PM wajib masukkan poin ini ke
+  handover SEBELUM nulis.
+- **business-analyst (sesi dilanjutkan, task_id sama)** tulis ulang in place
+  `documents/business/README-DRAFT.md` → **80 baris**. `README.md` tetap gak disentuh.
+- **Verifikasi PM:** grep path → sisa cuma `run.py` di 2 blok perintah (diizinkan); grep
+  `AIGate` kapital → 0 (judul & badan semua `aigate`); angka "24 tools" cocok hitungan preset;
+  klaim proot tetap berlabel belum dites + marker `TODO-VERIFY`; link wiki 1 buah (URL repo
+  emang `AI-Gate`, bukan penyebutan file).
+- **Dibuang dari draf v1:** daftar endpoint, seksi Gateway API, nama modul, istilah SQLite/
+  FastAPI/WebSocket PTY/ADR-012, blok `PW_EXECUTABLE`, instruksi pip/venv/uvicorn/npm, seksi
+  Testing, tabel Repo layout.
+- **Ditambah:** intro 4 baris (3 nilai jual + "plain Python app"), seksi "Picture this ☕"
+  (adegan angkot), arahan ke wiki.
+- **Nunggu user:** (1) bahasa — draf masih Inggris, mau versi Indonesia? (2) kalimat penutup
+  "try it, break it, and tell me where it hurts" — nada personal/solo, oke atau diganti?
+
+## 2026-09-08 — README draf v3: kultur netral + platform dinyatakan SUDAH DITES + baris kredit
+User: "pake inggris aja, tapi jangan bawa kultur suatu negara… masa lu nyebut angkot. linux udah
+di test, windows juga udah di test jadi gak usah ada klaim untested. lu sok tau banget dah."
++ ACC kalimat penutup + minta baris kredit "Made with ❤️ by Fadhly Permata".
+- **Rule baru R42** (commit `2619612`): materi publik wajib kultur netral; **status pengujian
+  adalah wewenang maintainer** — PM/sub-agent dilarang pasang/tulis caveat "untested/experimental"
+  atas dugaan; kalau ragu tanya 1 kalimat; konfirmasi maintainer dicatat di `documents/pm/`.
+- **KONFIRMASI MAINTAINER (sumber kebenaran, berlaku lintas sesi):** aigate **sudah dites di
+  Linux, Windows, dan Android/Termux**, termasuk menjalankan distro Linux penuh di dalam HP.
+  → semua `TODO-VERIFY`/kata "experimental/unverified" DIHAPUS dari draf. Jangan pasang caveat
+  lagi untuk hal ini.
+- **business-analyst (task_id sama, sesi dipake ulang)** tulis ulang in place → tetap **80 baris**.
+  Adegan: "angkot" → "on the bus home". Penutup baru: `Made with ❤️ by Fadhly Permata`
+  (setelah `---` di baris terakhir).
+- **Verifikasi PM:** grep `TODO-VERIFY|unverified|experimental|haven't tested|angkot|warkop` =
+  bersih; grep path = bersih (sisa cuma `run.py` di 2 blok perintah); penutupan "Try it, break
+  it, and tell me where it hurts." tetap utuh; `aigate` kecil semua.
+- **Sisa keputusan user:** aside "if you like that kind of magic" di baris Linux-dalam-HP —
+  dipertahankan atau dipotong? Setelah itu: tempel ke `README.md` + push branch `docs/wiki`?
+
+## 2026-09-08 — README BARU PASANG (commit README-only di branch docs/wiki)
+User: "oke pasang".
+- **business-analyst** (handover scope eksplisit dari PM — R3) menimpa `README.md` dengan salinan
+  verbatim draf v3 lalu **menghapus** `documents/business/README-DRAFT.md` (2 salinan = drift).
+- **Verifikasi PM:** SHA-256 `README.md` == SHA-256 draf di HEAD (`ed67124a…`), 80 baris / 3164
+  byte, nol selisih karakter; grep path di README baru = **0**; `git status` cuma 2 file itu.
+- README lama (131 baris, penuh path + instruksi pip/venv/uvicorn/npm + tabel layout) **digantikan**;
+  isinya yang teknis jadi bahan halaman wiki nanti (belum ditulis — wiki masih dikunci user).
+- BELUM di-push (branch `docs/wiki` lokal). User belum bilang push.
+
+## 2026-09-08 — PUSH branch `docs/wiki` ke origin (README baru + R39–R42)
+User: "push".
+- Scan secret pada diff `origin/main..HEAD` (5 file): **0 token** (`ghp_/github_pat_/sk-/AKIA/Bearer`
+  tidak ada) — aman ke repo publik.
+- `git push -u origin docs/wiki:docs/wiki` -> **`* [new branch]`**, upstream sekarang
+  `origin/docs/wiki`. 11 commit naik. `main` TIDAK disentuh (`default_branch` tetap `main`).
+- Verifikasi remote: blob SHA `README.md` lokal == remote ref `docs/wiki` (`b3a77a42…`).
+- PR bisa dibuat di https://github.com/fadhly-permata/AI-Gate/pull/new/docs/wiki — BELUM gue buat
+  (user belum minta). Wiki tetap gak disentuh.

@@ -291,3 +291,31 @@
 - RULE BARU **R28**: baca kode HARUS lewat codegraph dulu (dapet path + line) baru baca
   file yg bersangkutan — hemat token, hindari broad grep/Explore. Reinit via
   `codegraph init` kalau index usang. Berlaku utk PM + semua sub-agent.
+
+## Dokumen wiki — keputusan (2026-09-08)
+- Kerja dokumen wiki jalan di **branch `docs/wiki`** (basis `origin/main`) di repo ini.
+  BUKAN repo terpisah — user mengoreksi (R39). Wiki GitHub sendiri sudah berupa repo git
+  terpisah (`AI-Gate.wiki.git`), jadi file wiki toh gak pernah nyampur sama `src/**`.
+- Kendala terverifikasi: fitur Wiki tidak bisa dinyalakan lewat API (`PATCH has_wiki`
+  diabaikan GitHub) → perlu 1 klik web UI (Settings → Features → Wikis). **SUDAH dilakukan
+  user (2026-09-08)** — wiki hidup di branch `master`, halaman awal `Home.md`. Izin tulis
+  diverifikasi lewat `git push --dry-run` (diterima, 0 byte ditulis) → auto-commit siap.
+- **BATAS IKAT dari user:** jangan menulis/meng-push apa pun ke wiki sampai izin turun.
+  Boleh: baca, clone, probe/dry-run.
+- Rencana tooling (belum dikerjakan): script publisher di `.opencode/tools/docs/wiki/`
+  (idempoten, wajib ada `--dry-run`), token dari `gh auth token` / `.env` (rule secrets,
+  gak di-hardcode), sumber konten = `.md` di branch `docs/wiki` ini; wiki = hasil publikasi.
+- Repo `fadhly-permata/AI-Gate-docs` (private) = **artefak salah**, tidak dipakai. User sudah
+  perintahkan hapus, tapi **terblokir**: PAT gak punya scope `delete_repo` (HTTP 403).
+  Menunggu user hapus lewat web atau menambah scope.
+
+### Konfirmasi maintainer (sumber kebenaran — jangan pasang caveat lagi)
+- 2026-09-08, user: **aigate SUDAH DITES di Linux, Windows, dan Android/Termux**, termasuk
+  menjalankan distro Linux penuh di dalam HP. Materi publik menulis ini sebagai fakta teruji;
+  DILARANG muncul kata "untested/experimental/belum diverifikasi" untuk hal ini (R42).
+- Nama produk ditulis **`aigate`** (huruf kecil semua), termasuk judul README.
+- README: bahasa **Inggris**, kultur **netral** (tanpa rujukan khas negara/daerah), nada ceria +
+  emoji, **tanpa path/nama file** (pengecualian `run.py` di perintah), detail teknis dialihkan ke
+  wiki → https://github.com/fadhly-permata/AI-Gate/wiki
+- Kalimat penutup README yang di-ACC user: "Try it, break it, and tell me where it hurts."
+  + baris kredit terakhir: "Made with ❤️ by Fadhly Permata".
