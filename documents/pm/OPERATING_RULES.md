@@ -567,3 +567,43 @@ Aturan wajib:
    supaya sesi berikutnya tidak memasang caveat lagi.
 4. Sebaliknya: klaim yang belum pernah dikonfirmasi maintainer tetap tidak boleh dilebihkan.
    Netral = faktual, bukan penuh tanda tanya.
+
+## R43 — Varian bahasa = TULISAN ASLI dalam bahasa itu, bukan hasil terjemahan; kalimat wajib jelas
+Pelajaran (2026-09-08, user soal varian README id: "dih bahasa lu absurd dan ambigu banget.
+benerin dong kalimatnya, tapi tetep dengan nada kasual. btw, lu jangan translate dari inggris,
+boleh beda yang penting strukturnya tetep sama"):
+Sub-agent menulis `README.id.md` sebagai calque dari versi Inggris → muncul "ngeresolve",
+"request tetep kejawab", "bilang gue di mana encernya", "kalau lu suka trik begitu" — kasual tapi
+absurd dan ambigu.
+
+Aturan wajib (berlaku utk SEMUA varian bahasa: id, ru, nl, ja, zh, zh-tw):
+1. **DILARANG menerjemahkan kalimat per kalimat.** Tulis materi **asli** dalam bahasa target yang
+   kebetulan menyampaikan produk yang sama. Contoh, idiom, dan adegan **boleh berbeda** — yang
+   **sama hanya struktur seksi dan urutan informasi**.
+2. Yang tetap identik lintas bahasa: **fakta** (jumlah tool, nama produk `aigate`, perintah
+   menjalankan, URL wiki, daftar platform yang sudah dites, baris kredit). Yang bebas: kalimat,
+   metafora, adegan, penutup.
+3. **Satu kalimat = satu makna yang langsung kebaca.** Dilarang: calque struktur Inggris, kata
+   campur bahasa yang gak perlu, sapaan sok akrab, kiasan yang gantung. Kasual ≠ berantakan.
+4. Sapaan default: **impersonal atau "kamu"** untuk dokumen publik; "lu/gue" hanya kalau user
+   minta eksplisit.
+5. PM WAJIB menuliskan poin 1–4 di handover SEBELUM sub-agent menulis, dan **membaca hasil akhirnya
+   sendiri** — bukan cuma ngandelin receipt — sebelum ditampilkan ke user.
+
+### R43 addendum (2026-09-08, user: "masih banyak kalimat yang terasa janggal")
+Hasil audit PM baris-per-baris atas varian id. Pola janggal yang HARUS dihindari di semua varian
+bahasa (bukan cuma Indonesia):
+1. **Pasif kaku** ("dijalankan", "diarahkan", "diteruskan", "dilaporkan") → ganti aktif + subjek
+   jelas: "aigate menjalankan…", "kamu kirim…".
+2. **Subjek hilang** ("Sudah diuji di Linux…", "Arahkan ke project yang error:") → sebut siapa.
+3. **Reduplikasi palsu** ("akun-akun provider", "Asisten-asisten coding") → pakai bentuk tunggal
+   atau kata penghitung ("banyak asisten coding", "semua akun provider").
+4. **Nominalisasi kaku**: "pemasangan"→"pasang/install", "pengujian"→"tes", "pengerjaannya"→
+   "prosesnya", "riwayat pemakaian"→"riwayat pemakaian" boleh tapi "permintaan" utk *request*
+   JANGAN (pakai "request" — itu yang dipakai developer Indonesia).
+5. **Diksi salah rasa**: "provider mati" → "provider sedang bermasalah/down"; "Tema terang dan
+   gelap" → "mode terang dan gelap"; "terpasang dan berjalan native" → "bisa dipasang dan jalan".
+6. **Redundansi**: "dengan cara yang sama seperti" → "sama seperti".
+7. **Kata yang salah maksud**: "tulis satu perintah singkat" padahal yang ditulis itu instruksi ke
+   agent → "tulis satu instruksi singkat".
+8. Kalimat panjang >2 klausa + banyak "yang" bertumpuk → pecah jadi 2 kalimat.

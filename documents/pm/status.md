@@ -1620,3 +1620,89 @@ User: "push".
 - Verifikasi remote: blob SHA `README.md` lokal == remote ref `docs/wiki` (`b3a77a42…`).
 - PR bisa dibuat di https://github.com/fadhly-permata/AI-Gate/pull/new/docs/wiki — BELUM gue buat
   (user belum minta). Wiki tetap gak disentuh.
+
+## 2026-09-08 — PR #8 dibuka: `docs/wiki` → `main`
+User: "bikin pr deh biar enak liat yang 'main'".
+- Pre-flight PM: working tree bersih; `origin/main...HEAD` = 0 belakang / 12 depan; daftar 12
+  commit & diff 5 file diperiksa SEMUANYA (bukan cuma commit terakhir); scan secret = 0 token;
+  tidak ada PR terbuka lain (`gh pr list` kosong).
+- **PR #8**: https://github.com/fadhly-permata/AI-Gate/pull/8 — base `main`, head `docs/wiki`,
+  judul `docs(readme): README untuk pembaca awam + aturan PM R39–R42`. Body gaya repo (Ringkasan /
+  README baru / Yang ikut naik / Verifikasi / Catatan review / Belum termasuk). File body temp
+  sudah dihapus (R8).
+- Status GitHub: **mergeable=MERGEABLE, mergeStateStatus=CLEAN**, 12 commit, 5 file
+  (`README.md`, `documents/pm/{OPERATING_RULES,memory-bank,state,status}.md`).
+- **Gak ada perubahan kode** → gate tes tidak dijalankan (tidak relevan); README lama tetap ada di
+  riwayat `main` kalau user mau bandingkan.
+- Commit catatan PR ini **sengaja belum di-push** biar PR tetap persis 12 commit yang sedang lu
+  review. Naik bareng kerjaan wiki berikutnya.
+- Wiki tetap gak disentuh.
+
+## 2026-09-08 — README multi-bahasa: cara A, folder `documents/readme-variants/`, SEKUENSIAL (1/6: id)
+User: "pake cara A. varian ditaro di `documents/readme-variants`. boleh pake istilah/cerita yang
+cocok buat masing-masing kultur. kerjain satu persatu dulu, biar bisa gw review."
+- **Keputusan tercatat:** cara A (baris bahasa + file varian), lokasi `documents/readme-variants/**`
+  (izin eksplisit — R33 aman, root tetap ramping), pendekatan **transcreation** (adegan & idiom
+  lokal per bahasa, bukan terjemahan kaku), mode **sekuensial** (`state.md: multiagent_mode:
+  sequential`). Urutan: id → ru → nl → ja → zh → zh-tw. **Baris bahasa di `README.md` dipasang
+  PALING AKHIR** setelah 6 varian ACC (biar gak ada link mati di tengah jalan).
+- **Delegasi:** `business-analyst` (task_id sama, sesi dipake ulang biar suara tulisannya konsisten)
+  → `documents/readme-variants/README.id.md`, **84 baris**.
+- **Verifikasi PM:** fakta cocok sama README EN (24 tool, self-heal, sudah dites Linux/Windows/
+  Termux, 7 bahasa, kredit diterjemahkan); grep hedge = bersih; grep path = bersih (sisa `run.py`
+  di perintah + link balik); tautan balik `../../README.md` = benar secara relatif; emoji per judul.
+- **Pilihan lokal BA:** adegan KRL pulang kerja; "gas"; "tambal, ulang"; penutup "oprek sepuasnya —
+  kalau ada yang nyangkut, bilang gue di mana encernya"; sapaan "lu/gue" konsisten.
+- **Ditandai BA utk review user:** kata "ngeresolve" (baris 63) agak janggal — kandidat: "Android
+  punya aturan sendiri buat ngatur paket". Level kasual varian ini jadi patokan 5 berikutnya.
+- **Nunggu user:** ACC/ubah varian id → baru gue jalanin ru.
+
+## 2026-09-08 — Varian id ditulis ULANG sebagai teks asli Indonesia (bukan terjemahan) — R43
+User: "dih bahasa lu absurd dan ambigu banget… jangan translate dari inggris, boleh beda yang
+penting strukturnya tetep sama."
+- **Rule baru R43** (commit `39192a6`): varian bahasa = tulisan asli dalam bahasa itu; yang sama
+  hanya struktur seksi + urutan; fakta terkunci (24 tool, `aigate` kecil, perintah, URL, daftar
+  platform teruji, kredit); 1 kalimat 1 makna; DILARANG calque & sapaan sok akrab ("lu/gue" →
+  impersonal/"kamu"); PM wajib baca sendiri hasilnya, bukan ngandelin receipt.
+- **business-analyst** tulis ulang in place → **86 baris**. Adegan diganti total (bukan "bus home"):
+  *rebahan sebelum tidur, ingat project error dari sore*. Judul seksi jadi "Sebelum tidur ☕".
+- **Yang hilang dari versi kemarin:** "ngeresolve paket", "request tetep kejawab", "loop self-heal
+  yang bisa lu tonton", "bilang gue di mana encernya", "kalau lu suka trik begitu", sapaan lu/gue.
+- **Verifikasi PM (baca sendiri, R43.5):** calque → 0; sapaan konsisten "kamu"/impersonal; fakta
+  cocok (24 tool, anti-pura-pura-sukses, teruji Linux/Windows/Termux + distro Linux penuh, 7 bahasa,
+  terang/gelap); `run.py` satu-satunya nama file; link balik `[English](../../README.md)` di baris 10;
+  kredit `Dibuat dengan ❤️ oleh Fadhly Permata`; tanpa tabel; emoji hanya di judul.
+- BA juga lapor self-review-nya: 3 kalimat masih berbau terjemahan ("di sebuah tab" → "di satu tab",
+  "termasuk saat menjalankan" → "termasuk untuk menjalankan", "Semua yang lebih dalam —" →
+  "Penjelasan lengkap soal") dan sudah dibenerin SEBELUM receipt.
+- **Nunggu user:** ACC varian id → lanjut **ru** (Rusia).
+
+## 2026-09-08 — Varian id ronde 3: audit PM baris-per-baris → 11 pola janggal dibenerin
+User: "masih banyak kalimat yang terasa janggal" (tanpa nunjuk baris) → PM gak nanya balik, gue
+audit sendiri, ketemu 11 pola sistemik → **R43 addendum** (commit `5464b96`): pasif tanpa pelaku,
+subjek hilang, reduplikasi palsu ("akun-akun", "Asisten-asisten"), "permintaan" utk *request*,
+diksi salah rasa ("provider mati", "Tema terang dan gelap", "pilihan pemasangan", "dokumentasi
+pengujian"), redundansi ("dengan cara yang sama seperti"), salah maksud ("satu perintah singkat"
+padahal instruksi ke agent), kalimat >2 klausa.
+- **business-analyst** benerin semua (receipt + read-back sendiri: "error diperbaiki… dites ulang"
+  → "dia memperbaiki error satu per satu, mengulang tes"; "perintah pasang yang ditampilkan adalah…"
+  → "perintah pasang yang muncul dijamin benar-benar jalan").
+- **Ronde 4 (PM nemu 4 nit sisa):** pembuka "jadi…jadi…mengerjakan koding" → "Di dalamnya ada agent
+  AI yang nulis kode buat kamu"; "banyak asisten coding" → "24 asisten coding"; "mengunduh sendiri
+  …dibutuhkannya" → "otomatis mengunduh paket Python yang dibutuhkan"; kalimat Status dipecah dua.
+- **Verifikasi PM:** grep pola lama = **0**; 86 baris; fakta terkunci utuh; `run.py` satu-satunya
+  nama file; struktur seksi gak bergeser.
+- **Dibuka ke user:** angka "24" sekarang muncul 2x di satu bullet (judul + badan) — mau dirapikan
+  atau biarin?
+
+## 2026-09-08 — Daftar CLI tool diberi catatan "masih dikembangkan" (README EN + varian id)
+User: "soal 24 tools itu, infokan aja kalo masih dalam tahap pengembangan; versi berikutnya bisa
+jadi ada update daftar cli tools".
+- **business-analyst** (handover scope: `README.md` + `documents/readme-variants/README.id.md`)
+  nambah 1 kalimat catatan di bullet yang sama + **hapus angka "24" yang kedua** (sebelumnya muncul
+  2x di varian id) → sekarang **1x per file** (grep `24` = 1 dan 1).
+- README.md 80→81 baris, varian id 86→87 baris. Bagian lain gak tersentuh.
+- Fakta ini dipindah ke `memory-bank.md` sebagai **aturan lintas dokumen**: angka cukup sekali +
+  wajib ada catatan "daftar masih dikembangkan" (alasan nyata: sebagian preset belum punya jalur
+  install di semua platform — lihat `cli_presets.py` `NO_INSTALL` + `TERMUX_INSTALL`).
+- **Push** → PR #8 ikut ke-update (README + varian id).
