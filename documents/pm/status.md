@@ -1706,3 +1706,14 @@ jadi ada update daftar cli tools".
   wajib ada catatan "daftar masih dikembangkan" (alasan nyata: sebagian preset belum punya jalur
   install di semua platform — lihat `cli_presets.py` `NO_INSTALL` + `TERMUX_INSTALL`).
 - **Push** → PR #8 ikut ke-update (README + varian id).
+
+## 2026-09-08 — PR #8 di-MERGE user; delta berikutnya masuk PR #9
+- Cek remote: **PR #8 `merged=true`** oleh `fadhly-permata` (22:05) → `main` = `cc6b546`, README
+  versi baru **sudah tampil di halaman utama repo**.
+- `git merge origin/main` ke `docs/wiki` → 0 konflik; branch sekarang 8 commit di depan `main`
+  (R43 + addendum, varian id 3 ronde, catatan WIP tool, log PM).
+- **PR #9** dibuka: https://github.com/fadhly-permata/AI-Gate/pull/9 — base `main`, 8 commit,
+  6 file, **mergeable=MERGEABLE / CLEAN**. Body-nya nyebut angka 8 commit; commit catatan ini
+  sengaja BELUM di-push biar PR tetap persis seperti yang lu review.
+- Konfirmasi penting: catatan "daftar tool masih dikembangkan" **belum** ada di `main` (baru di
+  PR #9) — grep di `origin/main:README.md` = 0.
