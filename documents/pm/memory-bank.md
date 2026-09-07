@@ -308,3 +308,14 @@
 - Repo `fadhly-permata/AI-Gate-docs` (private) = **artefak salah**, tidak dipakai. User sudah
   perintahkan hapus, tapi **terblokir**: PAT gak punya scope `delete_repo` (HTTP 403).
   Menunggu user hapus lewat web atau menambah scope.
+
+### Konfirmasi maintainer (sumber kebenaran — jangan pasang caveat lagi)
+- 2026-09-08, user: **aigate SUDAH DITES di Linux, Windows, dan Android/Termux**, termasuk
+  menjalankan distro Linux penuh di dalam HP. Materi publik menulis ini sebagai fakta teruji;
+  DILARANG muncul kata "untested/experimental/belum diverifikasi" untuk hal ini (R42).
+- Nama produk ditulis **`aigate`** (huruf kecil semua), termasuk judul README.
+- README: bahasa **Inggris**, kultur **netral** (tanpa rujukan khas negara/daerah), nada ceria +
+  emoji, **tanpa path/nama file** (pengecualian `run.py` di perintah), detail teknis dialihkan ke
+  wiki → https://github.com/fadhly-permata/AI-Gate/wiki
+- Kalimat penutup README yang di-ACC user: "Try it, break it, and tell me where it hurts."
+  + baris kredit terakhir: "Made with ❤️ by Fadhly Permata".
