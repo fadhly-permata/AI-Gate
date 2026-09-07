@@ -1336,3 +1336,29 @@ audit diff, putuskan accept/re-work, serahkan re-work ke pemilik scope.
   sesi ini. BELUM di-merge (menunggu user; dan user perlu restart+refresh setelah merge).
 - PENDING user: restart aigate + hard-refresh (R32) — cache-buster baru `v=20260911`.
   Item yang user TOLAK: verifikasi flag `--model` per CLI (tetap open item, jangan dikerjakan).
+
+## 2026-09-07 (malam) — Sidebar: tautan Repository sticky di bawah + audit kecepatan vitest
+- User: "di sidemenu tambahin link repo aigate dong … sticky di bawah aja". Lalu protes
+  lama ("buset, lama amat bikin item baru di sidemenu") -> **handover pertama gue dibatalin
+  user**, gue ringkasin jadi ~20 baris.
+- **fe-dev (ses_f8390c573ffeRZDbjnksOQGKTX):** kerjaan kode SUDAH mendarat dari spawn yang
+  di-cancel (PM audit diff-nya, diterima), fe-dev cuma benerin 1 assertion tes
+  (`.bottom-nav .bn-item` 5 -> 7; 7 = jumlah item yang sudah ada, tautan repo TIDAK masuk
+  bottom-nav). Hasil: `index.html` `.sidebar-footer` di luar `<nav>`, `app.js` skip item
+  tanpa `data-view` (kalau tidak, klik repo di-`preventDefault`), `styles.css` `.sidebar`
+  flex column + footer `sticky;bottom:0` + `margin-top:auto`, `i18n` `nav.repo` EN/ID,
+  cache-buster `v=20260912`, `views.test.js` +8 tes.
+- **Commit `86a5ef1`** (1 commit, 5 file) + CODE_CHANGES.md (R22). **PR #5 sudah MERGED**
+  (`0e290ae`) TAPI sebelum commit ini masuk -> link repo masih di `refactor/ui`,
+  perlu PR susulan.
+- **Gate PM (sekali, R35):** vitest penuh **484 passed (23 file), Duration 14.66s**.
+- **Diagnosa "kenapa vitest lama" (terukur, bukan perasaan):**
+  (1) 17 dari 23 file tes meng-import `static/app.js` (70 KB) / `static/terminal.js` (61 KB)
+  yang IIFE-nya menjalankan `init()` saat import -> biaya "collect" 24s, setara biaya
+  tesnya sendiri (23.8s). (2) 9 file `readFileSync` + `new JSDOM(index.html)` — HTML 63 KB
+  di-parse ulang tiap file. (3) ms/tes tertinggi: `row-actions` 148, `terminal_discard` 113,
+  `selfheal` 111, `combos` 110 -> re-init per tes, bukan assertion. (4) Termux:
+  `os.cpus()=0` -> vitest fallback 1 fork (sekuensial) + throttling Android.
+  Yang SUDAH dibenerin sesi ini: `isolate:false` (jsdom gak dibangun ulang 23x).
+  Sisa opsi (belum dikerjakan, nunggu user): helper DOM bersama (1 parse utk semua file),
+  stop `init()` ulang per tes di 4 file terberat.

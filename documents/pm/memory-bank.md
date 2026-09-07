@@ -36,6 +36,15 @@
   delegasi re-work ke pemilik scope, baru catat + commit.
 
 ## Progress
+- 2026-09-07 (malam): **Sidebar + tautan Repository sticky — DONE (`86a5ef1`, belum masuk `main`).**
+  User minta link repo (`https://github.com/fadhly-permata/AI-Gate`) nempel di dasar menu
+  samping. FE-only: `.sidebar-footer` di luar `<nav>` (jaga rule `.nav-section:last-child`),
+  `app.js` skip item tanpa `data-view` (kalau tidak, klik luar di-block), `.sidebar` jadi
+  flex column + footer `sticky;bottom:0`+`margin-top:auto`, i18n `nav.repo` EN/ID,
+  cache-buster `v=20260912`, +8 tes `views.test.js`. Gate PM: vitest **484 passed, 14.66s**.
+  **PR #5 sudah MERGED (`0e290ae`) tapi keburu sebelum commit ini** -> 1 commit ini butuh PR
+  susulan. PELAJARAN PROSES: user protes lama ("buset, lama amat") -> handover PM kepanjangan;
+  spawn pertama dibatalin user, spawn kedua ~20 baris dan langsung kelar.
 - 2026-09-07 (sesi ini, akhir): **BERES-BERES — semua kerjaan numpuk di-commit rapi + suite hijau.**
   (1) **Fitur cleanup log** (BE T1 + FE T2, handover `documents/pm/handover-20260907-logs-{be,fe}.md`):
   `DELETE /api/logs` (severity/before, wipe-all wajib `confirm=all`), retensi startup

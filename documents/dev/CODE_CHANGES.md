@@ -1,5 +1,47 @@
 # Code Changes Register (code ↔ docs alignment)
 
+## 2026-09-07 — Sidebar: tautan Repository nempel di bawah — DONE (commit `86a5ef1`)
+
+**Permintaan user:** "di sidemenu tambahin link repo aigate dong
+(https://github.com/fadhly-permata/AI-Gate) buat posisinya sticky di bawah aja ya."
+
+### `src/frontend/static/index.html`
+- `<div class="sidebar-footer">` = anak terakhir `<aside class="sidebar">`, **di luar
+  `<nav>`** → `.nav-section:last-child { border-bottom: 0 }` tetap berarti sama.
+- Isinya `<a class="nav-item" target="_blank" rel="noopener noreferrer">` + ikon
+  `fa-brands fa-github` + `<span class="nav-label" data-i18n="nav.repo">`;
+  `aria-label`/`title` + `data-i18n-aria` supaya tetap terbaca saat sidebar di-collapse.
+- Cache-buster dinaikkan ke `?v=20260912` untuk `styles.css`, `app.js`, `i18n.js`.
+
+### `src/frontend/static/app.js` (4 baris)
+- Handler klik navigasi sekarang `if (!item.hasAttribute("data-view")) return;` —
+  tanpa itu tautan repo ikut di-`preventDefault()` dan gak ke mana-mana.
+
+### `src/frontend/static/styles.css`
+- `.sidebar` jadi `display:flex; flex-direction:column` (sebelumnya block) supaya
+  footer bisa didorong ke bawah; `.nav` tidak diubah (min-height otomatis = tinggi
+  konten → menu panjang overflow, `.sidebar` yang scroll).
+- `.sidebar-footer`: `position:sticky; bottom:0` + `margin-top:auto` + `flex:0 0 auto`
+  + `background:var(--sidebar-bg)` + `z-index:1` → dua mekanisme saling melengkapi
+  (menu pendek → nempel bawah; menu panjang/scroll → tetap terlihat, item terakhir
+  tetap terjangkau di akhir scroll). `body.sidebar-collapsed .sidebar-footer{padding:4px 0}`.
+  Tanpa hex baru (token saja). Mobile tidak disentuh (`.sidebar` tetap `display:none`,
+  `.bottom-nav` tetap 7 item).
+
+### `src/frontend/static/i18n.js`
+- `nav.repo`: EN `"Repository"`, ID `"Repositori"` (satu kunci = satu nilai, sesuai
+  keputusan i18n 2026-09-06).
+
+### `src/frontend/tests/views.test.js` (+115 baris, 8 tes)
+- href persis + `target=_blank` + `rel` noopener/noreferrer; TIDAK punya `data-view`
+  + guard binding `app.js` (regression lock); posisi wrapper (last child `.sidebar`,
+  di luar `<nav>`, 4 `.nav-section` utuh); markup ulang pola nav (ikon + label +
+  aria/title); mode collapsed (label tetap di DOM, disembunyikan CSS); kontrak CSS
+  sticky ( assertion teks rule — jsdom tidak menjalankan layout); ponsel tidak berubah.
+
+**Verifikasi PM:** `node node_modules/.bin/vitest run` → **484 passed (23 file),
+Duration 14.66s**. Backend tidak disentuh (tanpa perubahan `src/backend/**`).
+
 ## 2026-09-07 — Log cleanup: hapus / retensi / tanda "selesai" (BE T1 + FE T2) — DONE (commit `86c4778` + `45206c0`)
 
 **Permintaan user:** fitur bersihin log — 3 opsi: hapus manual, auto-hapus per umur,
