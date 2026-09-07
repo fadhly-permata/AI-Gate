@@ -25,7 +25,14 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from backend.config.db import SessionLocal
-from backend.log import logger, log_error, log_error_exc, log_info, log_warning
+from backend.log import (
+    logger,
+    log_error,
+    log_error_exc,
+    log_info,
+    log_warning,
+    log_warning_exc,
+)
 from backend.models import (
     ComboMember,
     EndpointBinding,
@@ -304,8 +311,10 @@ async def _run_provider_test(req: ProviderTestRequest) -> dict:
                 return {"ok": False, "error": f"HTTP {status}"}
             return {"ok": True}
     except httpx.TimeoutException as exc:
-        logger.error("provider test failed: timeout", exc_info=True)
-        log_error_exc(
+        # Expected outcome of a probe against an unreachable/slow host: a
+        # concise warning, never a full traceback dump.
+        logger.warning("provider test failed: timeout")
+        log_warning_exc(
             "provider test failed: timeout",
             source=LOG_SOURCE,
             exc=exc,
@@ -313,8 +322,10 @@ async def _run_provider_test(req: ProviderTestRequest) -> dict:
         )
         return {"ok": False, "error": "Timeout"}
     except httpx.HTTPError as exc:  # connection refused, DNS, etc.
-        logger.error("provider test failed: transport error", exc_info=True)
-        log_error_exc(
+        # Expected outcome of a probe against a dead/refused host (e.g. port 9):
+        # concise warning, no noisy httpx/httpcore traceback.
+        logger.warning("provider test failed: transport error")
+        log_warning_exc(
             "provider test failed: transport error",
             source=LOG_SOURCE,
             exc=exc,
