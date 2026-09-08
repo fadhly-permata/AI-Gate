@@ -6,6 +6,10 @@
 它就是一個普通的 Python 應用程式：不用 Docker、不用雲端帳號，
 金鑰和紀錄都留在你自己的裝置上。
 
+aigate 免費且開放原始碼——沒有付費方案，也沒有需要訂閱才能使用的功能。
+任何人都能自由複製這份程式碼，所以 aigate 唯一的官方來源就是
+[github.com/fadhly-permata/AI-Gate](https://github.com/fadhly-permata/AI-Gate)。
+
 🌐 [English](../../README.md) · [Bahasa Indonesia](README.id.md) · [Русский](README.ru.md) · [Nederlands](README.nl.md) · [日本語](README.ja.md) · [简体中文](README.zh.md) · **繁體中文** · [हिन्दी](README.hi.md)
 
 ## 下班，搭捷運回家 ☕

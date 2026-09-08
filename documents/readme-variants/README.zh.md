@@ -9,6 +9,10 @@ AI agent 替你写代码，你负责看。
 就是一个普通的 Python 应用：不用 Docker，不用云账号，
 密钥和记录都留在你自己的设备上。
 
+aigate 免费且开源——没有付费套餐，也没有需要订阅才能用的功能。
+任何人都能自由复制这份代码，所以 aigate 唯一的官方来源就是
+[github.com/fadhly-permata/AI-Gate](https://github.com/fadhly-permata/AI-Gate)。
+
 🌐 [English](../../README.md) · [Bahasa Indonesia](README.id.md) · [Русский](README.ru.md) · [Nederlands](README.nl.md) · [日本語](README.ja.md) · **简体中文** · [繁體中文](README.zh-tw.md) · [हिन्दी](README.hi.md)
 
 ## 下班路上 ☕

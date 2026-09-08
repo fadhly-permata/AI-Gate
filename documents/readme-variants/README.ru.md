@@ -7,6 +7,10 @@
 аккаунта.
 API-ключи и история запросов остаются на устройстве.
 
+aigate бесплатен, а его исходный код открыт — платных тарифов нет, и ничего
+не скрыто за подпиской. Скопировать этот код может кто угодно, поэтому
+единственный официальный адрес aigate — [github.com/fadhly-permata/AI-Gate](https://github.com/fadhly-permata/AI-Gate).
+
 🌐 [English](../../README.md) · [Bahasa Indonesia](README.id.md) · **Русский** · [Nederlands](README.nl.md) · [日本語](README.ja.md) · [简体中文](README.zh.md) · [繁體中文](README.zh-tw.md) · [हिन्दी](README.hi.md)
 
 ## Вечерняя электричка ☕

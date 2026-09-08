@@ -6,6 +6,10 @@
 Docker は要りません。クラウドのアカウントも要りません。aigate はごく普通の
 Python アプリです。APIキーも履歴も、手元の端末にだけ残ります。
 
+aigate は無料で、ソースコードも公開されています。有料プランはなく、課金しないと
+使えない機能もありません。誰でもこのコードを自由にコピーできるため、aigate の公式な配布先は
+ひとつだけです: [github.com/fadhly-permata/AI-Gate](https://github.com/fadhly-permata/AI-Gate)
+
 🌐 [English](../../README.md) · [Bahasa Indonesia](README.id.md) · [Русский](README.ru.md) · [Nederlands](README.nl.md) · **日本語** · [简体中文](README.zh.md) · [繁體中文](README.zh-tw.md) · [हिन्दी](README.hi.md)
 
 ## 満員電車の帰り道 ☕
