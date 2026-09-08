@@ -89,6 +89,20 @@ tapi perangkatnya seadanya. Halaman 2 ini lanjutan praktisnya: dari belum punya 
 6. `## Your first three minutes ✨` — kunci → pilih → jalan.
 7. `## When something goes wrong 🧯` — 3 hal paling umum, singkat, bukan daftar panjang.
 
+## 4b. HASIL VERIFIKASI PM (keraguan BA yang sekarang jadi fakta)
+- **Cara ambil kode:** satu-satunya jalur menjalankan = `git clone` repo resmi lalu `python run.py`
+  (dibuktikan: tidak ada script pembungkus, tidak ada perintah install selain yang tercatat di §1).
+  Yang tidak punya git bisa pakai tombol unduh arsip GitHub — itu tombol web GitHub, bukan fitur kita.
+- **Cara cek versi Python:** `python --version`; di Windows `py --version` juga jalan.
+  ⚠️ DITEMUKAN LUBANG PRODUK: `run.py` **tidak mengecek versi Python sama sekali** (46 baris,
+  tanpa `version_info`). Python lama bikin error yang gak bisa dibaca orang awam → catatan wiki
+  wajib ada, dan gue buka task perbaikan terpisah.
+- **Windows / PowerShell sintaks variabel lingkungan berbeda dari bash:**
+  PowerShell: `$env:AIGATE_PORT = "9090"` lalu `python run.py` · cmd: `set AIGATE_PORT=9090` lalu
+  `python run.py`. Ini pengetahuan platform standar, bukan klaim produk → boleh ditulis.
+- **Kebijakan gaya wiki (user, 2026-09-08: "natural, ringan, asumsi pembacanya awam"):** boleh ada
+  1 baris suara pribadi maintainer, maksimal satu per halaman, tanpa emoji.
+
 ## 5. Definisi selesai
 - [ ] Hanya `Quick-Start.md` yang ditulis.
 - [ ] Tidak ada satu pun perintah di luar §1.
