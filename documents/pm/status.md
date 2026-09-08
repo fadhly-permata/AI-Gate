@@ -1822,3 +1822,16 @@ biaya = `cost_est` (TAKSIRAN, bukan tagihan); tab terminal + tombol `+` + scroll
   baru (`clitools.js` buildLaunchCommand + launchInNewTab). "rough moment" → "bad moment".
 - Hasil akhir: 319 kata, 0 kata terlarang, 5 tautan internal semuanya ada dalam 8 halaman rencana.
 - **PAUSED** di sini (R17): halaman 2–8 TIDAK dikerjakan sampai user meng-ACC halaman 1.
+
+## 2026-09-08 — Lisensi MIT naik sebagai PR #11
+User jawab "b" (naikkan lisensi SETELAH PR #10). Cek gerbang: PR #10 ternyata **sudah MERGED**
+(→ `origin/main` = 8b72f84, 7 varian README + baris bahasa ikut masuk). LICENSE belum ada di main.
+- `chore/mit-license` di-push; **PR #11** dibuka → mergeable=clean, 9 commit, 16 file, +632/-8.
+- Verifikasi sebelum push: working tree bersih · README +3/0 (sisipan murni) · tidak ada
+  node_modules/file wiki ikut · 0 referensi "this repo" tersisa.
+- `main` lokal disinkron ke origin/main.
+- Koreksi atas statement PM sebelumnya: kalimat "free and open source" TIDAK pernah tayang di `main`
+  tanpa `LICENSE` → tidak ada periode klaim menyesatkan.
+- GATE berikutnya: user me-review & merge PR #11. Setelah merge → (a) label lisensi muncul di
+  GitHub, (b) WL.2a sebarkan 1 kalimat ke 7 varian (URL tidak diterjemahkan), (c) wiki lanjut
+  halaman 1 ACC → halaman 2.

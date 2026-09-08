@@ -48,7 +48,12 @@ Legenda: `[ ]` antre · `[~]` dikerjakan · `[!]` draft siap, **nunggu review us
 - DILARANG muncul: "untested/experimental/belum diverifikasi" untuk hal yang sudah dikonfirmasi
   maintainer (R42); tapi DILARANG juga melebihkan klaim yang belum dicek (R23).
 
-## Tahap 1.5 — Keputusan lisensi (user 2026-09-08: "kita pake MIT aja dulu")
+## Tahap 1.5 — Keputusan lisensi (NAIK KE PR #11)
+PR: https://github.com/fadhly-permata/AI-Gate/pull/11 · branch `chore/mit-license` (9 commit,
+16 file, +632/-8, mergeable=clean) · PR #10 sudah merged → 7 varian README + baris bahasa sudah di
+`main` · `main` lokal disinkron. Setelah PR #11 merge: GitHub baru menampilkan label lisensi,
+dan WL.2a baru boleh dikerjakan.
+--- (user 2026-09-08: "kita pake MIT aja dulu")
 - [x] **WL.1** Pasang `LICENSE` MIT + `THIRD_PARTY_NOTICES.md` (notis xterm.js yang wajib) + field
       lisensi `pyproject.toml`. → owner: be-dev (handover eksplisit; fullstack-dev baru ke-generate tapi belum terdaftar di runtime) · branch `chore/mit-license`
       → hasil: `LICENSE` (badan MIT **identik byte** dgn teks resmi SPDX), `THIRD_PARTY_NOTICES.md`
