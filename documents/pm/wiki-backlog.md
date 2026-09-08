@@ -10,11 +10,12 @@ Legenda: `[ ]` antre · `[~]` dikerjakan · `[!]` draft siap, **nunggu review us
 - [x] **W0.1** Rencanakan cakupan + audit bahan yang sudah ada (`documents/`), tahan isi internal.
 - [x] **W0.2** Tetapkan nada & batas konten (Inggris kasual, pembaca awam, emoji) → R44.
 - [x] **W0.3** Siapkan staging `documents/pm/wiki-drafts/` + folder ini. Wiki asli **tidak disentuh**.
-- [ ] **W0.4** Verifikasi 3 bug README di halaman 2 dari kode (requirements.txt, AIGATE_DEV, `aigate`).
+- [x] **W0.4** Verifikasi 3 bug README dari kode: `requirements.txt` TIDAK ada · `AIGATE_SIMULATE_DEVICE` TIDAK ada (yang ada `AIGATE_DEV`, launcher.py:26) · command `aigate` NYATA ada (`[project.scripts]`) (requirements.txt, AIGATE_DEV, `aigate`).
 
 ## Tahap 1 — Delapan halaman (satu per satu, berhenti tiap halaman untuk review)
-- [!] **W1.1** `Home.md` — peta jalan. Draft v0 sudah ada (contoh gaya), **belum di-ACC**.
-      → owner: business-analyst · status: nunggu arahan user atas contoh gaya
+- [!] **W1.1** `Home.md` — peta jalan. **Draft final siap direview user** (PM sudah koreksi 1 klaim salah).
+      → owner: business-analyst · 319 kata · 0 kata terlarang · 5 tautan internal valid
+      → temuan: klaim Self-Heal salah digambarkan → DICORET (lihat pertanyaan terbuka #6 di plan)
 - [ ] **W1.2** `Quick-Start.md` — pasang sampai jalan, 3 platform. Perbaiki 3 bug README.
       → owner: system-analyst (verifikasi perintah) + business-analyst (nada)
 - [ ] **W1.3** `Interfaces.md` — daftar cara memakai aigate + link per halaman.

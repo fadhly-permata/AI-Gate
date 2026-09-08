@@ -1805,3 +1805,20 @@ bahasa Inggris kasual, pembaca awam, emoji boleh**; **isi `documents/` tidak bol
   command `aigate` hilang.
 - Status: **PAUSED menunggu user bangun & me-review Home**. Tidak ada sub-agent yang dijalankan
   untuk halaman 2–8 (R17: satu per satu). PR #10 masih open.
+
+## 2026-09-08 — W1.1 draft Home SELESAI (nunggu ACC user)
+User: "gas". Gerbang fakta PM (sebelum delegasi): **repo TIDAK punya file LICENSE** → klaim
+"free / open source" DILARANG di materi publik; `aistudio/cursor/github/openai/google` URL keluar
+semuanya endpoint OAuth provider yang user daftarkan → **nol telemetri ke server kita** (klaim
+"nothing reports back to us" aman); failover = strategi `fallback` (+ `load_balance`, `latency_cost`);
+biaya = `cost_est` (TAKSIRAN, bukan tagihan); tab terminal + tombol `+` + scrollback 5000 = nyata.
+- Scope business-analyst **diperluas** (write: `documents/pm/wiki-drafts/**`, read: lembar fakta
+  `documents/pm/handovers/` saja + dilarang baca `documents/**` yang lain) → R44 bisa ditegakkan:
+  penulis materi publik tidak pernah melihat dokumen internal.
+- Lembar fakta ditulis PM: `documents/pm/handovers/2026-09-08-wiki-home-facts.md`.
+- BA menulis `documents/pm/wiki-drafts/Home.md` (322 kata). **Audit PM menemukan 1 klaim SALAH**:
+  Self-Heal digambarkan "friendly nudge to fix settings" — aslinya agen yang memperbaiki kode dan
+  merge branch. Ganti ke fakta yang terbukti: pilih tool → pilih model → diluncurkan di tab terminal
+  baru (`clitools.js` buildLaunchCommand + launchInNewTab). "rough moment" → "bad moment".
+- Hasil akhir: 319 kata, 0 kata terlarang, 5 tautan internal semuanya ada dalam 8 halaman rencana.
+- **PAUSED** di sini (R17): halaman 2–8 TIDAK dikerjakan sampai user meng-ACC halaman 1.
