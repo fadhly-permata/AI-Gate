@@ -7,7 +7,7 @@ jalankan dari HP.
 Bentuknya aplikasi Python biasa: tanpa Docker, tanpa akun cloud. aigate
 menyimpan API key dan riwayat pemakaian di perangkat kamu sendiri.
 
-[English](../../README.md)
+🌐 [English](../../README.md) · **Bahasa Indonesia** · [Русский](README.ru.md) · [Nederlands](README.nl.md) · [日本語](README.ja.md) · [简体中文](README.zh.md) · [繁體中文](README.zh-tw.md) · [हिन्दी](README.hi.md)
 
 ## Sebelum tidur ☕
 

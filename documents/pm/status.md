@@ -1706,3 +1706,68 @@ jadi ada update daftar cli tools".
   wajib ada catatan "daftar masih dikembangkan" (alasan nyata: sebagian preset belum punya jalur
   install di semua platform — lihat `cli_presets.py` `NO_INSTALL` + `TERMUX_INSTALL`).
 - **Push** → PR #8 ikut ke-update (README + varian id).
+
+## 2026-09-08 — PR #8 di-MERGE user; delta berikutnya masuk PR #9
+- Cek remote: **PR #8 `merged=true`** oleh `fadhly-permata` (22:05) → `main` = `cc6b546`, README
+  versi baru **sudah tampil di halaman utama repo**.
+- `git merge origin/main` ke `docs/wiki` → 0 konflik; branch sekarang 8 commit di depan `main`
+  (R43 + addendum, varian id 3 ronde, catatan WIP tool, log PM).
+- **PR #9** dibuka: https://github.com/fadhly-permata/AI-Gate/pull/9 — base `main`, 8 commit,
+  6 file, **mergeable=MERGEABLE / CLEAN**. Body-nya nyebut angka 8 commit; commit catatan ini
+  sengaja BELUM di-push biar PR tetap persis seperti yang lu review.
+- Konfirmasi penting: catatan "daftar tool masih dikembangkan" **belum** ada di `main` (baru di
+  PR #9) — grep di `origin/main:README.md` = 0.
+
+## 2026-09-08 — Baris pemilih bahasa dipasang di semua file README yang ada
+User: "harusnya tambahin link ke setiap bahasa readme. kalo gak ada link nya user mana tau. buat
+link untuk semua bahasa di semua file readme".
+- Diambil dari registry aplikasi (`src/frontend/static/i18n.js` `LANGS`) biar daftar bahasa README
+  sama dengan daftar bahasa di dalam aplikasi; endonym tidak diterjemahkan.
+- `README.md` baris 10 + `README.id.md` baris 10 (mengganti tautan `[English](../../README.md)`
+  yang tunggal). Bahasa sendiri ditebalkan tanpa link. Diff +3/-1, nol baris lain berubah
+  (verifikasi PM: `git diff --stat` + baca langsung + cek tidak berubah jadi bullet list).
+- RISIKO DILAPORKAN ke user: 5 link (ru, nl, ja, zh, zh-tw) masih MATI karena filenya belum ada
+  -> PR #9 jangan di-merge sebelum 6 varian dibuat. Konvensi baris bahasa dicatat di memory-bank
+  supaya varian berikutnya otomatis ikut.
+
+## 2026-09-08 — Bahasa ke-8 utk README: Hindi (varian + baris bahasa) — khusus README
+User: "tambahin satu bahasa lagi buat readme, bahasa india" → setelah diklarifikasi: **Hindi**,
+**README saja**, aplikasi nanti di branch lain.
+- Kode `hi`, endonym **हिन्दी**, bendera 🇮🇳. README sekarang 8 bahasa; registry aplikasi TETAP 7
+  (perbedaan ini disengaja & dicatat di memory-bank).
+- `business-analyst`: (1) ujung baris bahasa di `README.md` + `README.id.md` ditambah `· [हिन्दी](...)`;
+  (2) file baru **`documents/readme-variants/README.hi.md`** 83 baris — teks asli Devanagari,
+  register "आप" (grep `तुम` = 0), adegan "रात की चाय" (larut malam + chai), bukan terjemahan.
+- **Verifikasi PM (struktural):** 83 baris; baris bahasa persis spesifikasi + **हिन्दी** tebal tanpa
+  link; satu-satunya nama file = `run.py` (2x, di blok perintah) + nama file di baris bahasa; URL
+  wiki utuh; angka "24" 1x; kredit `Fadhly Permata ने ❤️ के साथ इसे बनाया है` (nama tetap latin);
+  tanpa tabel; emoji hanya di judul.
+- **Nit ketemu & dibenerin:** judul seksi terakhir masih `## Status 📌` → jadi `## हालत 📌`
+  (BA menolak "स्थिति" karena kedengeran birokratis) + "personal project" → "निजी प्रोजेक्ट".
+- **BATAS JUJUR gue:** gue (dan user) bukan penutur asli Hindi — kualitas rasa bahasanya belum
+  ada yang ngecek. Struktur & fakta udah diverifikasi, tapi perlu mata penutur Hindi sebelum
+  dianggap final.
+
+## 2026-09-08 — 5 varian README sisanya (ru, nl, ja, zh, zh-tw) — PARALEL, lalu audit silang PM
+User: "lanjut ke semua bahasa lain, toh gw juga gak ngerti jadi gak bisa review" → alasan
+sekuensial (review per biji) hilang, dan tiap bahasa = file sendiri (scope gak tumpang tindih) →
+PM pindah ke **paralel** (5 spawn `business-analyst` sekaligus). `state.md: multiagent_mode` dicatat.
+- **1 spawn GAGAL** (zh, HTTP 429 upstream) → diulang, berhasil. Catatan: kegagalan paralel =
+  cuma 1 file, tidak nyentuh hasil agen lain.
+- **5 micro-fix hasil keputusan PM** atas keraguan yang dilaporkan penulisnya: ru «Даёте aigate
+  проект…» → «Указываете aigate проект, в котором сыпятся ошибки…»; ru «local-first» → «всё
+  локально»; nl "doet zich nooit voor als geslaagd" → "doet nooit alsof het gelukt is"; ja baris 71
+  kembali ke ます調; zh-tw «不會多連一台伺服器» → «不會有任何東西連到雲端» (+ nuansa "yang kamu pilih
+  sendiri" dipertegas 你自己選的).
+- **Audit silang PM atas 8 file README** (bukan ngandelin receipt):
+  jumlah baris 79–89; **semua** punya tepat 1 baris `🌐` dengan 7 pemisah `·` dan bahasa sendiri
+  ditebalkan tanpa link; **0 link mati** (semua target file ada); klaim "sudah diuji Linux/Windows/
+  Termux" ada di 8/8; **0 kata hedge** (unverified/experimental/未検証/未验证/未驗證/niet getest/
+  экспериментальн/eksperimental); angka "24" **1x per file**; kalimat "daftar tool masih
+  berkembang" ada di 8/8; satu-satunya nama file = `run.py`; kredit baris terakhir 8/8 (nama tetap
+  latin); 0 tabel; **zh 0 karakter Tradisional** dan **zh-tw 0 karakter Sederhana** di prosa
+  (muncul cuma di label bahasa, itu wajib).
+- **Diputuskan PM (bukan ditanya balik):** zh «你负责看» dipertahankan (tajam & natural, bukan
+  kalka); ru «Попробуйте» vs «Попробуй» → agen benar, register «вы» dijaga konsisten.
+- **BATAS JUJUR:** kualitas rasa 5 bahasa non-Latin ini belum diperiksa penutur asli — sama seperti
+  kamus aplikasi. Yang gue jamin = struktur, fakta, tautan, dan tidak adanya klaim palsu.
