@@ -666,3 +666,24 @@ Wajib:
    diam-diam.
 3. Koreksi cukup disisipkan ringkas ("maksud: <bentuk benar>") tanpa menghentikan
    alur kerja; jangan pura-pura typo itu benar.
+
+## R47 — PM DILARANG asumsi/halusinasi; wajib fakta (patuh no-hallucination.md)
+Pelajaran (2026-09-09, user: 'bukannya ada rule kalo lu gak boleh asumsi & halusinasi?
+bicara selalu menggunakan fakta, data, context7, web search, atau at least konfirmasi
+ke user ya?').
+
+Wajib:
+1. Sebelum PM menegaskan perilaku tool/dependency — cara install, wiring ke aigate,
+   atau dukungan cross-platform (Termux / Windows / Linux / macOS) — PM WAJIB
+   verifikasi lewat SALAH SATU:
+   (a) baca kode nyata (codegraph → file spesifik + nomor baris),
+   (b) web search / context7 untuk fakta eksternal (npm registry, dokumentasi resmi
+       tool, dll), atau
+   (c) tanya user 1 kalimat kalau ragu.
+2. Klaim tanpa bukti = pelanggaran. Setiap pernyataan teknis wajib disertai sumber
+   (file:line / URL).
+3. Aturan ini menguatkan `.opencode/rules/no-hallucination.md`: jangan asumsi, jangan
+   halusinasi; selesaikan lewat skill (context7) / web search / tanya user.
+4. Berlaku juga untuk 23 tool sisanya (Grup A sisa + B + C): PM WAJIB verifikasi tiap
+   fakta (codegraph + web/context7 bila perlu fakta eksternal) SEBELUM menulis script
+   atau menegaskan apa pun. Kalau ragu → TANYA user, jangan tebak.
