@@ -1,5 +1,26 @@
 # Code Changes Register (code ↔ docs alignment)
 
+## 2026-09-09 — cli-tools install/launch scripts (branch `setup/cli-tools`) — IN PROGRESS
+
+**Permintaan user:** buat install+launch script per CLI tool (24 tool, 3 grup) di `scripts/cli-tools/`,
+wiring ke selected model/combo seperti aigate, cross-platform (Termux/Win/Linux/Mac), idempoten.
+
+> Catatan PM: sesi ini PM sub-agent TIDAK punya Task tool, jadi `claude.sh` + `_common.sh` dikerjakan
+> langsung oleh PM (deviasi R21, transparan) dalam scope ketat `scripts/cli-tools/`.
+
+### `scripts/cli-tools/_common.sh` (BARU)
+- Helper lintas-platform: `detect_os`/`detect_pm` (Termux/Linux→pkg/apt, Mac→brew, Windows→WSL/Git Bash/winget/choco),
+  `load_gateway_config` (baca `~/.aigate/aigate.db` setting+endpoint, fallback `http://localhost:8080/v1` + `aigate-local`),
+  `have_cmd`, `ensure_installed` (idempoten via `command -v`), `log_msg`.
+
+### `scripts/cli-tools/claude.sh` (BARU)
+- Install `npm i -g @anthropic-ai/claude-code` (idempoten). Launch **native** — claude = `anthropic_only`
+  di aigate (`LAUNCH_SUPPORT`), tidak ada OpenAI-compatible builder, jadi TIDAK dipaksa wiring gateway
+  (cerminkan behavior `resolve()` → 409). Catatan Termux/aarch64: npm tak pasang binary arm64 → bisa mati saat run.
+
+Status: A1 claude = done (script). `_common.sh` = done. Sisa A2..A12, B1..B6, C1..C6 menyusul per tool.
+
+
 ## 2026-09-08 — i18n: satu file per bahasa + 5 bahasa baru (ru, nl, ja, zh, zh-tw) — DONE (`f7beaf9` + `c1477eb`, branch `feat/i18n-locales`)
 
 **Permintaan user:** "buatkan beberapa file bahasa berikut: Rusia, Belanda, Jepang, Cina"
