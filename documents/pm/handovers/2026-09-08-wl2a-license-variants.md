@@ -33,10 +33,10 @@ yang resmi**.
   [github.com/fadhly-permata/AI-Gate](https://github.com/fadhly-permata/AI-Gate)."
 - **nl:** ⚠️ **JANGAN pakai kata "thuis" (rumah) secara kiasan** — dalam Belanda itu terasa aneh
   untuk alamat web. Pakai "de officiële plek"/"hier". Draf: "aigate is gratis en open source — er is
-  geen betaald abonnement en niets zit achter een betaalmuur. Wie wil mag de kopiëren, dus de enige
+  geen betaald abonnement en niets zit achter een betaalmuur. Wie dat wil mag deze code kopiëren, dus de enige
   officiële plek voor aigate is
   [github.com/fadhly-permata/AI-Gate](https://github.com/fadhly-permata/AI-Gate)."
-  (cek lagi: "mag de kopiëren" salah ketik → perbaiki)
+  (kata ganti objek "m't" sudah dibuang — jangan kembalikan)
 - **ja:** ⚠️ "自由なライセンス" itu **tidak netral** — itu klaim soal jenis lisensi. Ganti jadi
   "自由にコピーできます". Draf: "aigate は無料で、ソースも公開されています。有料プランや、課金しないと
   使えない機能はありません。ライセンス上誰でもコードをコピーできるため、aigate の公式な配布先は
@@ -50,7 +50,7 @@ yang resmi**.
   यह कोड कोई भी कॉपी कर सकता है, इसलिए aigate का एकमात्र आधिकारिक पता यही है:
   [github.com/fadhly-permata/AI-Gate](https://github.com/fadhly-permata/AI-Gate)।"
 
-
+## ⚠️ PEMBETULAN WAJIB (kesalahan yang sudah gue tangkap di draf atas, jangan diulang)
 1. **Jangan menulis "salinannya harus tetap terbuka / wajib buka kode hasil turunan".** MIT itu
    lisensi permisif: orang **boleh** menutup kode turunannya. Yang benar cuma: "siapa pun bebas
    menyalin". Kalau draf lu menyiratkan copyleft → itu SALAH secara hukum.
