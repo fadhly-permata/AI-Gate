@@ -7,6 +7,10 @@ jalankan dari HP.
 Bentuknya aplikasi Python biasa: tanpa Docker, tanpa akun cloud. aigate
 menyimpan API key dan riwayat pemakaian di perangkat kamu sendiri.
 
+aigate gratis dan kodenya terbuka — tidak ada paket berbayar, tidak ada fitur
+yang dikunci. Siapa pun bebas menyalin kode ini, jadi satu-satunya alamat resmi
+aigate ada di [github.com/fadhly-permata/AI-Gate](https://github.com/fadhly-permata/AI-Gate).
+
 🌐 [English](../../README.md) · **Bahasa Indonesia** · [Русский](README.ru.md) · [Nederlands](README.nl.md) · [日本語](README.ja.md) · [简体中文](README.zh.md) · [繁體中文](README.zh-tw.md) · [हिन्दी](README.hi.md)
 
 ## Sebelum tidur ☕

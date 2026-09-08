@@ -7,6 +7,10 @@ telefoon.
 Verder is het een gewone Python-app: geen Docker, geen cloud-account. Je
 API-sleutels en je historie blijven op je eigen apparaat.
 
+aigate is gratis en open source — er is geen betaald abonnement en niets zit
+verstopt achter een betaalmuur. Wie wil mag deze code kopiëren, dus de enige
+officiële plek voor aigate is [github.com/fadhly-permata/AI-Gate](https://github.com/fadhly-permata/AI-Gate).
+
 🌐 [English](../../README.md) · [Bahasa Indonesia](README.id.md) · [Русский](README.ru.md) · **Nederlands** · [日本語](README.ja.md) · [简体中文](README.zh.md) · [繁體中文](README.zh-tw.md) · [हिन्दी](README.hi.md)
 
 ## 's Avonds op de bank ☕

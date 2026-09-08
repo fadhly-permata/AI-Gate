@@ -7,6 +7,10 @@ aigate आपके सारे AI providers के लिए एक ही द
 यह एक साधारण Python ऐप है — न Docker, न कोई cloud account। आपकी API keys
 और पुरानी गतिविधियाँ बस आपके अपने डिवाइस में रहती हैं।
 
+aigate मुफ़्त है और इसका कोड सबके लिए खुला है — कोई पेड प्लान नहीं, कोई फ़ीचर
+लॉक नहीं। यह कोड कोई भी कॉपी कर सकता है, इसलिए aigate का एकमात्र आधिकारिक पता
+यही है: [github.com/fadhly-permata/AI-Gate](https://github.com/fadhly-permata/AI-Gate)
+
 🌐 [English](../../README.md) · [Bahasa Indonesia](README.id.md) · [Русский](README.ru.md) · [Nederlands](README.nl.md) · [日本語](README.ja.md) · [简体中文](README.zh.md) · [繁體中文](README.zh-tw.md) · **हिन्दी**
 
 ## रात की चाय ☕
