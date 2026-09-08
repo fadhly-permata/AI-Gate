@@ -1771,3 +1771,17 @@ PM pindah ke **paralel** (5 spawn `business-analyst` sekaligus). `state.md: mult
   kalka); ru «Попробуйте» vs «Попробуй» → agen benar, register «вы» dijaga konsisten.
 - **BATAS JUJUR:** kualitas rasa 5 bahasa non-Latin ini belum diperiksa penutur asli — sama seperti
   kamus aplikasi. Yang gue jamin = struktur, fakta, tautan, dan tidak adanya klaim palsu.
+
+## 2026-09-08 — Housekeeping branch (izin user: "boleh")
+User nanya guna `master` → temuan: `master` = cabang awal repo (5 commit, 2026-09-03, tip
+`e876a6f`), `main` lahir PERSIS dari tip itu dan `master` ditinggal → 0 commit unik, 140 ketinggalan.
+(Bukan sama dengan `master` di repo WIKI — yang itu branch default wiki, bukan sisa.)
+- Gerbang sebelum aksi (verifikasi dulu, baru hapus): `merge-base --is-ancestor master origin/main`
+  = OK; `origin/main..master` = 0; master lokal == remote (`e876a6f`); `origin/main..main` = 0.
+- **Dihapus:** `origin/master` (`git push origin --delete master`) + `master` lokal (`-D`, karena
+  terbukti 0 commit unik; `-d` nolak cuma karena HEAD lagi di `docs/wiki`).
+- **Disinkron:** `main` lokal 62 di belakang → `git branch -f main origin/main` → sekarang `17f9bd3`,
+  nyambung ke `origin/main`. Tree kerja gak berpindah (masih di `docs/wiki`).
+- Sisa branch remote: `main`, `docs/wiki`, `refactor/ui`, `feat/i18n-locales`, `docs/readme-main`.
+  Tiga terakhir sudah 100% masuk `main` (PR #2/#5-#7) → kandidat hapus, TAPI nunggu izin user.
+- Commit catatan ini SENGAJA belum di-push (PR #10 tetap persis 11 commit yang lagi direview).
