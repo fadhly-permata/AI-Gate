@@ -47,3 +47,19 @@ Legenda: `[ ]` antre · `[~]` dikerjakan · `[!]` draft siap, **nunggu review us
 - Angka tool cukup disebut sekali per halaman; jangan tempel daftarnya di banyak halaman.
 - DILARANG muncul: "untested/experimental/belum diverifikasi" untuk hal yang sudah dikonfirmasi
   maintainer (R42); tapi DILARANG juga melebihkan klaim yang belum dicek (R23).
+
+## Tahap 1.5 — Keputusan lisensi (user 2026-09-08: "kita pake MIT aja dulu")
+- [!] **WL.1** Pasang `LICENSE` MIT + `THIRD_PARTY_NOTICES.md` (notis xterm.js yang wajib) + field
+      lisensi `pyproject.toml`. → owner: fullstack-dev (generated 2026-09-08) · branch `chore/mit-license`
+- [!] **WL.2** Buka larangan kata "free / open source" + tambah kalimat "this is the only official
+      source" di `README.md` (root) & `documents/pm/wiki-drafts/Home.md`. → owner: business-analyst
+      (varian id/ru/nl/ja/zh/zh-tw/hi TIDAK disentuh sampai master English di-ACC user)
+- [ ] **WL.3** REVIEW LISensi — "dulu/sementara" dari user. Pemicu review: (a) sebelum rilis publik
+      pertama, (b) sebelum kontribusi orang lain masuk, (c) kalau ada yang mulai ngomersialkan klon.
+      Catat: salinan MIT yang sudah tersebar tidak bisa ditarik balik.
+- [ ] **WL.4** Pin versi xterm.js yang di-vendor (sekarang TIDAK tercatat di repo — provenance gap)
+      dan simpan salinan teks lisensi upstream di folder vendor.
+- [ ] **WL.5** ⚠️ Font Awesome dimuat dari CDN Cloudflare (`index.html:42`) padahal xterm sengaja
+      di-vendor biar offline-safe → icons mati tanpa internet + ada request keluar ke pihak ketiga,
+      bertentangan dengan klaim privasi di README/wiki. BUTUH KEPUTUSAN user: vendor lokal / ganti
+      ikon / tetap CDN + koreksi kalimat privasi.
