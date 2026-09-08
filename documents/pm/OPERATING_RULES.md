@@ -607,3 +607,48 @@ bahasa (bukan cuma Indonesia):
 7. **Kata yang salah maksud**: "tulis satu perintah singkat" padahal yang ditulis itu instruksi ke
    agent → "tulis satu instruksi singkat".
 8. Kalimat panjang >2 klausa + banyak "yang" bertumpuk → pecah jadi 2 kalimat.
+
+## R44 — Materi publik (wiki) TIDAK BOLEH membocorkan isi `documents/`; nada natural utk pembaca awam
+Pelajaran (2026-09-08, user: "gua gak mau isi dokumen @documents/ di umbar. cukup bahas dari halaman
+1 sampai 8 aja. kerjain satu persatu biar gua bisa review dulu. bahasa natural, ringan, asumsi
+pembacanya awam. bahasa inggris intonasi kasual. boleh pake emoji"):
+
+Wiki = materi publik untuk orang luar. `documents/` = kerja internal. Keduanya TIDAK boleh disatukan.
+
+Aturan wajib:
+1. DILARANG menyebut path/nama file di dalam `documents/**` di materi publik (wiki, README,
+   deskripsi repo, UI). Publik tidak boleh tahu struktur dokumen internal kita.
+2. DILARANG menyalin/mengutip/menterjemahkan isi `documents/**` apa pun ke wiki — termasuk tabel
+   isi, penomoran seksi, nomor keputusan (ADR-00x), nama tabel/kolom DB, dan path sumber (`src/...`).
+3. Wiki **tidak boleh berupa cerminan** `documents/`. Wiki berdiri sendiri: isinya apa yang
+   **terlihat dan terasa oleh user** (layar, perintah, hasil, batas produk).
+4. Sumber fakta wiki = **kode & perilaku nyata** (dibaca read-only oleh sub-agent), BUKAN ringkasan
+   dokumen. Yang tidak terbukti → tandai `TODO-VERIFY: <cara cek>`, jangan ditulis sebagai fakta.
+5. Nada: **natural + ringan + kasual**, bahasa Inggris, **pembaca diasumsikan awam** → setiap istilah
+   langsung dijelaskan di tempat pakai kata sehari-hari. Emoji boleh, secukupnya.
+6. Nama produk `aigate` huruf kecil; jangan tulis angka yang cepat basi (jumlah baris/komit/file).
+7. Kerjakan **satu halaman → stop → user review → ACC → baru halaman berikutnya** (R17 sekuensial).
+   DILARANG memborong semua halaman sekali jalan walau secara teknis bisa paralel.
+8. Draft disimpan di staging `documents/pm/wiki-drafts/`. **Wiki asli tidak boleh ditulis/di-push**
+   sampai user membuka larangannya.
+9. Saat menerjemahkan ke bahasa lain nanti: R43 tetap berlaku (tulisan asli, bukan calque).
+
+## R45 — Jangan pernah menulis "repo ini" di materi publik: pakai URL absolut
+Pelajaran (2026-09-08, user soal kalimat README "so this repo is where the real aigate lives":
+"gak pake link repo aslinya? ya kalo di fork bisa kebawa dong filenya, jadi ambigue nanti"):
+
+Materi publik ikut ter-**fork** dan ikut ter-**copy** — teks apa pun yang menunjuk "sini" jadi salah
+alamat di tempat lain. Bahaya ini paling gede justru di bawah lisensi permisif (MIT), yang tidak
+mewajibkan apa pun ke peng-copy.
+
+Wajib:
+1. DILARANG pakai referensi relatif-ke-diri di materi publik: "this repo", "repo ini", "the one true
+   home" tanpa alamat, "di sini", "link di atas", "file ini". Yang menunjuk **ke luar** harus URL
+   absolut: `https://github.com/fadhly-permata/AI-Gate` (wiki: `.../wiki`).
+2. Setiap kali menulis klaim identitas/resmi/asli → **sertakan alamatnya**, bukan cuma kata-kata.
+3. Tautan ke file lain di repo sendiri (varian README, gambar) boleh relatif — yang dilarang cuma
+   klaim yang bergantung pada "di mana dokumen ini berada sekarang".
+4. Link ke repo di dalam UI wajib absolut dan menunjuk repo resmi (sudah benar: sidebar
+   `index.html:152`) — supaya fork tetap menunjuk ke asal, bukan ikut menunjuk diri sendiri.
+5. URL tidak diterjemahkan: di SEMUA varian bahasa alamatnya identik (perlu dicek saat menyebar
+   kalimat lisensi ke 7 varian).

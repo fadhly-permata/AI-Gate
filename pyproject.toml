@@ -6,6 +6,8 @@ build-backend = "setuptools.build_meta"
 name = "aigate"
 version = "0.0.1"
 description = "aigate — AI Proxy Gateway & Management Tool (native Python, FastAPI)."
+license = "MIT"   # SPDX string (PEP 639); license classifier sengaja TIDAK dipakai — deprecated
+                  # di setuptools >=77 dan tabrakan gaya dengan field ini. Teks: lihat file LICENSE.
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.95,<0.100",   # pin <0.100 → Pydantic v1 (pure Python, no pydantic-core/Rust) → runs on Termux

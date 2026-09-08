@@ -1771,3 +1771,67 @@ PM pindah ke **paralel** (5 spawn `business-analyst` sekaligus). `state.md: mult
   kalka); ru «Попробуйте» vs «Попробуй» → agen benar, register «вы» dijaga konsisten.
 - **BATAS JUJUR:** kualitas rasa 5 bahasa non-Latin ini belum diperiksa penutur asli — sama seperti
   kamus aplikasi. Yang gue jamin = struktur, fakta, tautan, dan tidak adanya klaim palsu.
+
+## 2026-09-08 — Housekeeping branch (izin user: "boleh")
+User nanya guna `master` → temuan: `master` = cabang awal repo (5 commit, 2026-09-03, tip
+`e876a6f`), `main` lahir PERSIS dari tip itu dan `master` ditinggal → 0 commit unik, 140 ketinggalan.
+(Bukan sama dengan `master` di repo WIKI — yang itu branch default wiki, bukan sisa.)
+- Gerbang sebelum aksi (verifikasi dulu, baru hapus): `merge-base --is-ancestor master origin/main`
+  = OK; `origin/main..master` = 0; master lokal == remote (`e876a6f`); `origin/main..main` = 0.
+- **Dihapus:** `origin/master` (`git push origin --delete master`) + `master` lokal (`-D`, karena
+  terbukti 0 commit unik; `-d` nolak cuma karena HEAD lagi di `docs/wiki`).
+- **Disinkron:** `main` lokal 62 di belakang → `git branch -f main origin/main` → sekarang `17f9bd3`,
+  nyambung ke `origin/main`. Tree kerja gak berpindah (masih di `docs/wiki`).
+- Sisa branch remote: `main`, `docs/wiki`, `refactor/ui`, `feat/i18n-locales`, `docs/readme-main`.
+  Tiga terakhir sudah 100% masuk `main` (PR #2/#5-#7) → kandidat hapus, TAPI nunggu izin user.
+- Commit catatan ini SENGAJA belum di-push (PR #10 tetap persis 11 commit yang lagi direview).
+
+## 2026-09-08 — Perencanaan wiki: cakupan 8 halaman + aturan anti-bocor (R44)
+User (sebelum tidur): lanjut wiki, tunjukin rencana + draft per halaman; **nada natural, ringan,
+bahasa Inggris kasual, pembaca awam, emoji boleh**; **isi `documents/` tidak boleh diumbar**;
+**cukup halaman 1–8**; **kerjakan satu per satu** biar bisa direview.
+- Temuan PM: bahan teknis sebenarnya SUDAH ada (ERD 405, FSD 471, TSD 405, BRD 278, PRD 208,
+  kontrak API 119, skema config 257, SETUP 58, TEST_PLAN 53, TERMINAL_UX 41, BACKLOG 102 baris)
+  → tapi karena R44, wiki TIDAK boleh jadi cerminannya. Wiki ditulis ulang dari **perilaku nyata**.
+- Halaman 9–14 (Data Model, Architecture, plain-language spec, Testing/QA, Roadmap) **DITAHAN** —
+  terlalu internal / terlalu dekat ke isi `documents/`.
+- Artefak baru: `documents/pm/wiki-plan.md` (rencana + pembuktian + definisi selesai + 5 pertanyaan
+  terbuka), `documents/pm/wiki-backlog.md` (W0.x persiapan, W1.1–W1.8 per halaman, W2.x pasca-ACC),
+  `documents/pm/wiki-drafts/Home.md` (draft v0 = contoh gaya yang sudah ditampilkan ke user).
+- Aturan baru: **R44** (publik ≠ internal; sumber fakta = kode/perilaku; `TODO-VERIFY` kalau belum
+  terbukti; sekuensial; staging draft; larangan tulis wiki masih aktif).
+- Bug yang harus dibenerin saat nulis Quick Start: `requirements.txt` tidak ada;
+  `AIGATE_SIMULATE_DEVICE` tidak ada di kode (yang ada `AIGATE_DEV`); `pip install -e .` bikin
+  command `aigate` hilang.
+- Status: **PAUSED menunggu user bangun & me-review Home**. Tidak ada sub-agent yang dijalankan
+  untuk halaman 2–8 (R17: satu per satu). PR #10 masih open.
+
+## 2026-09-08 — W1.1 draft Home SELESAI (nunggu ACC user)
+User: "gas". Gerbang fakta PM (sebelum delegasi): **repo TIDAK punya file LICENSE** → klaim
+"free / open source" DILARANG di materi publik; `aistudio/cursor/github/openai/google` URL keluar
+semuanya endpoint OAuth provider yang user daftarkan → **nol telemetri ke server kita** (klaim
+"nothing reports back to us" aman); failover = strategi `fallback` (+ `load_balance`, `latency_cost`);
+biaya = `cost_est` (TAKSIRAN, bukan tagihan); tab terminal + tombol `+` + scrollback 5000 = nyata.
+- Scope business-analyst **diperluas** (write: `documents/pm/wiki-drafts/**`, read: lembar fakta
+  `documents/pm/handovers/` saja + dilarang baca `documents/**` yang lain) → R44 bisa ditegakkan:
+  penulis materi publik tidak pernah melihat dokumen internal.
+- Lembar fakta ditulis PM: `documents/pm/handovers/2026-09-08-wiki-home-facts.md`.
+- BA menulis `documents/pm/wiki-drafts/Home.md` (322 kata). **Audit PM menemukan 1 klaim SALAH**:
+  Self-Heal digambarkan "friendly nudge to fix settings" — aslinya agen yang memperbaiki kode dan
+  merge branch. Ganti ke fakta yang terbukti: pilih tool → pilih model → diluncurkan di tab terminal
+  baru (`clitools.js` buildLaunchCommand + launchInNewTab). "rough moment" → "bad moment".
+- Hasil akhir: 319 kata, 0 kata terlarang, 5 tautan internal semuanya ada dalam 8 halaman rencana.
+- **PAUSED** di sini (R17): halaman 2–8 TIDAK dikerjakan sampai user meng-ACC halaman 1.
+
+## 2026-09-08 — Lisensi MIT naik sebagai PR #11
+User jawab "b" (naikkan lisensi SETELAH PR #10). Cek gerbang: PR #10 ternyata **sudah MERGED**
+(→ `origin/main` = 8b72f84, 7 varian README + baris bahasa ikut masuk). LICENSE belum ada di main.
+- `chore/mit-license` di-push; **PR #11** dibuka → mergeable=clean, 9 commit, 16 file, +632/-8.
+- Verifikasi sebelum push: working tree bersih · README +3/0 (sisipan murni) · tidak ada
+  node_modules/file wiki ikut · 0 referensi "this repo" tersisa.
+- `main` lokal disinkron ke origin/main.
+- Koreksi atas statement PM sebelumnya: kalimat "free and open source" TIDAK pernah tayang di `main`
+  tanpa `LICENSE` → tidak ada periode klaim menyesatkan.
+- GATE berikutnya: user me-review & merge PR #11. Setelah merge → (a) label lisensi muncul di
+  GitHub, (b) WL.2a sebarkan 1 kalimat ke 7 varian (URL tidak diterjemahkan), (c) wiki lanjut
+  halaman 1 ACC → halaman 2.
