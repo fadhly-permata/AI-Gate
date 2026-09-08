@@ -677,3 +677,28 @@ Aturan wajib untuk SEMUA materi publik (README, varian, wiki):
    **2–3 pilihan adegan** biar user yang milih — lebih murah daripada menebak 3 ronde.
 5. Detail konkret mengalahkan kata sifat. Satu "satu baris perintah" lebih hidup daripada
    "sederhana dan powerful".
+
+## R47 — Gerbang git wajib sebelum kerja cabang; jangan pernah percaya `&& echo`
+Pelajaran (2026-09-08, tiga cacat beruntun saat memindahkan draf wiki antar branch):
+1. PM membuat branch kerja **dari branch yang punya PR terbuka** (`chore/mit-license` dari
+   `docs/wiki`) → pekerjaan lisensi ikut menumpuk di atas pekerjaan yang belum di-merge.
+2. `git cherry-pick -q A B C` → `-q` ditafsirkan **milih commit**, bukan senyap; urutan tidak jalan
+   sama sekali, dan `--abort` diam-diam mengembalikan HEAD ke commit LAMA sehingga `reset --soft`
+   berikutnya menghasilkan **commit merge liar**.
+3. Perintah `git merge --ff-only -q X && echo ok` dan `... | tee /tmp/opencode/...` tampak "sukses"
+   padahal gagal (`fatal`, `No such file or directory`) — pesan kesalahan hanya lewat di antara
+   `echo` yang tetap tercetak.
+
+Gerbang wajib (semuanya harus dijalankan, bukan salah satunya):
+1. **Basis branch baru = `origin/main`**, kecuali penumpangan sengaja dan dinyatakan ke user.
+   Sebelum bikin: `git rev-list --count origin/main..<basis>` harus **0**.
+2. **Satu jenis pekerjaan = satu branch.** Hukum/legal/UI/dokumen tidak boleh numpang di branch PR lain.
+3. Nama cabang yang dituju ditulis **lengkap** (`origin/main`, bukan `main`) — dan dibedakan dari
+   `main` lokal yang bisa basi.
+4. Setelah operasi cabang apa pun, **verifikasi hasil, bukan niatnya**:
+   `git rev-parse --short HEAD HEAD^` (parent benar?), `git log --oneline --graph -3`,
+   `git rev-list --count origin/main..HEAD`, dan baca isi file yang berubah.
+5. DILARANG merangkai perintah git yang mengubah state pakai `&& echo "ok"` tanpa membaca
+   keluarannya. Setiap perintah gagal → berhenti dan laporkan, jangan dilanjut.
+6. DILARANG nulis file sementara ke `/tmp`. Pakai `/data/data/com.termux/files/usr/tmp/opencode/`.
+7. Lokasi penyimpanan dokumen wiki: branch **`docs/wiki`**. Branch lain tidak boleh nampung draf wiki.
