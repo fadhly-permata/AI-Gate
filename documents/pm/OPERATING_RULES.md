@@ -607,3 +607,28 @@ bahasa (bukan cuma Indonesia):
 7. **Kata yang salah maksud**: "tulis satu perintah singkat" padahal yang ditulis itu instruksi ke
    agent → "tulis satu instruksi singkat".
 8. Kalimat panjang >2 klausa + banyak "yang" bertumpuk → pecah jadi 2 kalimat.
+
+## R44 — Materi publik (wiki) TIDAK BOLEH membocorkan isi `documents/`; nada natural utk pembaca awam
+Pelajaran (2026-09-08, user: "gua gak mau isi dokumen @documents/ di umbar. cukup bahas dari halaman
+1 sampai 8 aja. kerjain satu persatu biar gua bisa review dulu. bahasa natural, ringan, asumsi
+pembacanya awam. bahasa inggris intonasi kasual. boleh pake emoji"):
+
+Wiki = materi publik untuk orang luar. `documents/` = kerja internal. Keduanya TIDAK boleh disatukan.
+
+Aturan wajib:
+1. DILARANG menyebut path/nama file di dalam `documents/**` di materi publik (wiki, README,
+   deskripsi repo, UI). Publik tidak boleh tahu struktur dokumen internal kita.
+2. DILARANG menyalin/mengutip/menterjemahkan isi `documents/**` apa pun ke wiki — termasuk tabel
+   isi, penomoran seksi, nomor keputusan (ADR-00x), nama tabel/kolom DB, dan path sumber (`src/...`).
+3. Wiki **tidak boleh berupa cerminan** `documents/`. Wiki berdiri sendiri: isinya apa yang
+   **terlihat dan terasa oleh user** (layar, perintah, hasil, batas produk).
+4. Sumber fakta wiki = **kode & perilaku nyata** (dibaca read-only oleh sub-agent), BUKAN ringkasan
+   dokumen. Yang tidak terbukti → tandai `TODO-VERIFY: <cara cek>`, jangan ditulis sebagai fakta.
+5. Nada: **natural + ringan + kasual**, bahasa Inggris, **pembaca diasumsikan awam** → setiap istilah
+   langsung dijelaskan di tempat pakai kata sehari-hari. Emoji boleh, secukupnya.
+6. Nama produk `aigate` huruf kecil; jangan tulis angka yang cepat basi (jumlah baris/komit/file).
+7. Kerjakan **satu halaman → stop → user review → ACC → baru halaman berikutnya** (R17 sekuensial).
+   DILARANG memborong semua halaman sekali jalan walau secara teknis bisa paralel.
+8. Draft disimpan di staging `documents/pm/wiki-drafts/`. **Wiki asli tidak boleh ditulis/di-push**
+   sampai user membuka larangannya.
+9. Saat menerjemahkan ke bahasa lain nanti: R43 tetap berlaku (tulisan asli, bukan calque).

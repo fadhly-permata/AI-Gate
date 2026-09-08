@@ -1785,3 +1785,23 @@ User nanya guna `master` → temuan: `master` = cabang awal repo (5 commit, 2026
 - Sisa branch remote: `main`, `docs/wiki`, `refactor/ui`, `feat/i18n-locales`, `docs/readme-main`.
   Tiga terakhir sudah 100% masuk `main` (PR #2/#5-#7) → kandidat hapus, TAPI nunggu izin user.
 - Commit catatan ini SENGAJA belum di-push (PR #10 tetap persis 11 commit yang lagi direview).
+
+## 2026-09-08 — Perencanaan wiki: cakupan 8 halaman + aturan anti-bocor (R44)
+User (sebelum tidur): lanjut wiki, tunjukin rencana + draft per halaman; **nada natural, ringan,
+bahasa Inggris kasual, pembaca awam, emoji boleh**; **isi `documents/` tidak boleh diumbar**;
+**cukup halaman 1–8**; **kerjakan satu per satu** biar bisa direview.
+- Temuan PM: bahan teknis sebenarnya SUDAH ada (ERD 405, FSD 471, TSD 405, BRD 278, PRD 208,
+  kontrak API 119, skema config 257, SETUP 58, TEST_PLAN 53, TERMINAL_UX 41, BACKLOG 102 baris)
+  → tapi karena R44, wiki TIDAK boleh jadi cerminannya. Wiki ditulis ulang dari **perilaku nyata**.
+- Halaman 9–14 (Data Model, Architecture, plain-language spec, Testing/QA, Roadmap) **DITAHAN** —
+  terlalu internal / terlalu dekat ke isi `documents/`.
+- Artefak baru: `documents/pm/wiki-plan.md` (rencana + pembuktian + definisi selesai + 5 pertanyaan
+  terbuka), `documents/pm/wiki-backlog.md` (W0.x persiapan, W1.1–W1.8 per halaman, W2.x pasca-ACC),
+  `documents/pm/wiki-drafts/Home.md` (draft v0 = contoh gaya yang sudah ditampilkan ke user).
+- Aturan baru: **R44** (publik ≠ internal; sumber fakta = kode/perilaku; `TODO-VERIFY` kalau belum
+  terbukti; sekuensial; staging draft; larangan tulis wiki masih aktif).
+- Bug yang harus dibenerin saat nulis Quick Start: `requirements.txt` tidak ada;
+  `AIGATE_SIMULATE_DEVICE` tidak ada di kode (yang ada `AIGATE_DEV`); `pip install -e .` bikin
+  command `aigate` hilang.
+- Status: **PAUSED menunggu user bangun & me-review Home**. Tidak ada sub-agent yang dijalankan
+  untuk halaman 2–8 (R17: satu per satu). PR #10 masih open.

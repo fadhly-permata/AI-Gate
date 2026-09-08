@@ -338,3 +338,10 @@
 - Path relatif: dari root → `documents/readme-variants/README.<kode>.md`; antar varian → cukup
   `README.<kode>.md`; dari varian ke root → `../../README.md`.
 - Varian yang belum dibuat = link mati → PR jangan di-merge sampai 6 varian ada.
+
+### Peta file kerja wiki (2026-09-08) — baca ini dulu kalau sesi putus
+- Rencana + batas konten + pertanyaan terbuka → `documents/pm/wiki-plan.md`
+- Task list hidup (W0.x / W1.1–W1.8 / W2.x) → `documents/pm/wiki-backlog.md`
+- Draft per halaman (staging, BUKAN wiki asli) → `documents/pm/wiki-drafts/`
+- Aturan terikat: **R44** (publik tidak membocorkan `documents/`, sumber fakta = kode/perilaku,
+  sekuensial satu-per-satu) + R43 (varian bahasa = tulisan asli) + R39 (branch `docs/wiki`).
