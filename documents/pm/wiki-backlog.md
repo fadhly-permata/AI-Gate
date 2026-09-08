@@ -38,6 +38,19 @@ Legenda: `[ ]` antre · `[~]` dikerjakan · `[!]` draft siap, **nunggu review us
 - [ ] **W1.8** `Providers-and-Combos.md` — model mental provider → combo → giliran pakai.
       → owner: system-analyst + business-analyst
 
+- [!] **W1.2** `Quick-Start.md` — cara pasang. Draf siap direview (±440 kata, 6 seksi, 5 blok
+      perintah, semua perintah diverifikasi PM dari kode).
+      → PM menutup 4 keraguan BA dengan verifikasi: cara ambil kode (`git clone` — tidak ada jalur
+        lain, tidak ada script pembungkus), cek versi Python, sintaks variabel di PowerShell/cmd.
+      → ⚠️ LUBANG PRODUK Ketemu: `run.py` (46 baris) TIDAK mengecek versi Python → Python lama
+        memuntahkan error yang tidak bisa dibaca orang awam. Usulan perbaikan kecil, lihat WP.1.
+
+## Tahap 1.9 — Perbaikan produk ketemu dari penulisan wiki
+- [ ] **WP.1** Tambah cek versi Python di awal `run.py`: kalau < 3.10, cetak satu pesan manusiawi
+      ("aigate needs Python 3.10+ — you have X.Y") lalu keluar bersih, BUKAN traceback.
+      → owner: be-dev · alasan: ini kegagalan langkah-pertama paling umum, dan dokumentasi tidak
+        bisa menutupi kode yang diam saja.
+
 ## Tahap 2 — Setelah 8 halaman di-ACC (JANGAN dimulai sebelum itu)
 - [ ] **W2.1** `_Sidebar.md` + `_Footer.md` — navigasi wiki.
 - [ ] **W2.2** Putuskan: terjemahkan ke 7 bahasa atau tunggu stabil.
