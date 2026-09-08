@@ -652,3 +652,17 @@ Wajib:
    `index.html:152`) — supaya fork tetap menunjuk ke asal, bukan ikut menunjuk diri sendiri.
 5. URL tidak diterjemahkan: di SEMUA varian bahasa alamatnya identik (perlu dicek saat menyebar
    kalimat lisensi ke 7 varian).
+
+## R46 — Koreksi typo/user salah ketik WAJIB, jangan diikuti
+Pelajaran (2026-09-09, user: 'bukannya ada rule kalo gua typo lu harus koreks?!'):
+user mengetik `scripts/cli-toils/` (typo dari `scripts/cli-tools/`); PM malah
+mengikuti typo itu alih-alih mengoreksi.
+
+Wajib:
+1. Bila user mengetik salah (typo / nama folder / salah ketik), PM WAJIB menunjukkan
+   bentuk yang benar dan memakai bentuk benar di seluruh komunikasi & file. JANGAN
+   diam-diam mengadopsi typo user.
+2. Kalau ragu mana yang benar, tanya SATU kalimat sebelum lanjut — jangan tebak
+   diam-diam.
+3. Koreksi cukup disisipkan ringkas ("maksud: <bentuk benar>") tanpa menghentikan
+   alur kerja; jangan pura-pura typo itu benar.
