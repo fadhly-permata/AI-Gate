@@ -247,6 +247,19 @@
   `documents/pm/OPERATING_RULES.md`. Saat merge #4, duplikat R23-routing `main`
   tidak dimasukkan karena sudah tercakup R29.)
 
+
+### Keputusan lisensi (2026-09-08) — user: "kita pake mit aja dulu"
+- Lisensi proyek: **MIT**, `Copyright (c) 2026 Fadhly Permata`, file `LICENSE` di branch `chore/mit-license`.
+  Badan teks diverifikasi identik byte dengan teks resmi SPDX (bukan ditulis dari ingatan).
+- Dikatakan eksplisit oleh user: **SEMENTARA**. Pemicu review lagi: sebelum rilis publik pertama /
+  sebelum kontribusi luar masuk / kalau ada yang ngomersialkan klon. Salinan MIT yang sudah tersebar
+  tidak bisa ditarik balik; naik ke copyleft nanti hanya melindungi versi ke depan.
+- Efek: larangan kata "free / open source" di materi publik DICABUT. Alasan "repo ini satu-satunya
+  sumber resmi" ikut ditulis, karena MIT tidak mewajibkan apa pun ke peng-copy.
+- Ketaatan pihak ketiga: notis MIT xterm.js (di-vendor) disimpan di `THIRD_PARTY_NOTICES.md`; versi
+  xterm TIDAK tercatat di repo → masih utang (WL.4). Font Awesome cuma lewat CDN (tidak didistribusikan),
+  tapi memuat CDN = icons mati tanpa internet + request keluar → bertentangan dengan klaim privasi (WL.5).
+
 ## Open risks
 - Agent file business-analyst / system-analyst / tech-architect SUDAH dibuat tapi
   belum terdaftar di sesi berjalan; perlu reload opencode agar bisa dipakai sbg

@@ -49,11 +49,15 @@ Legenda: `[ ]` antre · `[~]` dikerjakan · `[!]` draft siap, **nunggu review us
   maintainer (R42); tapi DILARANG juga melebihkan klaim yang belum dicek (R23).
 
 ## Tahap 1.5 — Keputusan lisensi (user 2026-09-08: "kita pake MIT aja dulu")
-- [!] **WL.1** Pasang `LICENSE` MIT + `THIRD_PARTY_NOTICES.md` (notis xterm.js yang wajib) + field
-      lisensi `pyproject.toml`. → owner: fullstack-dev (generated 2026-09-08) · branch `chore/mit-license`
+- [x] **WL.1** Pasang `LICENSE` MIT + `THIRD_PARTY_NOTICES.md` (notis xterm.js yang wajib) + field
+      lisensi `pyproject.toml`. → owner: be-dev (handover eksplisit; fullstack-dev baru ke-generate tapi belum terdaftar di runtime) · branch `chore/mit-license`
+      → hasil: `LICENSE` (badan MIT **identik byte** dgn teks resmi SPDX), `THIRD_PARTY_NOTICES.md`
+      (notis xterm.js upstream + Font Awesome berlisensi berlapis + daftar deps tanpa klaim bohong),
+      `pyproject.toml`: `license = "MIT"` SAJA — classifier lisensi dibuang (deprecated setuptools>=77)
 - [!] **WL.2** Buka larangan kata "free / open source" + tambah kalimat "this is the only official
       source" di `README.md` (root) & `documents/pm/wiki-drafts/Home.md`. → owner: business-analyst
       (varian id/ru/nl/ja/zh/zh-tw/hi TIDAK disentuh sampai master English di-ACC user)
+      → README murni sisipan (+3 baris, 0 hapus) · Home.md 337 kata · PM memperhalus 2 frasa kaku
 - [ ] **WL.3** REVIEW LISensi — "dulu/sementara" dari user. Pemicu review: (a) sebelum rilis publik
       pertama, (b) sebelum kontribusi orang lain masuk, (c) kalau ada yang mulai ngomersialkan klon.
       Catat: salinan MIT yang sudah tersebar tidak bisa ditarik balik.
