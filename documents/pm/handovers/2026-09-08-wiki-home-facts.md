@@ -23,9 +23,12 @@ wiki tidak boleh jadi cerminan dokumen internal. Sumber fakta lu = **lembar ini 
   → **Cara menulis klaim privasi (PENTING, biar tidak bohong):** jangan menulis "your prompts
   never leave your device". Yang benar: data hanya pergi ke penyedia AI yang kamu pilih sendiri,
   bukan lewat layanan perantara milik orang lain.
-- **DILARANG menulis "free" atau "open source"** — file LICENSE belum ada di repo (ditemukan PM
-  2026-09-08). Tulis saja bahwa kode sumbernya terbuka untuk dibaca/diunduh di GitHub; kata "open
-  source" menunggu keputusan lisensi dari user.
+- **[DIUPDATE 2026-09-08 — larangan DICABUT]** User memutuskan lisensi: **MIT**
+  (`Copyright (c) 2026 Fadhly Permata`, file `LICENSE` sudah dipasang di branch `chore/mit-license`).
+  Kata **"free" dan "open source" SEKARANG BOLEH** dipakai. Tetap jangan menyebut nomor versi
+  lisensi atau mengutip isi file LICENSE.
+  Wajib disertakan bareng: satu kalimat tegas bahwa repo resmi ini **satu-satunya sumber resmi**,
+  karena kode bebas di-fork tanpa kewajiban apa pun di bawah MIT.
 
 **Yang bisa dilakukan (semua terbukti di kode)**
 - **Giliran otomatis saat satu penyedia bermasalah.** Namanya *strategy* pada sebuah *combo*:

@@ -6,7 +6,7 @@ A calm home base for the AI you already use — run it on your own machine, no s
 
 aigate is a small app you run yourself on Linux, Windows, or Android (it even works inside a full Linux distro on your phone). Start it up and a local page opens in your browser. No account, no sign-up, and nothing quietly reports back to us.
 
-Your data only travels to the AI providers *you* pick and connect — never through someone else's middleman service. Curious what's under the hood? The source code is open to read and download on GitHub.
+Your data only travels to the AI providers *you* pick and connect — never through someone else's middleman service. Curious what's under the hood? aigate is free and open source — read it, run it, tinker with it. Anyone may copy that code, so this GitHub repo is the one true home of aigate.
 
 ## What you can do with it 🧭
 
