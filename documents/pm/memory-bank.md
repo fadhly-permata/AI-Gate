@@ -268,6 +268,27 @@
   xterm TIDAK tercatat di repo → masih utang (WL.4). Font Awesome cuma lewat CDN (tidak didistribusikan),
   tapi memuat CDN = icons mati tanpa internet + request keluar → bertentangan dengan klaim privasi (WL.5).
 
+### Offline penuh + fakta teknis lintas halaman (2026-09-08)
+- Keputusan user: **UI harus bisa jalan 100% tanpa internet**. Font Awesome 6.5.1 di-vendor
+  (`src/frontend/static/vendor/font-awesome/`, CSS + 3 `.woff2` + LICENSE.txt). Setelah ini **nol**
+  referensi eksternal sebagai aset di frontend — satu-satunya `https://` yang tersisa hyperlink repo.
+  Berkas font `.ttf` & face kompat-v4 sengaja tidak diambil: CSS memanggil WOFF2 lebih dulu dan
+  kelas ikon aigate tidak pernah menyentuh keluarga warisan itu.
+- Fakta yang harus konsisten di SEMUA halaman wiki (sudah divalidasi PM dari kode):
+  1. **Satu port nyata** = port aplikasi (bawaan 8080, layar + API bersamaan). Host/port di layar
+     endpoint itu **label dokumentasi user**, bukan listener — jangan pernah menulis sebaliknya.
+  2. Alamat yang disodorkan ke alat coding = `http://localhost:8080/v1` (satu nilai setelan, bisa diganti).
+  3. **Tidak ada combo bawaan** (`default` tidak di-seed) → contoh selalu pakai placeholder.
+  4. Putus koneksi ≠ mati sesi: view lepas, PTY lanjut jalan + buffer; reaper hanya membersihkan yang
+     lepas DAN tanpa keluaran (bawaan 60 menit; setelan `terminal_idle_reap_minutes`).
+  5. `fallback` = urut prioritas + **coba akun lain di penyedia yang sama** dulu + error terakhir
+     dilempar apa adanya. `load_balance` & `latency_cost` = **satu kali percobaan, tanpa pindah**.
+  6. Jenis penyedia yang dikenal punya peta terjemahan sendiri; yang tidak dikenal dianggap jalur
+     OpenAI (pass-through) — jadi penyedia lokal/aneh tetap jalan.
+  7. Hanya 3 variabel lingkungan: `AIGATE_PORT`, `AIGATE_DEV`, `AIGATE_DB_PATH`.
+  8. Setelan bawaan yang nyata: port, mode developer, tema, bahasa, catatan detail per request (mati),
+     retensi log 7 hari, reaper terminal 60 menit.
+
 ## Open risks
 - Agent file business-analyst / system-analyst / tech-architect SUDAH dibuat tapi
   belum terdaftar di sesi berjalan; perlu reload opencode agar bisa dipakai sbg

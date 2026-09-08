@@ -31,8 +31,12 @@ dulu butuh SSH/aplikasi terpisah, sekarang satu tab.
   (bisa dipilih) + proyek. **Tulis risikonya**: dia benar-benar menulis kode dan menggabungkan
   branch, jadi pake itu di proyek yang bisa kamu periksa sendiri. Jangan tulis angka keberhasilan
   atau janji.
-- Batas yang jujur: terminalnya butuh sesi di perangkat tempat aigate jalan; kalau perangkatnya
-  tidur/layar mati, sesi bisa putus → itu sebabnya ada tahan-nyala. Jangan ngarang perilaku lain.
+- ⚠️ **KOREKSI PM (tadi lembar ini salah, dan naskahnya ikut salah):** koneksi putus (tab dibekukan,
+  Wi-Fi hilang, layar mati) TIDAK membunuh sesi. Yang benar: **view lepas, proses tetap jalan dan
+  menampung output**, dan saat tab dibuka lagi user menyusul apa yang lewat. Yang benar-benar
+  mengakhiri sesi cuma: ditutup sendiri, atau lepas + menganggur tanpa keluaran (bawaan 60 menit,
+  satu nilai setelan). Sesi yang masih bekerja tidak pernah disingkirkan hanya karena tab-nya diam.
+- Fungsi tahan-nyala = layar tetap hidup buat nonton, BUKAN penopang nyawanya sesi.
 
 Panjang 380–480 kata.
 

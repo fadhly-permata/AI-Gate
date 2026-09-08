@@ -25,17 +25,17 @@ Legenda: `[ ]` antre · `[~]` dikerjakan · `[!]` draft siap, **nunggu review us
       → temuan: klaim Self-Heal salah digambarkan → DICORET (lihat pertanyaan terbuka #6 di plan)
 - [ ] **W1.2** `Quick-Start.md` — pasang sampai jalan, 3 platform. Perbaiki 3 bug README.
       → owner: system-analyst (verifikasi perintah) + business-analyst (nada)
-- [ ] **W1.3** `Interfaces.md` — daftar cara memakai aigate + link per halaman.
+- [!] **W1.3** `Interfaces.md` — daftar cara memakai aigate + link per halaman.
       → owner: system-analyst · perlu membaca route/menu frontend (read-only)
-- [ ] **W1.4** `Configuration-and-Keys.md` — pasang key, atur provider, ganti port.
+- [!] **W1.4** `Configuration-and-Keys.md` — pasang key, atur provider, ganti port.
       → owner: system-analyst · caveat: key tersimpan teks biasa
-- [ ] **W1.5** `CLI-Tools.md` — 24 tool + cara menyambungkan. Catatan "daftar masih berkembang".
+- [!] **W1.5** `CLI-Tools.md` — 24 tool + cara menyambungkan. Catatan "daftar masih berkembang".
       → owner: system-analyst (hitung preset nyata) + business-analyst (cara pakai)
-- [ ] **W1.6** `OpenAI-API.md` — alamat lokal + contoh request.
+- [!] **W1.6** `OpenAI-API.md` — alamat lokal + contoh request.
       → owner: be-dev (endpoint nyata) + business-analyst (penulisan awam)
-- [ ] **W1.7** `Terminal.md` — tab, fullscreen, paste, scroll/swipe, log, pemulihan gagal.
+- [!] **W1.7** `Terminal.md` — tab, fullscreen, paste, scroll/swipe, log, pemulihan gagal.
       → owner: fe-dev (kontrol yang muncul di UI)
-- [ ] **W1.8** `Providers-and-Combos.md` — model mental provider → combo → giliran pakai.
+- [!] **W1.8** `Providers-and-Combos.md` — model mental provider → combo → giliran pakai.
       → owner: system-analyst + business-analyst
 
 - [!] **W1.2** `Quick-Start.md` — cara pasang. Draf siap direview (±440 kata, 6 seksi, 5 blok
@@ -50,6 +50,17 @@ Legenda: `[ ]` antre · `[~]` dikerjakan · `[!]` draft siap, **nunggu review us
       ("aigate needs Python 3.10+ — you have X.Y") lalu keluar bersih, BUKAN traceback.
       → owner: be-dev · alasan: ini kegagalan langkah-pertama paling umum, dan dokumentasi tidak
         bisa menutupi kode yang diam saja.
+
+DRAF 8 HALAMAN SUDAH SEMUA (user 2026-09-08: "langsung kerjain sisa file wiki"). Status per halaman:
+W1.1 Home = DI-ACC · W1.2–W1.8 = draf jadi, **belum direview user**.
+Hasil kerja tambahan saat menulis (jangan sampai hilang):
+- **Koreksi fakta besar #1:** host/port pada endpoint **tidak** membuka port kedua (tidak ada kode
+  yang memakainya untuk listen). Satu port nyata = port aplikasi. Ditulis di halaman 4, 6, 8.
+- **Koreksi fakta besar #2:** koneksi terputus = **view lepas, proses tetap jalan + menampung
+  output**; sesi dihapus hanya kalau ditutup sendiri atau lepas & tanpa keluaran (bawaan 60 menit).
+  Lembar fakta C tadinya SALAH (PM yang salah), halaman 7 sudah dibetulkan.
+- **Koreksi #3:** tidak ada combo bawaan bernama `default` → semua contoh pakai placeholder.
+- Halaman 5: angka per kelompok (12/6/6) dibuang supaya tidak basi; daftar tool tetap contoh.
 
 ## Tahap 2 — Setelah 8 halaman di-ACC (JANGAN dimulai sebelum itu)
 - [ ] **W2.1** `_Sidebar.md` + `_Footer.md` — navigasi wiki.

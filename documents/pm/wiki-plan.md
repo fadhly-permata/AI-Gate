@@ -72,7 +72,7 @@ ada → (c) klaim tak terbukti ditandai `TODO-VERIFY: <cara cek>`, DILARANG neba
 
 1. Putusan #7 (wiki bukan cermin) — benar begitu, atau wiki memang harus tetap bisa ditelusuri
    balik ke dokumen internal?
-2. Apakah **Proxy Pools** perlu halaman sendiri? Sampai sekarang baru disebut di README; istilah
+2. ~~Perlu halaman sendiri?~~ **TERJAWAL:** tidak. Cukup satu bagian singkat di halaman 4 (Configuration) + disebut di halaman 8. Fakta: kolam per endpoint, rotasi bergantian, status & latensi tercatat, dan memang dipakai sebagai jalur keluar (egress) oleh gerbang. Sampai sekarang baru disebut di README; istilah
    itu bisa berarti dua hal (pool penyedia model vs proxy jaringan). Belum diverifikasi.
 3. Halaman 6 (API): boleh menyebut format request itu "kompatibel OpenAI"? (istilah itu perlu
    buat orang luar menemukan kita — tapi jelaskan singkat.)

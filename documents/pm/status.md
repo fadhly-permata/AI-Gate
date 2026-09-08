@@ -1850,3 +1850,25 @@ User: "agak kurang menarik ya, rewrite dong".
 - ⚠️ MASIH TERBUKA (menunggu user): baris "no usage reports phoning home to us" BENAR soal telemetri
   kita, tapi Font Awesome masih dimuat dari CDN cloudflare → bukan nol request pihak ketiga.
   Opsi user: (a) terima rumusan sempit ini, (b) vendor ikon.
+
+## 2026-09-08 — Offline penuh (WO.1) + 8 halaman wiki jadi draf
+User: "gua gak ekspek user pake aigate offline... ya udah kita bikin bisa full offline aja deh" lalu
+"setelah selesai, langsung kerjain sisa file wiki... commit & push".
+- **WO.1 selesai**: fe-dev vendor Font Awesome 6.5.1 (CSS + 3 woff2 + LICENSE.txt) → `index.html`
+  cuma 1 blok berubah. PM verifikasi **mandiri**: 4 berkas identik byte vs jsDelivr resmi,
+  `grep` aset eksternal = **0**, `url(http` di CSS = 0. Commit `91de605`.
+  Utang internal (bukan publik): TSD §228 & FSD §320 masih menulis "ikon via CDN" -> salah sekarang.
+- **WO.2–WO.4 selesai** (3 penulis paralel, lembar fakta PM dari kode): halaman 3 Interfaces,
+  4 Configuration-and-Keys, 5 CLI-Tools, 6 OpenAI-API, 7 Terminal, 8 Providers-and-Combos.
+  8/8 lolos audit mesin: 0 path `documents/`/`src/`, 0 nama tabel, 0 ADR/R#, 0 "this repo", 0 MIT,
+  0 "untested/experimental", tidak ada `combo:default`, semua tautan internal valid, kredit utuh.
+- **3 koreksi fakta penting keluar dari proses ini** (lihat memory bank): endpoint host/port bukan
+  listener; putus koneksi tidak membunuh sesi; combo `default` tidak ada. Yang pertama hampir lolos
+  ke publik lewat halaman 4 (sumbernya lembar fakta PM sendiri), yang kedua murni kesalahan lembar
+  fakta C — naskah mengikuti kesalahan gue, ketahuan pas audit, sudah dibetulkan.
+- Dibuang dari halaman 5: angka per kelompok 12/6/6 (basi kalau daftar tumbuh) dan klaim "marked
+  not launchable" (yang benar: tidak ditawarkan jalur launch-nya).
+- Batas kata dipatuhi: Terminal digepeng 555 -> 449.
+- Branch `docs/wiki`: commit produk (`91de605`) + draf & catatan -> push. **Wiki GitHub asli tetap
+  TIDAK disentuh.**
+- GATE user sekarang: review halaman 2–8. WP.1 (cek versi Python di run.py) masih nunggu izin.

@@ -55,10 +55,19 @@ JANGAN menulis nama field-nya apa adanya — tulis dalam kalimat ("alamat tempat
   dan **ekspor laporan** jadi CSV. Peringatan: berkas unduhan itu berisi kunci → jangan di-commit.
 
 ## Alamat & port
-- Layar + API = **aplikasi yang sama, port yang sama** (bawaan `8080`, diganti `AIGATE_PORT`).
-- Alamat dengar aplikasi `0.0.0.0` → kelihatan dari jaringan sekitar. Untuk yang mau dibatasi ke
-  perangkat saja, itu ada di pengaturan endpoint (tiap endpoint bisa diset host lokal
-  `127.0.0.1` dan port sendiri, bawaan `8000`).
+- Layar + API = **satu aplikasi di satu port** (bawaan `8080`; bisa diganti dari **layar setelan**
+  lewat pilihan "Port", atau lewat `AIGATE_PORT`).
+- ⚠️ **Fakta yang tadi salah di lembar ini, sekarang sudah dibetulin PM:** field host/port pada
+  endpoint **TIDAK membuka port baru** — tidak ada kode yang memakai nilainya untuk listen.
+  Jadi JANGAN menulis "set endpoint ke 127.0.0.1 biar cuma bisa dari perangkat" (itu janji palsu).
+  Yang benar: **satu-satunya pembuka akses nyata** = alamat dengar aplikasi (`0.0.0.0` → kelihatan
+  dari jaringan sekitar) + **kunci akses per endpoint** yang memang ditegakkan di gerbang.
+- Alamat yang disodorkan ke alat coding = `http://localhost:8080/v1` secara bawaan; tersimpan
+  sebagai satu nilai setelan dan bisa diganti kalau user menaruh aigate di alamat lain.
+- Layar setelan menunjukkan: **Port**, **mode developer**, **tema (terang/gelap)**, **bahasa**.
+  Ada juga pilihan teknis lewat jalur setelan: pencatatan detail per request (mati bawaan),
+  umur penyimpanan catatan log (bawaan 7 hari), dan batas waktu sesi terminal yang lepas
+  (bawaan 60 menit). Jangan menulis nama kuncinya apa adanya.
 - Endpoint bisa dilengkapi **kunci akses sendiri** (nyala/matikan + satu kunci internal). Kalau
   mati, siapa pun di jaringan itu bisa pakai. Jujur soal ini.
 - Proxy keluar (untuk request ke penyedia) itu **opsional**: satu kolam per endpoint, anggotanya
