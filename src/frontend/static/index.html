@@ -37,10 +37,8 @@
     })();
   </script>
   <title>aigate</title>
-  <!-- Font Awesome via CDN (no build step, ADR-001) -->
-  <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
-        crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <!-- Font Awesome 6.5.1 Free vendored LOCALLY (offline-safe; ADR-001 no build) -->
+  <link rel="stylesheet" href="vendor/font-awesome/css/all.min.css" />
   <!-- xterm.js 5.x + FitAddon vendored LOCALLY (offline-safe; ADR-001 no build,
        ADR-009 native run). No CDN dependency — terminal works with no internet. -->
   <link rel="stylesheet" href="vendor/xterm/xterm.css" />

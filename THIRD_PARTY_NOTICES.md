@@ -58,32 +58,54 @@ vendored copies.
 
 ---
 
-## 2. Font Awesome Free 6.5.1 — loaded from a CDN, not vendored
+## 2. Font Awesome Free 6.5.1 — vendored in this repository
 
-Referenced from `src/frontend/static/index.html` as a stylesheet link:
+Files copied into this repository, under `src/frontend/static/vendor/font-awesome/`:
 
-```
-https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css
-```
-
-**No Font Awesome files are copied into, or distributed with, this repository.**
-The assets are fetched at runtime by the browser from the cdnjs CDN. This entry is
-recorded for transparency only.
-
-Font Awesome Free's licensing is **layered**, and it is not accurate to describe
-the whole package as "MIT licensed":
-
-| Component | License |
+| File | Role |
 | --- | --- |
-| Icons (SVG / JS) | Creative Commons Attribution 4.0 International (CC BY 4.0) |
-| Font files | SIL Open Font License 1.1 (OFL 1.1), with Reserved Font Name "Font Awesome" |
-| Code / CSS | MIT |
+| `css/all.min.css` | the stylesheet linked from `src/frontend/static/index.html` |
+| `webfonts/fa-solid-900.woff2` | solid icon font (weight 900) |
+| `webfonts/fa-regular-400.woff2` | regular icon font (weight 400) |
+| `webfonts/fa-brands-400.woff2` | brand-logo icon font |
+| `LICENSE.txt` | upstream license text, unmodified |
 
-Font Awesome additionally **requests attribution** where its CC-licensed icons are
-used. Full upstream terms: <https://fontawesome.com/license/free>
+**Version: 6.5.1**, taken verbatim from the official npm release
+`@fortawesome/fontawesome-free@6.5.1`; the downloaded package's integrity was checked
+against the registry metadata before the files were copied. Nothing was regenerated,
+re-minified or edited — `css/all.min.css` still carries Fonticons' own header line
+`Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License`.
 
-Because aigate links to these assets over a CDN and redistributes nothing, no
-upstream license file is reproduced in this section.
+Font Awesome Free's licensing is **layered**, and it is not accurate to describe the
+whole package as "MIT licensed". Which layer applies to what aigate now ships:
+
+| Component | License | Shipped by aigate? |
+| --- | --- | --- |
+| Code / CSS | MIT | **Yes** — `css/all.min.css` |
+| Font files | SIL Open Font License 1.1 (OFL 1.1), with Reserved Font Name "Font Awesome" | **Yes** — the `.woff2` files listed above |
+| Icons (SVG / JS) | Creative Commons Attribution 4.0 International (CC BY 4.0) | **No** — no `svg/` or `js/` files from the package are vendored, so this layer is not engaged |
+
+The complete upstream license text — the MIT permission text, the full OFL 1.1 body
+with its Reserved Font Name clause, and the CC BY 4.0 paragraph covering the parts that
+are *not* distributed here — is reproduced verbatim in
+[`src/frontend/static/vendor/font-awesome/LICENSE.txt`](src/frontend/static/vendor/font-awesome/LICENSE.txt),
+so the notice travels with the distributed files as both MIT and OFL 1.1 require. It is
+deliberately not re-typed into this document: that file is the single authoritative copy,
+and this section only points at it. The vendored font files are unmodified, so the
+Reserved Font Name "Font Awesome" is respected.
+
+**Deliberately not vendored:** the package also ships `.ttf` copies of the same fonts, a
+`fa-v4compatibility` font, and the SVG/JS icon sets. Only WOFF2 is shipped. In
+`css/all.min.css` every `@font-face` lists its WOFF2 source first with a `.ttf` legacy
+fallback, so a browser that supports WOFF2 — every browser aigate targets — never
+requests the `.ttf`; and `fa-v4compatibility` is reached only through the legacy
+`"FontAwesome"` font-family name, which FA 6's own CSS never applies to any class (the
+classes aigate uses resolve to "Font Awesome 6 Free" / "Font Awesome 6 Brands"). No
+`url(...)` in the vendored CSS points outside this repository, so the UI needs no network
+request for icons.
+
+Font Awesome additionally **requests attribution** where its icons are used. Full
+upstream terms: <https://fontawesome.com/license/free>
 
 ---
 
