@@ -13,7 +13,14 @@ Legenda: `[ ]` antre · `[~]` dikerjakan · `[!]` draft siap, **nunggu review us
 - [x] **W0.4** Verifikasi 3 bug README dari kode: `requirements.txt` TIDAK ada · `AIGATE_SIMULATE_DEVICE` TIDAK ada (yang ada `AIGATE_DEV`, launcher.py:26) · command `aigate` NYATA ada (`[project.scripts]`) (requirements.txt, AIGATE_DEV, `aigate`).
 
 ## Tahap 1 — Delapan halaman (satu per satu, berhenti tiap halaman untuk review)
-- [!] **W1.1** `Home.md` — peta jalan. **Draft final siap direview user** (PM sudah koreksi 1 klaim salah).
+- [!] **W1.1** `Home.md` — peta jalan. **Rewrite v2** (user: "agak kurang menarik ya, rewrite dong"). Gaya: adegan pembuka + heading percakapan + hasil dulu.
+      → naskah berubah total · 6 seksi tetap · nol "this repo" · URL absolut
+      → RONDE 3 ("cerita ilustrasinya kurang asik") dan RONDE 4 (user kasih arah: "vibe coding tapi
+        perangkat terbatas, lagi bepergian, minim budget beli device") → v4 = HP bekas + bus malam,
+        375 kata. PM potong klaim absolut "every coding guide" → "most".
+      → KOREKSI ATURAN: Self-Heal ternyata SUDAH PUBLIK di README (bikin branch, jalankan agen,
+        benerin warning, merge) → larangan di wiki DICABUT. v4 tidak menyebutnya (butuh proyek +
+        agen terpasang, off-theme); WAJIB dibahas di halaman 7 + risikonya.
       → owner: business-analyst · 319 kata · 0 kata terlarang · 5 tautan internal valid
       → temuan: klaim Self-Heal salah digambarkan → DICORET (lihat pertanyaan terbuka #6 di plan)
 - [ ] **W1.2** `Quick-Start.md` — pasang sampai jalan, 3 platform. Perbaiki 3 bug README.

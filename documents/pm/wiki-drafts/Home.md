@@ -1,36 +1,34 @@
-# aigate 👋
+# aigate 📱
 
-A calm home base for the AI you already use — run it on your own machine, no server needed.
+**The only machine you own is a phone** — a second-hand one — yet most coding guides open with "grab a real laptop and a GPU." So the idea stayed parked for some future budget. Then you find a route that asks for none of it. The heavy AI thinking never runs on your phone — it runs at the providers you pick; your phone only routes traffic. Now, on a night bus with one hand on the screen, you ship from your pocket. The gear stopped being the excuse.
 
-## What it is, and why it feels different 🔑
+## What this is, and why it feels different ✨
 
-aigate is a small app you run yourself on Linux, Windows, or Android (it even works inside a full Linux distro on your phone). Start it up and a local page opens in your browser. No account, no sign-up, and nothing quietly reports back to us.
-
-Your data only travels to the AI providers *you* pick and connect — never through someone else's middleman service. Curious what's under the hood? aigate is free and open source — read it, run it, tinker with it. Anyone may copy that code, so the one true home of aigate is [github.com/fadhly-permata/AI-Gate](https://github.com/fadhly-permata/AI-Gate).
+aigate is a plain Python app you run yourself — Linux, Windows, Android (Termux), or a full Linux distro on a phone. No GPU, no compiler, nothing desktop-only. Start it and a page opens at a local address: no server, no account. Nothing talks back to us — your requests go only to the AI providers *you* chose, never through someone else's middleman. It's free and open source, and anyone may copy the code, so aigate's one true home is [github.com/fadhly-permata/AI-Gate](https://github.com/fadhly-permata/AI-Gate).
 
 ## What you can do with it 🧭
 
-- **Keep answers coming.** If one provider is having a bad moment, aigate can move along to another one you've set up.
-- **See what things cost.** Every request is logged with its token counts and an *estimated* price, and you can export it all to a spreadsheet.
-- **Use a real terminal in your browser.** Multiple tabs, fullscreen, and it keeps thousands of lines of history. [Learn more](Terminal).
-- **Use your coding tools with the models you chose.** Pick from 24 of them (the list keeps growing), pick a model, and aigate starts the tool for you in a fresh terminal tab — already wired to your setup. [See the tools](CLI-Tools).
-- **Call it from any program.** One local address that code in any language can use. [See how](OpenAI-API).
+- **Build on a small screen.** Made for phones, in seven languages, light or dark.
+- **Keep going when a key runs dry.** Line up a few providers in one group: when one errors or hits its quota, aigate moves to the next without a resend. [Set that up](Providers-and-Combos)
+- **See where your AI money went.** Each request logs tokens and an *estimated* cost, grouped your way, plus a CSV export.
+- **A real terminal in the browser.** 24 coding tools launch into a fresh tab with your chosen model. Missing one? You get an install command matched to your device — list still growing. [Look around](Terminal) · [See the tools](CLI-Tools)
+- **Call it from your own code.** One local address, any language. [Here's how](OpenAI-API)
 
 ## Pick your starting point 🚀
 
 | I want to… | Read this |
 |------------|-----------|
-| get it running right now | [Quick Start](Quick-Start) |
-| connect my coding tool | [CLI Tools](CLI-Tools) |
+| get it running on my phone | [Quick Start](Quick-Start) |
+| hook up my coding tool | [CLI Tools](CLI-Tools) |
+| choose and line up providers | [Providers & Combos](Providers-and-Combos) |
 | send requests from my own code | [OpenAI API](OpenAI-API) |
-| set up my providers and backups | [Providers & Combos](Providers-and-Combos) |
 
 ## How it works, in one paragraph 🧠
 
-You connect the AI providers you use and drop them into a group called a *combo*. aigate then hands you one tidy local address backed by that combo. Anything you like — the built-in terminal, a coding tool, or your own program — points at that single address, and aigate quietly decides which provider answers.
+Add the providers you have, put them side by side in a group — aigate calls it a *combo* — and each combo gives one tidy local address. Terminal, tools, your scripts: all point there. Which provider answers is aigate's problem, not yours. Your device only routes; models run on someone else's hardware, over your normal connection.
 
 ---
 
-That's the map. The rest of the wiki fills in each step.
+That's the map. [Quick Start](Quick-Start) is the first step.
 
 Made with ❤️ by Fadhly Permata

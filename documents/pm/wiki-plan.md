@@ -77,17 +77,21 @@ ada → (c) klaim tak terbukti ditandai `TODO-VERIFY: <cara cek>`, DILARANG neba
 3. Halaman 6 (API): boleh menyebut format request itu "kompatibel OpenAI"? (istilah itu perlu
    buat orang luar menemukan kita — tapi jelaskan singkat.)
 4. Setelah 8 halaman ACC: terjemahkan ke 7 bahasa sekalian, atau tunggu stabil dulu?
-6. **LISENSI** — repo belum punya file `LICENSE`, jadi materi publik **tidak boleh** menyebut
-   "free" / "open source" (sudah dilarang di draft Home). User perlu pilih lisensi dulu, baru
-   kata itu boleh dipakai di README + wiki.
-7. **Self-Heal mau dibuka ke publik atau tidak?** Yang sebenarnya dia lakukan (terbukti dari
-   `src/backend/selfheal.py`): bikin branch git, menjalankan agen AI (CLI agentic yang terpasang
-   user) untuk memperbaiki masalah yang tercatat di log, mengulang tes, menghapus entri log yang
-   sudah beres, lalu merge ke `main` dan menghapus branch. Ini fitur **untuk developer yang ngoding
-   di repo pakai aigate** — bukan untuk pengguna awam. Kalau jadi dibuka, butuh 1 halaman sendiri
-   + penjelasan risiko (dia menulis kode dan menggabungkan branch). Untuk sekarang: TIDAK disebut
-   di halaman mana pun.
-8. Konfirmasi rumusan privasi di Home (§1 handover): "data hanya pergi ke penyedia AI yang kamu
+6. ~~LISENSI~~ **TERJAWAL — user memilih MIT** (2026-09-08). `LICENSE` sudah merge ke `main`
+   (`785845a`), label MIT sudah kebaca di GitHub. Larangan kata "free / open source" DICABUT dan
+   sudah disebar ke README + 7 varian. Utang tersisa: WL.3 (tinjau ulang sebelum rilis publik /
+   sebelum kontribusi luar masuk) dan WL.4 (versi xterm.js yang di-vendor tidak tercatat di repo).
+7. ~~Self-Heal dibuka atau tidak~~ **TERJAWAL SENDIRI: ternyata SUDAH PUBLIK.** `README.md` yang
+   sudah di-ACC user menyebutnya lengkap dengan alurnya ("makes a branch, runs an agent in a live
+   tab, fixes warning after warning, and merges back when things pass") + kegagalan karena
+   "out of quota". Jadi larangan menyebut Self-Heal di wiki **DICABUT** — yang tetap dilarang
+   cuma ngarang detail yang belum diverifikasi (R23). Konsekuensi: **halaman 7 wajib** menjelaskan
+   fitur ini apa adanya + risikonya (dia menulis kode dan menggabungkan branch). Untuk **halaman
+   depan** tetap jangan jadi bintang utama: dia butuh proyek + agen yang sudah terpasang, sedangkan
+   cerita halaman depan sekarang adalah keterbatasan perangkat.
+8. Konfirmasi rumusan privasi: "nothing talks/reports back to us" BENAR untuk telemetri milik kita
+   (nol alamat non-provider di backend), TAPI Font Awesome masih dimuat dari CDN cloudflare
+   → bukan nol request pihak ketiga. User belum memutuskan: (a) terima rumusan sempit, (b) vendor ikon.
    pilih sendiri" — sudah benar secara teknis, tapi user yang punya hak menyatakan.
 5. Kapan izin tulis ke wiki turun, dan mau otomatis lewat script publisher atau manual?
 

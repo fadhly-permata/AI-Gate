@@ -652,3 +652,28 @@ Wajib:
    `index.html:152`) — supaya fork tetap menunjuk ke asal, bukan ikut menunjuk diri sendiri.
 5. URL tidak diterjemahkan: di SEMUA varian bahasa alamatnya identik (perlu dicek saat menyebar
    kalimat lisensi ke 7 varian).
+
+## R46 — "Kurang menarik / kurang asik" = materi publik harus punya GERAK cerita
+Pelajaran (2026-09-08, dua tegoran beruntun atas wiki Home: "agak kurang menarik ya, rewrite dong"
+→ setelah direwrite masih: "cerita ilustrasinya kurang asik"):
+
+PM mendiagnosa "hambar" sebagai masalah **kata** (metafora lembek, heading kaku, ritme seragam) dan
+menyuruh specialist menukarpropertiesnya. user tetap tidak puas, karena yang kurang adalah
+**gerak**: ilustrasinya cuma satu foto diam, bukan cerita.
+
+Ciri ilustrasi yang DITERIMA user (bukti: paragraf "Picture this" di README, satu-satunya teks yang
+di-ACC tanpa revisi): ada **tokoh** → **maunya apa** → **rintangannya apa** → **aksi** →
+**hasil yang berubah di akhir**, ditutup kalimat pendek. Rintangan + payoff itu WAJIB; tanpa keduanya
+teksnya jadi brosur, bukan cerita.
+
+Aturan wajib untuk SEMUA materi publik (README, varian, wiki):
+1. Ilustrasi pembuka wajib punya **konflik kecil dan penyelesaian**. "Orang lagi kerja di meja dapur,
+   kopi dingin" = suasana, bukan cerita → DILARANG dianggap cukup.
+2. Rintangan & penyelesaian yang dipakai **harus perilaku produk yang sudah terbukti** (R23/R42) —
+   jangan pinjam ketegangan dari fitur yang belum diizinkan muncul (contoh: Self-Heal masih ditahan).
+3. Gaya kalimat tetap seperti R44/R45: natural, ringan, awam, bahasa Inggris kasual, emoji secukupnya.
+4. Kalau user bilang "kurang asik/kurang menarik" **setelah** satu revisi gaya: JANGAN perbaiki
+   propertiesnya lagi. Ganti **struktur ceritanya**, dan kalau arah cerita belum jelas, tawarkan
+   **2–3 pilihan adegan** biar user yang milih — lebih murah daripada menebak 3 ronde.
+5. Detail konkret mengalahkan kata sifat. Satu "satu baris perintah" lebih hidup daripada
+   "sederhana dan powerful".

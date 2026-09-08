@@ -1835,3 +1835,18 @@ User jawab "b" (naikkan lisensi SETELAH PR #10). Cek gerbang: PR #10 ternyata **
 - GATE berikutnya: user me-review & merge PR #11. Setelah merge → (a) label lisensi muncul di
   GitHub, (b) WL.2a sebarkan 1 kalimat ke 7 varian (URL tidak diterjemahkan), (c) wiki lanjut
   halaman 1 ACC → halaman 2.
+
+## 2026-09-08 — Wiki Home direwrite (v2) karena user anggap hambar
+User: "agak kurang menarik ya, rewrite dong".
+- PM mendiagnosa dulu (bukan langsung lempar "buat lebih keren"): pembuka metafora lembek, heading
+  berlabel abstrak, semua bullet berbobot sama, nada terlalu sopan, ritme kalimat seragam 20-30 kata.
+- Acuan gaya = README yang sudah di-ACC user (buka pakai **adegan**) — teksnya ditempel ke prompt,
+  BA disuruh meniru **ritme**, bukan menyalin kata, dan dilarang pakai adegan bus yang sudah kepake.
+- BA menulis ulang (419 kata). PM: audit + 1 penghalusan ("clipboard paste" → "paste straight from
+  your clipboard") → akhir **349 kata**, 6 seksi tetap, nol klaim baru.
+- Gate lolos: nol sebutan Self-Heal · nol "prompts never leave" · nol "this repo" (URL absolut, R45)
+  · angka 24 sekali + catatan daftar bertambah · biaya selalu "estimated" · ekspor disebut CSV ·
+  kredit utuh · 5 tautan internal semuanya dalam 8 halaman rencana · `aigate` lowercase.
+- ⚠️ MASIH TERBUKA (menunggu user): baris "no usage reports phoning home to us" BENAR soal telemetri
+  kita, tapi Font Awesome masih dimuat dari CDN cloudflare → bukan nol request pihak ketiga.
+  Opsi user: (a) terima rumusan sempit ini, (b) vendor ikon.
