@@ -57,7 +57,10 @@ Legenda: `[ ]` antre · `[~]` dikerjakan · `[!]` draft siap, **nunggu review us
 - [!] **WL.2** Buka larangan kata "free / open source" + tambah kalimat "this is the only official
       source" di `README.md` (root) & `documents/pm/wiki-drafts/Home.md`. → owner: business-analyst
       (varian id/ru/nl/ja/zh/zh-tw/hi TIDAK disentuh sampai master English di-ACC user)
-      → README murni sisipan (+3 baris, 0 hapus) · Home.md 337 kata · PM memperhalus 2 frasa kaku
+      → README murni sisipan (+3 baris, 0 hapus) · Home.md ±337 kata · PM memperhalus 2 frasa kaku
+      → KOREKSI user (R45): "this repo" AMBIGU di fork (teks ikut ter-copy) → ganti URL absolut
+        `https://github.com/fadhly-permata/AI-Gate` di README & Home. UI sidebar sudah absolut ✔
+      → PEKERJAAN SUSULAN: saat menyebarkan kalimat ini ke 7 varian, alamatnya TIDAK diterjemahkan
 - [ ] **WL.3** REVIEW LISensi — "dulu/sementara" dari user. Pemicu review: (a) sebelum rilis publik
       pertama, (b) sebelum kontribusi orang lain masuk, (c) kalau ada yang mulai ngomersialkan klon.
       Catat: salinan MIT yang sudah tersebar tidak bisa ditarik balik.

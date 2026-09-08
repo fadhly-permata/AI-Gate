@@ -8,7 +8,8 @@ on your own computer or Android device, and your API keys and history stay
 right there with it.
 
 It's free and open source — no paid tier, and nothing locked behind a plan.
-Anyone may copy this code, so this repo is where the real aigate lives.
+Anyone may copy this code, so the one true home of aigate is
+[github.com/fadhly-permata/AI-Gate](https://github.com/fadhly-permata/AI-Gate).
 
 🌐 **English** · [Bahasa Indonesia](documents/readme-variants/README.id.md) · [Русский](documents/readme-variants/README.ru.md) · [Nederlands](documents/readme-variants/README.nl.md) · [日本語](documents/readme-variants/README.ja.md) · [简体中文](documents/readme-variants/README.zh.md) · [繁體中文](documents/readme-variants/README.zh-tw.md) · [हिन्दी](documents/readme-variants/README.hi.md)
 

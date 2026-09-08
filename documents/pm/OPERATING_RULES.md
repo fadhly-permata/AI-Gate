@@ -632,3 +632,23 @@ Aturan wajib:
 8. Draft disimpan di staging `documents/pm/wiki-drafts/`. **Wiki asli tidak boleh ditulis/di-push**
    sampai user membuka larangannya.
 9. Saat menerjemahkan ke bahasa lain nanti: R43 tetap berlaku (tulisan asli, bukan calque).
+
+## R45 — Jangan pernah menulis "repo ini" di materi publik: pakai URL absolut
+Pelajaran (2026-09-08, user soal kalimat README "so this repo is where the real aigate lives":
+"gak pake link repo aslinya? ya kalo di fork bisa kebawa dong filenya, jadi ambigue nanti"):
+
+Materi publik ikut ter-**fork** dan ikut ter-**copy** — teks apa pun yang menunjuk "sini" jadi salah
+alamat di tempat lain. Bahaya ini paling gede justru di bawah lisensi permisif (MIT), yang tidak
+mewajibkan apa pun ke peng-copy.
+
+Wajib:
+1. DILARANG pakai referensi relatif-ke-diri di materi publik: "this repo", "repo ini", "the one true
+   home" tanpa alamat, "di sini", "link di atas", "file ini". Yang menunjuk **ke luar** harus URL
+   absolut: `https://github.com/fadhly-permata/AI-Gate` (wiki: `.../wiki`).
+2. Setiap kali menulis klaim identitas/resmi/asli → **sertakan alamatnya**, bukan cuma kata-kata.
+3. Tautan ke file lain di repo sendiri (varian README, gambar) boleh relatif — yang dilarang cuma
+   klaim yang bergantung pada "di mana dokumen ini berada sekarang".
+4. Link ke repo di dalam UI wajib absolut dan menunjuk repo resmi (sudah benar: sidebar
+   `index.html:152`) — supaya fork tetap menunjuk ke asal, bukan ikut menunjuk diri sendiri.
+5. URL tidak diterjemahkan: di SEMUA varian bahasa alamatnya identik (perlu dicek saat menyebar
+   kalimat lisensi ke 7 varian).
