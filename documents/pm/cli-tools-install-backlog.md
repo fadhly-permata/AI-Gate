@@ -91,7 +91,7 @@ Kolom `Launch` = status di `LAUNCH_SUPPORT` (konteks, bukan bagian script).
 | C1 | llm | llm | `pip install llm` | python (pip) | verified | done |
 | C2 | sgpt | sgpt | `NO_INSTALL` (no-op) | — | unsupported (install_unverified) | done |
 | C3 | mods | mods | `NO_INSTALL` (no-op) | — | unsupported (no_binary) | done |
-| C4 | oterm | oterm | `pip install oterm` | python (pip) | verified | todo |
+| C4 | oterm | oterm | `pip install oterm` | python (pip) | verified | done |
 | C5 | gptme | gptme | `pip install gptme` | python (pip) | verified | todo |
 | C6 | aichat | aichat | `pkg install aichat` (override) / `cargo install aichat` | pkg (atau rust/cargo) | verified | todo |
 
@@ -100,6 +100,8 @@ Kolom `Launch` = status di `LAUNCH_SUPPORT` (konteks, bukan bagian script).
 > **C2 sgpt = done (2026-09-09):** **NO_INSTALL** — script HANYA menampilkan pesan `sgpt: NO_INSTALL — belum ada install terverifikasi di environment ini.` lalu `exit 0`, TIDAK memasang apa pun (no side-effect). Bukti `cli_presets.py:101` (`install: NO_INSTALL`) + `cli_presets.py:224` (`LAUNCH_UNSUPPORTED`/`REASON_INSTALL_UNVERIFIED`); `TERMUX_INSTALL` tidak punya entry sgpt; npm `sgpt` = **squat** tak terkait (author `peidayu`, deskripsi kosong, 218 byte — BUKAN CLI), PyPI `sgpt` = **404** (tidak ada package), GitHub CLI chat sungguhan `tbckr/sgpt` (Go) TIDAK punya build Termux/android-arm64 terverifikasi → TIDAK ada rute install resmi. Sesuai keputusan user untuk tool `NO_INSTALL`.
 
 > **C3 mods = done (2026-09-09):** **NO_INSTALL** — script HANYA menampilkan pesan `mods: NO_INSTALL — belum ada install terverifikasi di environment ini.` lalu `exit 0`, TIDAK memasang apa pun (no side-effect). Bukti `cli_presets.py:102` (`install: NO_INSTALL`) + `cli_presets.py:225` (`LAUNCH_UNSUPPORTED`/`REASON_NO_BINARY`); `TERMUX_INSTALL` tidak punya entry mods; npm `mods` = **squat Node.js** tak terkait (BUKAN CLI `charmbracelet/mods`), PyPI `mods` = **404** (tidak ada package), GitHub CLI resmi `charmbracelet/mods` (Go) di-archive/sunset 2026-03-09 & binari resmi HANYA Linux/macOS/Windows — TIDAK ada build Termux/android-arm64 terverifikasi → TIDAK ada rute install resmi. Sesuai keputusan user untuk tool `NO_INSTALL`.
+
+> **C4 oterm = done (2026-09-09):** install idempoten `pip install oterm` (fakta `cli_presets.py:103` = `pip install oterm`); launch **OpenAI-compatible** — oterm forward ke aigate `/v1/chat/completions` (wiring persis mirip `_oterm_builder` di `cli_tools_router.py:891-917`: tulis config `.oterm-aigate/config.json` blok `openaiCompatible.aigate` `{base_url=<gateway>/v1/chat/completions, api_key="${OPENAI_API_KEY}"}`, set `OTERM_DATA_DIR=.oterm-aigate` + env `OPENAI_API_BASE`+`OPENAI_API_KEY`). Bukti `cli_presets.py:222` = `oterm` = `LAUNCH_VERIFIED` (OpenAI-compatible). PyPI `oterm` 0.24.0 butuh Python >=3.10. **Catatan Termux (known-broken, bukan blocker):** di Termux/aarch64 + Python 3.14, `pip install oterm` diprediksi gagal build `jiter` (tidak ada wheel Android) → script handle hint + `exit 1`. `bash -n` clean; mode exec. Commit `aea87c3`.
 
 ---
 

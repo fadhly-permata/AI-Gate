@@ -365,6 +365,24 @@
 
  Semua tool Grup C yang dikerjakan (C1 llm done + C2 sgpt done + C3 mods done) — lanjut C4 oterm, C5 gptme, C6 aichat. Progres keseluruhan cli-tools: **21/24**.
 
+## CLI Tools C4: oterm install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/oterm.sh` (C4 oterm).
+
+**Fakta kode (cross-check):**
+- `cli_presets.py:103` = `{"name":"oterm","binary":"oterm","install": _pip("oterm")}` → `pip install oterm` (install string).
+- `cli_presets.py:222` = `"oterm": LaunchSupport(LAUNCH_VERIFIED, REASON_NONE)` — oterm = verified, OpenAI-compatible.
+- `cli_tools_router.py:891-917` = `_oterm_builder` — wiring: tulis `.oterm-aigate/config.json` blok `openaiCompatible.aigate` `{base_url=<gateway>/v1/chat/completions, api_key="${OPENAI_API_KEY}"}`, set `OTERM_DATA_DIR=.oterm-aigate` + env `OPENAI_API_BASE`+`OPENAI_API_KEY` ke aigate `/v1/chat/completions`.
+- PyPI `oterm` 0.24.0 butuh Python >=3.10.
+
+**Script behavior:** install idempoten via `ensure_installed` → `pip install oterm`; launch **OpenAI-compatible** — tulis config `.oterm-aigate/config.json` (`openaiCompatible.aigate` {base_url=gateway, api_key="${OPENAI_API_KEY}"}), set `OTERM_DATA_DIR=.oterm-aigate`, + env `OPENAI_API_BASE`/`OPENAI_API_KEY`, ke `/v1/chat/completions`.
+
+**Catatan Termux (known-broken, bukan blocker):** di Termux/aarch64 + Python 3.14, `pip install oterm` diprediksi gagal build `jiter` (tidak ada wheel Android) — script handle hint + `exit 1`.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/oterm.sh` → clean; perms `-rwx------` (exec).
+
+**Status: DONE — OpenAI-compatible (verified).** oterm di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → oterm forward model apa adanya. Commit `aea87c3`. Progres keseluruhan cli-tools: **22/24**.
+
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
 bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.
