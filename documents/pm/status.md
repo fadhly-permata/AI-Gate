@@ -254,6 +254,23 @@
 
 **Status: DONE — NO_INSTALL (message + exit 0, no side-effect).** autogpt ditandai aigate NO_INSTALL + LAUNCH_UNSUPPORTED(REASON_INSTALL_UNVERIFIED); TERMUX_INSTALL tak punya entry; PyPI `autogpt` = placeholder squat tak terkait; GitHub AutoGPT = platform Docker-based berat. Script HANYA pesan + `exit 0`, TIDAK memasang apa pun. Commit `a5d1a91`.
 
+## CLI Tools B5: gpt-researcher install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/gpt-researcher.sh` (B5 gpt-researcher).
+
+**Fakta kode (cross-check 3 sumber independen, R47/R48):**
+- `cli_presets.py:92` = `{"name":"gpt-researcher","binary":"gpt-researcher","install": _pip("gpt-researcher")}` → aigate memang punya install string terverifikasi `pip install gpt-researcher` (paket ADA & RESMI — BUKAN `NO_INSTALL` seperti autogpt/swe-agent).
+- `cli_presets.py:197-204` = `"gpt-researcher": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NOT_A_CLI)` — aigate menandai gpt-researcher BUKAN CLI yang bisa di-launch.
+- `cli_tools_router.py` `_LAUNCH_BUILDERS` (~:976-988) TIDAK punya entry `gpt-researcher` / `_gpt_researcher_builder` → `resolve()` masuk cabang `support.mode != LAUNCH_VERIFIED` → 409 `tool_unsupported`. Env `OPENAI_API_BASE`/`OPENAI_API_KEY` (~:1081-1084) TIDAK PERNAH sampai ke gpt-researcher.
+- PyPI `gpt-researcher` v0.16.0 (Assaf Elovic): metadata TIDAK ada `console_scripts`/`[project.scripts]`/`entry_points` (0 hit) → `pip install` TIDAK menghasilkan biner `gpt-researcher`; dependensi (litellm/langchain/openai/fastapi/duckduckgo-search) = library/agency, bukan CLI biner. `requires_python ">=3.12"`.
+- Docs resmi (github.com/assafelovic/gpt-researcher + docs.gptr.dev): pakai `from gpt_researcher import GPTResearcher` (library); "Run with CLI" = `git clone` + `pip install -r requirements.txt` + `python cli.py "<query>" --report_type <type>` (wajib query, tulis report lalu EXIT, bukan chat interaktif); server mode = `python -m uvicorn main:app` / Docker. Memang OpenAI-compatible (OPENAI_API_KEY + OPENAI_BASE_URL), TAPI tidak ada biner CLI untuk di-wire ke aigate `/v1/chat/completions`.
+
+**Script behavior:** source `_common.sh` (read-only helpers `detect_os`/`detect_pm`/`load_gateway_config` + `log_msg`) lalu log pesan penjelasan (pip-installable tapi NOT_A_CLI) + `exit 0` — TIDAK memasang/menjalankan apa pun yang bisa di-spawn (no side-effect, idempoten). Sengaja TIDAK menjalankan `pip install`/`python cli.py` agar tidak memasang paket yang tak bisa di-launch.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/gpt-researcher.sh` → clean; mode `-rwx------` (exec `100755`); eksekusi langsung → `exit 0`, TIDAK memasang apa pun.
+
+**Status: DONE — NOT_A_CLI (message + exit 0, no side-effect).** gpt-researcher pip-installable & resmi (`cli_presets.py:92`, PyPI v0.16.0), TAPI tanpa biner CLI (`cli_presets.py:197-204` = `LAUNCH_UNSUPPORTED`/`REASON_NOT_A_CLI`; PyPI no `console_scripts`; docs cuma `python cli.py <query>` yang butuh query & exit). aigate gak punya builder → `resolve()` 409. BUKAN murni `NO_INSTALL`, tapi gak bisa di-launch sebagai CLI. Script: pesan + `exit 0`, TIDAK install apa pun yg bisa di-spawn. Commit `cd346b4`.
+
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
 bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.
