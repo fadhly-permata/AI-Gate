@@ -146,6 +146,23 @@
 
 **Status: DONE — OpenAI-compatible (verified).** qwen di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → qwen forward model apa adanya. Commit `73478a0`.
 
+## CLI Tools A11: cline install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/cline.sh` (A11 cline).
+
+**Fakta kode (cross-check):**
+- `cli_presets.py:80` = `npm i -g cline` (install string).
+- `cli_presets.py:182` = `"cline": LaunchSupport(LAUNCH_VERIFIED, REASON_NONE)` — cline = verified, OpenAI-compatible.
+- `cli_tools_router.py:732-764` = `_cline_builder` — wiring `cline auth --provider openai-native --apikey <key> --modelid <model> --baseurl <base>` + env `OPENAI_API_BASE` + `OPENAI_API_KEY` ke aigate `/v1/chat/completions`.
+
+**Script behavior:** install idempoten via `ensure_installed` → `npm i -g cline`; launch **OpenAI-compatible** — wiring flag CLI `cline auth --provider openai-native --apikey <key> --modelid <model> --baseurl <base>` + env `OPENAI_API_BASE`+`OPENAI_API_KEY` (dari `load_gateway_config`) ke aigate `/v1/chat/completions`.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/cline.sh` → clean; perms `-rwx------` (exec).
+
+**Known-broken (bukan blocker):** npm `cline@3.0.61` TIDAK punya variant binary `android` → terpasang tapi gagal jalan di Termux/aarch64 (sama pola claude/codex/kilo/amp). Script tetap memasang; tool bisa jadi tidak bisa dijalankan di perangkat ini.
+
+**Status: DONE — OpenAI-compatible (verified).** cline di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → cline forward model apa adanya. Commit `d931921`.
+
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
 bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.
