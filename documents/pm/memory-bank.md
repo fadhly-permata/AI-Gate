@@ -4,7 +4,11 @@
 (empty — diisi PM saat task pertama)
 
 ## Decisions
-- 2026-09-10 (⑥+⑧ SELESAI): 8 berkas keluar dari `documents/pm/` (backlog/wiki → `documents/plan/`, katalog cli-tools → `documents/config/`, 4 handover → `handovers/`); `status.md` 202 KB → 11 KB aktif + arsip 191 KB; `memory-bank.md` 52 KB → 22 KB aktif + 2 arsip; heading `## Decisions` dobel dirapikan; 14 laporan dinormalisasi ke `[yyyymmdd]/[jenis]/[hhmm]_*` + 1 duplikat identik dihapus; rujukan hidup dibetulkan, histori tidak ditulis ulang; gate LOLOS, utang laporan 0. Detail: `documents/dev/CODE_CHANGES.md`.
+- 2026-09-10 (⑥+⑧ SELESAI, (e) BLOCKED): (e) Graphify dicoba sungguh-sungguh: `pkg install python-numpy tree-sitter`,
+  venv luar-repo, `pip install --no-deps graphifyy` 0.9.57, `graphify --help` exit 0 — TAPI `graphify update`
+  menghasilkan 0 node karena binding grammar Python tidak bisa dimuat di Android. Venv percobaan dihapus (B5).
+  C4 tetap berkondisi; 3 opsi lanjutan ada di Open risks + CODE_CHANGES.
+: 8 berkas keluar dari `documents/pm/` (backlog/wiki → `documents/plan/`, katalog cli-tools → `documents/config/`, 4 handover → `handovers/`); `status.md` 202 KB → 11 KB aktif + arsip 191 KB; `memory-bank.md` 52 KB → 22 KB aktif + 2 arsip; heading `## Decisions` dobel dirapikan; 14 laporan dinormalisasi ke `[yyyymmdd]/[jenis]/[hhmm]_*` + 1 duplikat identik dihapus; rujukan hidup dibetulkan, histori tidak ditulis ulang; gate LOLOS, utang laporan 0. Detail: `documents/dev/CODE_CHANGES.md`.
 - 2026-09-10 (EKSEKUSI perapian governance — langkah b/c/d SELESAI): rules **v1→v2**. v1 (52 rule,
   52.698 B) diarsipkan utuh di `documents/pm/archive/OPERATING_RULES-v1-52rules.md` (git rename →
   history_kept). v2 = 49 rule / 10 tema A–J / **11.101 B** (−79%), tiap rule ≤4 baris + sitatan
@@ -102,6 +106,12 @@
 ## Keputusan lama
 Arsip: `documents/pm/archive/memory-bank-decisions-lama.md`.
 ## Open risks
+- 2026-09-10 **Graphify tidak jalan di Termux** (percobaan (e)): CLI + `graphify --help` OK, tapi binding
+  grammar Python gagal dlopen (`tree_sitter_python_external_scanner_create`) → graf KOSONG 0 node. C4
+  dibiarkan berkondisi. Detail bukti + versi: `documents/dev/CODE_CHANGES.md` (blok "langkah (e)").
+  Diskrepansi sumber: graphify.net tulis MIT + "3.7k stars", GitHub API bilang Apache-2.0 + 116.361 stars
+  → kalau jadi dipakai, verifikasi lisensi dulu sebelum masuk THIRD_PARTY_NOTICES.
+
 - Agent file business-analyst / system-analyst / tech-architect SUDAH dibuat tapi
   belum terdaftar di sesi berjalan; perlu reload opencode agar bisa dipakai sbg
   subagent_type asli (selama ini pakai 'general' stand-in).

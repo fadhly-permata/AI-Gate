@@ -108,10 +108,20 @@ Dibaca penuh sebelum bertindak (11 berkas `.opencode/rules/*.md`, 229 baris; ind
 - [02:30] pencatatan → `documents/dev/CODE_CHANGES.md` (per berkas, H3), `memory-bank.md`
   (keputusan + beresnya heading `## Decisions` dobel), `status.md` (blok Record Protocol),
   `state.md` (`mode: governance-cleanup`, checkpoint v2, `rules_ref` v2).
-- BELUM dikerjakan (sengaja, menunggu): ⑥ pemindahan 19 berkas `documents/pm/**` (butuh ACC karena
-  memutus rujukan `BACKLOG.md:101`, `CODE_CHANGES.md:139`, `business-analyst.md:11` bila tidak
-  dibetulkan bersamaan); ⑧ normalisasi 14 berkas laporan; (e) instalasi Graphify (prasyarat `uv`
-  belum ada; Python lokal 3.14.6 vs permintaan 3.12); push 8 commit ke `origin/refactor/ui`.
+- [02:50] langkah ⑥+⑧ → selesai (rincian di `documents/dev/CODE_CHANGES.md`). `documents/pm/` turun
+  dari 19 berkas jadi 8 entri; `status.md` 202.175 → 11.018 byte aktif (arsip 191.477);
+  `memory-bank.md` 51.882 → 21.896 byte aktif (arsip 30.400); 14 berkas laporan dinormalisasi
+  (utang gate jadi 0) + 1 duplikat byte-identik dihapus; rujukan hidup dibetulkan, histori tidak
+  ditulis ulang.
+- [02:55] langkah (e) Graphify → **BLOCKED** (bukan DONE). Dipasang sungguhan: `pkg install
+  python-numpy tree-sitter`, venv di luar repo, `pip install --no-deps graphifyy` (0.9.57),
+  `graphify --help` exit 0. Uji nyata pada fixture satu file `.py` menghasilkan **0 node / 0 edge**
+  dengan peringatan `tree_sitter_python not installed`; penyebab `dlopen` gagal memuat symbol
+  `tree_sitter_python_external_scanner_create` pada Android/Termux. Versi lepas (0.25.0) dan versi
+  pin (<0.26) sama-sama gagal. Venv dan fixture dihapus (B5). Aturan C4 sengaja dibiarkan
+  berkondisi agar tidak menulis klaim yang belum benar. Selisih sumber dicatat: situs menyebut MIT
+  dan 3,7 ribu bintang, API GitHub menyebut Apache-2.0 dan 116.361 bintang.
+- BELUM: push commit ke `origin/refactor/ui` (dilakukan terakhir sesuai perintah user).
 - Syarat wajib: **user restart opencode** supaya `AGENTS.md`, `opencode.json`, agent/skill/rule yang
   baru dimuat — sesi yang sedang berjalan masih memakai konfigurasi lama.
 ## Peta Target (hasil langkah a)
@@ -135,7 +145,7 @@ langsung oleh kode (mis. `src/backend/models.py:5`, `src/backend/gateway/errors.
 tidak boleh dipindah tanpa memperbaiki rujukan tersebut (R18, R22).
 
 ## Status Akhir
-Sebagian — langkah (a) selesai (sensus + peta target), laporan dibuat lebih dahulu sesuai
+Sebagian — langkah (a)(b)(c)(d)(⑥)(⑧) selesai; (e) terblokir environment. langkah (a) selesai (sensus + peta target), laporan dibuat lebih dahulu sesuai
 `task-report.md`. Langkah (b) baru pada tahap **desain** (`system-analyst`, berkas
 `documents/analysis/2026-09-10-rules-consolidation.md`, commit `40ae85e`): 52 rule terpetakan ke
 10 tema tanpa kehilangan isi, 10 konflik tercatat dengan usulan penengah, dan urutan eksekusi

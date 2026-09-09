@@ -27,6 +27,25 @@
 - Verification: jumlah rule lama (51) harus nongol semua di peta old→new hasil (b); `git diff`
   nggak boleh nghapus teks rule mana pun (cuma pindah ke `archive/`).
 
+## Langkah (e) — Graphify dipasang sungguh-sungguh lalu DIBLOKIR environment — 2026-09-10 (PM)
+**Perintah:** "ganti pake graphify aja" + "3 dan 2 kerjain dulu". **Hasil: BLOCKED, bukan DONE.**
+`pkg install -y python-numpy tree-sitter` (numpy 2.4.4 + CLI tree-sitter 0.26.13 OK) → venv luar-repo →
+`pip install tree-sitter networkx rapidfuzz` + `--no-deps graphifyy` (0.9.57) → `graphify --help` exit 0.
+Tapi uji nyata di fixture 1 file `.py`: `graphify update` = exit 0 dengan
+`warning: 1 .py file(s) contributed nothing to the graph ... tree_sitter_python not installed (#1745)`
+→ **0 node / 0 edge**. Sebab: `ImportError: dlopen failed: cannot locate symbol
+"tree_sitter_python_external_scanner_create"` (binding grammar Python tidak jalan di Android/Termux;
+sudah dicoba versi lepas 0.25.0 dan pin `<0.26` force-reinstall → sama). Termux cuma punya grammar
+level-C, bukan binding Python-nya.
+**Keputusan:** C4 `OPERATING_RULES.md` TETAP berkondisi (nol klaim palsu — F3/no-hallucination);
+venv + fixture dihapus (B5, 43 MB); repo nol perubahan kode/venv.
+**Sumber identitas (F3, 2 sumber):** PyPI `graphifyy` 0.9.57 requires-python >=3.10 (situs tulis "3.12+uv");
+GitHub API `Graphify-Labs/graphify` = **Apache-2.0**, branch default `v8` — situs tulis **MIT** dan
+"3.7k+ stars" (API: 116.361). Selisih lisensi STAR jika jadi dipakai → cek sebelum `THIRD_PARTY_NOTICES.md`.
+**Opsi buat user:** (i) generate `graph.json` di mesin Linux, query tetap lokal di HP
+(`graphify path/explain --graph <file>` tidak butuh LLM); (ii) tetap tanpa kanal graf;
+(iii) deep-dive build binding (tidak dijamin berhasil). Detail teknis: `documents/dev/CODE_CHANGES.md`.
+
 ## Langkah ⑥+⑧ — pindah berkas `documents/pm/**` + normalisasi laporan — 2026-09-10 (PM)
 **Perintah user:** "3 dan 2 kerjain dulu" (= sisa pekerjaan ⑥⑧(e) lalu push).
 **⑥ pindah (git mv, nol isi berubah):** `cli-tools-install-backlog` + `wiki-plan` + `wiki-backlog` → `documents/plan/`;

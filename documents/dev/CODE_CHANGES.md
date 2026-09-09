@@ -1335,3 +1335,39 @@ Bukti "kode lama masih aktif" tidak berlaku: tidak ada proses produk yang disent
 - `grep` sitatan path laporan lama di berkas ter-track = 0 (tidak ada rujukan putus).
 - Gate: `python3 .opencode/tools/governance/rules-index.py` → LOLOS; utang format laporan **0** (sebelumnya 14).
 - `documents/pm/` akhir: 8 entri (`OPERATING_RULES.md`, `state.md`, `status.md`, `memory-bank.md`, `bugs.md`, `handovers/`, `wiki-drafts/`, `archive/`) — `wiki-drafts/` TIDAK disentuh (R44 ayat 8 staging wajib).
+
+## 2026-09-10 — langkah (e): coba pasang Graphify di Termux → DIBLOKIR environment — BLOCKED (bukan DONE)
+
+### Yang dipasang (semua DI LUAR repo — nol berkas proyek berubah)
+- `pkg install -y python-numpy tree-sitter` → `numpy 2.4.4` OK, CLI `tree-sitter 0.26.13` OK.
+  (dpkg tetap error di paket tak terkait `hope2333-mirrorlist` = read-only /etc/apt, sudah tercatat di memory-bank.)
+- venv terisolasi `~/tmp/graphify-venv` (`--system-site-packages` biar numpy kepakai) →
+  `pip install tree-sitter>=0.23,<0.26 networkx rapidfuzz` → ketiganya import OK.
+- `pip install --no-deps graphifyy` → **0.9.57** terpasang; entry `graphify` + `graphify-mcp` ADA;
+  `graphify --help` → exit 0 (perintah: install/uninstall/path/explain/update/cluster-only/watch/clone/merge-*).
+
+### Uji nyata (bukti, bukan asumsi)
+- Fixture `~/tmp/grf-test/mod.py` (1 file .py) → `graphify update` exit 0 TAPI:
+  `warning: 1 .py file(s) contributed nothing to the graph because a dependency is missing:
+  tree_sitter_python not installed. (#1745)` → hasil **0 nodes / 0 edges / 0 communities**.
+- Sebab: binding Python grammar gagal dimuat di Android/Termux:
+  `ImportError: dlopen failed: cannot locate symbol
+   "tree_sitter_python_external_scanner_create" ... _binding.abi3.so`
+- Sudah dicoba: `tree-sitter-python` versi apa adanya (0.25.0) dan dipin `<0.26` (force-reinstall) → SAMA.
+  Tersedia di Termux hanya grammar level-C (`tree-sitter-python`, `-javascript`, dst.) bukan binding Python-nya.
+- Konsekuensi: untuk repo ini (Python 334 file + JS frontend) Graphify menghasilkan graf KOSONG → tidak bisa
+  jadi kanal pencarian kode di HP ini sekarang.
+
+### Versi terverifikasi identitas tool (2 sumber, sesuai F3)
+- PyPI `graphifyy` 0.9.57, `requires_python >=3.10` (BUKAN 3.12 kaku seperti tertulis di graphify.net).
+- GitHub `Graphify-Labs/graphify` → API: **Apache-2.0**, default branch `v8`; situs claiming **MIT** dan
+  "3.7k+ stars". Dua angka di situs TIDAK cocok dengan API (API: Apache-2.0). Kalau nanti dipakai,
+  cek ulang lisensinya sebelum masuk daftar pihak ketiga (`THIRD_PARTY_NOTICES.md`).
+
+### Keputusan
+- `OPERATING_RULES.md` C4 tetap **berkondisi** ("kanal graf hanya wajib bila terpasang"). Tidak menulis
+  rule yang belum benar. R28 lama tetap arsip/mati.
+- venv percobaan DIHAPUS (B5): `rm -rf ~/tmp/graphify-venv ~/tmp/grf-test`.
+- Jalan yang tersisa (butuh keputusan user): (i) generate `graph.json` di mesin Linux/x86 lalu query
+  lokal di HP (`graphify path/explain --graph <file>` jalan tanpa LLM/tanpa grammar),
+  (ii) tetap tanpa graf (C4 berkondisi), (iii) coba build binding grammar lebih dalam (tidak dijamin).
