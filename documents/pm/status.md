@@ -333,6 +333,38 @@
 
 **Status: DONE — OpenAI-compatible (verified).** llm di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → llm forward model apa adanya.
 
+## CLI Tools C2: sgpt install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/sgpt.sh` (C2 sgpt).
+
+**Fakta kode (cross-check):**
+- `cli_presets.py:101` = `{"name":"sgpt","binary":"sgpt","install": NO_INSTALL}` (NO_INSTALL = echo no-op).
+- `cli_presets.py:224` = `"sgpt": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_INSTALL_UNVERIFIED)` — sgpt = unsupported (install unverified).
+- `TERMUX_INSTALL` map (`cli_presets.py:241-244`) HANYA berisi `aichat` + `codex` — TIDAK ada entry sgpt; registry: npm `sgpt` = squat tak terkait (author `peidayu`, BUKAN CLI), PyPI `sgpt` = 404, GitHub `tbckr/sgpt` (Go) gak build Termux/android-arm64.
+
+**Script behavior:** **NO_INSTALL** — script HANYA menampilkan pesan `sgpt: NO_INSTALL — belum ada install terverifikasi di environment ini.` + `exit 0`, TIDAK memasang apa pun (no side-effect, idempoten). Pesan literal (TIDAK ada backtick/`$()` — lesson dari B2 swe-agent).
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/sgpt.sh` → clean; perms `-rwx------` (exec); eksekusi langsung → `exit 0`, TIDAK memasang apa pun. `git status` hanya berisi `sgpt.sh`+`mods.sh` + dokumen PM (working tree bersih selain itu).
+
+**Status: DONE — NO_INSTALL (message + exit 0, no side-effect).** sgpt ditandai aigate `LAUNCH_UNSUPPORTED`/`REASON_INSTALL_UNVERIFIED` (`cli_presets.py:224`); tidak ada rute install terverifikasi → script HANYA pesan + keluar.
+
+## CLI Tools C3: mods install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/mods.sh` (C3 mods).
+
+**Fakta kode (cross-check):**
+- `cli_presets.py:102` = `{"name":"mods","binary":"mods","install": NO_INSTALL}` (NO_INSTALL = echo no-op).
+- `cli_presets.py:225` = `"mods": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NO_BINARY)` — mods = unsupported (no binary).
+- `TERMUX_INSTALL` map (`cli_presets.py:241-244`) HANYA berisi `aichat` + `codex` — TIDAK ada entry mods; registry: npm `mods` = squat Node.js tak terkait (BUKAN CLI `charmbracelet/mods`), PyPI `mods` = 404, GitHub `charmbracelet/mods` (Go) di-archive/sunset 2026-03-09 & binari resmi HANYA Linux/macOS/Windows — gak build Termux/android-arm64.
+
+**Script behavior:** **NO_INSTALL** — script HANYA menampilkan pesan `mods: NO_INSTALL — belum ada install terverifikasi di environment ini.` + `exit 0`, TIDAK memasang apa pun (no side-effect, idempoten). Pesan literal (TIDAK ada backtick/`$()` — lesson dari B2 swe-agent).
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/mods.sh` → clean; perms `-rwx------` (exec); eksekusi langsung → `exit 0`, TIDAK memasang apa pun. `git status` hanya berisi `sgpt.sh`+`mods.sh` + dokumen PM (working tree bersih selain itu).
+
+**Status: DONE — NO_INSTALL (message + exit 0, no side-effect).** mods ditandai aigate `LAUNCH_UNSUPPORTED`/`REASON_NO_BINARY` (`cli_presets.py:225`); tidak ada biner/rute install terverifikasi → script HANYA pesan + keluar.
+
+ Semua tool Grup C yang dikerjakan (C1 llm done + C2 sgpt done + C3 mods done) — lanjut C4 oterm, C5 gptme, C6 aichat. Progres keseluruhan cli-tools: **21/24**.
+
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
 bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.

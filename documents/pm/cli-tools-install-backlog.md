@@ -89,13 +89,17 @@ Kolom `Launch` = status di `LAUNCH_SUPPORT` (konteks, bukan bagian script).
 | # | Tool | Binary | Install (pkg/PM) | Dep (pkg/PM) | Launch | Status |
 |---|------|--------|------------------|--------------|--------|--------|
 | C1 | llm | llm | `pip install llm` | python (pip) | verified | done |
-| C2 | sgpt | sgpt | `NO_INSTALL` (no-op) | — | unsupported (install_unverified) | todo |
-| C3 | mods | mods | `NO_INSTALL` (no-op) | — | unsupported (no_binary) | todo |
+| C2 | sgpt | sgpt | `NO_INSTALL` (no-op) | — | unsupported (install_unverified) | done |
+| C3 | mods | mods | `NO_INSTALL` (no-op) | — | unsupported (no_binary) | done |
 | C4 | oterm | oterm | `pip install oterm` | python (pip) | verified | todo |
 | C5 | gptme | gptme | `pip install gptme` | python (pip) | verified | todo |
 | C6 | aichat | aichat | `pkg install aichat` (override) / `cargo install aichat` | pkg (atau rust/cargo) | verified | todo |
 
 > **C1 llm = done (2026-09-09):** install idempoten `pip install llm` (fakta `cli_presets.py:100` = `_pip("llm")` → `pip install llm`); launch **OpenAI-compatible** — llm forward ke aigate `/v1/chat/completions` (wiring persis mirip `_llm_builder` di `cli_tools_router.py:570-592`: `llm openai endpoint <base> [-m <model>] --key <key> --chat` (atau `--models` bila tanpa model) + env `OPENAI_API_BASE`+`OPENAI_API_KEY`). Bukti `cli_presets.py:219` = `llm` = `LAUNCH_VERIFIED` (OpenAI-compatible). PyPI `llm` 0.35 (simonw) butuh Python >=3.10. **Catatan Termux (known-broken, bukan blocker):** di Termux/aarch64 + Python 3.14, `pip install llm` gagal build `jiter` (tidak ada wheel Android, butuh `pkg install rust`) → install bisa gagal di perangkat ini. `bash -n` clean; mode exec.
+
+> **C2 sgpt = done (2026-09-09):** **NO_INSTALL** — script HANYA menampilkan pesan `sgpt: NO_INSTALL — belum ada install terverifikasi di environment ini.` lalu `exit 0`, TIDAK memasang apa pun (no side-effect). Bukti `cli_presets.py:101` (`install: NO_INSTALL`) + `cli_presets.py:224` (`LAUNCH_UNSUPPORTED`/`REASON_INSTALL_UNVERIFIED`); `TERMUX_INSTALL` tidak punya entry sgpt; npm `sgpt` = **squat** tak terkait (author `peidayu`, deskripsi kosong, 218 byte — BUKAN CLI), PyPI `sgpt` = **404** (tidak ada package), GitHub CLI chat sungguhan `tbckr/sgpt` (Go) TIDAK punya build Termux/android-arm64 terverifikasi → TIDAK ada rute install resmi. Sesuai keputusan user untuk tool `NO_INSTALL`.
+
+> **C3 mods = done (2026-09-09):** **NO_INSTALL** — script HANYA menampilkan pesan `mods: NO_INSTALL — belum ada install terverifikasi di environment ini.` lalu `exit 0`, TIDAK memasang apa pun (no side-effect). Bukti `cli_presets.py:102` (`install: NO_INSTALL`) + `cli_presets.py:225` (`LAUNCH_UNSUPPORTED`/`REASON_NO_BINARY`); `TERMUX_INSTALL` tidak punya entry mods; npm `mods` = **squat Node.js** tak terkait (BUKAN CLI `charmbracelet/mods`), PyPI `mods` = **404** (tidak ada package), GitHub CLI resmi `charmbracelet/mods` (Go) di-archive/sunset 2026-03-09 & binari resmi HANYA Linux/macOS/Windows — TIDAK ada build Termux/android-arm64 terverifikasi → TIDAK ada rute install resmi. Sesuai keputusan user untuk tool `NO_INSTALL`.
 
 ---
 
