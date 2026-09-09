@@ -68,7 +68,22 @@ wiring ke selected model/combo seperti aigate, cross-platform (Termux/Win/Linux/
 - `GEMINI_MODEL` di-forward dari `AIGATE_MODEL` bila ada; reachability probe ke aigate `/v1/models` cuma warning (gemini tetap tidak dirutekan). Caveat Termux: bundle pure-JS (`bin=bundle/gemini.js`, node≥20) jalan di Bionic; optional `node-pty` tidak ada build arm64 → PTY degrade tapi CLI tetap launch.
 - Verifikasi: `bash -n scripts/cli-tools/gemini.sh` → **clean**; `chmod` `-rwx------`.
 
-Status: A1 claude = done (script). A2 opencode = done (script). A3 gemini = done (script, native Google mode, unsupported by aigate). `_common.sh` = done. Sisa A4..A12, B1..B6, C1..C6 menyusul per tool.
+### `scripts/cli-tools/codex.sh` (BARU, 136 baris)
+- Install + launch script untuk **codex** (A4). Install: Termux → `pkg install codex`
+  (`cli_presets.py:243`, tur-repo, bin bionic terverifikasi); non-Termux →
+  `npm i -g @openai/codex` (`cli_presets.py:72`, portable string). npm registry
+  `@openai/codex` v0.153.4 punya optional dep `linux-arm64`. Docs:
+  github.com/openai/codex, learn.chatgpt.com/docs.
+- Launch **native OpenAI mode** + warning: codex TIDAK di-wire ke aigate. Bukti
+  `cli_presets.py:180` = `"codex": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_RESPONSES_ONLY)`
+  — aigate punya inbound `/v1/responses` (`router.py:342`) tapi **non-streaming only**
+  (`responses.py:227-233`: `stream:true` → tolak `responses_streaming_unsupported`
+  / `RESPONSES_STREAMING_TODO` / `STREAMING_UNSUPPORTED_CODE`), sedangkan codex CLI
+  **wajib streaming** → tidak bisa di-rute. Script sadar ini: jalan native mode OpenAI
+  + peringatan (sama pola gemini/claude yang unsupported), TIDAK set env palsu ke aigate.
+- Verifikasi: `bash -n scripts/cli-tools/codex.sh` → **clean**; `chmod` `-rwx------`.
+
+Status: A1 claude = done (script). A2 opencode = done (script). A3 gemini = done (script, native Google mode, unsupported by aigate). **A4 codex = done (script, native OpenAI mode, unsupported by aigate — butuh streaming Responses API yang belum ada).** `_common.sh` = done. Sisa A5..A12, B1..B6, C1..C6 menyusul per tool.
 
 
 ## 2026-09-08 — i18n: satu file per bahasa + 5 bahasa baru (ru, nl, ja, zh, zh-tw) — DONE (`f7beaf9` + `c1477eb`, branch `feat/i18n-locales`)

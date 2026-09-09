@@ -44,6 +44,19 @@
 
 **Status: DONE — native Google mode.** gemini TIDAK di-rute aigate (bukti `cli_presets.py:175` = `LAUNCH_UNSUPPORTED`/`REASON_GEMINI_ONLY`); aigate hanya serve OpenAI `/v1/chat/completions` + Anthropic `/v1/messages`. Script sengaja tidak set `ANTHROPIC_BASE_URL`/`OPENAI_API_BASE` palsu (gemini CLI mengabaikannya → no-op).
 
+## CLI Tools A4: codex install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/codex.sh` (A4 codex).
+
+**Bukti kode (cross-check, ≥2 sumber):**
+- `cli_presets.py:180` = `"codex": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_RESPONSES_ONLY)` — codex TIDAK di-wire aigate.
+- aigate punya inbound `/v1/responses` (`router.py:342`) tapi **non-streaming only**: `responses.py:227-233` → `stream:true` ditolak `responses_streaming_unsupported` (`RESPONSES_STREAMING_TODO`/`STREAMING_UNSUPPORTED_CODE`). codex CLI **wajib streaming** → tak bisa di-rute.
+- Install: Termux `pkg install codex` (`cli_presets.py:243`, tur-repo bionic); non-Termux `npm i -g @openai/codex` (`cli_presets.py:72`). npm `@openai/codex` v0.153.4 ada optional dep `linux-arm64`. Docs: github.com/openai/codex, learn.chatgpt.com/docs.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/codex.sh` -> clean; perms `-rwx------` (mode `100755`).
+
+**Status: DONE — native OpenAI mode.** codex launch **native** + warning (TIDAK di-wire aigate — butuh streaming Responses API yang belum ada). Script tidak set env palsu ke aigate.
+
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
 bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.
