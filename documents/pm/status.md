@@ -27,6 +27,19 @@
 - Verification: jumlah rule lama (51) harus nongol semua di peta old→new hasil (b); `git diff`
   nggak boleh nghapus teks rule mana pun (cuma pindah ke `archive/`).
 
+## Merge `origin/main` + PR #17 — 2026-09-10 (PM)
+**Perintah:** user "ok" (setelah ditanya boleh sinkron + bikin PR). **Hasil: PR #17 TERBUKA, mergeable=clean.**
+- 4 berkas bentrok diselesaiin: v2 + arsip aktif menang, salinan versi main dipindah ke
+  `archive/memory-bank-progress-lama.md` (+59 baris) dan `archive/state-sebelum-v2.md` (+6 baris).
+  Verifikasi nol-kehilangan: tiap baris versi `main` dicocokkan ke (berkas aktif ∪ arsip) → **0 ilang**.
+- Bonus: header ganda di `OPERATING_RULES.md` v2 (akibat sisipan saya sendiri) dibetulkan → 11.319 B.
+- Handover FE dari main (`handover-20260909-fe-test-env.md`) langsung masuk rumah barunya `documents/pm/handovers/`.
+- Gate `python3 .opencode/tools/governance/rules-index.py` → LOLOS (11 checks). Suite FE dijalankan sekali
+  sebelum commit merge: `node node_modules/.bin/vitest run` di `src/frontend` → **23 berkas / 523 tes lulus**, 11,53 s.
+- Commit merge `b5e5886` di-push. PR: https://github.com/fadhly-permata/AI-Gate/pull/17
+  (label `documentation` + `enhancement` sesuai H4; isi = sensus, rule v2, kanal wajib-baca, pembersihan
+  rujukan hantu, penataan berkas, normalisasi laporan, gerbang pemeriksa, + catatan Graphify yang mentok).
+
 ## Langkah (e) — Graphify dipasang sungguh-sungguh lalu DIBLOKIR environment — 2026-09-10 (PM)
 **Perintah:** "ganti pake graphify aja" + "3 dan 2 kerjain dulu". **Hasil: BLOCKED, bukan DONE.**
 `pkg install -y python-numpy tree-sitter` (numpy 2.4.4 + CLI tree-sitter 0.26.13 OK) → venv luar-repo →

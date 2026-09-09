@@ -4,7 +4,15 @@
 (empty — diisi PM saat task pertama)
 
 ## Decisions
-- 2026-09-10 (⑥+⑧ SELESAI, (e) BLOCKED): (e) Graphify dicoba sungguh-sungguh: `pkg install python-numpy tree-sitter`,
+- 2026-09-10 (MERGE main + PR #17): user "ok" -> `origin/main` digabung ke `refactor/ui`. Bentrok 4 berkas
+  (`OPERATING_RULES.md`, `memory-bank.md`, `state.md`, `status.md`) diselesaiin dengan kebijakan:
+  **v2 + arsip aktif menang, salinan versi main diarsipin** — diverifikasi **0 baris konten ilang**
+  (bandang tiap baris theirs vs berkas aktif + isi `documents/pm/archive/`). Temuan bonus: header ganda di
+  rule v2 (bekas sisipan saya) dibetulin. Handover FE bawaan main dipindah ke `documents/pm/handovers/`.
+  Gate `rules-index.py` LOLOS; suite FE jalan sekali: 23 berkas / 523 tes LULUS (11,5 s).
+  **PR #17** `refactor/ui -> main` TERBUKA, label `documentation` + `enhancement` (H4), mergeable=clean,
+  17 commit / 57 berkas / +4.730 -3.474: https://github.com/fadhly-permata/AI-Gate/pull/17
+: (e) Graphify dicoba sungguh-sungguh: `pkg install python-numpy tree-sitter`,
   venv luar-repo, `pip install --no-deps graphifyy` 0.9.57, `graphify --help` exit 0 — TAPI `graphify update`
   menghasilkan 0 node karena binding grammar Python tidak bisa dimuat di Android. Venv percobaan dihapus (B5).
   C4 tetap berkondisi; 3 opsi lanjutan ada di Open risks + CODE_CHANGES.
