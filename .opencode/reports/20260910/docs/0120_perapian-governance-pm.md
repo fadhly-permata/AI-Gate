@@ -56,7 +56,28 @@ Dibaca penuh sebelum bertindak (11 berkas `.opencode/rules/*.md`, 229 baris; ind
   `opencode.json` maupun konfigurasi global, tidak ada skill/command terkait. Aturan wajib sejak
   2026-09-06 tetapi tidak dapat dipenuhi.
 - [01:20] langkah (a) — sensus dan peta target disusun → selesai (lihat bagian Peta Target).
-- Keputusan pengguna untuk langkah (b) sampai (d) masih ditunggu.
+- [01:35] keputusan user dicatat: R28 → Graphify; peleburan rule dibolehkan (arsip utuh);
+  langkah (c) diserahkan ke PM (putusan: kanal wajib-baca = `AGENTS.md`, plugin ditunda);
+  gaya tulis `.md` = caveman ultra, komunikasi ke user = bahasa normal (jadi R52).
+- [01:54] langkah (b) DESAIN — didelegasikan ke `system-analyst` (R21; hanya menulis di
+  `documents/analysis/**`) → selesai. Hasil: `documents/analysis/2026-09-10-rules-consolidation.md`
+  (37.789 B): peta lama→baru 52 rule (0 hilang, 0 ganda), 10 tema A–J, 49 rule baru ≤4 baris,
+  target `OPERATING_RULES.md` v2 = 10.533 B (−80%), 10 konflik K1–K10 dengan usulan penengah,
+  shortlist `AGENTS.md` 12 baris, rencana pindah 19 berkas, spesifikasi skrip pemeriksa
+  `.opencode/tools/governance/rules-index.py`. Commit `40ae85e`.
+- [01:54] koreksi sensus langkah (a): berkas rule sekarang **52** rule / 52.698 B (R52 bertambah
+  setelah sensus); ukuran nyata `documents/pm/` = **403.321 B** — angka 427 KB tadi berasal dari
+  `du` yang membulatkan blok.
+- [01:54] temuan terpenting: **definisi agen PM menunjuk objek yang tidak ada** —
+  `ProjectManager.md:30` skill `pm-postmortem` (tidak ada di `.opencode/skills/`), `:76` nama skill
+  `fullstack-skill` (nyata `fullstack-dev-skill`), `:85,93,110` write root `docs/analysis/**`
+  bertentangan dengan `agent-boundaries.md:23-27` (`documents/...`) dan R5; ditambah 17 rujukan
+  `pm/...` basi di 6 berkas hidup. Kandidat akar pelanggaran berulang: instruksi menunjuk path
+  dan skill hantu.
+- [01:54] urutan aman usulan (sekuensial): ① perbaiki rujukan basi → ② sepakati pemilik tulis
+  `.opencode/rules/**` → ③ tulis arsip v1 → ④ pasang rule v2 → ⑤ gerbang skrip pemeriksa →
+  ⑥ pindahkan berkas → ⑦ perbarui `AGENTS.md` → ⑧ normalisasi folder laporan.
+- Keputusan user untuk ① dan ② masih ditunggu; eksekusi (b) belum dimulai.
 
 ## Peta Target (hasil langkah a)
 Kondisi saat ini dan nasib tiap berkas diusulkan sebagai berikut.
@@ -79,6 +100,9 @@ langsung oleh kode (mis. `src/backend/models.py:5`, `src/backend/gateway/errors.
 tidak boleh dipindah tanpa memperbaiki rujukan tersebut (R18, R22).
 
 ## Status Akhir
-Sebagian — langkah (a) selesai dan laporan dibuat lebih dahulu sesuai `task-report.md`.
-Langkah (b) sampai (d) menunggu persetujuan pengguna karena bersifat merusak (memangkas,
-menggabungkan, dan memindahkan dokumen governance).
+Sebagian — langkah (a) selesai (sensus + peta target), laporan dibuat lebih dahulu sesuai
+`task-report.md`. Langkah (b) baru pada tahap **desain** (`system-analyst`, berkas
+`documents/analysis/2026-09-10-rules-consolidation.md`, commit `40ae85e`): 52 rule terpetakan ke
+10 tema tanpa kehilangan isi, 10 konflik tercatat dengan usulan penengah, dan urutan eksekusi
+①–⑧ diajukan. Eksekusi (b) menunggu putusan pengguna untuk ① (pemilik tulis `.opencode/rules/**`)
+dan ② (setuju rujukan basi dibetulkan lebih dulu), karena menyentuh konfigurasi agen.

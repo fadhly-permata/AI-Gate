@@ -1,5 +1,30 @@
 # PM Status
 
+## 2026-09-10 01:35 — PM decided wrong → user correction recorded (R51 + R52) (ProjectManager)
+
+### Violation
+- Rule broken: `.opencode/rules/language.md:2` ("English caveman ultra") + R46 (typo user wajib
+  dikoreksi) + `task-report.md` (laporan wajib ditulis di awal) + R51 (kredensial dari `.env`).
+- What PM did: jawab user dengan tabel/uraian panjang berkali-kali, nggak koreksi typo
+  ("operation_rule.md", "kitq"), nawarin nyimpen kredensial di luar `.env`, dan sempat
+  ngaku "nggak bisa push" tanpa cek `.env`/rules.
+
+### Correction
+- Durable rule captured: **R52** — caveman ultra HANYA untuk penulisan berkas `.md`; komunikasi
+  & konfirmasi ke user tetap bahasa Indonesia casual normal, jelas, non-IT, tanpa singkatan.
+  (Amandemen `language.md` dieksekusi di langkah (d).)
+- User juga mutusin: **R28 diganti Graphify** (bukan codegraph), **lebur 51 rule boleh** (teks
+  lama diarsip, nggak dihapus), **(c) diserahkan ke PM** → keputusan PM: kanal wajib-baca =
+  `AGENTS.md` (nol kode, terbukti ke-load), plugin `chat.system.transform` DITUNDA (YAGNI/R38).
+
+### Prevention
+- Mechanism: (1) PM wajib baca `.opencode/rules/*.md` + indeks rule SEBELUM aksi apa pun
+  (dilakukan di langkah (a) dan langsung nangkep 4 pelanggaran); (2) langkah (b) merampingkan
+  51 rule → kelompok tema + indeks auto-generate; (3) langkah (c) mindahin subset wajib ke
+  `AGENTS.md` supaya ke-inject tanpa perlu inisiatif baca.
+- Verification: jumlah rule lama (51) harus nongol semua di peta old→new hasil (b); `git diff`
+  nggak boleh nghapus teks rule mana pun (cuma pindah ke `archive/`).
+
 ## Perapian governance — langkah (a) sensus + peta target — 2026-09-10 (PM, mode SEKUENSIAL)
 **Perintah user:** "intinya rapihin semua, tapi pastikan lu gak akan pernah nabrak rule lagi" →
 pilih **sekuensial** (R16, dicatat di `state.md:multiagent_mode`) → "lanjut" buat langkah (a).

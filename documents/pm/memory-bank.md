@@ -7,6 +7,16 @@
 - 2026-09-03: Arsitektur agen PM + sub-agent spesialis (on-demand, scoped).
 
 ## Decisions
+- 2026-09-10 (perapian governance — 4 keputusan user): (1) **R28 diganti**: codegraph → **Graphify**
+  (graphify.net, MIT; Tree-sitter + NetworkX + Leiden; dukung OpenCode). BELUM dipasang — prasyarat
+  belum diverifikasi (`uv` tidak ada, Python 3.14 vs diminta 3.12) → R28 MASIH berstatus mati sampai
+  instalasi beneran kelar (jangan tulis rule yang belum benar). (2) **Lebur 51 rule = BOLEH**, syarat:
+  teks lama DIARSIP, tidak ada yang hilang. (3) **Langkah (c) diserahkan ke PM** → putusan PM: kanal
+  wajib-baca = **`AGENTS.md`** (nol kode, terbukti ke-load — file itu yang nyelametin R29), plugin
+  `experimental.chat.system.transform` **DITUNDA** (YAGNI + R38). (4) **R52**: caveman ultra cuma buat
+  nulis berkas `.md`; komunikasi/konfirmasi ke user tetap Indonesia casual normal.
+  Temuan pendamping: `task-report.md` (laporan DI AWAL) + R46 (koreksi typo) + R28 = pelanggaran/rule
+  mati yang baru kebaca setelah gua baca rules DULU sebelum aksi.
 - 2026-09-10 (R51 — kredensial cuma dari `.env`): user ngingetin gua **nabrak rule yang udah ada**
   (`.opencode/rules/secrets.md`: token/PAT/API key → simpen di `.env`, jangan hardcode, jangan
   ke-commit). Kejadian: `git push --delete` gagal (git nggak nanya ke `.env`, dan nggak ada TTY) →

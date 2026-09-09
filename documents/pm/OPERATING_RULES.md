@@ -768,5 +768,21 @@ Sejak sekarang PM WAJIB:
 R51 ini ngiket R24/R25 (sumber daya eksternal) dan jalan bareng R46/R48: klaim kemampuan harus
 berdasarkan fakta yang dicek, bukan asumsi.
 (Pelajaran konkrit: `git push --delete` gagal karena git nggak nanya ke `.env` → gua simpulkan
-"perlu kredensial dari user" dan malah nawarin nyimpen token polos di disk. Padahal PAT-nya udah
+"butuh kredensial dari user" dan malah nawarin nyimpen token polos di disk. Padahal PAT-nya udah
 ada, kuat, dan tinggal disuapin ke git.)
+
+## R52 — Caveman ultra cuma buat NULIS berkas `.md`; komunikasi sama user tetap normal
+Pelajaran (2026-09-10, user: "caveman ultra cuma buat penulisan file md aja, untuk
+komunikasi/konfirmasi dan lain sebagainya tetep normal gak pake caveman").
+
+Amandemen `.opencode/rules/language.md`:
+- **Berkas** `.md` (`.opencode/**`, `documents/**`, README/komentar dokumen) → tulis **caveman
+  ultra**: pendek, padat, potong kata kerangka, tanpa basa-basi.
+- **Balasan ke user** (jawab, konfirmasi, tawarin opsi, lapor hasil) → bahasa Indonesia casual
+  NORMAL, jelas,   non-IT, **tanpa singkatan**, kalimat utuh. Bukan telegram-style, bukan tabel gede buat hal kecil.
+- `language.md` sebelumnya cuma bilang "`.opencode` files: English caveman ultra" → nggak pernah
+  nyebut kanal user-facing, jadi gua salah terjemahin jadi "hemat kata di mana-mana" sekaligus
+  salah terjemahin jadi "boleh ur panjang di chat". Dua-duanya salah.
+Batasannya tetap: normal ≠ bertele-tele (R50: jawab seperlunya), dan format wajib yang udah
+ditentukan rule lain (mis. blok "Record when PM decided wrong" di `status.md`, template
+`task-report.md`, laporan Indonesia formal di `.opencode/reports/**`) tidak boleh dipangkas.
