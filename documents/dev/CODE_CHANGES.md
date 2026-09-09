@@ -150,7 +150,30 @@ wiring ke selected model/combo seperti aigate, cross-platform (Termux/Win/Linux/
 - Verifikasi: `bash -n scripts/cli-tools/goose.sh` → **clean**; mode `-rwx------` (exec);
   eksekusi langsung → `exit 0`, TIDAK memasang apa pun.
 
-Status: A1 claude = done (script). A2 opencode = done (script). A3 gemini = done (script, native Google mode, unsupported by aigate). **A4 codex = done (script, native OpenAI mode, unsupported by aigate — butuh streaming Responses API yang belum ada).** **A5 antigravity = done (script, NO_INSTALL — message + exit 0, no side-effect).** **A6 phi = done (script, NO_INSTALL — message + exit 0, no side-effect).** **A7 aider = done (script, OpenAI-compatible via aigate `/v1/chat/completions`, verified — `LAUNCH_VERIFIED` at `cli_presets.py:172`).** **A8 goose = done (script, NO_INSTALL — message + exit 0, no side-effect).** `_common.sh` = done. Sisa A9..A12, B1..B6, C1..C6 menyusul per tool. (Progress: **8/24**.)
+### `scripts/cli-tools/amp.sh` (BARU, 108 baris) — **A9 amp = NO_INSTALL (message + exit 0, no side-effect)**
+- TIDAK memasang apa pun (sesuai keputusan user utk tool `NO_INSTALL`): script hanya
+  menampilkan pesan lalu `exit 0` (no-op, idempoten, tanpa side-effect).
+- Pesan: `amp: NO_INSTALL — belum ada install terverifikasi di environment ini.`
+- Fakta kunci (cross-check 5 sumber independen, R47/R48):
+  - `cli_presets.py:78` → `{"name":"amp","binary":"amp","install": NO_INSTALL}`
+    (NO_INSTALL didefinisikan di `cli_presets.py:45` = echo no-op).
+  - `cli_presets.py:179` → `"amp": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NO_BINARY)`
+    — aigate menandai amp BUKAN CLI yang bisa di-launch (biner `amp` TIDAK ada /
+    tidak ada install terverifikasi untuk environment ini).
+  - `TERMUX_INSTALL` map (`cli_presets.py:241-244`) HANYA berisi `aichat` + `codex` —
+    TIDAK ada entry amp → di Termux pun tak ada rute install terverifikasi.
+  - npm unscoped `amp` = library messaging tak terkait (tjholowaychuk/node-amp, v0.3.1,
+    "Abstract messaging protocol"); `@ampcode/cli` (eks `@sourcegraph/amp`) memang ADA
+    tapi optional deps-nya HANYA darwin/linux/win32 — TIDAK ada build android/termux,
+    sehingga `npm install -g @ampcode/cli` tidak menarik biner `amp` yang berfungsi di sini;
+    PyPI `AMP` = parser matematika (Ini Oguntola); Homebrew `amp` = text editor terminal
+    (amp.rs / jmacdonald). Konklusi: TIDAK ada rute install resmi terverifikasi.
+- Script source `_common.sh` (read-only: `detect_os`/`detect_pm`/`load_gateway_config`
+  + `log_msg`) lalu log pesan + `exit 0`. Tidak ada `ensure_installed`/install command.
+- Verifikasi: `bash -n scripts/cli-tools/amp.sh` → **clean**; mode `-rwx------` (exec);
+  eksekusi langsung → `exit 0`, TIDAK memasang apa pun.
+
+Status: A1 claude = done (script). A2 opencode = done (script). A3 gemini = done (script, native Google mode, unsupported by aigate). **A4 codex = done (script, native OpenAI mode, unsupported by aigate — butuh streaming Responses API yang belum ada).** **A5 antigravity = done (script, NO_INSTALL — message + exit 0, no side-effect).** **A6 phi = done (script, NO_INSTALL — message + exit 0, no side-effect).** **A7 aider = done (script, OpenAI-compatible via aigate `/v1/chat/completions`, verified — `LAUNCH_VERIFIED` at `cli_presets.py:172`).** **A8 goose = done (script, NO_INSTALL — message + exit 0, no side-effect).** **A9 amp = done (script, NO_INSTALL — message + exit 0, no side-effect).** `_common.sh` = done. Sisa A10..A12, B1..B6, C1..C6 menyusul per tool. (Progress: **9/24**.)
 
 
 ## 2026-09-08 — i18n: satu file per bahasa + 5 bahasa baru (ru, nl, ja, zh, zh-tw) — DONE (`f7beaf9` + `c1477eb`, branch `feat/i18n-locales`)

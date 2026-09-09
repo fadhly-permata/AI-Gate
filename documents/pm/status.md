@@ -116,6 +116,20 @@
 
 **Status: DONE — NO_INSTALL (message + exit 0).** goose TIDAK di-install (sesuai keputusan user untuk tool `NO_INSTALL`); script hanya pesan + keluar 0. Commit `414ea06`.
 
+## CLI Tools A9: amp install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/amp.sh` (A9 amp).
+
+**Fakta kode (cross-check 5 sumber independen, R47/R48):**
+- `cli_presets.py:78` = `{"name":"amp","binary":"amp","install": NO_INSTALL}` — aigate menandai amp `NO_INSTALL` (NO_INSTALL didefinisikan di `cli_presets.py:45` = echo no-op).
+- `cli_presets.py:179` = `"amp": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NO_BINARY)` — amp BUKAN CLI yang bisa di-launch (biner `amp` TIDAK ada / tidak ada install terverifikasi untuk environment ini).
+- `TERMUX_INSTALL` map (`cli_presets.py:241-244`) HANYA berisi `aichat` + `codex` — TIDAK ada entry amp.
+- npm unscoped `amp` = library messaging tak terkait (tjholowaychuk/node-amp, v0.3.1, "Abstract messaging protocol"); `@ampcode/cli` (eks `@sourcegraph/amp`) memang ADA tapi optional deps-nya HANYA darwin/linux/win32 — TIDAK ada build android/termux, sehingga `npm install -g @ampcode/cli` tidak menarik biner `amp` yang berfungsi di sini; PyPI `AMP` = parser matematika (Ini Oguntola); Homebrew `amp` = text editor terminal (amp.rs / jmacdonald). Konklusi: TIDAK ada rute install resmi (npm/pip/brew) terverifikasi untuk environment ini.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/amp.sh` → clean; mode `-rwx------` (exec); eksekusi langsung → `exit 0`, TIDAK memasang apa pun. Script source `_common.sh` (read-only helpers: `detect_os`/`detect_pm`/`load_gateway_config` + `log_msg`) lalu log pesan `amp: NO_INSTALL — belum ada install terverifikasi di environment ini.` + `exit 0` — TIDAK memasang apa pun (no side-effect).
+
+**Status: DONE — NO_INSTALL (message + exit 0).** amp TIDAK di-install (sesuai keputusan user untuk tool `NO_INSTALL`); script hanya pesan + keluar 0. Commit `446f78f`.
+
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
 bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.
