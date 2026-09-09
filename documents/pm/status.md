@@ -235,6 +235,25 @@
 
 **Status: DONE — OpenAI-compatible (verified).** open-interpreter di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → open-interpreter forward model apa adanya. Commit `31b9a04`.
 
+## CLI Tools B4: autogpt install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/autogpt.sh` (B4 autogpt).
+
+**Fakta kode (cross-check 3 sumber):**
+- `cli_presets.py:91` = `{"name":"autogpt","binary":"autogpt","install": NO_INSTALL}` → autogpt ditandai tool TANPA perintah install terverifikasi.
+- `cli_presets.py:217` = `"autogpt": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_INSTALL_UNVERIFIED)` — aigate menandai autogpt BUKAN CLI yang bisa di-launch (install tidak terverifikasi).
+- `TERMUX_INSTALL` map (`cli_presets.py:241-244`) HANYA berisi `aichat` + `codex` — TIDAK ada entry autogpt → di Termux pun tak ada rute install terverifikasi.
+- PyPI `autogpt` = **placeholder/squat tak terkait** (author "Shadow Walker", `0.0.1.dev0`, 2023-04-02, `requires_dist: ["torch"]` SAJA, TIDAK ada `[project.scripts]`/console script → `pip install autogpt` TIDAK menghasilkan biner `autogpt` di PATH). BUKAN AutoGPT resmi (Significant-Gravitas).
+- GitHub resmi `Significant-Gravitas/AutoGPT` kini berupa **PLATFORM** — di-host (berbayar) atau self-host butuh **Docker + konfigurasi + API key sendiri** (install via `install.sh` setup.agpt.co / Docker Compose); berat & tidak praktis di Termux/android-arm64. Cross-check 3 sumber → TIDAK ada install terverifikasi di env ini.
+
+**Script behavior:** source `_common.sh` (read-only helpers `detect_os`/`detect_pm`/`load_gateway_config` + `log_msg`) lalu log pesan `autogpt: NO_INSTALL — belum ada install terverifikasi di environment ini.` + `exit 0` — TIDAK memasang apa pun (no side-effect, idempoten).
+
+**Catatan transparan:** ada paket PyPI bernama `autogpt`, TAPI placeholder TAK TERKAIT (bukan AutoGPT resmi) & tidak menghasilkan biner; AutoGPT asli butuh Docker. Sesuai keputusan user untuk tool `NO_INSTALL`: script HANYA pesan lalu KELUAR.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/autogpt.sh` → clean; mode `-rwx------` (exec); eksekusi langsung → `exit 0`, TIDAK memasang apa pun. `git status` hanya berisi `autogpt.sh` + dokumen PM (working tree bersih selain itu).
+
+**Status: DONE — NO_INSTALL (message + exit 0, no side-effect).** autogpt ditandai aigate NO_INSTALL + LAUNCH_UNSUPPORTED(REASON_INSTALL_UNVERIFIED); TERMUX_INSTALL tak punya entry; PyPI `autogpt` = placeholder squat tak terkait; GitHub AutoGPT = platform Docker-based berat. Script HANYA pesan + `exit 0`, TIDAK memasang apa pun. Commit `a5d1a91`.
+
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
 bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.
