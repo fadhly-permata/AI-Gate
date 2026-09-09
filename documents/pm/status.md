@@ -216,6 +216,25 @@
 
 **Status: DONE — NO_INSTALL (message + exit 0).** swe-agent TIDAK di-install (sesuai keputusan user untuk tool `NO_INSTALL`); script hanya pesan + keluar 0. Commit `13a257c`.
 
+## CLI Tools B3: open-interpreter install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/open-interpreter.sh` (B3 open-interpreter).
+
+**Fakta kode (cross-check):**
+- `cli_presets.py:90` = `{"name":"open-interpreter","binary":"interpreter","install": _pip("open-interpreter")}` → `pip install open-interpreter` (bin `interpreter`).
+- `cli_presets.py:196` = `"open-interpreter": LaunchSupport(LAUNCH_VERIFIED)` — open-interpreter = verified, OpenAI-compatible.
+- `cli_tools_router.py:824-837` = `_interpreter_builder` — bentuk launch: `interpreter --api_base <base> --api_key <key> [--model openai/<model>]` (model flag di-skip bila raw model kosong), forward ke aigate `/v1/chat/completions`.
+- `cli_tools_router.py:1081-1084` = env injection `OPENAI_API_BASE` + `OPENAI_API_KEY` yang tiap tool terima.
+- PyPI `open-interpreter` 0.4.3 pure-python, `requires_python ">=3.9,<4"` (install di Python 3.9–3.13; host 3.14.6 masih `<4` → resolver lolos, kontras openhands yang pin 3.12).
+
+**Script behavior:** install idempoten via `ensure_installed` → `python3 -m pip install open-interpreter`; launch **OpenAI-compatible** — set env `OPENAI_API_BASE`+`OPENAI_API_KEY` (dari `load_gateway_config`) + flags `--api_base <base> --api_key <key>` ke aigate `/v1/chat/completions`, `--model openai/<AIGATE_MODEL>` bila `AIGATE_MODEL` disetel. Reachability probe best-effort ke aigate `/v1/models` (warning bila gateway mati).
+
+**Catatan product drift (bukan blocker, R47/R48 cross-check 3 sumber):** situs live `docs.openinterpreter.com` + repo GitHub sekarang nggarap produk **Rust/Codex-fork** yang TIDAK punya flag `--api_base`/`--api_key`; tapi paket `pip install open-interpreter` (0.4.3, Python line) yang dipasang preset **MASIH punya** flag `--api_base`/`--api_key` (terkonfirmasi dari PyPI 0.4.3 README + builder aigate). Script pakai flag Python package — benar per preset. JANGAN pakai `curl install.sh` dari situs live (itu produk Rust yang salah).
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/open-interpreter.sh` → clean; perms `-rwx------` (exec). `git status` hanya berisi `open-interpreter.sh` + dokumen PM (working tree bersih selain itu).
+
+**Status: DONE — OpenAI-compatible (verified).** open-interpreter di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → open-interpreter forward model apa adanya. Commit `31b9a04`.
+
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
 bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.
