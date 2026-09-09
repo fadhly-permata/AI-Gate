@@ -1,5 +1,23 @@
 # Code Changes Register (code ↔ docs alignment)
 
+## 2026-09-09 — BUGFIX: aider.sh guard Python 3.10–3.12 (branch `setup/cli-tools`) — DONE (commit `1d1a31c`)
+
+**Bug:** user lapor `scripts/cli-tools/aider.sh` → `pip install aider-chat` error saat dijalankan di device ini.
+
+**Root cause (terverifikasi fakta, R47/R48):**
+- Device Python = **3.14.6** (`python3 --version`); pip 26.2.1.
+- PyPI `aider-chat` latest = **0.86.2**, `requires_python = ">=3.10,<3.13"` (cross-check PyPI JSON `info.requires_python`). Rilis 0.16.1–0.86.2 semuanya "require a different python version" → pip tolak di 3.14.
+- Error asli pip (`pip install --no-deps aider-chat==0.86.2`): `ERROR: Could not find a version that satisfies the requirement aider-chat==0.86.2 (from versions: 0.13.0 ... 0.16.0)` + `ERROR: No matching distribution found for aider-chat==0.86.2`. (Pada unpinned dry-run sebelumnya pip malah lanjut build aiohttp 3.8.4 sdist — native build juga gagal di 3.14; dua-duanya akar sama: Python di luar range aider.)
+- Skrip lama HANYA punya catatan `NOTE` **Termux-only** yang dicetak **SETELAH** `ensure_installed` sudah mencoba install → user tetap dapet raw pip error. Tidak ada `exit 1` pre-install guard.
+
+**Fix (`scripts/cli-tools/aider.sh`, +28/−12):**
+- Tambah **version-guard SEBELUM** `ensure_installed`: deteksi `python3 --version` → major.minor; kalau di LUAR 3.10–3.12 → `log_msg "ERROR: aider needs Python 3.10–3.12; this device has Python <x.y>."` + saran (`pkg install python3.11` / pyenv / venv) lalu **`exit 1` TANPA menjalankan pip install**.
+- Guard berlaku **semua platform** (bukan cuma Termux), pakai pengecekan numerik major/minor (robust utk "3.14.6" → 3.14).
+- Hapus blok `NOTE` Termux-only lama (redundan + sudah jadi bug).
+- Wiring launch (flags `--openai-api-base/--openai-api-key` + `--model openai/<m>`, env `OPENAI_API_BASE/KEY`, reachability probe) **tetap utuh**; idempoten via `ensure_installed`; `set -euo pipefail` + `_common.sh` tetap.
+
+**Verifikasi PM (R14/R35):** `bash -n scripts/cli-tools/aider.sh` → **clean**; mode `-rwx------` (exec). Simulasi guard: 3.10/3.11/3.12 → lanjut install; 3.9/3.13/3.14/3.14.6/2.7/4.0 → `exit 1`. (Tidak jalanin install beneran — batas sandbox, sesuai brief.)
+
 ## 2026-09-09 — feat: aigate Anthropic `/v1/messages` inbound (kayak litellm) — DONE (5 commit: `253aae5` `bb3b6c9` `7f330a1` `4986adc` `41d24f8`, branch `feat/anthropic-inbound`)
 
 **Tujuan:** aigate serve Anthropic-compatible `POST /v1/messages` **native** (tanpa litellm di tengah) supaya `claude-code` bisa `ANTHROPIC_BASE_URL=<aigate>/v1/messages`. Referensi desain: `documents/architecture/anthropic-inbound-endpoint.md`.

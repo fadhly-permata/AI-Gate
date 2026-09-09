@@ -1,5 +1,17 @@
 # PM Status
 
+## CLI Tools A7: aider.sh version-guard bugfix — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Task:** BUGFIX `scripts/cli-tools/aider.sh` — `pip install aider-chat` error saat dijalankan di device ini (Python 3.14.6).
+
+**Diagnosis PM (read-only + fakta, R47):** `python3 --version` = 3.14.6; `pip install aider-chat==0.86.2` → `ERROR: No matching distribution found for aider-chat==0.86.2` (pip ignore semua rilis 0.16.1–0.86.2 karena "require a different python version"; requires_python aider 0.86.2 = `>=3.10,<3.13` per PyPI JSON). Skrip lama HANYA punya `NOTE` **Termux-only** yang dicetak **SETELAH** `ensure_installed` sudah mencoba install → user tetap dapet raw pip error, tanpa `exit 1` pre-install.
+
+**Fix (PM, scope ketat `scripts/cli-tools/aider.sh`; sub-agent spawn tool TIDAK tersedia di sesi ini → PM edit langsung, deviasi R21 dicatat transparan per R29):** version-guard pre-install (major.minor numerik; luar 3.10–3.12 → ERROR + saran `pkg install python3.11`/pyenv/venv + `exit 1` TANPA jalanin pip); hapus blok `NOTE` Termux-only lama; wiring launch (`--openai-api-base/--openai-api-key` + `--model openai/<m>`, env `OPENAI_API_BASE/KEY`, reachability probe) tetap utuh; idempoten via `ensure_installed`; `set -euo pipefail` + `_common.sh` tetap.
+
+**Verifikasi PM (R14/R35):** `bash -n scripts/cli-tools/aider.sh` → **clean**; mode `-rwx------` (exec). Simulasi guard: 3.10/3.11/3.12 → lanjut install; 3.9/3.13/3.14/3.14.6/2.7/4.0 → `exit 1`.
+
+**Status: DONE — commit `1d1a31c`** (`fix(cli-tools): aider.sh guard Python 3.10-3.12 (avoid broken pip install on 3.13+)`). Doc di-commit terpisah (commit docs susulan).
+
 ## Anthropic `/v1/messages` inbound — 2026-09-09 (PM integrasi, branch `feat/anthropic-inbound`)
 
 **Tugas:** INTEGRASI (bukan implementasi ulang). Semua kode sudah ditulis specialist (tech-architect/be-dev/fullstack-dev/qa); PM hanya commit + dokumentasi. Tidak ada `src/**` atau `scripts/**` yang diubah PM.
