@@ -1,6 +1,6 @@
 # PM Status
 
-## Bottom-nav ponsel — hamburger, scroll, mirror 9 view + Repo + separator — 2026-09-09 (fe-dev 3 iterasi, PM-verified, BELUM di-commit)
+## Bottom-nav ponsel — hamburger, scroll, mirror 9 view + Repo + separator — 2026-09-09 (fe-dev 3 iterasi, PM-verified, DI-COMMIT 6fb210b+26b087d, pushed, PR #14)
 **Request user (berantai):**
 1. Di ponsel (potret) tombol hamburger hide/show sidemenu nge-bug → hilangkan; tablet & desktop
    tidak boleh kena.
@@ -28,7 +28,9 @@ specialist (fe-dev) → R16 tidak kepanggil.
       repo-hadir, sep=4 + batas, scroll=10); `git diff --check` bersih; markup ke-parse jsdom (0 artefak).
 
 **Keputusan/open:**
-- Belum di-commit (user belum minta). Rekomendasi: commit UI-change (tes-nya hijau) TERPISAH dari fix env.
+- **DI-COMMIT + PUSH:** `6fb210b` (fix ui) + `26b087d` (docs pm) → `origin/refactor/ui`. **PR #14**
+  `refactor/ui -> main` (branch cuma 2 commit di depan main): https://github.com/fadhly-permata/AI-Gate/pull/14
+  PM TIDAK merge (user yang putuskan review/merge). Menunggu user: review/merge + **tes manual scroll di HP** (no browser di box).
 - ⚠️ **Scroll browser-asli UNVERIFIED** (no browser di box; jsdom gak ngukur flex/@media) → user
   WAJIB pass manual di HP: geser bottom-nav sampe ikon GitHub, cek 4 separator tampil, tap usage/analytics/repo.
 - TASK SUSULAN (di luar scope UI): benerin env tes FE biar `localStorage` tersedia lagi
