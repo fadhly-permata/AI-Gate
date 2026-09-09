@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # claude.sh — install + launch Claude Code (Grup A / A1) for aigate.
 #
-# Source of truth: documents/pm/cli-tools-install-backlog.md (A1).
+# Source of truth: documents/pm/cli-tools-install-backlog.md (A1);
+# re-wire design: documents/architecture/anthropic-inbound-endpoint.md §7.
 #
 # INSTALL: npm i -g @anthropic-ai/claude-code   (idempotent via have_cmd)
 #   Package facts (verified on npm registry, @anthropic-ai/claude-code@2.1.265):
@@ -17,22 +18,19 @@
 #   npm DOES install the arm64 binary; the real blocker is the libc mismatch.
 #
 # LAUNCH WIRING: Claude Code speaks the *Anthropic Messages* API (POST /v1/messages),
-# not OpenAI. aigate's gateway (src/backend/gateway/router.py) exposes ONLY OpenAI
-# endpoints: /v1/chat/completions, /v1/responses, /v1/models. There is NO inbound
-# /v1/messages route — its Anthropic translator (translator.py _translate_request_anthropic,
-# provider_adapter.py:80-86) is OUTBOUND only (aigate as a *client* to an Anthropic
-# upstream). So ANTHROPIC_BASE_URL cannot point at aigate (claude would POST to
-# <aigate>/v1/messages -> 404), and aigate exposes no "anthropic endpoint/token".
-# The only workable wire for Claude Code is an Anthropic-compatible proxy in front:
-# litellm (which serves /v1/messages and translates to OpenAI). Chain:
-#     claude-code -> litellm(/v1/messages) -> aigate(/v1/chat/completions) -> backend
-# which matches the user's "claude -> litellm -> backend" stack.
+# not OpenAI. aigate's gateway NOW serves that endpoint natively (inbound) at
+# /v1/messages (router.py:499), accepting either `Authorization: Bearer` or
+# `x-api-key` as the aigate credential (ADR-007 plaintext internal_api_key). So
+# claude-code points directly at aigate — NO litellm (or any Anthropic proxy) in
+# the middle. Chain:
+#     claude-code -> aigate(/v1/messages) -> backend
+# claude-code appends "/v1/messages" to ANTHROPIC_BASE_URL itself, so the base
+# URL must be the aigate gateway ROOT (gateway_base_url with the "/v1" suffix
+# stripped). The aigate key comes from load_gateway_config (AIGATE_KEY), which
+# reads internal_api_key from the endpoint table (ADR-007 plaintext).
 #
-# Therefore this script wires Claude Code to litellm (NOT native, NOT aigate).
-# Configure via env (defaults assume litellm on localhost:4000):
-#   AIGATE_LITELLM_BASE_URL  default http://localhost:4000   (root, no trailing /v1)
-#   AIGATE_LITELLM_API_KEY   default sk-aigate
-#   AIGATE_LITELLM_MODEL     optional; passed as Claude Code --model / ANTHROPIC_MODEL
+# Configure via env (defaults come from the aigate gateway config via _common.sh):
+#   AIGATE_MODEL   optional; forwarded to Claude Code as --model / ANTHROPIC_MODEL
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -41,7 +39,7 @@ source "$SCRIPT_DIR/_common.sh"
 
 detect_os
 detect_pm
-load_gateway_config   # informational only (aigate has no anthropic endpoint)
+load_gateway_config   # aigate gateway base (AIGATE_BASE) + internal key (AIGATE_KEY)
 
 BIN="claude"
 INSTALL_CMD=(npm i -g @anthropic-ai/claude-code)
@@ -63,35 +61,32 @@ if [ "$AIGATE_OS" = "termux" ]; then
   log_msg "      (proot-distro Ubuntu / termux-exec / chroot). Needs Node >= 22."
 fi
 
-# --- Claude Code -> litellm wiring (Anthropic-compatible proxy) -------------
-# aigate has no /v1/messages server endpoint, so we route through litellm.
-LITELLM_BASE="${AIGATE_LITELLM_BASE_URL:-http://localhost:4000}"
-LITELLM_KEY="${AIGATE_LITELLM_API_KEY:-sk-aigate}"
-LITELLM_MODEL="${AIGATE_LITELLM_MODEL:-}"
+# --- Claude Code -> aigate wiring (Anthropic Messages, native /v1/messages) ----
+# aigate serves /v1/messages natively (no litellm). claude-code appends
+# "/v1/messages" to ANTHROPIC_BASE_URL, so we pass the gateway ROOT.
+AIGATE_ROOT="${AIGATE_BASE%/}"     # strip any trailing slash first
+AIGATE_ROOT="${AIGATE_ROOT%/v1}"   # then strip the /v1 suffix from gateway_base_url
 
-# Normalize: strip a trailing /v1 so claude-code builds <base>/v1/messages correctly.
-LITELLM_BASE="${LITELLM_BASE%/v1}"
-LITELLM_BASE="${LITELLM_BASE%/}"
-
-# Best-effort reachability check (tolerate missing curl). litellm serves
-# /health/liveliness without auth; only a hard connect/timeout failure warns.
+# Best-effort reachability check (tolerate missing curl). aigate exposes a
+# non-auth GET /v1/models (router.py:478); only a hard connect/timeout failure warns.
 if have_cmd curl; then
-  if ! curl -fsS -o /dev/null --max-time 3 "${LITELLM_BASE}/health/liveliness" 2>/dev/null; then
+  if ! curl -fsS -o /dev/null --max-time 3 "${AIGATE_BASE}/models" 2>/dev/null; then
     rc=$?
     if [ "$rc" -eq 7 ] || [ "$rc" -eq 28 ]; then
-      log_msg "WARN: litellm not reachable at $LITELLM_BASE (check AIGATE_LITELLM_BASE_URL);"
-      log_msg "      claude will fail to connect. Start litellm first if it is not running."
+      log_msg "WARN: aigate not reachable at $AIGATE_BASE (check gateway_base_url / is aigate running?);"
+      log_msg "      claude will fail to connect. Start aigate first if it is not running."
     fi
   fi
 fi
 
-export ANTHROPIC_BASE_URL="$LITELLM_BASE"
-export ANTHROPIC_API_KEY="$LITELLM_KEY"
-[ -n "$LITELLM_MODEL" ] && export ANTHROPIC_MODEL="$LITELLM_MODEL"
+export ANTHROPIC_BASE_URL="$AIGATE_ROOT"
+export ANTHROPIC_API_KEY="$AIGATE_KEY"
+AIGATE_MODEL="${AIGATE_MODEL:-}"
+[ -n "$AIGATE_MODEL" ] && export ANTHROPIC_MODEL="$AIGATE_MODEL"
 
-log_msg "launching claude via litellm (anthropic endpoint $LITELLM_BASE); aigate has no /v1/messages"
-if [ -n "$LITELLM_MODEL" ]; then
-  exec "$BIN" --model "$LITELLM_MODEL" "$@"
+log_msg "launching claude via aigate (anthropic endpoint ${AIGATE_ROOT}/v1/messages); aigate serves /v1/messages natively"
+if [ -n "$AIGATE_MODEL" ]; then
+  exec "$BIN" --model "$AIGATE_MODEL" "$@"
 else
   exec "$BIN" "$@"
 fi
