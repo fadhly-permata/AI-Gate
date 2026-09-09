@@ -68,7 +68,7 @@ BIN="codex"
 # Termux: tur-repo build (verified, bionic-compatible). Else: npm global per
 # aigate CLI_PRESETS (cli_presets.py:72).
 if [ "$AIGATE_OS" = "termux" ]; then
-  INSTALL_CMD=(pkg install codex)
+  INSTALL_CMD=(pkg install -y codex)
 else
   INSTALL_CMD=(npm i -g @openai/codex)
 fi

@@ -172,4 +172,5 @@ log_msg "  In oterm's new-chat dialog pick the 'aigate' (OpenAI Compatible) prov
 log_msg "  then type/pick a gateway model id (suggested live from ${AIGATE_BASE}/models)."
 # Bare `oterm` = interactive TUI. OTERM_DATA_DIR is scoped to this process only
 # (matches cli_tools_router.py:917: `OTERM_DATA_DIR=.oterm-aigate oterm`).
-exec OTERM_DATA_DIR="$OTERM_DATA_DIR" "$BIN" "$@"
+export OTERM_DATA_DIR
+exec "$BIN" "$@"

@@ -115,7 +115,7 @@ BIN="aichat"
 # (aigate TERMUX_INSTALL, aichat README "Android Termux Users"); everywhere else
 # `cargo install aichat` (aigate preset, crates.io, aichat README).
 if [ "$AIGATE_OS" = "termux" ]; then
-  INSTALL_CMD=(pkg install aichat)
+  INSTALL_CMD=(pkg install -y aichat)
 else
   INSTALL_CMD=(cargo install aichat)
 fi
@@ -204,4 +204,5 @@ fi
 # AICHAT_CONFIG_FILE scopes our config to this launch only (matches the backend
 # builder). "$@" passes through any extra flags the operator appends. Bare `aichat`
 # opens the interactive REPL (no model flag needed — the config carries it).
-exec AICHAT_CONFIG_FILE="$AICHAT_CONFIG_FILE" "$BIN" "$@"
+export AICHAT_CONFIG_FILE
+exec "$BIN" "$@"
