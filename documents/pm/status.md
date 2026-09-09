@@ -1,6 +1,29 @@
 # PM Status
 
-## Bottom-nav ponsel — hamburger, scroll, mirror 9 view + Repo + separator — 2026-09-09 (fe-dev 3 iterasi, PM-verified, DI-COMMIT 6fb210b+26b087d, pushed, PR #14)
+## Preferensi: setiap PR berlabel tipe (R49) — 2026-09-10 (PM)
+User minta PR SELALU pakai label (contoh `bug`). Jadi aturan **R49**: PM auto-klassif
+`bug`/`enhancement`/`documentation` (pakai label yang udah ada di repo; label baru butuh ACC user).
+Aksi: PR #15 di-tag **`bug`** via API. PR #14 (sudah merged) TIDAK di-retro-tag (user "2 aja").
+PR #15 di-MERGE ke main (merge commit; label `bug` ikut ke log). Catatan governance R49 di-
+COMMIT ke branch `fix/fe-test-env` supaya ikut ke-main lewat merge PR ini (sebelumnya PR #15
+tanpa label — pelajaran).
+
+## Harness tes FE — 22 fail `localStorage` (Node≥22.4 webstorage shadowing) — 2026-09-09 (fe-dev, PM-verified, DI-COMMIT 95d46e4, PR #15 open)
+**Asal (#3 sesi bottom-nav):** suite FE penuh merah 22 fail `window.localStorage`/`sessionStorage` undefined
+(logwindow 21 + terminal_discard 1), repro walau file jalan sendirian.
+**Akar (fe-dev, empiris):** Node v26.4.0 (≥22.4) punya global webstorage `localStorage`/`sessionStorage` sendiri
+(getter `undefined` tanpa `--localstorage-file`); vitest 2.1.9 gak nyalin storage jsdom ke global krn namanya udah
+ada + gak masuk KEYS allow-list → tes lihat stub Node. BUKAN `npm ci`; hipotesis PM (`environmentOptions.jsdom.url`)
+no-op (vitest udah default url localhost:3000). `sessionStorage` Node jalan → cuma pemakai localStorage (22) kena.
+**Fix (harness, `src/frontend/**`):** setupFile baru `tests/helpers/jsdom-storage.js` (re-point globalThis → storage
+window jsdom; guarded no-op + configurable) + prepend di `vitest.config.js`. Nol tes dihapus/dilemahkan; nol kode
+produksi; package.json tetap; isolate:false+maxForks:2 utuh. Ikut hapus dependensi urutan file (settings.test.js ikut kelar).
+**Gate PM:** `node node_modules/.bin/vitest run` → **23 file / 523 pass / 0 fail** (sebelum 22 fail).
+**Status:** DI-COMMIT `95d46e4` di branch `fix/fe-test-env`; **PR #15** `fix/fe-test-env -> main` OPEN:
+https://github.com/fadhly-permata/AI-Gate/pull/15 — belum di-merge (keputusan user). CAVEAT: bergantung
+`globalThis.jsdom` vitest (dijaga) → re-run gate tiap Node/vitest/isolate berubah.
+
+## Bottom-nav ponsel — hamburger, scroll, mirror 9 view + Repo + separator — 2026-09-09 (fe-dev 3 iterasi, PM-verified, DI-COMMIT 6fb210b+26b087d, pushed, PR #14 MERGED a1777f1)
 **Request user (berantai):**
 1. Di ponsel (potret) tombol hamburger hide/show sidemenu nge-bug → hilangkan; tablet & desktop
    tidak boleh kena.
