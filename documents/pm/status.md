@@ -102,6 +102,20 @@
 
 **Status: DONE — OpenAI-compatible (verified).** aider di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → aider forward model apa adanya. Commit `5a960e7`.
 
+## CLI Tools A8: goose install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/goose.sh` (A8 goose).
+
+**Fakta kode (cross-check 5 sumber independen, R47/R48):**
+- `cli_presets.py:77` = `{"name":"goose","binary":"goose","install": NO_INSTALL}` — aigate menandai goose `NO_INSTALL` (NO_INSTALL didefinisikan di `cli_presets.py:45` = echo no-op).
+- `cli_presets.py:178` = `"goose": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NO_BINARY)` — goose BUKAN CLI yang bisa di-launch (biner `goose` TIDAK ada / tidak ada install terverifikasi untuk environment ini).
+- `TERMUX_INSTALL` map (`cli_presets.py:241-244`) HANYA berisi `aichat` + `codex` — TIDAK ada entry goose.
+- npm `goose` = tool Golang tak terkait (jiyinyiyong, v0.0.3, bin→bin/index.js); `@block/goose` 404; PyPI `goose` (Goose 1.0.0, Mike Steder) = SQL migration tool SQLAlchemy; Homebrew `goose` = pressly/goose (v3.28.0, `conflicts_with block-goose-cli`). Install resmi Block (curl release script) tak punya build aarch64-android/termux terverifikasi. Konklusi: TIDAK ada rute install resmi (npm/pip/brew) yang terverifikasi untuk environment ini.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/goose.sh` → clean; mode `-rwx------` (exec); eksekusi langsung → `exit 0`, TIDAK memasang apa pun. Script source `_common.sh` (read-only helpers: `detect_os`/`detect_pm`/`load_gateway_config` + `log_msg`) lalu log pesan `goose: NO_INSTALL — belum ada install terverifikasi di environment ini.` + `exit 0` — TIDAK memasang apa pun (no side-effect).
+
+**Status: DONE — NO_INSTALL (message + exit 0).** goose TIDAK di-install (sesuai keputusan user untuk tool `NO_INSTALL`); script hanya pesan + keluar 0. Commit `414ea06`.
+
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
 bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.

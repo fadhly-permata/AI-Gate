@@ -128,7 +128,29 @@ wiring ke selected model/combo seperti aigate, cross-platform (Termux/Win/Linux/
 - Reachability probe best-effort ke aigate `/v1/models` (warning bila gateway mati/ga reachable); aider akan gagal connect bila aigate belum nyala.
 - Verifikasi: `bash -n scripts/cli-tools/aider.sh` → **clean**; mode `-rwx------` (exec).
 
-Status: A1 claude = done (script). A2 opencode = done (script). A3 gemini = done (script, native Google mode, unsupported by aigate). **A4 codex = done (script, native OpenAI mode, unsupported by aigate — butuh streaming Responses API yang belum ada).** **A5 antigravity = done (script, NO_INSTALL — message + exit 0, no side-effect).** **A6 phi = done (script, NO_INSTALL — message + exit 0, no side-effect).** **A7 aider = done (script, OpenAI-compatible via aigate `/v1/chat/completions`, verified — `LAUNCH_VERIFIED` at `cli_presets.py:172`).** `_common.sh` = done. Sisa A8..A12, B1..B6, C1..C6 menyusul per tool. (Progress: **7/24**.)
+### `scripts/cli-tools/goose.sh` (BARU, 104 baris) — **A8 goose = NO_INSTALL (message + exit 0, no side-effect)**
+- TIDAK memasang apa pun (sesuai keputusan user utk tool `NO_INSTALL`): script hanya
+  menampilkan pesan lalu `exit 0` (no-op, idempoten, tanpa side-effect).
+- Pesan: `goose: NO_INSTALL — belum ada install terverifikasi di environment ini.`
+- Fakta kunci (cross-check 5 sumber independen, R47/R48):
+  - `cli_presets.py:77` → `{"name":"goose","binary":"goose","install": NO_INSTALL}`
+    (NO_INSTALL didefinisikan di `cli_presets.py:45` = echo no-op).
+  - `cli_presets.py:178` → `"goose": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NO_BINARY)`
+    — aigate menandai goose BUKAN CLI yang bisa di-launch (biner `goose` TIDAK ada /
+    tidak ada install terverifikasi untuk environment ini).
+  - `TERMUX_INSTALL` map (`cli_presets.py:241-244`) HANYA berisi `aichat` + `codex` —
+    TIDAK ada entry goose → di Termux pun tak ada rute install terverifikasi.
+  - npm `goose` = tool Golang tak terkait (jiyinyiyong, v0.0.3, bin→bin/index.js);
+    `@block/goose` 404; PyPI `goose` (Goose 1.0.0, Mike Steder) = SQL migration tool
+    SQLAlchemy; Homebrew `goose` = pressly/goose (v3.28.0, `conflicts_with block-goose-cli`).
+    Install resmi Block (curl release script) tak punya build aarch64-android/termux
+    terverifikasi. Konklusi: TIDAK ada rute install resmi (npm/pip/brew) terverifikasi.
+- Script source `_common.sh` (read-only: `detect_os`/`detect_pm`/`load_gateway_config`
+  + `log_msg`) lalu log pesan + `exit 0`. Tidak ada `ensure_installed`/install command.
+- Verifikasi: `bash -n scripts/cli-tools/goose.sh` → **clean**; mode `-rwx------` (exec);
+  eksekusi langsung → `exit 0`, TIDAK memasang apa pun.
+
+Status: A1 claude = done (script). A2 opencode = done (script). A3 gemini = done (script, native Google mode, unsupported by aigate). **A4 codex = done (script, native OpenAI mode, unsupported by aigate — butuh streaming Responses API yang belum ada).** **A5 antigravity = done (script, NO_INSTALL — message + exit 0, no side-effect).** **A6 phi = done (script, NO_INSTALL — message + exit 0, no side-effect).** **A7 aider = done (script, OpenAI-compatible via aigate `/v1/chat/completions`, verified — `LAUNCH_VERIFIED` at `cli_presets.py:172`).** **A8 goose = done (script, NO_INSTALL — message + exit 0, no side-effect).** `_common.sh` = done. Sisa A9..A12, B1..B6, C1..C6 menyusul per tool. (Progress: **8/24**.)
 
 
 ## 2026-09-08 — i18n: satu file per bahasa + 5 bahasa baru (ru, nl, ja, zh, zh-tw) — DONE (`f7beaf9` + `c1477eb`, branch `feat/i18n-locales`)
