@@ -2288,3 +2288,20 @@ User: 'PM tugas: fix 4 bug...'. PM verifikasi 4 line via grep/read, edit langsun
 - codex/oterm hanya `bash -n` + pola benar (launch penuh gak bisa di Termux: codex butuh key/REPL, oterm pip native build gagal — by design, BUKAN bug).
 - Cleanup: retest dir dihapus; `pkg uninstall aichat` gagal (env read-only /etc/apt) tapi binary sdh hilang dari PATH.
 - Commit script: `61d64337b686a8b5ee0f58d17d52807119922d0a`. Docs di-commit terpisah.
+
+## CLI Tools cross-platform compat harness + cli_compat→JSON refactor — 2026-09-09 (PM eksekusi langsung, branch `setup/cli-tools`)
+
+**Task:** bikin harness `scripts/cli-tools/compat-test.sh` (probe 24 tool di Linux/Windows/macOS → isi kolom platform di katalog) + refactor `src/backend/cli_compat.py` jadi thin-loader atas `src/backend/cli_compat.json` + dokumen self-contained + copy-paste command untuk user di platform lain. User: "JANGAN ubah documents/** selain documents/pm/** dan documents/dev/CODE_CHANGES.md", branch `setup/cli-tools`, jangan push/PR.
+
+**Deviasi proses (transparan, R29 ayat 3):** tool `Task`/spawn sub-agent TIDAK tersedia di session ini (toolset PM = bash/read/write/edit/grep/glob/skill/webfetch; TIDAK ada Task). Maka PM eksekusi langsung dalam batas file ketat (`src/backend/**` + `scripts/cli-tools/**` + `documents/pm/**` + `documents/dev/CODE_CHANGES.md`), sama preseden CLI Compat catalog (status.md 2026-09-09). Bukan pelanggaran fungsional R21/R29.
+
+**File dikerjakan:**
+- BARU `src/backend/cli_compat.json` — migrasi data Termux dari `CLI_COMPAT` (24 tool, kolom `termux` seeded, lainnya `unknown`).
+- MODIFY `src/backend/cli_compat.py` — thin-loader JSON; API publik 1:1 dipertahankan; `current_platform()` di-harden (Termux via env/path + `platform.system()=="Android"`→`termux`).
+- BARU `scripts/cli-tools/compat-test.sh` — detect platform; 10 global (no run) + 14 probe; tulis kolom platform ke JSON (atomic, preserve lain); flag `--dry-run`/`--apply`; cleanup trap.
+- BARU `documents/pm/cli-tools-cross-platform-testing.md` — panduan self-contained (24 tool, arti status, klasifikasi global, cara jalanin di Linux/macOS/Windows(Git Bash), commit/push).
+- MODIFY `documents/pm/cli-tools-compatibility.md` — sync sumber ke JSON + catatan harness.
+
+**Verifikasi PM (R14/R35):** `bash -n compat-test.sh` → clean; `python3 -m py_compile cli_compat.py` → clean; `import cli_compat` OK, `current_platform()`→`termux`, `len(CLI_COMPAT)==24`; `bash compat-test.sh --dry-run` → rencana 24 tool tanpa install; write-path diuji terisolasi (kolom target update, kolom lain preserved, JSON valid). **`--apply` sungguhan TIDAK dijalankan di session ini** (akan install npm/pip/cargo nyata di Termux — berat/mutasi env); ditujukan untuk platform target.
+
+**Status: DONE — DI-COMMIT (lihat receipt PM).** Belum di-push (user yang jalanin di platform lain lalu push).

@@ -1,0 +1,150 @@
+{
+  "platforms": ["termux", "linux", "windows", "macos"],
+  "seeded_source": "tested-termux-2026-09",
+  "compat": {
+    "claude": {
+      "termux": {"status": "broken", "note": "npm @anthropic-ai/claude-code has no Android binary; npm is dead on Termux.", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    },
+    "opencode": {
+      "termux": {"status": "broken", "note": "npm opencode-ai has no Android binary; npm is dead on Termux.", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    },
+    "codex": {
+      "termux": {"status": "not_wired", "note": "NOT_WIRED — runs native OpenAI Responses API; aigate has no streaming responses inbound.", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    },
+    "gemini": {
+      "termux": {"status": "not_wired", "note": "NOT_WIRED — runs native Google mode; aigate serves OpenAI/Anthropic only.", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    },
+    "antigravity": {
+      "termux": {"status": "no_install", "note": "NO_INSTALL — no verified CLI package (npm squat / 404).", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    },
+    "phi": {
+      "termux": {"status": "no_install", "note": "NO_INSTALL — no verified CLI package (npm squat / PyPI unrelated).", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    },
+    "aider": {
+      "termux": {"status": "broken", "note": "pip install aider-chat needs Python 3.10-3.12 (device is 3.14); version guard exits.", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    },
+    "goose": {
+      "termux": {"status": "no_install", "note": "NO_INSTALL — no Android/Termux binary for Block's goose.", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    },
+    "amp": {
+      "termux": {"status": "no_install", "note": "NO_INSTALL — @ampcode/cli has no Android/Termux build.", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    },
+    "qwen": {
+      "termux": {"status": "broken", "note": "npm @qwen-code/qwen-code has no Android binary; npm is dead on Termux.", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    },
+    "cline": {
+      "termux": {"status": "broken", "note": "npm cline has no Android binary; npm is dead on Termux.", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    },
+    "kilo": {
+      "termux": {"status": "broken", "note": "npm @kilocode/cli has no Android binary; npm is dead on Termux.", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    },
+    "openhands": {
+      "termux": {"status": "broken", "note": "pip install openhands needs Python 3.12 (device is 3.14); version guard exits.", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    },
+    "swe-agent": {
+      "termux": {"status": "no_install", "note": "NO_INSTALL — PyPI 404; Docker/conda setup impractical on Termux.", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    },
+    "open-interpreter": {
+      "termux": {"status": "broken", "note": "pip install open-interpreter is heavy but reportedly installable on Termux (Py3.14).", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    },
+    "autogpt": {
+      "termux": {"status": "no_install", "note": "NO_INSTALL — official AutoGPT is a Docker platform; PyPI 'autogpt' is an unrelated squat.", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    },
+    "gpt-researcher": {
+      "termux": {"status": "not_a_cli", "note": "NOT_A_CLI — pip package is a library/backend only; no launchable binary.", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    },
+    "crewai": {
+      "termux": {"status": "not_a_cli", "note": "NOT_A_CLI — console script is a framework scaffolder/runner requiring a project in CWD.", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    },
+    "llm": {
+      "termux": {"status": "broken", "note": "pip install llm fails building 'jiter' (no Android wheel, Py3.14).", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    },
+    "sgpt": {
+      "termux": {"status": "no_install", "note": "NO_INSTALL — npm squat / PyPI 404 / Go binary has no Android build.", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    },
+    "mods": {
+      "termux": {"status": "no_install", "note": "NO_INSTALL — Go binary (charmbracelet/mods) has no Android build.", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    },
+    "oterm": {
+      "termux": {"status": "broken", "note": "pip install oterm fails building 'jiter' (no Android wheel, Py3.14).", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    },
+    "gptme": {
+      "termux": {"status": "broken", "note": "pip install gptme fails building 'jiter' (no Android wheel, Py3.14).", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    },
+    "aichat": {
+      "termux": {"status": "verified", "note": "pkg install aichat (0.30.0 verified runs on Termux); OpenAI-compatible, wired to aigate.", "source": "tested-termux-2026-09"},
+      "linux": {"status": "unknown", "note": "", "source": "unknown"},
+      "windows": {"status": "unknown", "note": "", "source": "unknown"},
+      "macos": {"status": "unknown", "note": "", "source": "unknown"}
+    }
+  }
+}
