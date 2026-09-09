@@ -48,6 +48,7 @@ E5 Jalur yang dijalankan tiap shell (`~/.bashrc`, `PROMPT_COMMAND`, hook) wajib 
 F1 Mengadopsi fitur dari sumber eksternal: fetch isinya dulu, sitat (nama + URL) di dokumen, align ke isi asli, lalu verifikasi sitat benar-benar ada. [R17]
 F2 Tag provenance inline (mis. "adopsi 9router") jangan dicabut demi kerapian — itu memori lintas sesi. [R18]
 F3 Klaim teknis wajib bukti: `file:line`, URL, atau konfirmasi user. Fakta eksternal (paket/binary/platform) minimal 2 sumber independen yang di-cross-check; konflik → selidiki sampai konsisten. [R47,R48] → `.opencode/rules/no-hallucination.md`.
+F4 Klaim ukuran/kuantitas wajib menyebut alat + satuan aslinya (`wc -c`=byte, `du -k`=KiB blok terbulatkan, `wc -l`=baris). Angka beda alat tidak boleh dicampur tanpa label; sebut rentang, bukan satu angka palsu-presisi. [baru]
 
 ## G — Verifikasi & quality gate
 G1 Kode produksi mengikuti DRY/KISS/SOLID/YAGNI; gate QA + PM menolak receipt copy-paste/over-engineer. Detail: `.opencode/rules/code-quality-principles.md`. [R25]

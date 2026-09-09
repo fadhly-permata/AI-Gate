@@ -1284,3 +1284,29 @@ reload (fresh `tabs` Map + `activeId`). Covers:
 - `pkg` di env ini gagal tulis `/etc/apt` (Read-only file system) saat upgrade hope2333-mirrorlist → dpkg abort (exit 100) baik saat install maupun uninstall aichat. Tidak memengaruhi logika script.
 
 Commit: `61d64337b686a8b5ee0f58d17d52807119922d0a`
+
+## 2026-09-10 — perapian governance: rule v2 + kanal wajib-baca + gate (BUKAN kode produk) — DONE
+
+### Perubahan (config & dokumen, nol `src/**` / `tests/**`)
+- `documents/pm/archive/OPERATING_RULES-v1-52rules.md` — rename (git mv) dari `documents/pm/OPERATING_RULES.md`; teks v1 52 rule utuh 52.698 B.
+- `documents/pm/OPERATING_RULES.md` — BARU v2: 50 rule / 10 tema A–J / 11.463 B (−78%). 8 rule duplikat dihapus dari sini (rumah tunggal `.opencode/rules/*`), sisanya ≤4 baris + sitatan `[R#]`. F4 ditambahkan (klaim ukuran wajib sebut alat+satuan).
+- `AGENTS.md` — ditulis ulang: 4 ayat routing dipertahankan + blok "ALWAYS-ON RULES" 12 baris (pointer tema) + rujukan gate + aturan bahasa. 1.866 → 3.247 B (kanal auto-inject tiap sesi).
+- `opencode.json` — += `"instructions": ["documents/pm/OPERATING_RULES.md"]` (kanal injeksi rule; skema diverifikasi ke https://opencode.ai/config.json → `Config.instructions: [string]`).
+- `.opencode/rules/agent-boundaries.md` — PM WRITE += `.opencode/rules/**` (grant user 2026-09-10) + `pm-orchestration/**` + `AGENTS.md`; subseksi "Task reports" (K2: pelaksana tulis laporannya sendiri); baris `tech-architect` dipindah ke dalam tabel (sebelumnya tabel pecah).
+- `.opencode/rules/{secrets,no-hallucination,commands,task-report,language}.md` — serap clause dari rule lama (R51/R47/R7/R23/R52).
+- `.opencode/skills/pm-orchestration/SKILL.md` — §6 "Record Protocol" ditulis (dulu `ProjectManager.md:30` menunjuk skill `pm-postmortem` yang TIDAK ADA → pointer hantu).
+- `.opencode/agents/ProjectManager.md` — pointer hantu dibetulkan: `pm-postmortem` → Record Protocol §6; `fullstack-skill` → `fullstack-dev-skill`; `docs/*` → `documents/*`.
+- 39 baris rujukan `pm/...` dan `docs/...` di 15 berkas hidup → `documents/pm/...` / `documents/...`. Berkas laporan lama (`.opencode/reports/**`) TIDAK disentuh (provenance).
+- `.opencode/tools/governance/rules-index.py` — BARU, gate 11 pemeriksaan (stdlib only).
+- `documents/analysis/2026-09-10-rules-consolidation.md` — desain (tulisan system-analyst, bukan PM).
+
+### Verifikasi
+- `python3 .opencode/tools/governance/rules-index.py` → **LOLOS**, exit 0; 11 PASS (index 50 rule/10 tema; coverage mapped=52 unique=52 dup=[]; range R1..R52 tanpa celah; size 11.463 ≤ 20.480; themes 10 ≤ 10; rule_lines tidak ada >4; archive 52 rule/52.698 B; live_paths tidak ada rusak; no_stale_refs tidak ada `pm/` basi; citations_resolve 52 sitatan terselesaikan semua).
+- `python3 .opencode/tools/governance/rules-index.py --json` → valid (keys: rules/themes/totals/checks/report_format_debt).
+- `python3 -m py_compile .opencode/tools/governance/rules-index.py` → OK; `__pycache__` dihapus lagi (B5).
+- `python3 -m json.tool opencode.json` → valid; `instructions` terbaca.
+- `git diff --cached --check` bersih di tiap commit; tidak ada berkas `src/**`/`tests/**` yang berubah; `.env` tetap tak ter-track.
+- Sisa utang TERBUKT (bukan gagal, dicatat): 14 berkas laporan tidak sesuai pola `[yyyymmdd]/[jenis]/[hhmm]_*.md` (K10); Graphify belum terpasang → C4 berkondisi; `documents/pm/**` belum dipindah (langkah ⑥).
+
+### Catatan
+Bukti "kode lama masih aktif" tidak berlaku: tidak ada proses produk yang disentuh. Perubahan config agen baru terasa setelah **user restart opencode** (aturan: config dimuat sekali saat start).

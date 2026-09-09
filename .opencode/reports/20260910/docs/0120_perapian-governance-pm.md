@@ -79,6 +79,41 @@ Dibaca penuh sebelum bertindak (11 berkas `.opencode/rules/*.md`, 229 baris; ind
   ⑥ pindahkan berkas → ⑦ perbarui `AGENTS.md` → ⑧ normalisasi folder laporan.
 - Keputusan user untuk ① dan ② masih ditunggu; eksekusi (b) belum dimulai.
 
+- [02:05] langkah ① (rujukan basi) → selesai. 39 baris di 15 berkas config diperbaiki:
+  `pm/...` -> `documents/pm/...`, `docs/...` -> `documents/...`, skill mati `pm-postmortem` ->
+  rujukan nyata ke §6 Record Protocol, `fullstack-skill` -> `fullstack-dev-skill`. Berkas laporan
+  lama tidak diubah (provenance). Verifikasi: `grep` sisa rujukan basi = 0 di berkas hidup.
+  Commit `b0b81b3`.
+- [02:05] langkah ② (pemilik tulis `.opencode/rules/**`) → user menunjuk PM. Dicatat di
+  `agent-boundaries.md` (beserta perluasan: playbook PM sendiri + kanal `AGENTS.md`).
+- [02:10] berkas kanonik `.opencode/rules/{secrets,no-hallucination,commands,task-report,language}.md`
+  diperluas untuk menampung clause yang sebelumnya dobel di OPERATING_RULES (R51, R47, R7, R23, R52).
+  §6 "Record Protocol" ditulis ke `pm-orchestration/SKILL.md` (sebelumnya pointer menunjuk skill
+  yang tidak pernah ada). Total `.opencode/rules/` 9.929 -> 12.669 byte. Commit `1c4d4d4`.
+- [02:15] langkah ③+④ → selesai. v1 diarsipkan utuh lewat `git mv` (52.698 byte, 52 rule, riwayat
+  git tetap kebaca); `OPERATING_RULES.md` v2 dipasang: 50 rule / 10 tema A–J / 11.463 byte
+  (−78% dari v1), tiap rule ≤4 baris, sitatan `[R#]` menunjuk arsip. F4 ditambahkan (klaim ukuran
+  wajib menyebut alat dan satuan — akibat salah sensus `du` vs `wc -c`).
+- [02:20] langkah ⑤ (gerbang) → selesai. Skrip `.opencode/tools/governance/rules-index.py`
+  (stdlib saja) menulis 11 pemeriksaan dan **LOLOS** `exit 0`: indeks 50 rule/10 tema; cakupan
+  `mapped=52 unique=52 dup=[] missing=[]`; rentang R1–R52 tanpa celah; ukuran 11.463 ≤ 20.480;
+  tema 10 ≤ 10; tidak ada rule >4 baris; arsip utuh 52 rule; tidak ada path mati; tidak ada rujukan
+  `pm/` basi; 52 sitatan `R#` terselesaikan; 14 laporan tercatat sebagai utang format (peringatan).
+  `py_compile` bersih; `__pycache__` dihapus. Commit `8e59d87` + `c82d567`.
+- [02:25] langkah ⑦ (kanal wajib-baca) → selesai. `AGENTS.md` ditulis ulang: 12 aturan always-on
+  bergaya caveman ultra + pointer tema + rujukan gerbang (1.866 -> 3.247 byte). `opencode.json`
+  ditambah `"instructions": ["documents/pm/OPERATING_RULES.md"]` supaya 50 rule ikut ter-inject;
+  bentuk field diverifikasi ke skema resmi https://opencode.ai/config.json sebelum menulis
+  (`Config.instructions` = array of string) dan `python3 -m json.tool` lolos. Commit `223c83b`.
+- [02:30] pencatatan → `documents/dev/CODE_CHANGES.md` (per berkas, H3), `memory-bank.md`
+  (keputusan + beresnya heading `## Decisions` dobel), `status.md` (blok Record Protocol),
+  `state.md` (`mode: governance-cleanup`, checkpoint v2, `rules_ref` v2).
+- BELUM dikerjakan (sengaja, menunggu): ⑥ pemindahan 19 berkas `documents/pm/**` (butuh ACC karena
+  memutus rujukan `BACKLOG.md:101`, `CODE_CHANGES.md:139`, `business-analyst.md:11` bila tidak
+  dibetulkan bersamaan); ⑧ normalisasi 14 berkas laporan; (e) instalasi Graphify (prasyarat `uv`
+  belum ada; Python lokal 3.14.6 vs permintaan 3.12); push 8 commit ke `origin/refactor/ui`.
+- Syarat wajib: **user restart opencode** supaya `AGENTS.md`, `opencode.json`, agent/skill/rule yang
+  baru dimuat — sesi yang sedang berjalan masih memakai konfigurasi lama.
 ## Peta Target (hasil langkah a)
 Kondisi saat ini dan nasib tiap berkas diusulkan sebagai berikut.
 

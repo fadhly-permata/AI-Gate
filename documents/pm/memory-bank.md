@@ -4,9 +4,27 @@
 (empty — diisi PM saat task pertama)
 
 ## Decisions
+- 2026-09-10 (EKSEKUSI perapian governance — langkah b/c/d SELESAI): rules **v1→v2**. v1 (52 rule,
+  52.698 B) diarsipkan utuh di `documents/pm/archive/OPERATING_RULES-v1-52rules.md` (git rename →
+  history_kept). v2 = 49 rule / 10 tema A–J / **11.101 B** (−79%), tiap rule ≤4 baris + sitatan
+  `[R#]` ke arsip. 8 rule duplikat dihapus dari OPERATING_RULES (R1,R2,R3,R4,R16,R23,R25,R52) →
+  rumah tunggal = `.opencode/rules/*`; 3 terbagi (R7,R47,R51) → clause-nya diserap ke
+  `commands.md`, `no-hallucination.md`, `secrets.md`; `language.md` diamandemen (R52: `.opencode`
+  Inggris caveman, `documents/**` Indonesia caveman, laporan formal, user = normal).
+  **Kanal wajib-baca** (putusan PM, user serahkan): `AGENTS.md` diisi 12 aturan always-on + pointer
+  tema; `opencode.json` += `"instructions": ["documents/pm/OPERATING_RULES.md"]` → rules ikut
+  ke-inject (opsi plugin `chat.system.transform` DITUNDA — YAGNI). Skema `instructions` dicek ke
+  `https://opencode.ai/config.json` (properties.Config.instructions = array of string) sebelum ditulis.
+  **Gate baru**: `.opencode/tools/governance/rules-index.py` (stdlib only, exit 0/1, `--json`) —
+  11 pemeriksaan: indeks, cakupan 52→52 tanpa ganda, rentang R#, ukuran ≤20 KB, tema ≤10, rule ≤4
+  baris, arsip utuh, path hidup ada, tidak ada `pm/` basi, **sitatan R# terselesaikan**, utang format
+  laporan. Hasil: **LOLOS 11/11**. 39 baris rujukan hantu dibersihkan di 15 berkas config
+  (`pm/`→`documents/pm/`, `docs/`→`documents/`, skill mati `pm-postmortem`→Record Protocol,
+  `fullstack-skill`→`fullstack-dev-skill`); `Record Protocol` ditulis beneran ke
+  `.opencode/skills/pm-orchestration/SKILL.md` §6 (sebelumnya pointer ke skill yang tidak ada).
+  **BELUM**: ⑥ pindah 19 berkas `documents/pm/**`, ⑧ normalisasi 14 laporan non-standar,
+  (e) instal Graphify, push ke remote. Restart opencode dibutuhkan agar config/agent/skill baru kebaca.
 - 2026-09-03: Arsitektur agen PM + sub-agent spesialis (on-demand, scoped).
-
-## Decisions
 - 2026-09-10 (perapian governance — 4 keputusan user): (1) **R28 diganti**: codegraph → **Graphify**
   (graphify.net, MIT; Tree-sitter + NetworkX + Leiden; dukung OpenCode). BELUM dipasang — prasyarat
   belum diverifikasi (`uv` tidak ada, Python 3.14 vs diminta 3.12) → R28 MASIH berstatus mati sampai
@@ -249,7 +267,7 @@
 - 2026-09-09: **cli-tools C5 gptme = done (OpenAI-compatible, verified)** — `scripts/cli-tools/gptme.sh` di-commit (`16d36f9`). Bukti `cli_presets.py:104` (`pip install gptme`) + `cli_presets.py:223` (`gptme` = `LAUNCH_VERIFIED`) + `cli_tools_router.py:595-612` (`_gptme_builder`: env `OPENAI_BASE_URL` = gateway base [gptme baca `OPENAI_BASE_URL` BUKAN `OPENAI_API_BASE`] + `OPENAI_API_KEY` + flag `-m local/<model>` ke `/v1/chat/completions`). PyPI `gptme` 0.33.0 butuh Python `>=3.10,<3.15`. Catatan Termux (known-broken, bukan blocker): `pip install gptme` di aarch64/Py3.14 diprediksi gagal build `jiter` (no Android wheel) → script handle hint + `exit 1`. `bash -n` clean; mode exec. Progres keseluruhan cli-tools **23/24**. Sisa: C6 aichat.
 - 2026-09-09: **cli-tools C6 aichat = done (OpenAI-compatible, verified)** — `scripts/cli-tools/aichat.sh` di-commit (`1c4e592`). Bukti `cli_presets.py:105` (`cargo install aichat`) + `cli_presets.py:226` (`aichat` = `LAUNCH_VERIFIED`) + `cli_presets.py:242` (`TERMUX_INSTALL["aichat"]="pkg install aichat"`, "verified 0.30.0 runs" di Termux) + `cli_tools_router.py:469-511` (`_aichat_builder`: generate `aichat-aigate.yaml` client `aigate` openai-compatible {api_base=gateway, api_key}, set env `AICHAT_CONFIG_FILE`, model `aigate:<raw>` ke `/v1/chat/completions`). crates.io `aichat` 0.30.0 (Rust). Catatan Termux (terbukti WORKING, bukan blocker): `pkg install aichat` di Termux terbukti jalan (usable di Termux). `bash -n` clean; mode exec. **Progres keseluruhan cli-tools 24/24 (ALL DONE — A1–A12, B1–B6, C1–C6 SELESAI).**
 
-## Decisions
+## Decisions (arsip lama — keputusan terbaru ada di heading pertama)
 - 2026-09-08: Materi publik TIDAK boleh menulis "this repo"/"repo ini" untuk menunjuk diri sendiri —
   teks ikut ter-fork jadi ambigu. Klaim identitas resmi wajib pakai URL absolut
   `https://github.com/fadhly-permata/AI-Gate`. Diumumkan sebagai aturan **R45** setelah user menegur

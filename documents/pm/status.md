@@ -25,6 +25,36 @@
 - Verification: jumlah rule lama (51) harus nongol semua di peta old→new hasil (b); `git diff`
   nggak boleh nghapus teks rule mana pun (cuma pindah ke `archive/`).
 
+## 2026-09-10 02:35 — PM decided wrong → user correction recorded (rule v2 + kanal wajib-baca + gate) (ProjectManager)
+
+### Violation
+- Rule broken: `AGENTS.md` A1 ayat 4 / `.opencode/rules/request-routing.md` (gua sempat nganggap
+  "rule" = sesuatu yang gua inget, bukan berkas yang harus dibaca); `no-hallucination.md` + F3
+  (klaim sensus "427 KB" dan "27 laporan" tanpa cek alat — `du -k` membulatkan blok, angka nyata
+  403.321 B); R46 (typo user "operation_rule.md" / "kitq" nggak dikoreksi); `language.md`
+  (balasan user panjang-polin; harusnya caveman cuma untuk tulis berkas → R52).
+- What PM did: jawab pakai angka hasil `du` sebagai byte, tawarin solusi kredensial di luar `.env`,
+  dan ngejalanin aksi sebelum baca `.opencode/rules/*.md`.
+
+### Correction
+- Durable rule captured: R51 (kredensial → J5), R52 (ruang lingkup caveman → I7 + `language.md`),
+  **F4 baru** (klaim ukuran wajib sebut alat + satuan).
+- Decision: user nyerahin kepemilikan tulis `.opencode/rules/**` ke PM + nyerahin putusan (c) ke PM.
+
+### Prevention
+- Mechanism: (1) `documents/pm/OPERATING_RULES.md` v2 = 50 rule / 10 tema / 11.463 B (v1 52 rule /
+  52.698 B diarsipkan utuh) → rule jadi muat dibaca; (2) kanal wajib-baca `AGENTS.md` (12 aturan
+  always-on) + `opencode.json` `"instructions": [documents/pm/OPERATING_RULES.md]` → rule ke-inject
+  tanpa mengandalkan inisiatif; (3) gerbang `python3 .opencode/tools/governance/rules-index.py`
+  (11 pemeriksaan; LOLOS exit 0) nangkep rujukan hantu, ID dobel, rule kepanjangan, path mati;
+  (4) 39 baris rujukan hantu (`pm/`, `docs/`, skill `pm-postmortem`, `fullstack-skill`) dibersihin
+  di 15 berkas config — sumber salah baca paling sering; (5) `.opencode/skills/pm-orchestration/SKILL.md`
+  §6 Record Protocol ditulis beneran (sebelumnya pointer ke skill yang nggak ada).
+- Verification: gate exit 0; `grep` rujukan `pm/` basi = 0 di berkas hidup; `wc -c` per kanal
+  (AGENTS.md 3.247 B; rules v2 11.463 B; `.opencode/rules/` 12.669 B); `py_compile` + `json.tool`
+  bersih; `git diff --check` bersih; `src/**` & `tests/**` nol berubah.
+- **User WAJIB restart opencode** supaya AGENTS.md / opencode.json / agent / skill yang baru kebaca.
+
 ## Perapian governance — langkah (a) sensus + peta target — 2026-09-10 (PM, mode SEKUENSIAL)
 **Perintah user:** "intinya rapihin semua, tapi pastikan lu gak akan pernah nabrak rule lagi" →
 pilih **sekuensial** (R16, dicatat di `state.md:multiagent_mode`) → "lanjut" buat langkah (a).
