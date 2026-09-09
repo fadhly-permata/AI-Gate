@@ -2,6 +2,20 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 2026-09-10 03:40 — Banner halaman Fase 2: draf copy 8 halaman selesai, tunggu ACC user (ProjectManager)
+- User: teksnya dibikinin tim ("ya justru itu, buatin dong teksnya") → asumsi Fase 1 (teks dari user) DICABUT user.
+- PM baca penuh 8 section + modul JS + model backend (models.py, usage_router.py, selfheal.py, proxy_selector.py) → 8 draf ID ≤140 char, semua klaim berbukti file:line.
+- TEMUAN: skill `aigatedoc-copywriting-skill` yang dirujuk instruksi TIDAK ADA (ls .opencode/skills = 8 direktori, grep "aigatedoc" repo = 0). Gaya suara diambil dari language.md + mikrocopy id.js yang hidup. Dilaporkan ke user, tidak pura-pura baca.
+- Kunci baru: 8× `page_desc.<view>` di 7 kamus sekaligus (parity guard i18n.test.js:81 aman). Rekom urut: opsi A (ACC ID dulu → translate 6 bahasa → fe-dev sekali jalan).
+- Laporan: `.opencode/reports/20260910/research/0338_banner-copy-draft.md`. Nol perubahan src, nol sub-agent. NEXT: ACC/edit 8 draf + ACC opsi A → turun fe-dev.
+
+## 2026-09-10 03:30 — Banner tujuan halaman: Fase 0+1 selesai, tunggu user (ProjectManager)
+- User minta banner "tujuan halaman" di semua halaman kecuali home + terminal; teks dikasih user per halaman (belum dikasih).
+- PM kerjakan read-only sendiri (inventarisasi, bukan implementasi — boleh, A2 cuma larang PM nulis src/tests). Cek poin: 10 view di satu `index.html` (SPA, tanpa route URL), home=`welcome` (:164), terminal (:676), target 8: settings/providers/combos/proxies/endpoints/usage/analytics/cli.
+- Proposal: Opsi B (elemen `.page-banner` anak pertama tiap section + kunci i18n `page_desc.<view>` di 7 kamus, parity guard jaganya) DIREKOMENDASIKAN; Opsi A (banner tunggal + hook showView) ditolak (nyentuh app.js sentral + risiko flex terminal).
+- Sub-agent TIDAK diturunkan (perintah user: tunggu teks + ACC). Laporan: `.opencode/reports/20260910/research/0324_banner-halaman-inventarisasi-proposal.md`. Checkpoint awal: `refactor/ui` @ e8ce6ae bersih.
+- Hasil: menanti jawaban user atas daftar isian 1–8 + persetujuan opsi.
+
 ## 2026-09-10 01:35 — PM decided wrong → user correction recorded (R51 + R52) (ProjectManager)
 
 ### Violation
