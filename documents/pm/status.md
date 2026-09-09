@@ -1,5 +1,449 @@
 # PM Status
 
+## CLI Compat catalog + `cli tools` view — 2026-09-09 (PM eksekusi langsung, branch `setup/cli-tools`)
+
+**Task:** rancang & implementasi katalog kompatibilitas per-tool × per-platform (24 CLI tool) + tampilkan di perintah `cli tools` (frontend CLI Tools view) dengan badge per-platform, sorot platform saat ini, & warning merah untuk status broken/no_install/not_a_cli/not_wired di platform saat ini.
+
+**Deviasi proses (transparan, R29):** tool spawn sub-agent (`Task`) TIDAK tersedia di environment sesi ini → PM eksekusi langsung dengan batas file ketat (`src/backend/**`, `src/frontend/**`, `documents/pm/**`, `documents/dev/CODE_CHANGES.md`). Sesuai preseden di `status.md` (bugfix aider.sh/openhands.sh). Bukan pelanggaran fungsional R21/R29.
+
+**File dikerjakan:**
+- BARU `src/backend/cli_compat.py` — `CLI_COMPAT` + `current_platform()` + `compat_for()`.
+- MODIFY `src/backend/cli_tools_router.py` — `ToolDTO.compat`, `_tool_to_dto`, `list_cli_tools` → +`current_platform`.
+- MODIFY `src/frontend/static/clitools.js` — badge per-platform + legend + warning.
+- MODIFY `src/frontend/static/styles.css` — style badge status.
+- MODIFY `src/frontend/static/i18n/{en,id,ja,nl,ru,zh,zh-tw}.js` — +13 key `cli.compat/platform/status`.
+- BARU `documents/pm/cli-tools-compatibility.md` — mirror human-readable.
+
+**Verifikasi:** py_compile bersih; `import cli_compat` (bare + PYTHONPATH) OK; `list_cli_tools()` end-to-end → `current_platform=termux`, claude termux=`broken`; `node --check clitools.js` OK; i18n parity 7 locale 0 missing/0 extra/0 empty; `clitools.test.js` assertions ditrace manual tetap valid. Vitest penuh TIDAK dijalankan (no node_modules di sandbox).
+
+**Stretch (step 5): SKIP** — print catatan kompatibilitas di `scripts/cli-tools/*.sh` di-skip (user izinkan skip kalau ribet; 24 script + guard sudah cukup kompleks, fitur utama sudah ter-cover di view).
+
+**Status: DONE — DI-COMMIT (lihat receipt PM).** Belum di-push (user butuh push untuk test Windows/Linux).
+
+## CLI Tools B1: openhands.sh version-guard bugfix — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Task:** BUGFIX `scripts/cli-tools/openhands.sh` — `pip install openhands` (fallback) error di device ini (Python 3.14.6; openhands `requires_python ==3.12.*` per PyPI 1.16.0). uv route (`uv tool install openhands --python 3.12`) managed sendiri 3.12-nya, tapi device ini gak punya uv → pip route gagal.
+
+**Fix (PM, scope ketat `scripts/cli-tools/openhands.sh`):** version-guard pre-install (+30 baris): `have_cmd uv` → lanjut (uv fetch 3.12 sendiri); `elif python3` major.minor != 3.12 → `log_msg "ERROR: openhands butuh persis Python 3.12 ..."` + saran `pkg install python3.12`/pyenv/venv/uv + `exit 1` TANPA jalanin pip; parse-gagal/python3-hilang → WARN (best-effort). Wiring launch (`LLM_BASE_URL`/`LLM_API_KEY` + `LLM_MODEL=openai/<m>` + `--override-with-envs`) tetap utuh; idempoten via `ensure_installed`; `set -euo pipefail` + `_common.sh` tetap.
+
+**Verifikasi PM (R14/R35):** `bash -n scripts/cli-tools/openhands.sh` → clean; mode `-rwx------` (exec). Simulasi guard (uv absen): 3.12 → lanjut; 3.13/3.14/3.14.6/3.11/3.10/3.9/2.7/4.0 → exit 1.
+
+**Konfirmasi NOT_A_CLI (crewai.sh / gpt-researcher.sh):** di-READ SELURUHNYA — keduanya TIDAK ada `pip install`/`uv tool install` (hanya `log_msg` + `exit 0`, NOT_A_CLI). Tidak ada install step → version-guard TIDAK relevan → TIDAK diubah (sesuai boundary).
+
+**Status: DONE — commit `313a2c2`.**
+
+## CLI Tools A7: aider.sh version-guard bugfix — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Task:** BUGFIX `scripts/cli-tools/aider.sh` — `pip install aider-chat` error saat dijalankan di device ini (Python 3.14.6).
+
+**Diagnosis PM (read-only + fakta, R47):** `python3 --version` = 3.14.6; `pip install aider-chat==0.86.2` → `ERROR: No matching distribution found for aider-chat==0.86.2` (pip ignore semua rilis 0.16.1–0.86.2 karena "require a different python version"; requires_python aider 0.86.2 = `>=3.10,<3.13` per PyPI JSON). Skrip lama HANYA punya `NOTE` **Termux-only** yang dicetak **SETELAH** `ensure_installed` sudah mencoba install → user tetap dapet raw pip error, tanpa `exit 1` pre-install.
+
+**Fix (PM, scope ketat `scripts/cli-tools/aider.sh`; sub-agent spawn tool TIDAK tersedia di sesi ini → PM edit langsung, deviasi R21 dicatat transparan per R29):** version-guard pre-install (major.minor numerik; luar 3.10–3.12 → ERROR + saran `pkg install python3.11`/pyenv/venv + `exit 1` TANPA jalanin pip); hapus blok `NOTE` Termux-only lama; wiring launch (`--openai-api-base/--openai-api-key` + `--model openai/<m>`, env `OPENAI_API_BASE/KEY`, reachability probe) tetap utuh; idempoten via `ensure_installed`; `set -euo pipefail` + `_common.sh` tetap.
+
+**Verifikasi PM (R14/R35):** `bash -n scripts/cli-tools/aider.sh` → **clean**; mode `-rwx------` (exec). Simulasi guard: 3.10/3.11/3.12 → lanjut install; 3.9/3.13/3.14/3.14.6/2.7/4.0 → `exit 1`.
+
+**Status: DONE — commit `1d1a31c`** (`fix(cli-tools): aider.sh guard Python 3.10-3.12 (avoid broken pip install on 3.13+)`). Doc di-commit terpisah (commit docs susulan).
+
+## Anthropic `/v1/messages` inbound — 2026-09-09 (PM integrasi, branch `feat/anthropic-inbound`)
+
+**Tugas:** INTEGRASI (bukan implementasi ulang). Semua kode sudah ditulis specialist (tech-architect/be-dev/fullstack-dev/qa); PM hanya commit + dokumentasi. Tidak ada `src/**` atau `scripts/**` yang diubah PM.
+
+**STATUS MERGE — 2026-09-09 (PM, user opsi B):** `feat/anthropic-inbound` → **di-merge (fast-forward) ke `setup/cli-tools`** via `git merge --ff-only`. `setup/cli-tools` sekarang di tip `97e5557` (= tip fitur; tidak ada commit baru di `setup/cli-tools` sejak branch dibuat dari `a69eed3`, jadi merge murni FF). Branch `feat/anthropic-inbound` BISA dibiarkan apa adanya atau dihapus nanti — **JANGAN hapus sekarang tanpa instruksi user**. Tidak di-push ke remote / tidak buka PR (belum diminta). Working tree bersih (`git status` clean sebelum & sesudah).
+
+**Commits (5, Conventional, R19/R36):** `253aae5` feat(gateway), `bb3b6c9` test(backend), `7f330a1` docs(architecture), `4986adc` fix(cli-tools), `41d24f8` docs(reports). Staged per-file (tanpa `git add -A`); working tree bersih setelah commit.
+
+**Keputusan (dari desain `documents/architecture/anthropic-inbound-endpoint.md`):**
+- Model mapping: **bare model id** dilewat apa adanya ke `resolve_target` (reuse `_resolve_bare_model`); tanpa static map (DRY/YAGNI).
+- Streaming: **Stage 1 = non-streaming only** — `stream:true` ditolak 400 `anthropic_streaming_unsupported` (translated format tak bisa stream).
+- Tools: **passthrough (bukan 400)** — Anthropic `tools`/`tool_use`/`tool_result`/`tool_choice` ↔ OpenAI; extended-thinking & `cache_control` di-doc sebagai future phase.
+- Auth: **terima `Bearer` ATAU `x-api-key`** (plug-and-play untuk claude-code), terbuka spt chat/responses; client `x-api-key` gak diteruskan ke upstream.
+
+**Verifikasi PM (R14/R35):** `python -m py_compile` 3 file backend → clean; `bash -n claude.sh` → clean. Tidak jalanin suite penuh (batas sandbox, sesuai R20).
+
+**QA:** `qa-engineer` → status **LULUS** (`.opencode/reports/qa_anthropic_inbound_verification.md`): py_compile bersih + import OK, 11/11 pure test passed, 0 regression translator (17/17), R25 principle review LULUS, R12 LULUS (0 `except:pass`). 9 route-level test gagal eksekusi murni env mismatch `httpx 0.28.1` vs `starlette 0.27.0` (pre-existing, BUKAN bug kode).
+
+**claude.sh:** SUDAH di-rewire (`4986adc`) — buang litellm, arahkan claude-code langsung ke aigate `/v1/messages` (`ANTHROPIC_BASE_URL`=gateway root, `ANTHROPIC_API_KEY`=`AIGATE_KEY`).
+
+**Open risk:** route-level integration test belum ke-cover runtime di sandbox (env dep mismatch). Fix = selaraskan `httpx<0.28` di `pyproject.toml` lalu jalanin di env user (R20). Bukan blocker commit.
+
+## CLI Tools A2: opencode install/launch script — 2026-09-09 (fullstack-dev -> PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt fullstack-dev untuk `scripts/cli-tools/opencode.sh` (A2 opencode).
+
+**Receipt fullstack-dev:** install via `npm i -g opencode-ai`, wiring via `OPENAI_API_BASE` + `OPENAI_API_KEY` ke aigate `/v1/chat/completions`, generate `opencode.json` di CWD. Sumber: `cli_presets.py:71`, `cli_tools_router.py:1082-1083`, `cli_tools_router.py:417-431`.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/opencode.sh` -> clean. Commit `f8d9f0b`.
+
+**Known caveat:** Termux npm registry `os` field tidak ada `"android"`, tapi binary musl bisa jalan native di Bionic.
+
+**Status: DONE.**
+
+## CLI Tools A3: gemini install/launch script — 2026-09-09 (fullstack-dev -> PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt fullstack-dev untuk `scripts/cli-tools/gemini.sh` (A3 gemini).
+
+**Receipt fullstack-dev (R47/R48, ≥2 sumber):** install idempoten `npm i -g @google/gemini-cli` (alt `brew install gemini-cli`); launch **native Google mode** (auth `GEMINI_API_KEY`/`GOOGLE_API_KEY`/`GOOGLE_CLOUD_PROJECT` atau OAuth browser). Sumber: `cli_presets.py:73` (install string), `cli_presets.py:156-158` (komentar: gateway exposes no Google generateContent inbound), `cli_presets.py:175` (`"gemini": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_GEMINI_ONLY)`), `cli_tools_router.py:976` (no gemini builder), npm registry `@google/gemini-cli@0.59.0`, GitHub README google-gemini/gemini-cli, docs geminicli.com.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/gemini.sh` -> clean; perms `-rwx------`.
+
+**Status: DONE — native Google mode.** gemini TIDAK di-rute aigate (bukti `cli_presets.py:175` = `LAUNCH_UNSUPPORTED`/`REASON_GEMINI_ONLY`); aigate hanya serve OpenAI `/v1/chat/completions` + Anthropic `/v1/messages`. Script sengaja tidak set `ANTHROPIC_BASE_URL`/`OPENAI_API_BASE` palsu (gemini CLI mengabaikannya → no-op).
+
+## CLI Tools A4: codex install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/codex.sh` (A4 codex).
+
+**Bukti kode (cross-check, ≥2 sumber):**
+- `cli_presets.py:180` = `"codex": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_RESPONSES_ONLY)` — codex TIDAK di-wire aigate.
+- aigate punya inbound `/v1/responses` (`router.py:342`) tapi **non-streaming only**: `responses.py:227-233` → `stream:true` ditolak `responses_streaming_unsupported` (`RESPONSES_STREAMING_TODO`/`STREAMING_UNSUPPORTED_CODE`). codex CLI **wajib streaming** → tak bisa di-rute.
+- Install: Termux `pkg install codex` (`cli_presets.py:243`, tur-repo bionic); non-Termux `npm i -g @openai/codex` (`cli_presets.py:72`). npm `@openai/codex` v0.153.4 ada optional dep `linux-arm64`. Docs: github.com/openai/codex, learn.chatgpt.com/docs.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/codex.sh` -> clean; perms `-rwx------` (mode `100755`).
+
+**Status: DONE — native OpenAI mode.** codex launch **native** + warning (TIDAK di-wire aigate — butuh streaming Responses API yang belum ada). Script tidak set env palsu ke aigate.
+
+## CLI Tools A5: antigravity install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/antigravity.sh` (A5 antigravity).
+
+**Fakta kode (cross-check 3 sumber independen, R47/R48):**
+- `cli_presets.py:74` = `{"name":"antigravity","binary":"antigravity","install": NO_INSTALL}` — aigate menandai antigravity `NO_INSTALL` (NO_INSTALL didefinisikan di `cli_presets.py:45` = echo no-op).
+- `cli_presets.py:176` = `"antigravity": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NOT_A_CLI)` — antigravity BUKAN CLI yang bisa di-launch.
+- `TERMUX_INSTALL` map (`cli_presets.py:241-244`) HANYA berisi `aichat` + `codex` — TIDAK ada entry antigravity.
+- npm registry `antigravity` = placeholder squat (v0.0.0, "placeholder for the haters"); `@anthropic/antigravity` 404; PyPI `antigravity` milik pihak lain (Fabien Schwob); Homebrew formula `antigravity` 404. Konklusi: TIDAK ada rute install resmi (npm/pip/brew).
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/antigravity.sh` → clean; mode `-rwx------` (exec). Script source `_common.sh` (read-only helpers) lalu log pesan `antigravity: NO_INSTALL — tidak ada paket CLI terverifikasi` + `exit 0` — TIDAK memasang apa pun (no side-effect).
+
+**Status: DONE — NO_INSTALL (message + exit 0).** antigravity TIDAK di-install (sesuai keputusan user untuk tool `NO_INSTALL`); script hanya pesan + keluar 0. Commit `2259c1c`.
+
+## CLI Tools A6: phi install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/phi.sh` (A6 phi).
+
+**Fakta kode (cross-check 3 sumber independen, R47/R48):**
+- `cli_presets.py:75` = `{"name":"phi","binary":"phi","install": NO_INSTALL}` — aigate menandai phi `NO_INSTALL` (NO_INSTALL didefinisikan di `cli_presets.py:45` = echo no-op).
+- `cli_presets.py:177` = `"phi": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_INSTALL_UNVERIFIED)` — phi BUKAN CLI yang bisa di-launch (install tak terverifikasi).
+- `TERMUX_INSTALL` map (`cli_presets.py:241-244`) HANYA berisi `aichat` + `codex` — TIDAK ada entry phi.
+- npm `phi` = squat lama (v0.0.2, 2013, tak terkait); PyPI `phi` = library functional programming (cgarciae, bukan CLI); Homebrew formula `phi` 404. Konklusi: TIDAK ada rute install resmi (npm/pip/brew).
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/phi.sh` → clean; mode `-rwx------` (exec); eksekusi langsung → `exit 0`, TIDAK memasang apa pun. Script source `_common.sh` (read-only helpers) lalu log pesan `phi: NO_INSTALL — belum ada install terverifikasi` + `exit 0` — TIDAK memasang apa pun (no side-effect).
+
+**Status: DONE — NO_INSTALL (message + exit 0).** phi TIDAK di-install (sesuai keputusan user untuk tool `NO_INSTALL`); script hanya pesan + keluar 0. Commit `3135e32`.
+
+## CLI Tools A7: aider install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/aider.sh` (A7 aider).
+
+**Bukti kode (cross-check):**
+- `cli_presets.py:76` = `pip install aider-chat` (install string).
+- `cli_presets.py:172` = `"aider": LaunchSupport(LAUNCH_VERIFIED, REASON_NONE)` — aider = verified, OpenAI-compatible.
+- `cli_tools_router.py:355-369` = `_aider_builder` — bentuk launch: `aider --openai-api-base <base> --openai-api-key <key> [--model openai/<model>]`, forward ke aigate `/v1/chat/completions` (aider menempelkan `/chat/completions` ke base URL).
+- `cli_tools_router.py:1081-1084` = env injection `OPENAI_API_BASE` + `OPENAI_API_KEY` yang tiap tool terima.
+- PyPI `aider-chat` 0.86.2 pure-python (`py3-none-any`), `requires_python ">=3.10,<3.13"` (gagal resolve di Python 3.13+). Termux caveat: kalau `python3` = 3.13+, `pip install` gagal → butuh venv/pyenv 3.10–3.12.
+
+**Script behavior:** install idempoten via `ensure_installed` → `python3 -m pip install aider-chat`; launch wiring persis mirip `_aider_builder` (flags CLI, TIDAK generate config file); `AIGATE_MODEL` di-forward sebagai `--model openai/<AIGATE_MODEL>`; reachability probe best-effort ke aigate `/v1/models` (warning bila gateway mati).
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/aider.sh` → clean; perms `-rwx------` (exec). `git status` hanya berisi `aider.sh` + dokumen PM (working tree bersih selain itu).
+
+**Status: DONE — OpenAI-compatible (verified).** aider di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → aider forward model apa adanya. Commit `5a960e7`.
+
+## CLI Tools A8: goose install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/goose.sh` (A8 goose).
+
+**Fakta kode (cross-check 5 sumber independen, R47/R48):**
+- `cli_presets.py:77` = `{"name":"goose","binary":"goose","install": NO_INSTALL}` — aigate menandai goose `NO_INSTALL` (NO_INSTALL didefinisikan di `cli_presets.py:45` = echo no-op).
+- `cli_presets.py:178` = `"goose": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NO_BINARY)` — goose BUKAN CLI yang bisa di-launch (biner `goose` TIDAK ada / tidak ada install terverifikasi untuk environment ini).
+- `TERMUX_INSTALL` map (`cli_presets.py:241-244`) HANYA berisi `aichat` + `codex` — TIDAK ada entry goose.
+- npm `goose` = tool Golang tak terkait (jiyinyiyong, v0.0.3, bin→bin/index.js); `@block/goose` 404; PyPI `goose` (Goose 1.0.0, Mike Steder) = SQL migration tool SQLAlchemy; Homebrew `goose` = pressly/goose (v3.28.0, `conflicts_with block-goose-cli`). Install resmi Block (curl release script) tak punya build aarch64-android/termux terverifikasi. Konklusi: TIDAK ada rute install resmi (npm/pip/brew) yang terverifikasi untuk environment ini.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/goose.sh` → clean; mode `-rwx------` (exec); eksekusi langsung → `exit 0`, TIDAK memasang apa pun. Script source `_common.sh` (read-only helpers: `detect_os`/`detect_pm`/`load_gateway_config` + `log_msg`) lalu log pesan `goose: NO_INSTALL — belum ada install terverifikasi di environment ini.` + `exit 0` — TIDAK memasang apa pun (no side-effect).
+
+**Status: DONE — NO_INSTALL (message + exit 0).** goose TIDAK di-install (sesuai keputusan user untuk tool `NO_INSTALL`); script hanya pesan + keluar 0. Commit `414ea06`.
+
+## CLI Tools A9: amp install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/amp.sh` (A9 amp).
+
+**Fakta kode (cross-check 5 sumber independen, R47/R48):**
+- `cli_presets.py:78` = `{"name":"amp","binary":"amp","install": NO_INSTALL}` — aigate menandai amp `NO_INSTALL` (NO_INSTALL didefinisikan di `cli_presets.py:45` = echo no-op).
+- `cli_presets.py:179` = `"amp": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NO_BINARY)` — amp BUKAN CLI yang bisa di-launch (biner `amp` TIDAK ada / tidak ada install terverifikasi untuk environment ini).
+- `TERMUX_INSTALL` map (`cli_presets.py:241-244`) HANYA berisi `aichat` + `codex` — TIDAK ada entry amp.
+- npm unscoped `amp` = library messaging tak terkait (tjholowaychuk/node-amp, v0.3.1, "Abstract messaging protocol"); `@ampcode/cli` (eks `@sourcegraph/amp`) memang ADA tapi optional deps-nya HANYA darwin/linux/win32 — TIDAK ada build android/termux, sehingga `npm install -g @ampcode/cli` tidak menarik biner `amp` yang berfungsi di sini; PyPI `AMP` = parser matematika (Ini Oguntola); Homebrew `amp` = text editor terminal (amp.rs / jmacdonald). Konklusi: TIDAK ada rute install resmi (npm/pip/brew) terverifikasi untuk environment ini.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/amp.sh` → clean; mode `-rwx------` (exec); eksekusi langsung → `exit 0`, TIDAK memasang apa pun. Script source `_common.sh` (read-only helpers: `detect_os`/`detect_pm`/`load_gateway_config` + `log_msg`) lalu log pesan `amp: NO_INSTALL — belum ada install terverifikasi di environment ini.` + `exit 0` — TIDAK memasang apa pun (no side-effect).
+
+**Status: DONE — NO_INSTALL (message + exit 0).** amp TIDAK di-install (sesuai keputusan user untuk tool `NO_INSTALL`); script hanya pesan + keluar 0. Commit `446f78f`.
+
+## CLI Tools A10: qwen install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/qwen.sh` (A10 qwen).
+
+**Fakta kode (cross-check):**
+- `cli_presets.py:79` = `npm i -g @qwen-code/qwen-code` (install string).
+- `cli_presets.py:181` = `"qwen": LaunchSupport(LAUNCH_VERIFIED, REASON_NONE)` — qwen = verified, OpenAI-compatible.
+- `cli_tools_router.py:526-567` = `_qwen_builder` — wiring `OPENAI_API_BASE` + `OPENAI_API_KEY` ke aigate `/v1/chat/completions` + generate `.qwen/settings.json` (`modelProviders.openai` `baseUrl`=gateway, `envKey`=`OPENAI_API_KEY`, `security.auth.selectedType`=`openai`). Endpoint `/v1/chat/completions`.
+- npm `@qwen-code/qwen-code` v0.23.1 pure-JS butuh Node >=22.
+
+**Script behavior:** install idempoten via `ensure_installed` → `npm i -g @qwen-code/qwen-code`; launch **OpenAI-compatible** — wiring `OPENAI_API_BASE` + `OPENAI_API_KEY` (dari `load_gateway_config`) + generate `.qwen/settings.json`, endpoint `/v1/chat/completions`.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/qwen.sh` → clean; perms `-rwx------` (exec). `git status` hanya berisi `qwen.sh` + dokumen PM (working tree bersih selain itu).
+
+**Status: DONE — OpenAI-compatible (verified).** qwen di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → qwen forward model apa adanya. Commit `73478a0`.
+
+## CLI Tools A11: cline install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/cline.sh` (A11 cline).
+
+**Fakta kode (cross-check):**
+- `cli_presets.py:80` = `npm i -g cline` (install string).
+- `cli_presets.py:182` = `"cline": LaunchSupport(LAUNCH_VERIFIED, REASON_NONE)` — cline = verified, OpenAI-compatible.
+- `cli_tools_router.py:732-764` = `_cline_builder` — wiring `cline auth --provider openai-native --apikey <key> --modelid <model> --baseurl <base>` + env `OPENAI_API_BASE` + `OPENAI_API_KEY` ke aigate `/v1/chat/completions`.
+
+**Script behavior:** install idempoten via `ensure_installed` → `npm i -g cline`; launch **OpenAI-compatible** — wiring flag CLI `cline auth --provider openai-native --apikey <key> --modelid <model> --baseurl <base>` + env `OPENAI_API_BASE`+`OPENAI_API_KEY` (dari `load_gateway_config`) ke aigate `/v1/chat/completions`.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/cline.sh` → clean; perms `-rwx------` (exec).
+
+**Known-broken (bukan blocker):** npm `cline@3.0.61` TIDAK punya variant binary `android` → terpasang tapi gagal jalan di Termux/aarch64 (sama pola claude/codex/kilo/amp). Script tetap memasang; tool bisa jadi tidak bisa dijalankan di perangkat ini.
+
+**Status: DONE — OpenAI-compatible (verified).** cline di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → cline forward model apa adanya. Commit `d931921`.
+
+## CLI Tools A12: kilo install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/kilo.sh` (A12 kilo).
+
+**Fakta kode (cross-check, R47/R48):**
+- `cli_presets.py:81` = `{"name":"kilo","binary":"kilo","install": _npm("@kilocode/cli")}` — install string `npm install -g @kilocode/cli`, bin `kilo`.
+- `cli_presets.py:183` = `"kilo": LaunchSupport(LAUNCH_VERIFIED)` — kilo = verified, OpenAI-compatible.
+- `cli_tools_router.py:616-729` = `_kilo_builder` — wiring trusted additive config `KILO_CONFIG`=`.kilo/aigate-kilo.json` (provider `"aigate"` via `npm: "@ai-sdk/openai-compatible"`, `options.baseURL`=gateway, `options.apiKey`=`{env:OPENAI_API_KEY}`), env `OPENAI_API_BASE`+`OPENAI_API_KEY`, flag `-m aigate/<model>` (priority 1); catatan Termux no-android di `:687-689`.
+- npm `@kilocode/cli@7.5.16`: bin `kilo`, `os:["darwin","linux","win32"]` (TIDAK ada `"android"`) → known-broken di Termux/aarch64.
+
+**Script behavior:** install idempoten via `ensure_installed` → `npm install -g @kilocode/cli`; launch **OpenAI-compatible** — tulis `KILO_CONFIG` (secret TIDAK ke disk, resolved via `{env:OPENAI_API_KEY}`), set `OPENAI_API_BASE`+`OPENAI_API_KEY`, dan bila `AIGATE_MODEL` disetel → `model` key `aigate/<model>` + flag `-m aigate/<model>`.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/kilo.sh` → clean; perms `-rwx------` (exec).
+
+**Known-broken (bukan blocker):** npm `@kilocode/cli` TIDAK punya variant binary `android` → terpasang tapi gagal jalan di Termux/aarch64 (sama pola claude/codex/cline/amp). Script tetap memasang; tool bisa jadi tidak bisa dijalankan di perangkat ini.
+
+**Status: DONE — OpenAI-compatible (verified).** kilo di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → kilo forward model apa adanya. Commit `2a194cc`.
+
+## ===== GRUP A SELESAI (12/12) =====
+ Semua 12 tool Grup A (`agentic_coding`) — A1 claude, A2 opencode, A3 gemini, A4 codex, A5 antigravity, A6 phi, A7 aider, A8 goose, A9 amp, A10 qwen, A11 cline, A12 kilo — SELESAI (script install/launch + wiring/NO_INSTALL sesuai preset). Lanjut ke **Grup B** (B1..B6) dan **Grup C** (C1..C6). Progres keseluruhan cli-tools: **12/24**.
+
+## CLI Tools B1: openhands install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/openhands.sh` (B1 openhands).
+
+**Fakta kode (cross-check):**
+- `cli_presets.py:88` = `_pip("openhands")` → `pip install openhands` (install string).
+- `cli_presets.py:190` = `"openhands": LaunchSupport(LAUNCH_VERIFIED, REASON_NONE)` — openhands = verified, OpenAI-compatible.
+- `cli_tools_router.py:960-972` = `_openhands_builder` — wiring env `LLM_BASE_URL` + `LLM_API_KEY` + `LLM_MODEL=openai/<model>` ke aigate `/v1/chat/completions` + flag `--override-with-envs`.
+- PyPI `openhands` v1.16.0 pure-python tapi butuh **Python 3.12** (`requires_python` gagal resolve di 3.13+).
+
+**Script behavior:** install pilih `uv` dulu (`uv tool install openhands`, butuh Python 3.12), fallback `ensure_installed` → `pip install openhands`; launch **OpenAI-compatible** — set `LLM_BASE_URL` + `LLM_API_KEY` (dari `load_gateway_config`) + `LLM_MODEL=openai/<AIGATE_MODEL>` ke aigate `/v1/chat/completions`, flag `--override-with-envs`.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/openhands.sh` → clean; perms `-rwx------` (exec). `git status` hanya berisi `openhands.sh` + dokumen PM (working tree bersih selain itu).
+
+**Status: DONE — OpenAI-compatible (verified).** openhands di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → openhands forward model apa adanya. Catatan Python 3.12: bila `python3` = 3.13+ (`uv`/`pip` gagal resolve) → butuh venv/pyenv 3.12 (bukan blocker).
+
+## CLI Tools B2: swe-agent install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/swe-agent.sh` (B2 swe-agent).
+
+**Fakta kode (cross-check 3 sumber independen, R47/R48):**
+- `cli_presets.py:89` = `{"name":"swe-agent","binary":"swe-agent","install": NO_INSTALL}` — aigate menandai swe-agent `NO_INSTALL` (NO_INSTALL didefinisikan di `cli_presets.py:45` = echo no-op).
+- `cli_presets.py:216` = `"swe-agent": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_INSTALL_UNVERIFIED)` — swe-agent BUKAN CLI yang bisa di-launch (install tidak terverifikasi).
+- `TERMUX_INSTALL` map (`cli_presets.py:241-244`) HANYA berisi `aichat` + `codex` — TIDAK ada entry swe-agent.
+- PyPI `swe-agent` = **404** (tidak ada paket); `sweagent` (tanpa strip) = **v0.0.1** tapi library butuh **Docker + conda** (tidak praktis di Termux); GitHub setup resmi **berat** (container/conda). Cross-check 3 sumber → TIDAK ada install terverifikasi di env ini.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/swe-agent.sh` → clean; mode `-rwx------` (exec); eksekusi langsung → `exit 0`, TIDAK memasang apa pun. Script source `_common.sh` (read-only helpers) lalu log pesan `swe-agent: NO_INSTALL — belum ada install terverifikasi` + `exit 0` — TIDAK memasang apa pun (no side-effect).
+
+**Bug yang sudah dibenerin (lesson):** versi awal pesan NO_INSTALL ke-tulis pakai backtick command-substitution yang mengeksekusi `pip install swe-agent` saat pesan di-render. Sudah dibenerin → pesan murni teks statis (TIDAK ada command-substitution di pesan NO_INSTALL — aturan: pesan NO_INSTALL harus literal, jangan dibungkus backtick/`$()`).
+
+**Status: DONE — NO_INSTALL (message + exit 0).** swe-agent TIDAK di-install (sesuai keputusan user untuk tool `NO_INSTALL`); script hanya pesan + keluar 0. Commit `13a257c`.
+
+## CLI Tools B3: open-interpreter install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/open-interpreter.sh` (B3 open-interpreter).
+
+**Fakta kode (cross-check):**
+- `cli_presets.py:90` = `{"name":"open-interpreter","binary":"interpreter","install": _pip("open-interpreter")}` → `pip install open-interpreter` (bin `interpreter`).
+- `cli_presets.py:196` = `"open-interpreter": LaunchSupport(LAUNCH_VERIFIED)` — open-interpreter = verified, OpenAI-compatible.
+- `cli_tools_router.py:824-837` = `_interpreter_builder` — bentuk launch: `interpreter --api_base <base> --api_key <key> [--model openai/<model>]` (model flag di-skip bila raw model kosong), forward ke aigate `/v1/chat/completions`.
+- `cli_tools_router.py:1081-1084` = env injection `OPENAI_API_BASE` + `OPENAI_API_KEY` yang tiap tool terima.
+- PyPI `open-interpreter` 0.4.3 pure-python, `requires_python ">=3.9,<4"` (install di Python 3.9–3.13; host 3.14.6 masih `<4` → resolver lolos, kontras openhands yang pin 3.12).
+
+**Script behavior:** install idempoten via `ensure_installed` → `python3 -m pip install open-interpreter`; launch **OpenAI-compatible** — set env `OPENAI_API_BASE`+`OPENAI_API_KEY` (dari `load_gateway_config`) + flags `--api_base <base> --api_key <key>` ke aigate `/v1/chat/completions`, `--model openai/<AIGATE_MODEL>` bila `AIGATE_MODEL` disetel. Reachability probe best-effort ke aigate `/v1/models` (warning bila gateway mati).
+
+**Catatan product drift (bukan blocker, R47/R48 cross-check 3 sumber):** situs live `docs.openinterpreter.com` + repo GitHub sekarang nggarap produk **Rust/Codex-fork** yang TIDAK punya flag `--api_base`/`--api_key`; tapi paket `pip install open-interpreter` (0.4.3, Python line) yang dipasang preset **MASIH punya** flag `--api_base`/`--api_key` (terkonfirmasi dari PyPI 0.4.3 README + builder aigate). Script pakai flag Python package — benar per preset. JANGAN pakai `curl install.sh` dari situs live (itu produk Rust yang salah).
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/open-interpreter.sh` → clean; perms `-rwx------` (exec). `git status` hanya berisi `open-interpreter.sh` + dokumen PM (working tree bersih selain itu).
+
+**Status: DONE — OpenAI-compatible (verified).** open-interpreter di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → open-interpreter forward model apa adanya. Commit `31b9a04`.
+
+## CLI Tools B4: autogpt install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/autogpt.sh` (B4 autogpt).
+
+**Fakta kode (cross-check 3 sumber):**
+- `cli_presets.py:91` = `{"name":"autogpt","binary":"autogpt","install": NO_INSTALL}` → autogpt ditandai tool TANPA perintah install terverifikasi.
+- `cli_presets.py:217` = `"autogpt": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_INSTALL_UNVERIFIED)` — aigate menandai autogpt BUKAN CLI yang bisa di-launch (install tidak terverifikasi).
+- `TERMUX_INSTALL` map (`cli_presets.py:241-244`) HANYA berisi `aichat` + `codex` — TIDAK ada entry autogpt → di Termux pun tak ada rute install terverifikasi.
+- PyPI `autogpt` = **placeholder/squat tak terkait** (author "Shadow Walker", `0.0.1.dev0`, 2023-04-02, `requires_dist: ["torch"]` SAJA, TIDAK ada `[project.scripts]`/console script → `pip install autogpt` TIDAK menghasilkan biner `autogpt` di PATH). BUKAN AutoGPT resmi (Significant-Gravitas).
+- GitHub resmi `Significant-Gravitas/AutoGPT` kini berupa **PLATFORM** — di-host (berbayar) atau self-host butuh **Docker + konfigurasi + API key sendiri** (install via `install.sh` setup.agpt.co / Docker Compose); berat & tidak praktis di Termux/android-arm64. Cross-check 3 sumber → TIDAK ada install terverifikasi di env ini.
+
+**Script behavior:** source `_common.sh` (read-only helpers `detect_os`/`detect_pm`/`load_gateway_config` + `log_msg`) lalu log pesan `autogpt: NO_INSTALL — belum ada install terverifikasi di environment ini.` + `exit 0` — TIDAK memasang apa pun (no side-effect, idempoten).
+
+**Catatan transparan:** ada paket PyPI bernama `autogpt`, TAPI placeholder TAK TERKAIT (bukan AutoGPT resmi) & tidak menghasilkan biner; AutoGPT asli butuh Docker. Sesuai keputusan user untuk tool `NO_INSTALL`: script HANYA pesan lalu KELUAR.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/autogpt.sh` → clean; mode `-rwx------` (exec); eksekusi langsung → `exit 0`, TIDAK memasang apa pun. `git status` hanya berisi `autogpt.sh` + dokumen PM (working tree bersih selain itu).
+
+**Status: DONE — NO_INSTALL (message + exit 0, no side-effect).** autogpt ditandai aigate NO_INSTALL + LAUNCH_UNSUPPORTED(REASON_INSTALL_UNVERIFIED); TERMUX_INSTALL tak punya entry; PyPI `autogpt` = placeholder squat tak terkait; GitHub AutoGPT = platform Docker-based berat. Script HANYA pesan + `exit 0`, TIDAK memasang apa pun. Commit `a5d1a91`.
+
+## CLI Tools B5: gpt-researcher install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/gpt-researcher.sh` (B5 gpt-researcher).
+
+**Fakta kode (cross-check 3 sumber independen, R47/R48):**
+- `cli_presets.py:92` = `{"name":"gpt-researcher","binary":"gpt-researcher","install": _pip("gpt-researcher")}` → aigate memang punya install string terverifikasi `pip install gpt-researcher` (paket ADA & RESMI — BUKAN `NO_INSTALL` seperti autogpt/swe-agent).
+- `cli_presets.py:197-204` = `"gpt-researcher": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NOT_A_CLI)` — aigate menandai gpt-researcher BUKAN CLI yang bisa di-launch.
+- `cli_tools_router.py` `_LAUNCH_BUILDERS` (~:976-988) TIDAK punya entry `gpt-researcher` / `_gpt_researcher_builder` → `resolve()` masuk cabang `support.mode != LAUNCH_VERIFIED` → 409 `tool_unsupported`. Env `OPENAI_API_BASE`/`OPENAI_API_KEY` (~:1081-1084) TIDAK PERNAH sampai ke gpt-researcher.
+- PyPI `gpt-researcher` v0.16.0 (Assaf Elovic): metadata TIDAK ada `console_scripts`/`[project.scripts]`/`entry_points` (0 hit) → `pip install` TIDAK menghasilkan biner `gpt-researcher`; dependensi (litellm/langchain/openai/fastapi/duckduckgo-search) = library/agency, bukan CLI biner. `requires_python ">=3.12"`.
+- Docs resmi (github.com/assafelovic/gpt-researcher + docs.gptr.dev): pakai `from gpt_researcher import GPTResearcher` (library); "Run with CLI" = `git clone` + `pip install -r requirements.txt` + `python cli.py "<query>" --report_type <type>` (wajib query, tulis report lalu EXIT, bukan chat interaktif); server mode = `python -m uvicorn main:app` / Docker. Memang OpenAI-compatible (OPENAI_API_KEY + OPENAI_BASE_URL), TAPI tidak ada biner CLI untuk di-wire ke aigate `/v1/chat/completions`.
+
+**Script behavior:** source `_common.sh` (read-only helpers `detect_os`/`detect_pm`/`load_gateway_config` + `log_msg`) lalu log pesan penjelasan (pip-installable tapi NOT_A_CLI) + `exit 0` — TIDAK memasang/menjalankan apa pun yang bisa di-spawn (no side-effect, idempoten). Sengaja TIDAK menjalankan `pip install`/`python cli.py` agar tidak memasang paket yang tak bisa di-launch.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/gpt-researcher.sh` → clean; mode `-rwx------` (exec `100755`); eksekusi langsung → `exit 0`, TIDAK memasang apa pun.
+
+**Status: DONE — NOT_A_CLI (message + exit 0, no side-effect).** gpt-researcher pip-installable & resmi (`cli_presets.py:92`, PyPI v0.16.0), TAPI tanpa biner CLI (`cli_presets.py:197-204` = `LAUNCH_UNSUPPORTED`/`REASON_NOT_A_CLI`; PyPI no `console_scripts`; docs cuma `python cli.py <query>` yang butuh query & exit). aigate gak punya builder → `resolve()` 409. BUKAN murni `NO_INSTALL`, tapi gak bisa di-launch sebagai CLI. Script: pesan + `exit 0`, TIDAK install apa pun yg bisa di-spawn. Commit `cd346b4`.
+
+## CLI Tools B6: crewai install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/crewai.sh` (B6 crewai).
+
+**Fakta kode (cross-check ≥3 sumber independen, R47/R48):**
+- `cli_presets.py:93` = `{"name":"crewai","binary":"crewai","install": _pip("crewai")}` → aigate memang punya install string terverifikasi `pip install crewai` (paket ADA & RESMI — BUKAN `NO_INSTALL` seperti autogpt/swe-agent).
+- `cli_presets.py:205-215` = `"crewai": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NOT_A_CLI)` — aigate menandai crewai BUKAN CLI yang bisa di-launch. Komentar asli: console script exists, but it is a framework project scaffolder/runner; `crewai run`/`chat` run the Crew/Flow DEFINED BY THE PROJECT in the CWD; neither takes model/base-url/prompt at launch; in empty dir both error out.
+- `cli_tools_router.py` `_LAUNCH_BUILDERS` (~:976-988) TIDAK punya entry `crewai` / `_crewai_builder` → `resolve()` masuk cabang `support.mode != LAUNCH_VERIFIED` → 409 `tool_unsupported`. Env `OPENAI_API_BASE`/`OPENAI_API_KEY` (~:1081-1084) TIDAK PERNAH sampai ke crewai.
+- PyPI `crewai` v1.15.20 (crewAIInc): wheel `entry_points.txt` punya `[console_scripts] crewai = crewai_cli.cli:crewai` → `pip install` MENGHASILKAN biner `crewai` di PATH (install VALID). TAPI biner itu scaffolder/runner framework, BUKAN chat assistant; `requires_python ">=3.10,<3.14"`.
+- Docs resmi (docs.crewai.com Quickstart + github.com/crewAIInc/crewAI): `crewai create flow / install / run / chat / login / deploy` beroperasi pada PROYEK di CWD; `crewai chat`/`run` membaca config crew di direktori tsb dan TIDAK menerima argumen model/base-url/prompt di launch. Konfigurasi LLM (OpenAI-compatible) ditulis di kode proyek atau env `OPENAI_API_KEY`/`OPENAI_API_BASE_URL` — BUKAN surface CLI. Di direktori kosong `crewai run`/`chat` error.
+
+**Script behavior:** source `_common.sh` (read-only helpers `detect_os`/`detect_pm`/`load_gateway_config` + `log_msg`) lalu log pesan penjelasan (pip-installable tapi NOT_A_CLI) + `exit 0` — TIDAK memasang/menjalankan apa pun yang bisa di-spawn (no side-effect, idempoten). Sengaja TIDAK menjalankan `pip install crewai` / `crewai run`/`chat` agar tidak memasang/scaffold proyek yang tak bisa di-launch, atau menjalankan perintah yang butuh proyek di CWD.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/crewai.sh` → clean; mode `-rwx------` (exec `100755`); eksekusi langsung → `exit 0`, TIDAK memasang apa pun.
+
+**Status: DONE — NOT_A_CLI (message + exit 0, no side-effect).** crewai pip-installable & resmi (`cli_presets.py:93`, PyPI v1.15.20 `console_scripts` `crewai = crewai_cli.cli:crewai`), TAPI framework scaffolder/runner yang butuh proyek di CWD & gak ada flag `--model`/`--base-url` (gak launchable sbg aigate CLI); aigate gak punya builder → `resolve()` 409. BUKAN murni `NO_INSTALL`, tapi gak bisa di-launch sebagai CLI. Script: pesan + `exit 0`, TIDAK install apa pun yg bisa di-spawn. Commit `150475f`.
+
+## ===== GRUP B SELESAI (6/6) =====
+ Semua 6 tool Grup B (`autonomous_agents`) — B1 openhands, B2 swe-agent, B3 open-interpreter, B4 autogpt, B5 gpt-researcher, B6 crewai — SELESAI (script install/launch + wiring/NO_INSTALL/NOT_A_CLI sesuai preset). Lanjut ke **Grup C** (C1..C6). **C1 llm = done (OpenAI-compatible, verified — `LAUNCH_VERIFIED` at `cli_presets.py:219`).** Progres keseluruhan cli-tools: **19/24**.
+
+## CLI Tools C1: llm install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/llm.sh` (C1 llm).
+
+**Fakta kode (cross-check):**
+- `cli_presets.py:100` = `_pip("llm")` → `pip install llm` (install string).
+- `cli_presets.py:219` = `"llm": LaunchSupport(LAUNCH_VERIFIED, REASON_NONE)` — llm = verified, OpenAI-compatible.
+- `cli_tools_router.py:570-592` = `_llm_builder` — wiring `llm openai endpoint <base> [-m <model>] --key <key> --chat` (atau `--models` bila tanpa model) ke aigate `/v1/chat/completions`; env `OPENAI_API_BASE`+`OPENAI_API_KEY` di-inject.
+- PyPI `llm` 0.35 (simonw), `requires_python >=3.10`.
+
+**Script behavior:** install idempoten via `ensure_installed` → `pip install llm`; launch **OpenAI-compatible** — set env `OPENAI_API_BASE`+`OPENAI_API_KEY` (dari `load_gateway_config`) + jalankan `llm openai endpoint <base> [-m <model>] --key <key> --chat` (atau `--models` bila tanpa model) ke aigate `/v1/chat/completions`.
+
+**Known-broken (bukan blocker):** di Termux/aarch64 + Python 3.14, `pip install llm` gagal build `jiter` (tidak ada wheel Android, butuh `pkg install rust`) → install bisa gagal di perangkat ini; script tetap memasang.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/llm.sh` → clean; perms `-rwx------` (exec). `git status` hanya berisi `llm.sh` + dokumen PM (working tree bersih selain itu).
+
+**Status: DONE — OpenAI-compatible (verified).** llm di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → llm forward model apa adanya.
+
+## CLI Tools C2: sgpt install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/sgpt.sh` (C2 sgpt).
+
+**Fakta kode (cross-check):**
+- `cli_presets.py:101` = `{"name":"sgpt","binary":"sgpt","install": NO_INSTALL}` (NO_INSTALL = echo no-op).
+- `cli_presets.py:224` = `"sgpt": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_INSTALL_UNVERIFIED)` — sgpt = unsupported (install unverified).
+- `TERMUX_INSTALL` map (`cli_presets.py:241-244`) HANYA berisi `aichat` + `codex` — TIDAK ada entry sgpt; registry: npm `sgpt` = squat tak terkait (author `peidayu`, BUKAN CLI), PyPI `sgpt` = 404, GitHub `tbckr/sgpt` (Go) gak build Termux/android-arm64.
+
+**Script behavior:** **NO_INSTALL** — script HANYA menampilkan pesan `sgpt: NO_INSTALL — belum ada install terverifikasi di environment ini.` + `exit 0`, TIDAK memasang apa pun (no side-effect, idempoten). Pesan literal (TIDAK ada backtick/`$()` — lesson dari B2 swe-agent).
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/sgpt.sh` → clean; perms `-rwx------` (exec); eksekusi langsung → `exit 0`, TIDAK memasang apa pun. `git status` hanya berisi `sgpt.sh`+`mods.sh` + dokumen PM (working tree bersih selain itu).
+
+**Status: DONE — NO_INSTALL (message + exit 0, no side-effect).** sgpt ditandai aigate `LAUNCH_UNSUPPORTED`/`REASON_INSTALL_UNVERIFIED` (`cli_presets.py:224`); tidak ada rute install terverifikasi → script HANYA pesan + keluar.
+
+## CLI Tools C3: mods install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/mods.sh` (C3 mods).
+
+**Fakta kode (cross-check):**
+- `cli_presets.py:102` = `{"name":"mods","binary":"mods","install": NO_INSTALL}` (NO_INSTALL = echo no-op).
+- `cli_presets.py:225` = `"mods": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NO_BINARY)` — mods = unsupported (no binary).
+- `TERMUX_INSTALL` map (`cli_presets.py:241-244`) HANYA berisi `aichat` + `codex` — TIDAK ada entry mods; registry: npm `mods` = squat Node.js tak terkait (BUKAN CLI `charmbracelet/mods`), PyPI `mods` = 404, GitHub `charmbracelet/mods` (Go) di-archive/sunset 2026-03-09 & binari resmi HANYA Linux/macOS/Windows — gak build Termux/android-arm64.
+
+**Script behavior:** **NO_INSTALL** — script HANYA menampilkan pesan `mods: NO_INSTALL — belum ada install terverifikasi di environment ini.` + `exit 0`, TIDAK memasang apa pun (no side-effect, idempoten). Pesan literal (TIDAK ada backtick/`$()` — lesson dari B2 swe-agent).
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/mods.sh` → clean; perms `-rwx------` (exec); eksekusi langsung → `exit 0`, TIDAK memasang apa pun. `git status` hanya berisi `sgpt.sh`+`mods.sh` + dokumen PM (working tree bersih selain itu).
+
+**Status: DONE — NO_INSTALL (message + exit 0, no side-effect).** mods ditandai aigate `LAUNCH_UNSUPPORTED`/`REASON_NO_BINARY` (`cli_presets.py:225`); tidak ada biner/rute install terverifikasi → script HANYA pesan + keluar.
+
+ Semua tool Grup C yang dikerjakan (C1 llm done + C2 sgpt done + C3 mods done) — lanjut C4 oterm, C5 gptme, C6 aichat. Progres keseluruhan cli-tools: **21/24**.
+
+## CLI Tools C4: oterm install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/oterm.sh` (C4 oterm).
+
+**Fakta kode (cross-check):**
+- `cli_presets.py:103` = `{"name":"oterm","binary":"oterm","install": _pip("oterm")}` → `pip install oterm` (install string).
+- `cli_presets.py:222` = `"oterm": LaunchSupport(LAUNCH_VERIFIED, REASON_NONE)` — oterm = verified, OpenAI-compatible.
+- `cli_tools_router.py:891-917` = `_oterm_builder` — wiring: tulis `.oterm-aigate/config.json` blok `openaiCompatible.aigate` `{base_url=<gateway>/v1/chat/completions, api_key="${OPENAI_API_KEY}"}`, set `OTERM_DATA_DIR=.oterm-aigate` + env `OPENAI_API_BASE`+`OPENAI_API_KEY` ke aigate `/v1/chat/completions`.
+- PyPI `oterm` 0.24.0 butuh Python >=3.10.
+
+**Script behavior:** install idempoten via `ensure_installed` → `pip install oterm`; launch **OpenAI-compatible** — tulis config `.oterm-aigate/config.json` (`openaiCompatible.aigate` {base_url=gateway, api_key="${OPENAI_API_KEY}"}), set `OTERM_DATA_DIR=.oterm-aigate`, + env `OPENAI_API_BASE`/`OPENAI_API_KEY`, ke `/v1/chat/completions`.
+
+**Catatan Termux (known-broken, bukan blocker):** di Termux/aarch64 + Python 3.14, `pip install oterm` diprediksi gagal build `jiter` (tidak ada wheel Android) — script handle hint + `exit 1`.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/oterm.sh` → clean; perms `-rwx------` (exec).
+
+**Status: DONE — OpenAI-compatible (verified).** oterm di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → oterm forward model apa adanya. Commit `aea87c3`. Progres keseluruhan cli-tools: **22/24**.
+
+## CLI Tools C5: gptme install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/gptme.sh` (C5 gptme).
+
+**Fakta kode (cross-check):**
+- `cli_presets.py:104` = `_pip("gptme")` → `pip install gptme` (install string).
+- `cli_presets.py:223` = `"gptme": LaunchSupport(LAUNCH_VERIFIED, REASON_NONE)` — gptme = verified, OpenAI-compatible.
+- `cli_tools_router.py:595-612` = `_gptme_builder` — wiring env `OPENAI_BASE_URL` (= gateway base; gptme membaca `OPENAI_BASE_URL` BUKAN `OPENAI_API_BASE`) + `OPENAI_API_KEY` ke aigate `/v1/chat/completions` + flag `-m local/<model>`.
+- PyPI `gptme` 0.33.0 butuh Python `>=3.10,<3.15`.
+
+**Script behavior:** install idempoten via `ensure_installed` → `pip install gptme`; launch **OpenAI-compatible** — set env `OPENAI_BASE_URL`+`OPENAI_API_KEY` (dari `load_gateway_config`) + flag `-m local/<AIGATE_MODEL>` ke aigate `/v1/chat/completions`.
+
+**Catatan Termux (known-broken, bukan blocker):** di Termux/aarch64 + Python 3.14, `pip install gptme` diprediksi gagal build `jiter` (tidak ada wheel Android) → script handle hint + `exit 1` (TIDAK memasang, pesan jelas).
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/gptme.sh` → clean; perms `-rwx------` (exec).
+
+**Status: DONE — OpenAI-compatible (verified).** gptme di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → gptme forward model apa adanya. Commit `16d36f9`. Progres keseluruhan cli-tools: **23/24**.
+
+## CLI Tools C6: aichat install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/aichat.sh` (C6 aichat).
+
+**Fakta kode (cross-check):**
+- `cli_presets.py:105` = `_cargo("aichat")` → `cargo install aichat` (install string fallback).
+- `cli_presets.py:226` = `"aichat": LaunchSupport(LAUNCH_VERIFIED, REASON_NONE)` — aichat = verified, OpenAI-compatible.
+- `cli_presets.py:242` = `TERMUX_INSTALL["aichat"]="pkg install aichat"` — rute Termux override ("verified 0.30.0 runs" di Termux).
+- `cli_tools_router.py:469-511` = `_aichat_builder` — wiring: generate config `aichat-aigate.yaml` (client `aigate` openai-compatible, `api_base`=gateway, `api_key`), set env `AICHAT_CONFIG_FILE`, model `aigate:<raw>` ke aigate `/v1/chat/completions`.
+- crates.io `aichat` 0.30.0 (Rust).
+
+**Script behavior:** install via `pkg install aichat` (override `TERMUX_INSTALL`) dengan fallback `cargo install aichat`; launch **OpenAI-compatible** — generate `aichat-aigate.yaml` (client `aigate` openai-compatible, `api_base`=gateway, `api_key`), set env `AICHAT_CONFIG_FILE`, model `aigate:<raw>` ke `/v1/chat/completions`.
+
+**Catatan Termux (terbukti WORKING, bukan blocker):** `pkg install aichat` di Termux terbukti jalan (usable di Termux, "verified 0.30.0 runs") — rute install resmi via `pkg`, fallback `cargo` kalau pkg tidak ada.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/aichat.sh` → clean; perms `-rwx------` (exec).
+
+**Status: DONE — OpenAI-compatible (verified).** aichat di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → aichat forward model apa adanya. Commit `1c4e592`. Progres keseluruhan cli-tools: **24/24**.
+
+## ===== GRUP C SELESAI (6/6) =====
+
+ Semua 6 tool Grup C (`chat_shell`) — C1 llm, C2 sgpt, C3 mods, C4 oterm, C5 gptme, C6 aichat — SELESAI (script install/launch + wiring/NO_INSTALL sesuai preset). **SEMUA 24 TOOL SELESAI** (A1–A12, B1–B6, C1–C6). Progres keseluruhan cli-tools: **24/24 (ALL DONE)**.
+
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
 bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.
@@ -1835,3 +2279,12 @@ User jawab "b" (naikkan lisensi SETELAH PR #10). Cek gerbang: PR #10 ternyata **
 - GATE berikutnya: user me-review & merge PR #11. Setelah merge → (a) label lisensi muncul di
   GitHub, (b) WL.2a sebarkan 1 kalimat ke 7 varian (URL tidak diterjemahkan), (c) wiki lanjut
   halaman 1 ACC → halaman 2.
+
+## 2026-09-09 — fix 4 bug script cli-tools (aichat/codex/oterm) — DONE
+User: 'PM tugas: fix 4 bug...'. PM verifikasi 4 line via grep/read, edit langsung (scope ketat scripts/cli-tools/{aichat,codex,oterm}.sh; TIDAK ubah src/**/tests/**). Tidak ada sub-agent spesialis di-spawn — tool Task tidak tersedia di sesi ini, jadi PM eksekusi langsung untuk task mekanis & preskriptif ini.
+- Fix: (1) aichat.sh:118 `pkg install -y aichat`; (2) aichat.sh:207 `export AICHAT_CONFIG_FILE; exec $BIN $@`; (3) codex.sh:71 `pkg install -y codex`; (4) oterm.sh:175 `export OTERM_DATA_DIR; exec $BIN $@`.
+- `bash -n` ketiga file → clean.
+- Re-test aichat di folder terisolasi (`~/aichat-retest`): `aichat.sh --help` → skip install → tulis config → `exec aichat --help` cetak usage → EXIT 0. Bukti exec fix jalan.
+- codex/oterm hanya `bash -n` + pola benar (launch penuh gak bisa di Termux: codex butuh key/REPL, oterm pip native build gagal — by design, BUKAN bug).
+- Cleanup: retest dir dihapus; `pkg uninstall aichat` gagal (env read-only /etc/apt) tapi binary sdh hilang dari PATH.
+- Commit script: `61d64337b686a8b5ee0f58d17d52807119922d0a`. Docs di-commit terpisah.

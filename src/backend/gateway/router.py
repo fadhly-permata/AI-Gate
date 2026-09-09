@@ -50,7 +50,7 @@ from datetime import datetime
 from typing import List, Optional, Tuple, Union
 
 from fastapi import APIRouter, Request
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, ValidationError
 
 logger = logging.getLogger(__name__)
@@ -62,6 +62,14 @@ from backend.gateway import provider_adapter
 from backend.gateway.errors import GatewayError
 from backend.gateway import responses as _responses
 from backend.gateway.resolver import ResolvedTarget, TargetNotFound, resolve_target
+from backend.gateway.translator import (
+    ANTHROPIC_INVALID_REQUEST_CODE,
+    ANTHROPIC_MISSING_MODEL_CODE,
+    AnthropicMessagesRequest,
+    _extract_text,
+    anthropic_messages_request_to_openai_chat,
+    openai_chat_response_to_anthropic_messages,
+)
 from backend.log import log_error_exc, log_info, log_warning, log_warning_exc
 from backend.models import (
     Combo,
@@ -473,6 +481,226 @@ async def _handle_responses(request: Request, ctx: dict) -> dict:
         context={"model": model},
     )
     return _responses.chat_response_to_responses(chat_result, model)
+
+
+# --------------------------------------------------------------------------- #
+# Anthropic Messages API (POST /v1/messages) — inbound surface for claude-code
+# --------------------------------------------------------------------------- #
+# Stage 1 = NON-STREAMING. This is the SAME pipeline as ``/v1/responses`` (resolve
+# → adapter/combo → usage/logging) with two pure translation shims from
+# :mod:`backend.gateway.translator` (Anthropic request↔OpenAI chat). The ONLY
+# per-surface deviation: errors render as the **Anthropic** envelope
+# ``{"type":"error","error":{...}}`` (claude-code parses that shape) instead of the
+# OpenAI envelope — the internal :class:`GatewayError` is unchanged (DRY), only the
+# rendering differs. HTTP status mirrors the OpenAI contract (400/401/502..504).
+ANTHROPIC_LOG_SOURCE = "backend.gateway.router.anthropic"
+
+
+@router.post("/v1/messages")
+async def messages_completions(request: Request) -> Response:
+    """Anthropic Messages API proxy (Stage 1: non-streaming) → chat pipeline.
+
+    ``claude-code`` points ``ANTHROPIC_BASE_URL=<aigate>/v1/messages`` (no litellm
+    middleman). The request is translated to OpenAI chat by
+    :func:`backend.gateway.translator.anthropic_messages_request_to_openai_chat`
+    and run through the EXACT same resolver/adapter/combo/usage/logging pipeline as
+    ``/v1/chat/completions`` and ``/v1/responses``; the chat response is translated
+    back into the Anthropic Messages envelope.
+
+    B5.6 wrapper: same timing + ``RequestLog`` behavior as
+    ``chat_completions``/``responses_completions``. Per-surface deviation: a
+    :class:`GatewayError` is caught and rendered as the **Anthropic** error body
+    (the global OpenAI handler is deliberately NOT used here) so claude-code parses
+    the failure.
+    """
+    ctx: dict = {
+        "endpoint_id": None,
+        "model": None,
+        "payload": None,
+        "saved_bytes": None,
+    }
+    t0 = time.monotonic()
+    try:
+        result = await _handle_anthropic_messages(request, ctx)
+    except GatewayError as exc:
+        # Render Anthropic-shaped, but log the same internal envelope (R12).
+        _record_request_log_safe(
+            ctx, request, t0, error_envelope=exc.envelope, http_status=exc.status_code
+        )
+        return _anthropic_error_response(exc)
+    except Exception as exc:  # noqa: BLE001 - record debug row, then render Anthropic 500
+        _record_request_log_safe(
+            ctx, request, t0, error_envelope=None, http_status=500, exc=exc
+        )
+        return JSONResponse(
+            status_code=500,
+            content=_anthropic_error_body(
+                {
+                    "type": "api_error",
+                    "message": "internal server error",
+                    "code": "internal_error",
+                }
+            ),
+        )
+    _record_request_log_safe(ctx, request, t0, result=result, http_status=200)
+    return JSONResponse(content=result)
+
+
+async def _handle_anthropic_messages(request: Request, ctx: dict) -> dict:
+    """Validate + translate + route one Anthropic Messages request (raises)."""
+    payload = await _parse_object_body(request)
+
+    # `model` must be a non-empty string (resolved verbatim downstream, like chat).
+    model = payload.get("model")
+    if not isinstance(model, str) or not model:
+        log_warning(
+            "field 'model' is required and must be a string",
+            source=ANTHROPIC_LOG_SOURCE,
+        )
+        raise GatewayError(
+            400, "field 'model' is required", "invalid_request_error",
+            ANTHROPIC_MISSING_MODEL_CODE,
+        )
+
+    ctx["payload"] = payload
+    ctx["model"] = model
+
+    # Pydantic v1 shape check (semantic validation in the mapper).
+    try:
+        AnthropicMessagesRequest.parse_obj(payload)
+    except ValidationError as exc:
+        log_warning(
+            f"invalid anthropic messages request: {exc}",
+            source=ANTHROPIC_LOG_SOURCE,
+        )
+        raise GatewayError(
+            400,
+            "invalid anthropic messages request",
+            "invalid_request_error",
+            ANTHROPIC_INVALID_REQUEST_CODE,
+        )
+
+    # Anthropic → OpenAI chat translation; refuses stream:true / thinking.
+    chat_payload = anthropic_messages_request_to_openai_chat(payload)
+
+    # ADR-008: named Endpoint via X-Aigate-Endpoint header (same path as chat/responses).
+    endpoint_name = request.headers.get("x-aigate-endpoint")
+    if endpoint_name:
+        chat_payload, saved_bytes = _apply_token_saver_for_endpoint(
+            endpoint_name, chat_payload
+        )
+        ctx["saved_bytes"] = saved_bytes
+        chat_result = await _route_via_endpoint(
+            endpoint_name, model, chat_payload, request, ctx
+        )
+        if not isinstance(chat_result, dict):
+            # Defensive: unreachable while stream is refused; fail loudly (R12).
+            raise GatewayError(
+                500,
+                "endpoint path returned a stream for a non-streaming request",
+                "server_error",
+                "anthropic_internal_error",
+            )
+        log_info(
+            f"anthropic completion success via endpoint '{endpoint_name}' "
+            f"for model '{model}'",
+            source=ANTHROPIC_LOG_SOURCE,
+            context={"endpoint": endpoint_name, "model": model},
+        )
+        return openai_chat_response_to_anthropic_messages(chat_result, model)
+
+    try:
+        target = resolve_target(model)
+    except TargetNotFound as exc:
+        log_warning(
+            f"model reference not found: {model}",
+            source=ANTHROPIC_LOG_SOURCE,
+        )
+        raise GatewayError(
+            400, str(exc), "invalid_request_error", "model_not_found"
+        )
+
+    _upgrade_ctx_model(ctx, target.upstream_model)
+
+    # Combo strategy routing / plain provider — identical to the responses path so
+    # usage recording (B5.5) and savings attribution stay shared.
+    if target.combo_used:
+        combo_name = model[len("combo:"):]
+        chat_result = await execute_combo(combo_name, chat_payload)
+        _upgrade_ctx_model(ctx, chat_result.get("model"))
+    else:
+        chat_result = await provider_adapter.chat_completion(target, chat_payload)
+        _record_usage_safe(chat_result, target, endpoint_id=None)
+
+    log_info(
+        f"anthropic completion success for model '{model}'",
+        source=ANTHROPIC_LOG_SOURCE,
+        context={"model": model},
+    )
+    return openai_chat_response_to_anthropic_messages(chat_result, model)
+
+
+def _anthropic_error_body(error: dict) -> dict:
+    """Wrap an OpenAI-style error object into the Anthropic ``{"type":"error"}`` body."""
+    return {"type": "error", "error": error}
+
+
+def _anthropic_error_response(exc: GatewayError) -> JSONResponse:
+    """Render a :class:`GatewayError` as an Anthropic-shaped JSON error response."""
+    err = exc.envelope.get("error", {})
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=_anthropic_error_body(err),
+    )
+
+
+@router.post("/v1/messages/count_tokens")
+async def messages_count_tokens(request: Request) -> Response:
+    """Heuristic token estimate for an Anthropic ``/v1/messages`` request.
+
+    litellm parity: claude-code calls this so its UI shows a token count. Stage 1
+    uses a cheap heuristic (UTF-8 bytes ÷ 4, rounded; output_tokens:0) — no
+    upstream call, no universal tokenizer required (KISS/YAGNI). A real
+    tokenizer / upstream count is a future phase (design doc §8).
+    """
+    try:
+        payload = await request.json()
+    except Exception:  # noqa: BLE001 - malformed body
+        raise GatewayError(
+            400, "invalid JSON request body", "invalid_request_error", "invalid_json"
+        )
+    if not isinstance(payload, dict):
+        raise GatewayError(
+            400,
+            "request body must be a JSON object",
+            "invalid_request_error",
+            "invalid_body",
+        )
+
+    text_parts: List[str] = []
+    messages = payload.get("messages")
+    if isinstance(messages, list):
+        for m in messages:
+            if isinstance(m, dict):
+                text_parts.append(_extract_text(m.get("content")))
+    system = payload.get("system")
+    if system is not None:
+        text_parts.append(_extract_text(system))
+
+    joined = "".join(text_parts)
+    input_tokens = len(joined.encode("utf-8")) // 4
+    return JSONResponse(content={"input_tokens": input_tokens, "output_tokens": 0})
+
+
+@router.post("/api/event_logging/batch")
+async def event_logging_batch(request: Request) -> Response:
+    """Stub for claude-code telemetry batch (litellm parity).
+
+    claude-code POSTs event batches here; returning 202 keeps its telemetry from
+    emitting 404 noise. No body is persisted (the gateway is stateless w.r.t.
+    client-side telemetry).
+    """
+    return JSONResponse(status_code=202, content={})
 
 
 @router.get("/v1/models")

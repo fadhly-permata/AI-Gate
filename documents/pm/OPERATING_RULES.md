@@ -652,3 +652,53 @@ Wajib:
    `index.html:152`) — supaya fork tetap menunjuk ke asal, bukan ikut menunjuk diri sendiri.
 5. URL tidak diterjemahkan: di SEMUA varian bahasa alamatnya identik (perlu dicek saat menyebar
    kalimat lisensi ke 7 varian).
+
+## R46 — Koreksi typo/user salah ketik WAJIB, jangan diikuti
+Pelajaran (2026-09-09, user: 'bukannya ada rule kalo gua typo lu harus koreks?!'):
+user mengetik `scripts/cli-toils/` (typo dari `scripts/cli-tools/`); PM malah
+mengikuti typo itu alih-alih mengoreksi.
+
+Wajib:
+1. Bila user mengetik salah (typo / nama folder / salah ketik), PM WAJIB menunjukkan
+   bentuk yang benar dan memakai bentuk benar di seluruh komunikasi & file. JANGAN
+   diam-diam mengadopsi typo user.
+2. Kalau ragu mana yang benar, tanya SATU kalimat sebelum lanjut — jangan tebak
+   diam-diam.
+3. Koreksi cukup disisipkan ringkas ("maksud: <bentuk benar>") tanpa menghentikan
+   alur kerja; jangan pura-pura typo itu benar.
+
+## R47 — PM DILARANG asumsi/halusinasi; wajib fakta (patuh no-hallucination.md)
+Pelajaran (2026-09-09, user: 'bukannya ada rule kalo lu gak boleh asumsi & halusinasi?
+bicara selalu menggunakan fakta, data, context7, web search, atau at least konfirmasi
+ke user ya?').
+
+Wajib:
+1. Sebelum PM menegaskan perilaku tool/dependency — cara install, wiring ke aigate,
+   atau dukungan cross-platform (Termux / Windows / Linux / macOS) — PM WAJIB
+   verifikasi lewat SALAH SATU:
+   (a) baca kode nyata (codegraph → file spesifik + nomor baris),
+   (b) web search / context7 untuk fakta eksternal (npm registry, dokumentasi resmi
+       tool, dll), atau
+   (c) tanya user 1 kalimat kalau ragu.
+2. Klaim tanpa bukti = pelanggaran. Setiap pernyataan teknis wajib disertai sumber
+   (file:line / URL).
+3. Aturan ini menguatkan `.opencode/rules/no-hallucination.md`: jangan asumsi, jangan
+   halusinasi; selesaikan lewat skill (context7) / web search / tanya user.
+4. Berlaku juga untuk 23 tool sisanya (Grup A sisa + B + C): PM WAJIB verifikasi tiap
+   fakta (codegraph + web/context7 bila perlu fakta eksternal) SEBELUM menulis script
+   atau menegaskan apa pun. Kalau ragu → TANYA user, jangan tebak.
+
+## R48 — Pembuatan script WAJIB verifikasi dari >1 sumber fakta independen
+Pelajaran (2026-09-09, user: 'pastikan ya pembuatan script menggunakan sumber data &
+fakta lebih dari satu sumber'):
+Saat membuat script install/launch CLI tool (dan klaim teknis serupa), PM / specialist
+DILARANG cukup pakai SATU sumber. Wajib verifikasi dari MINIMAL 2 sumber fakta
+INDEPENDEN, misalnya kombinasi:
+  - kode aigate (`src/backend/**`, codegraph → file:line),
+  - registry npm / PyPI resmi (fakta package, binary, os/cpu/libc),
+  - dokumentasi resmi tool (docs tool tsb),
+  - GitHub releases / repo resmi tool.
+Lalu CROSS-CHECK antar sumber — kalau ada konflik, selidiki sampai konsisten. Satu sumber
+saja BELUM cukup untuk menegaskan fakta. Ini menguatkan R47 / no-hallucination.md: dari
+asumsi → fakta terverifikasi multipihak. Berlaku untuk 22 tool sisa (A3–C6) dan sesi
+berikutnya.

@@ -150,8 +150,12 @@ class LaunchSupport:
 # a newly added preset can never be launched until someone looks at it).
 #
 # Every entry below was checked ON THE DEVICE (Termux/aarch64), not from memory:
-#   claude / gemini  -> the gateway serves OpenAI /v1/chat/completions only;
-#                       these two speak Anthropic Messages / Google generateContent.
+#   claude  -> the gateway now serves a native inbound Anthropic Messages surface
+#              at POST /v1/messages (no litellm middleman), so claude-code points
+#              ANTHROPIC_BASE_URL there and speaks the Anthropic wire format natively.
+#   gemini  -> still unsupported: the gateway exposes no Google generateContent
+#              inbound surface; it speaks OpenAI /v1/chat/completions (and now
+#              Anthropic /v1/messages) only.
 #   codex            -> verified live: codex 0.122.0 (Termux tur build) refuses to
 #                       start with `wire_api = "chat"` ("no longer supported",
 #                       openai/codex discussion #7782) — it needs /v1/responses.
@@ -167,7 +171,7 @@ LAUNCH_SUPPORT: Dict[str, LaunchSupport] = {
     # --- Group A: agentic coding ---
     "aider": LaunchSupport(LAUNCH_VERIFIED),
     "opencode": LaunchSupport(LAUNCH_VERIFIED),
-    "claude": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_ANTHROPIC_ONLY),
+    "claude": LaunchSupport(LAUNCH_VERIFIED),
     "gemini": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_GEMINI_ONLY),
     "antigravity": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NOT_A_CLI),
     "phi": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_INSTALL_UNVERIFIED),
