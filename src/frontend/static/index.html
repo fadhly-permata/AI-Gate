@@ -3,6 +3,39 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- ===== i18n preloader (active language only) =====
+       One dictionary per language lives in i18n/<code>.js; i18n.js holds the
+       registry + helpers and no strings. This inline script runs synchronously
+       while the parser is still in <head>, so the file it injects is fetched
+       and executed BEFORE any deferred script (app.js & friends) — no race on
+       getStr() and no flash of English / raw keys on a reload in another
+       language. Only the active locale is loaded (plus en.js, the fallback
+       every locale needs); the rest are fetched on demand by i18n.js when the
+       user picks them. The code is whitelisted by regex before it reaches a
+       URL, and a locale file that does not exist yet simply fails to load —
+       i18n.js then renders English. Keep I18N_VER in sync with the ?v= tags
+       below; it is also read by i18n.js for the on-demand URLs. -->
+  <script>
+    (function () {
+      var V = "20260914";
+      window.I18N_VER = V;
+      var loc = "en";
+      try {
+        var s = localStorage.getItem("aigate.locale");
+        // Whitelist: 2-10 chars, lowercase letters + hyphens ("en", "zh-tw").
+        // Anything else can never reach the URL below.
+        if (s && /^[a-z][a-z-]{1,9}$/.test(s)) loc = s;
+      } catch (e) { /* storage blocked -> English */ }
+      var want = loc === "en" ? ["en"] : ["en", loc];
+      // Published for i18n.js: these files have already been fetched (these
+      // tags block the parser, so they are done before app.js runs). A code
+      // listed here with no dictionary is a 404 — do not probe it a second time.
+      window.I18N_PRELOAD = want;
+      for (var i = 0; i < want.length; i++) {
+        document.write('<script src="i18n/' + want[i] + ".js?v=" + V + '"><\/script>');
+      }
+    })();
+  </script>
   <title>aigate</title>
   <!-- Font Awesome via CDN (no build step, ADR-001) -->
   <link rel="stylesheet"
@@ -166,6 +199,9 @@
 
             <div class="form-row">
               <label class="form-label" for="setLocale" data-i18n="settings.locale">Language</label>
+              <!-- Rebuilt at boot from window.LANGS (app.js populateLocaleOptions),
+                   so a new language never needs an edit here. The two options
+                   below are the no-JS / no-registry fallback only. -->
               <select class="form-input" id="setLocale" name="locale">
                 <option value="en" data-i18n="settings.lang_en">English</option>
                 <option value="id" data-i18n="settings.lang_id">Indonesian</option>
@@ -1169,9 +1205,11 @@
       </nav>
     </div>
 
-  <!-- Client-side i18n dictionary (must load before app.js).
+  <!-- i18n registry + loader + helpers (must load before app.js).
+       Translation strings live in i18n/<code>.js, loaded by the inline
+       preloader in <head> (active language) and on demand by this file.
        ?v= cache-buster: bump whenever i18n.js changes (stale cache = missing labels). -->
-  <script src="i18n.js?v=20260913" defer></script>
+  <script src="i18n.js?v=20260914" defer></script>
   <!-- Device simulation helper (B4.2) — must load before app.js uses it -->
   <script src="device.js" defer></script>
   <!-- Searchable combobox widget (model pickers) — must load before app.js /
@@ -1180,7 +1218,7 @@
   <script src="combobox.js?v=20260911" defer></script>
   <!-- App bootstrap (defer preserves order).
        ?v= cache-buster: bump whenever app.js changes. -->
-  <script src="app.js?v=20260912" defer></script>
+  <script src="app.js?v=20260914" defer></script>
   <!-- Combos / Proxy Pools / Endpoints management (B2.4 / B2.3 / B2.5) -->
   <script src="combos.js" defer></script>
   <script src="proxies.js" defer></script>

@@ -1,131 +1,87 @@
-# AIGate
+# aigate 🚪
 
-Local AI proxy gateway and management console built with Python, FastAPI, and a vanilla JavaScript frontend.
+One door for every AI provider you use. One playground where AI coding
+agents do the typing for you. And the whole thing can run from your phone.
 
-## What it provides
+No Docker, no cloud account — aigate is just a plain Python app that lives
+on your own computer or Android device, and your API keys and history stay
+right there with it.
 
-- OpenAI-compatible gateway endpoints:
-  - `POST /v1/chat/completions`
-  - `POST /v1/responses` (non-streaming Responses API bridge)
-  - `GET /v1/models`
-- Provider management and model discovery.
-- Multi-provider combos with fallback, load balancing, latency/cost routing, and tiered strategies.
-- Endpoint routing with access control and proxy-pool binding.
-- Provider accounts, OAuth/token refresh support, quota and usage tracking.
-- Request logs, analytics, CSV export, and local settings backup/restore.
-- Local terminal with WebSocket PTY support and multiple tabs.
-- CLI tool launcher and self-heal workflow.
-- Responsive web UI with light/dark themes, EN/ID translations, searchable model pickers, and device simulation in developer mode.
+It's free and open source — no paid tier, and nothing locked behind a plan.
+Anyone may copy this code, so the one true home of aigate is
+[github.com/fadhly-permata/AI-Gate](https://github.com/fadhly-permata/AI-Gate).
 
-## Requirements
+🌐 **English** · [Bahasa Indonesia](documents/readme-variants/README.id.md) · [Русский](documents/readme-variants/README.ru.md) · [Nederlands](documents/readme-variants/README.nl.md) · [日本語](documents/readme-variants/README.ja.md) · [简体中文](documents/readme-variants/README.zh.md) · [繁體中文](documents/readme-variants/README.zh-tw.md) · [हिन्दी](documents/readme-variants/README.hi.md)
 
-- Python 3.10 or newer.
-- Internet access on first run when using the zero-setup launcher.
-- Node.js is only needed for frontend tests and browser automation.
+## Picture this ☕
 
-## Quick start
+You're on the bus home, phone in hand, browser open. Your side project
+keeps throwing errors. You type one sentence to your agent and hit go —
+a tab comes alive and starts fixing the errors one by one: run the test,
+read the failure, patch it, repeat. You just watch it work while the city
+rolls by. When the last error clears, the fixes land back on your main
+branch and the scratch branch quietly disappears. All of that from a
+phone, in a browser tab.
 
-Zero-setup launcher installs missing Python dependencies and starts the local server:
+## What makes it different ✨
+
+- **One door for all your AI providers.** Connect your provider accounts
+  once and aigate routes your requests through them — when one is down or
+  out of quota, the request still gets answered instead of failing.
+- **24 AI coding tools, one tap.** aigate runs them straight in its
+  built-in terminal tabs. Missing one? It shows an install command that
+  works on your device. The list is still growing — future versions may
+  add or change tools.
+- **A self-heal loop you can watch.** Point it at your project's errors:
+  it makes a branch, runs an agent in a live tab, fixes warning after
+  warning, and merges back when things pass. Nothing hidden — and it never
+  pretends a failed run succeeded.
+- **It really runs on a phone.** aigate installs and runs natively in
+  Termux on Android — no compilers, no build tools, nothing desktop-only.
+- **Private by default.** Your API keys and history are local data on
+  your device. Nothing talks to the cloud except the AI providers you
+  chose yourself.
+- **Comfortable to use.** Light and dark themes, seven languages, and a
+  UI that behaves on a small screen.
+
+## Try it in 60 seconds ⏱️
 
 ```bash
 python run.py
 ```
 
-Open <http://localhost:8080>.
+Open **http://localhost:8080** — the first run grabs the few Python
+packages it needs, then starts.
 
-For developer mode:
-
-```bash
-AIGATE_DEV=1 python run.py
-```
-
-Choose a different port with:
+Port busy? Pick another one:
 
 ```bash
 AIGATE_PORT=9090 python run.py
 ```
 
-## Install manually
+## Runs on your phone 📱
 
-Using a virtual environment:
+Install Termux on Android, get aigate in there, and start it the same way
+as on a laptop. The trickier part of phone life is installing the *coding
+tools* themselves — Android resolves packages differently than desktops —
+so aigate knows when it's on Termux and suggests the install command that
+actually works there, like a system package instead of the desktop one.
 
-```bash
-python -m venv .venv
-. .venv/bin/activate
-python -m pip install -e .
-python -m uvicorn backend.server:app --host 0.0.0.0 --port 8080
-```
+aigate is tested on Linux, Windows, and Android (Termux) — and it can run
+a full Linux distro inside your phone too, if you like that kind of magic.
 
-After editable installation, the `aigate` console command is also available:
+## Want the technical details? 📚
 
-```bash
-aigate --port 8080
-```
+The API, architecture, setup options, and testing docs all live in the
+[wiki](https://github.com/fadhly-permata/AI-Gate/wiki) — this README
+stays friendly, the wiki goes deep.
 
-On Windows, `pywinpty` is installed through the platform-specific dependency. POSIX and Termux use `ptyprocess`.
+## Status 📌
 
-## Frontend tests
+aigate is a personal, local-first tool under active development, tested
+across Linux, Windows, and Android (Termux). Try it, break it, and tell
+me where it hurts.
 
-```bash
-cd src/frontend
-npm install
-npm test
-```
+---
 
-Browser tests:
-
-```bash
-npm run test:e2e
-```
-
-Android/Termux browser runner:
-
-```bash
-PW_EXECUTABLE=/path/to/chromium PW_NO_SANDBOX=1 npm run test:e2e:android
-```
-
-## Backend tests
-
-From repository root, after installing development dependencies:
-
-```bash
-python -m pip install -e '.[dev]'
-pytest
-```
-
-## Configuration and data
-
-Runtime configuration and application data use the local SQLite database under `~/.aigate/`. API keys and other provider credentials are local application data; never commit them.
-
-Useful environment variables:
-
-- `AIGATE_PORT` — server port.
-- `AIGATE_DEV=1` — enable developer features.
-
-Local `.env`, database files, coverage output, and generated launcher configuration are ignored by Git.
-
-## Repository layout
-
-```text
-src/backend/       FastAPI server, gateway, routing, providers, terminal, CLI tools
-src/frontend/      Static vanilla JavaScript UI and browser tests
-tests/             Backend and project-level tests
-documents/         Product, architecture, API, setup, UX, and QA documentation
-documents/pm/                Project-manager memory and progress records
-run.py             Zero-setup launcher
-pyproject.toml     Python package and test configuration
-```
-
-## API compatibility
-
-Clients can use aigate as an OpenAI-compatible API by setting their base URL to:
-
-```text
-http://localhost:8080/v1
-```
-
-See [`documents/api/OPENAI_COMPATIBLE_CONTRACT.md`](documents/api/OPENAI_COMPATIBLE_CONTRACT.md) for the gateway contract and [`documents/dev/SETUP.md`](documents/dev/SETUP.md) for development standards.
-
-## Project status
-
-This repository is designed to run natively as a local Python application; deployment containers are not required.
+Made with ❤️ by Fadhly Permata

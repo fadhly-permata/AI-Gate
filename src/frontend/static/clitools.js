@@ -175,11 +175,72 @@
     setCliMsg(getStr("cli.loading"), "");
     fetchJson(CLI_API).then(function (data) {
       var list = (data && data.data) ? data.data : [];
-      renderGroups(list);
+      var cur = (data && data.current_platform) ? data.current_platform : "unknown";
+      renderGroups(list, cur);
       setCliMsg("");
     }).catch(function (err) {
       setCliMsg(getStr("cli.load_error") + " (" + err.message + ")", "error");
     });
+  }
+
+  /* Platform order shown as compatibility badges (must match backend PLATFORMS). */
+  var COMPAT_PLATFORMS = ["termux", "linux", "windows", "macos"];
+  /* Statuses that warrant a visible warning on the CURRENT platform. */
+  var COMPAT_WARN = { broken: 1, no_install: 1, not_a_cli: 1, not_wired: 1 };
+
+  function platformLabel(code) {
+    return getStr("cli.platform." + code);
+  }
+
+  function statusLabel(status) {
+    return getStr("cli.status." + (status || "unknown"));
+  }
+
+  /* One badge per platform, colored by status; the current platform is outlined. */
+  function renderCompatStrip(tool, currentPlatform) {
+    var compat = tool.compat || {};
+    var strip = document.createElement("div");
+    strip.className = "cli-compat";
+    COMPAT_PLATFORMS.forEach(function (p) {
+      var info = compat[p] || { status: "unknown", note: "", source: "unknown" };
+      var status = info.status || "unknown";
+      var chip = document.createElement("span");
+      chip.className = "cli-compat-chip cli-status-" + status +
+        (p === currentPlatform ? " cli-compat-current" : "");
+      chip.textContent = platformLabel(p);
+      chip.title = platformLabel(p) + ": " + statusLabel(status) +
+        (info.note ? " — " + info.note : "");
+      strip.appendChild(chip);
+    });
+    return strip;
+  }
+
+  /* Red warning line when the tool is not usable on the current platform. */
+  function renderCompatWarn(tool, currentPlatform) {
+    var compat = tool.compat || {};
+    var info = compat[currentPlatform] || { status: "unknown", note: "" };
+    var status = info.status || "unknown";
+    if (!COMPAT_WARN[status]) return null;
+    var warn = document.createElement("div");
+    warn.className = "cli-compat-warn";
+    warn.textContent = "⚠ " + getStr("cli.compat.warn_label") + " " + (info.note || statusLabel(status));
+    return warn;
+  }
+
+  /* Legend shown once above the groups (mirrors the per-tool badge styling). */
+  function renderCompatLegend(currentPlatform) {
+    var legend = document.createElement("div");
+    legend.className = "cli-compat-legend";
+    var txt = document.createElement("span");
+    txt.textContent = getStr("cli.compat.legend") + " ";
+    legend.appendChild(txt);
+    COMPAT_PLATFORMS.forEach(function (p) {
+      var chip = document.createElement("span");
+      chip.className = "cli-compat-chip" + (p === currentPlatform ? " cli-compat-current" : "");
+      chip.textContent = platformLabel(p);
+      legend.appendChild(chip);
+    });
+    return legend;
   }
 
   /* Human explanation for a struck-through tool. The server sends a stable
@@ -193,7 +254,7 @@
     return note === key ? getStr("cli.unsupported") : note;
   }
 
-  function renderGroups(groups) {
+  function renderGroups(groups, currentPlatform) {
     var wrap = el("cliGroups");
     if (!wrap) return;
     if (!groups.length) {
@@ -201,6 +262,10 @@
       return;
     }
     wrap.innerHTML = "";
+    // Legend explaining the per-platform badges (once, above all groups).
+    if (currentPlatform && currentPlatform !== "unknown") {
+      wrap.appendChild(renderCompatLegend(currentPlatform));
+    }
     groups.forEach(function (g) {
       var section = document.createElement("div");
       section.className = "cli-group";
@@ -214,6 +279,10 @@
       grid.className = "cli-tools";
 
       (g.tools || []).forEach(function (tool) {
+        // Cell = launch button + compatibility badges + optional warning.
+        var cell = document.createElement("div");
+        cell.className = "cli-tool-cell";
+
         var card = document.createElement("button");
         card.type = "button";
         card.className = "btn cli-tool";
@@ -237,7 +306,16 @@
           if (!launchable) { setCliMsg(unsupportedNote(tool), "warn"); return; }
           openLaunchModal(g, tool);
         });
-        grid.appendChild(card);
+        cell.appendChild(card);
+
+        // Per-platform compatibility badges (current platform highlighted).
+        cell.appendChild(renderCompatStrip(tool, currentPlatform));
+
+        // Red warning when the tool is not usable on the current platform.
+        var warn = renderCompatWarn(tool, currentPlatform);
+        if (warn) cell.appendChild(warn);
+
+        grid.appendChild(cell);
       });
 
       section.appendChild(grid);

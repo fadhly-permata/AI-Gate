@@ -1,793 +1,154 @@
-/* ===== aigate client-side i18n dictionary (EN / ID) ===== */
-/* Spec: FSD §2.7, TSD §3.4 — data-i18n keys resolved by applyLocale(). */
+/* ===== aigate client-side i18n: registry + loader + helpers ===== */
+/* Spec: FSD §2.7, TSD §3.4 — data-i18n keys resolved by applyLocale().
 
-window.I18N = {
-  en: {
-    "app.title": "aigate",
-    "app.subtitle": "AI Proxy Gateway",
-    "common.actions": "Actions",
-    "common.edit": "Edit",
-    "common.delete": "Delete",
-    "common.remove": "Remove",
-    "nav.group.gateway": "Gateway Setup",
-    "nav.group.operations": "Operations",
-    "nav.group.insights": "Insights",
-    "nav.group.system": "System",
-    "nav.providers": "Providers",
-    "nav.combos": "Combos",
-    "nav.proxies": "Proxy Pools",
-    "nav.endpoints": "Endpoints",
-    "nav.terminal": "Terminal",
-    "nav.cli": "CLI Tools",
-    "nav.settings": "Settings",
-    "nav.repo": "aigate Repo",
-    "settings.port": "Port",
-    "settings.dev_mode": "Developer Mode",
-    "settings.theme": "Theme",
-    "settings.locale": "Language",
-    "settings.save": "Save",
-    "settings.saved": "Settings saved.",
-    "settings.error": "Failed to save settings.",
-    "btn.theme": "Theme",
-    "btn.lang": "Language",
-    "btn.menu": "Toggle sidebar",
-    "ws.welcome": "Welcome to aigate",
-    "ws.placeholder": "The management console and terminal will appear here.",
-    "providers.add": "Add Provider",
-    "providers.edit": "Edit Provider",
-    "providers.name": "Name",
-    "providers.type": "Type",
-    "providers.base_url": "Base URL",
-    "providers.api_key": "API Key",
-    "providers.enabled": "Enabled",
-    "providers.disabled": "Disabled",
-    "providers.custom_headers": "Custom Headers",
-    "providers.add_header": "Add Header",
-    "providers.discover": "Discover Models",
-    "providers.discovering": "Discovering models…",
-    "providers.discovered": "Models discovered",
-    "providers.models": "Models",
-    "providers.no_models": "No models discovered yet.",
-    "providers.delete": "Delete",
-    "providers.no_items": "No providers yet.",
-    "providers.model_id": "Model ID",
-    "providers.model_name": "Model Name",
-    "providers.save": "Save",
-    "providers.cancel": "Cancel",
-    "providers.confirm_delete": "Are you sure you want to delete this provider?",
-    "providers.error": "Something went wrong. Please try again.",
-    "providers.model": "Model",
-    "providers.test": "Test Connection",
-    "providers.test_ok": "Connection OK",
-    "providers.test_fail": "Connection failed: ",
-    "term.log_window": "Log Window",
-    "term.refresh": "Refresh",
-    "term.severity": "Severity",
-    "term.sev_all": "All",
-    "term.sev_info": "Info",
-    "term.sev_warning": "Warning",
-    "term.sev_error": "Error",
-    "term.no_logs": "No logs.",
-    "term.pending": "Terminal connecting… (PTY backend in B3.2)",
-    "term.source": "Source",
-    "term.message": "Message",
-    "term.time": "Time",
-    "term.logs_error": "Failed to load logs.",
-    "term.stacktrace": "Stacktrace",
-    "term.new_tab": "New Tab",
-    "term.close_tab": "Close Tab",
-    "term.full_page": "Full Page",
-    "term.exit_full_page": "Exit Full Page",
-    "term.fullscreen": "Fullscreen",
-    "term.exit_fullscreen": "Exit Fullscreen",
-    "term.fullscreen_unsupported": "Fullscreen is not supported by this browser",
-    "term.fullscreen_menu": "Fullscreen options",
-    "term.full": "Full",
-    "term.settings": "Settings",
-    "term.settings_menu": "Settings options",
-    "term.paste": "Paste",
-    "term.paste_normal": "Paste normal",
-    "term.paste_menu": "Paste options",
-    "term.paste_code": "Paste as Code Block",
-    "term.keep_awake": "Keep Screen On",
-    "term.keep_awake_on": "Keep Screen On: On — the screen stays awake",
-    "term.keep_awake_off": "Keep Screen On: Off — the screen may sleep",
-    "term.keep_awake_unsupported": "Keep Screen On needs HTTPS or localhost (secure context)",
-    "term.keep_awake_error": "Keep Screen On could not be activated",
-    "term.tui_mode": "TUI Passthrough",
-    "term.tui_on": "TUI Passthrough: On — swipe goes to the app",
-    "term.tui_off": "TUI Passthrough: Off — swipe scrolls",
-    "term.connecting": "Connecting…",
-    "term.disconnected": "Terminal disconnected",
-    "term.reconnecting": "Reconnecting…",
-    "term.reconnected": "Reconnected",
-    "term.session_ended": "Session ended (code {n})",
-    "term.empty": "No terminal session yet. Open one to start working.",
-    "term.controls": "Terminal controls",
-    "cli.loading": "Loading CLI tools…",
-    "cli.load_error": "Failed to load CLI tools",
-    "cli.no_tools": "No CLI tool presets available.",
-    "cli.launch_title": "Launch CLI Tool",
-    "cli.launch": "Launch",
-    "cli.launching": "Launching…",
-    "cli.launching_or_installing": "Launching (will install if missing)…",
-    "cli.install": "Install",
-    "cli.installing": "Binary not found — installing…",
-    "cli.binary_missing": "Binary not found. The install command will run in a new terminal tab.",
-    "cli.model": "Model",
-    "cli.select_model": "Select Model",
-    "cli.cancel": "Cancel",
-    "cli.error": "Something went wrong launching the tool.",
-    "cli.resolve_error": "Failed to resolve tool.",
-    "cli.no_models": "No models available from the gateway.",
-    "cli.term_unavailable": "Terminal is not available.",
-    "cli.unsupported": "Not launchable against the aigate gateway yet.",
-    "cli.reason.pending": "No verified launch command yet — fix this tool next.",
-    "cli.reason.anthropic_only": "Needs an Anthropic /v1/messages endpoint; aigate only serves OpenAI /v1/chat/completions.",
-    "cli.reason.gemini_only": "Needs a Google generateContent endpoint; aigate only serves OpenAI /v1/chat/completions.",
-    "cli.reason.responses_only": "Needs the OpenAI Responses API (/v1/responses); aigate only serves /v1/chat/completions.",
-    "cli.reason.not_a_cli": "Not a CLI (GUI IDE or editor extension) — nothing to launch in a terminal.",
-    "cli.reason.no_binary": "No installable binary for this platform (needs cargo/go/brew or a native build).",
-    "cli.reason.install_unverified": "Package name not verified — the registry name is missing or squatted by an unrelated project.",
-    "selfheal.title": "Self-Heal",
-    "selfheal.check": "Check",
-    "selfheal.run": "Run Self-Heal",
-    "selfheal.checking": "Checking…",
-    "selfheal.running": "Running…",
-    "selfheal.ok": "OK",
-    "selfheal.status": "Status",
-    "selfheal.started": "Self-Heal is running — watch the new terminal tab.",
-    "selfheal.already_running": "Self-Heal is already running — watch the terminal tab.",
-    "selfheal.no_cli": "Self-Heal can't run: no agentic CLI installed",
-    "selfheal.cli_found": "Agentic CLI detected: {cli}",
-    "selfheal.merged": "Self-Heal complete: all issues resolved & merged to main ({n} iterations).",
-    "selfheal.partial": "Self-Heal ran but {n} issue(s) remain unresolved.",
-    "selfheal.git_failed": "Git operation failed",
-    "selfheal.error_generic": "Self-Heal failed unexpectedly.",
-    "selfheal.cli_label": "Agentic CLI",
-    "selfheal.model_label": "Model",
-    "selfheal.cli_auto": "Auto-detect (default)",
-    "selfheal.model_none": "No model flag (default)",
-    "selfheal.preview": "Live preview",
-    "selfheal.phase_label": "Phase",
-    "selfheal.phase.idle": "Idle",
-    "selfheal.phase.detecting": "Detecting agentic CLI",
-    "selfheal.phase.branching": "Creating heal branch",
-    "selfheal.phase.driving": "Driving agentic CLI",
-    "selfheal.phase.testing": "Running tests",
-    "selfheal.phase.merging": "Merging to main",
-    "selfheal.phase.done": "Done",
-    "selfheal.phase.aborted": "Aborted (run stopped)",
-    "selfheal.phase.skipped": "Skipped (nothing to heal)",
-    "selfheal.field.cli": "CLI",
-    "selfheal.field.model": "Model",
-    "selfheal.field.branch": "Branch",
-    "selfheal.field.iteration": "Iteration",
-    "selfheal.field.issue": "Issue",
-    "selfheal.field.remaining": "Remaining",
-    "selfheal.field.started": "Started",
-    "settings.device_sim": "Device Simulation",
-    "settings.device_phone": "Phone",
-    "settings.device_tablet": "Tablet",
-    "settings.device_desktop": "Desktop",
-    "settings.device_note": "Visual aid for development only — does not change server behavior.",
-    "settings.theme_light": "Light",
-    "settings.theme_dark": "Dark",
-    "settings.lang_en": "English",
-    "settings.lang_id": "Indonesian",
-    "lang.en": "English",
-    "lang.id": "Bahasa Indonesia",
-    "providers.header_key_ph": "Key",
-    "providers.header_val_ph": "Value",
-    "combos.title": "Combos",
-    "combos.add": "Add Combo",
-    "combos.edit": "Edit Combo",
-    "combos.name": "Name",
-    "combos.strategy": "Strategy",
-    "combos.enabled": "Enabled",
-    "combos.members": "Members",
-    "combos.delete": "Delete",
-    "combos.save": "Save",
-    "combos.cancel": "Cancel",
-    "combos.confirm_delete": "Delete this combo?",
-    "combos.error": "Something went wrong. Please try again.",
-    "combos.no_items": "No combos yet.",
-    "combos.strategy.three_tier": "Three-tier (subscription → cheap → free)",
-    "combos.strategy.fallback": "Fallback",
-    "combos.strategy.load_balance": "Load balance",
-    "combos.strategy.latency_cost": "Latency/cost",
-    "combos.members.none": "No members yet. Add a provider model to route this combo.",
-    "combos.member.add": "Add member",
-    "combos.member.update": "Update member",
-    "combos.member.provider": "Provider",
-    "combos.member.provider_ph": "— select provider —",
-    "combos.member.model": "Model",
-    "combos.member.model_required": "Pick a model from the list, or type one.",
-    "combos.member.priority": "Priority",
-    "combos.member.weight": "Weight",
-    "combos.member.remove": "Remove",
-    "combos.member.edit": "Edit",
-    "combos.member.cancel_edit": "Cancel edit",
-    "combos.member.confirm_delete": "Remove this member?",
-    "combos.member.provider_required": "Select a provider first.",
-    "combos.member.loading": "Loading models…",
-    "combos.member.load_failed": "Couldn't refresh models — showing cached",
-    "combobox.loading": "Loading models…",
-    "combobox.no_match": "No models match",
-    "combobox.search_ph": "Search or type a model…",
-    "combobox.use_custom": "Use \"%s\" as custom model",
-    "combobox.group_combos": "Combos",
-    "proxies.title": "Proxy Pools",
-    "proxies.add": "Add Proxy Pool",
-    "proxies.edit": "Edit Proxy Pool",
-    "proxies.name": "Name",
-    "proxies.strategy": "Rotation",
-    "proxies.strategy.round_robin": "Round robin",
-    "proxies.strategy.random": "Random",
-    "proxies.strategy.latency_cost": "Latency/cost",
-    "proxies.strategy.least_latency": "Least latency",
-    "proxies.enabled": "Enabled",
-    "proxies.nodes": "Nodes",
-    "proxies.health": "Health Check",
-    "proxies.health_done": "Health check complete",
-    "proxies.delete": "Delete",
-    "proxies.save": "Save",
-    "proxies.cancel": "Cancel",
-    "proxies.confirm_delete": "Delete this proxy pool?",
-    "proxies.error": "Something went wrong. Please try again.",
-    "proxies.no_items": "No proxy pools yet.",
-    "endpoints.title": "Endpoints",
-    "endpoints.add": "Add Endpoint",
-    "endpoints.edit": "Edit Endpoint",
-    "endpoints.name": "Name",
-    "endpoints.listen": "Listen",
-    "endpoints.host": "Host",
-    "endpoints.port": "Port",
-    "endpoints.access_control": "Access Control",
-    "endpoints.proxy_pool": "Proxy Pool",
-    "endpoints.binding": "Binding",
-    "endpoints.bind_type": "Bind To",
-    "endpoints.bind_id": "Bind ID",
-    "endpoints.bind.provider": "Provider",
-    "endpoints.bind.combo": "Combo",
-    "endpoints.none": "None",
-    "endpoints.enabled": "Enabled",
-    "endpoints.delete": "Delete",
-    "endpoints.save": "Save",
-    "endpoints.cancel": "Cancel",
-    "endpoints.confirm_delete": "Delete this endpoint?",
-    "endpoints.error": "Something went wrong. Please try again.",
-    "endpoints.no_items": "No endpoints yet.",
-    "btn.log_window": "Log Window",
-    "log.show": "Show log window",
-    "log.hide": "Hide log window",
-    "log.clear": "Clear logs",
-    "log.clear_title": "Clear logs",
-    "log.clear_warning": "This permanently deletes the selected log entries. This cannot be undone.",
-    "log.clear_scope": "Scope",
-    "log.clear_scope_warn_err": "Warnings + Errors only",
-    "log.clear_scope_all": "All logs",
-    "log.clear_confirm_btn": "Delete",
-    "log.cancel": "Cancel",
-    "log.cleared": "Deleted {n} log entries.",
-    "log.show_resolved": "Show resolved",
-    "log.resolved": "Resolved",
-    "log.resolve": "Mark as resolved",
-    "log.resolve_all": "Resolve all (filtered)",
-    "log.resolved_n": "Marked {n} entries resolved.",
-    "accounts.title": "Accounts",
-    "accounts.add": "Add Account",
-    "accounts.label": "Label",
-    "accounts.auth_type": "Auth Type",
-    "accounts.api_key": "API Key",
-    "accounts.auth_api_key": "API Key",
-    "accounts.auth_oauth": "OAuth",
-    "accounts.connect_oauth": "Connect OAuth",
-    "accounts.oauth_waiting": "Waiting for OAuth…",
-    "accounts.oauth_ok": "OAuth connected",
-    "accounts.oauth_not_configured": "OAuth is not configured for this provider.",
-    "accounts.oauth_timeout": "OAuth connect timed out. Please try again.",
-    "accounts.add_error": "Failed to add account",
-    "accounts.delete": "Delete",
-    "accounts.none": "No accounts yet.",
-    "accounts.delete_confirm": "Delete this account?",
-    "accounts.credential": "Credential",
-    "accounts.expires": "Expires",
-    "accounts.oauth_badge": "OAuth",
-    "accounts.provider_required": "Select a provider first.",
-    "nav.usage": "Usage & Quota",
-    "usage.title": "Usage & Quota",
-    "usage.quota": "Quota",
-    "usage.summary": "Usage summary",
-    "usage.recent": "Recent usage",
-    "usage.provider": "Provider",
-    "usage.tier": "Tier",
-    "usage.used": "Used",
-    "usage.limit": "Limit",
-    "usage.remaining": "Remaining",
-    "usage.unlimited": "unlimited",
-    "usage.progress": "Progress",
-    "usage.reset": "Resets in",
-    "usage.window": "Window",
-    "usage.cost": "Cost (est.)",
-    "usage.requests": "Requests",
-    "usage.tokens_in": "Tokens in",
-    "usage.tokens_out": "Tokens out",
-    "usage.model": "Model",
-    "usage.time": "Time",
-    "usage.range": "Range",
-    "usage.range.day": "Day",
-    "usage.range.week": "Week",
-    "usage.range.month": "Month",
-    "usage.by_provider": "By provider",
-    "usage.by_model": "By model",
-    "usage.top_models": "Top models",
-    "usage.no_data": "No data.",
-    "usage.refresh": "Refresh",
-    "nav.analytics": "Analytics",
-    "analytics.title": "Usage Analytics",
-    "analytics.range": "Range",
-    "analytics.group_by": "Group by",
-    "analytics.provider": "Provider",
-    "analytics.model": "Model",
-    "analytics.group": "Group",
-    "analytics.trend": "Trend",
-    "analytics.totals": "Totals",
-    "analytics.savings": "Est. savings (tokens)",
-    "analytics.by_group": "By group",
-    "analytics.no_data": "No data.",
-    "analytics.requests": "Requests",
-    "analytics.tokens_in": "Tokens in",
-    "analytics.tokens_out": "Tokens out",
-    "analytics.cost": "Cost (est.)",
-    "analytics.metric": "Metric",
-    "analytics.metric.tokens": "Tokens",
-    "analytics.metric.requests": "Requests",
-    "analytics.metric.cost": "Cost",
-    "analytics.refresh": "Refresh",
-    "analytics.export": "Export CSV",
-    "analytics.export.ok": "Export started.",
-    "reqlog.title": "Request Log (debug)",
-    "reqlog.enable": "Enable request logging",
-    "reqlog.ts": "Time",
-    "reqlog.model": "Model",
-    "reqlog.endpoint": "Endpoint",
-    "reqlog.duration": "Duration",
-    "reqlog.request": "Request",
-    "reqlog.response": "Response",
-    "reqlog.payload": "Payload",
-    "reqlog.empty": "Request logging is off or no logs yet.",
-    "reqlog.refresh": "Refresh",
-    "reqlog.truncated": "payload truncated",
-    "reqlog.enabled_ok": "Request logging enabled.",
-    "reqlog.disabled_ok": "Request logging disabled.",
-    "settings.backup.title": "Backup & Restore (local)",
-    "settings.backup.note": "Export all settings to one JSON file, or restore from a file. Stored locally — no cloud.",
-    "settings.export": "Export settings",
-    "settings.export.ok": "Export started.",
-    "settings.import": "Import settings",
-    "settings.import.choose": "Choose file",
-    "settings.import.mode": "Mode",
-    "settings.import.mode.replace": "Replace (overwrite all)",
-    "settings.import.mode.merge": "Merge",
-    "settings.import.confirm": "Importing in Replace mode erases ALL current settings before restoring. Continue?",
-    "settings.import.confirm.merge": "Import will merge the file into your current settings (existing items kept). Continue?",
-    "settings.import.done": "Import complete:",
-    "settings.import.invalid": "Invalid file: not a valid aigate settings JSON.",
-    "settings.import.error": "Import failed:",
-    "settings.import.cancelled": "Import cancelled.",
-    "settings.import.no_file": "Choose a settings file first."
-  },
-  id: {
-    "app.title": "aigate",
-    "app.subtitle": "Gateway Proxy AI",
-    "common.actions": "Aksi",
-    "common.edit": "Ubah",
-    "common.delete": "Hapus",
-    "common.remove": "Hapus",
-    "nav.group.gateway": "Penyiapan Gateway",
-    "nav.group.operations": "Operasi",
-    "nav.group.insights": "Wawasan",
-    "nav.group.system": "Sistem",
-    "nav.providers": "Penyedia",
-    "nav.combos": "Kombo",
-    "nav.proxies": "Pool Proxy",
-    "nav.endpoints": "Endpoint",
-    "nav.terminal": "Terminal",
-    "nav.cli": "Alat CLI",
-    "nav.settings": "Pengaturan",
-    // "aigate Repo" = nama produk/tautan eksternal, sengaja SAMA dengan EN
-    // (bukan string bilingual campur — tetap satu kunci satu nilai per locale).
-    "nav.repo": "aigate Repo",
-    "settings.port": "Port",
-    "settings.dev_mode": "Mode Pengembang",
-    "settings.theme": "Tema",
-    "settings.locale": "Bahasa",
-    "settings.save": "Simpan",
-    "settings.saved": "Pengaturan tersimpan.",
-    "settings.error": "Gagal menyimpan pengaturan.",
-    "btn.theme": "Tema",
-    "btn.lang": "Bahasa",
-    "btn.menu": "Alihkan bilah sisi",
-    "ws.welcome": "Selamat datang di aigate",
-    "ws.placeholder": "Konsol manajemen dan terminal akan muncul di sini.",
-    "providers.add": "Tambah Penyedia",
-    "providers.edit": "Edit Penyedia",
-    "providers.name": "Nama",
-    "providers.type": "Tipe",
-    "providers.base_url": "URL Dasar",
-    "providers.api_key": "Kunci API",
-    "providers.enabled": "Aktif",
-    "providers.disabled": "Nonaktif",
-    "providers.custom_headers": "Header Kustom",
-    "providers.add_header": "Tambah Header",
-    "providers.discover": "Temukan Model",
-    "providers.discovering": "Sedang mencari model…",
-    "providers.discovered": "Model ditemukan",
-    "providers.models": "Model",
-    "providers.no_models": "Belum ada model yang ditemukan.",
-    "providers.delete": "Hapus",
-    "providers.no_items": "Belum ada penyedia.",
-    "providers.model_id": "ID Model",
-    "providers.model_name": "Nama Model",
-    "providers.save": "Simpan",
-    "providers.cancel": "Batal",
-    "providers.confirm_delete": "Yakin ingin menghapus penyedia ini?",
-    "providers.error": "Terjadi kesalahan. Silakan coba lagi.",
-    "providers.model": "Model",
-    "providers.test": "Tes Koneksi",
-    "providers.test_ok": "Koneksi berhasil",
-    "providers.test_fail": "Koneksi gagal: ",
-    "term.log_window": "Jendela Log",
-    "term.refresh": "Segarkan",
-    "term.severity": "Tingkat",
-    "term.sev_all": "Semua",
-    "term.sev_info": "Info",
-    "term.sev_warning": "Peringatan",
-    "term.sev_error": "Kesalahan",
-    "term.no_logs": "Tidak ada log.",
-    "term.pending": "Terminal menyambung… (backend PTY di B3.2)",
-    "term.source": "Sumber",
-    "term.message": "Pesan",
-    "term.time": "Waktu",
-    "term.logs_error": "Gagal memuat log.",
-    "term.stacktrace": "Jejak tumpukan",
-    "term.new_tab": "Tab Baru",
-    "term.close_tab": "Tutup Tab",
-    "term.full_page": "Sepenuh Halaman",
-    "term.exit_full_page": "Keluar Sepenuh Halaman",
-    "term.fullscreen": "Layar Penuh",
-    "term.exit_fullscreen": "Keluar Layar Penuh",
-    "term.fullscreen_unsupported": "Layar Penuh tidak didukung browser ini",
-    "term.fullscreen_menu": "Opsi layar penuh",
-    "term.full": "Penuh",
-    "term.settings": "Pengaturan",
-    "term.settings_menu": "Opsi pengaturan",
-    "term.paste": "Tempel",
-    "term.paste_normal": "Tempel normal",
-    "term.paste_menu": "Opsi tempel",
-    "term.paste_code": "Tempel sebagai Blok Kode",
-    "term.keep_awake": "Layar Tetap Nyala",
-    "term.keep_awake_on": "Layar Tetap Nyala: Aktif — layar tidak ikut tidur",
-    "term.keep_awake_off": "Layar Tetap Nyala: Nonaktif — layar bisa tidur",
-    "term.keep_awake_unsupported": "Layar Tetap Nyala butuh HTTPS atau localhost (konteks aman)",
-    "term.keep_awake_error": "Layar Tetap Nyala tidak bisa diaktifkan",
-    "term.tui_mode": "Passthrough TUI",
-    "term.tui_on": "Passthrough TUI: Aktif — swipe dipakai aplikasi",
-    "term.tui_off": "Passthrough TUI: Nonaktif — swipe untuk scroll",
-    "term.connecting": "Menyambung…",
-    "term.disconnected": "Terminal terputus",
-    "term.reconnecting": "Menyambung ulang…",
-    "term.reconnected": "Terhubung kembali",
-    "term.session_ended": "Sesi berakhir (code {n})",
-    "term.empty": "Belum ada sesi terminal. Buka satu untuk mulai bekerja.",
-    "term.controls": "Kontrol terminal",
-    "cli.loading": "Memuat alat CLI…",
-    "cli.load_error": "Gagal memuat alat CLI",
-    "cli.no_tools": "Tidak ada preset alat CLI tersedia.",
-    "cli.launch_title": "Jalankan Alat CLI",
-    "cli.launch": "Jalankan",
-    "cli.launching": "Sedang menjalankan…",
-    "cli.launching_or_installing": "Menjalankan (memasang bila belum terpasang)…",
-    "cli.install": "Pasang",
-    "cli.installing": "Binary tidak ditemukan — memasang…",
-    "cli.binary_missing": "Binary tidak ditemukan. Perintah pemasangan akan dijalankan di tab terminal baru.",
-    "cli.model": "Model",
-    "cli.select_model": "Pilih Model",
-    "cli.cancel": "Batal",
-    "cli.error": "Terjadi kendala saat menjalankan alat.",
-    "cli.resolve_error": "Gagal menyelesaikan alat.",
-    "cli.no_models": "Tidak ada model dari gateway.",
-    "cli.term_unavailable": "Terminal tidak tersedia.",
-    "cli.unsupported": "Belum bisa dijalankan terhadap gateway aigate.",
-    "cli.reason.pending": "Belum ada command launch yang terverifikasi — perbaiki alat ini berikutnya.",
-    "cli.reason.anthropic_only": "Butuh endpoint Anthropic /v1/messages; aigate baru serve OpenAI /v1/chat/completions.",
-    "cli.reason.gemini_only": "Butuh endpoint Google generateContent; aigate baru serve OpenAI /v1/chat/completions.",
-    "cli.reason.responses_only": "Butuh OpenAI Responses API (/v1/responses); aigate baru serve /v1/chat/completions.",
-    "cli.reason.not_a_cli": "Bukan CLI (IDE GUI atau ekstensi editor) — tidak ada yang bisa dijalankan di terminal.",
-    "cli.reason.no_binary": "Tidak ada binary yang bisa dipasang di platform ini (butuh cargo/go/brew atau build native).",
-    "cli.reason.install_unverified": "Nama paket belum terverifikasi — tidak ada di registry atau dipakai proyek lain.",
-    "selfheal.title": "Self-Heal",
-    "selfheal.check": "Periksa",
-    "selfheal.run": "Jalankan Self-Heal",
-    "selfheal.checking": "Memeriksa…",
-    "selfheal.running": "Berjalan…",
-    "selfheal.ok": "OK",
-    "selfheal.status": "Status",
-    "selfheal.started": "Self-Heal jalan — lihat tab terminal baru.",
-    "selfheal.already_running": "Self-Heal masih jalan — lihat tab terminal.",
-    "selfheal.no_cli": "Self-Heal tidak bisa berjalan: tidak ada agentic CLI terinstall",
-    "selfheal.cli_found": "Agentic CLI terdeteksi: {cli}",
-    "selfheal.merged": "Self-Heal selesai: semua issue teratasi & di-merge ke main. ({n} iterasi).",
-    "selfheal.partial": "Self-Heal berjalan tapi {n} issue belum teratasi.",
-    "selfheal.git_failed": "Operasi git gagal",
-    "selfheal.error_generic": "Self-Heal gagal tak terduga.",
-    "selfheal.cli_label": "CLI agentic",
-    "selfheal.model_label": "Model",
-    "selfheal.cli_auto": "Auto-deteksi (default)",
-    "selfheal.model_none": "Tanpa flag model (default)",
-    "selfheal.preview": "Pratinjau langsung",
-    "selfheal.phase_label": "Fase",
-    "selfheal.phase.idle": "Menganggur",
-    "selfheal.phase.detecting": "Mendeteksi CLI agentic",
-    "selfheal.phase.branching": "Membuat branch heal",
-    "selfheal.phase.driving": "Menjalankan CLI agentic",
-    "selfheal.phase.testing": "Menjalankan tes",
-    "selfheal.phase.merging": "Merge ke main",
-    "selfheal.phase.done": "Selesai",
-    "selfheal.phase.aborted": "Dibatalkan (berhenti)",
-    "selfheal.phase.skipped": "Dilewati (tidak ada yang diheal)",
-    "selfheal.field.cli": "CLI",
-    "selfheal.field.model": "Model",
-    "selfheal.field.branch": "Branch",
-    "selfheal.field.iteration": "Iterasi",
-    "selfheal.field.issue": "Issue",
-    "selfheal.field.remaining": "Sisa",
-    "selfheal.field.started": "Mulai",
-    "settings.device_sim": "Simulasi Perangkat",
-    "settings.device_phone": "Telepon",
-    "settings.device_tablet": "Tablet",
-    "settings.device_desktop": "Desktop",
-    "settings.device_note": "Bantuan visual untuk pengembangan saja — tidak mengubah perilaku server.",
-    "settings.theme_light": "Terang",
-    "settings.theme_dark": "Gelap",
-    "settings.lang_en": "Inggris",
-    "settings.lang_id": "Indonesia",
-    "lang.en": "English",
-    "lang.id": "Bahasa Indonesia",
-    "providers.header_key_ph": "Kunci",
-    "providers.header_val_ph": "Nilai",
-    "combos.title": "Kombo",
-    "combos.add": "Tambah Kombo",
-    "combos.edit": "Edit Kombo",
-    "combos.name": "Nama",
-    "combos.strategy": "Strategi",
-    "combos.enabled": "Aktif",
-    "combos.members": "Anggota",
-    "combos.delete": "Hapus",
-    "combos.save": "Simpan",
-    "combos.cancel": "Batal",
-    "combos.confirm_delete": "Hapus kombo ini?",
-    "combos.error": "Terjadi kesalahan. Silakan coba lagi.",
-    "combos.no_items": "Belum ada kombo.",
-    "combos.strategy.three_tier": "Tiga tingkat (langganan → murah → gratis)",
-    "combos.strategy.fallback": "Fallback",
-    "combos.strategy.load_balance": "Beban merata",
-    "combos.strategy.latency_cost": "Latensi/biaya",
-    "combos.members.none": "Belum ada anggota. Tambahkan model penyedia untuk merutekan kombo ini.",
-    "combos.member.add": "Tambah anggota",
-    "combos.member.update": "Perbarui anggota",
-    "combos.member.provider": "Penyedia",
-    "combos.member.provider_ph": "— pilih penyedia —",
-    "combos.member.model": "Model",
-    "combos.member.model_required": "Pilih model dari daftar, atau ketik sendiri.",
-    "combos.member.priority": "Prioritas",
-    "combos.member.weight": "Bobot",
-    "combos.member.remove": "Hapus",
-    "combos.member.edit": "Ubah",
-    "combos.member.cancel_edit": "Batal ubah",
-    "combos.member.confirm_delete": "Hapus anggota ini?",
-    "combos.member.provider_required": "Pilih penyedia terlebih dahulu.",
-    "combos.member.loading": "Memuat model…",
-    "combos.member.load_failed": "Gagal menyegarkan model — menampilkan cache",
-    "combobox.loading": "Memuat model…",
-    "combobox.no_match": "Tidak ada model yang cocok",
-    "combobox.search_ph": "Cari atau ketik model…",
-    "combobox.use_custom": "Pakai \"%s\" sebagai model kustom",
-    "combobox.group_combos": "Kombo",
-    "proxies.title": "Pool Proxy",
-    "proxies.add": "Tambah Pool Proxy",
-    "proxies.edit": "Edit Pool Proxy",
-    "proxies.name": "Nama",
-    "proxies.strategy": "Rotasi",
-    "proxies.strategy.round_robin": "Bulat balik",
-    "proxies.strategy.random": "Acak",
-    "proxies.strategy.latency_cost": "Latensi/biaya",
-    "proxies.strategy.least_latency": "Latensi terendah",
-    "proxies.enabled": "Aktif",
-    "proxies.nodes": "Node",
-    "proxies.health": "Cek Kesehatan",
-    "proxies.health_done": "Cek kesehatan selesai",
-    "proxies.delete": "Hapus",
-    "proxies.save": "Simpan",
-    "proxies.cancel": "Batal",
-    "proxies.confirm_delete": "Hapus pool proxy ini?",
-    "proxies.error": "Terjadi kesalahan. Silakan coba lagi.",
-    "proxies.no_items": "Belum ada pool proxy.",
-    "endpoints.title": "Endpoint",
-    "endpoints.add": "Tambah Endpoint",
-    "endpoints.edit": "Edit Endpoint",
-    "endpoints.name": "Nama",
-    "endpoints.listen": "Dengarkan",
-    "endpoints.host": "Host",
-    "endpoints.port": "Port",
-    "endpoints.access_control": "Kontrol Akses",
-    "endpoints.proxy_pool": "Pool Proxy",
-    "endpoints.binding": "Binding",
-    "endpoints.bind_type": "Ikat Ke",
-    "endpoints.bind_id": "ID Ikat",
-    "endpoints.bind.provider": "Penyedia",
-    "endpoints.bind.combo": "Kombo",
-    "endpoints.none": "Tidak Ada",
-    "endpoints.enabled": "Aktif",
-    "endpoints.delete": "Hapus",
-    "endpoints.save": "Simpan",
-    "endpoints.cancel": "Batal",
-    "endpoints.confirm_delete": "Hapus endpoint ini?",
-    "endpoints.error": "Terjadi kesalahan. Silakan coba lagi.",
-    "endpoints.no_items": "Belum ada endpoint.",
-    "btn.log_window": "Jendela Log",
-    "log.show": "Tampilkan jendela log",
-    "log.hide": "Sembunyikan jendela log",
-    "log.clear": "Bersihkan log",
-    "log.clear_title": "Bersihkan log",
-    "log.clear_warning": "Tindakan ini menghapus permanen log terpilih. Tidak bisa dibatalkan.",
-    "log.clear_scope": "Cakupan",
-    "log.clear_scope_warn_err": "Hanya Warning + Error",
-    "log.clear_scope_all": "Semua log",
-    "log.clear_confirm_btn": "Hapus",
-    "log.cancel": "Batal",
-    "log.cleared": "{n} log dihapus.",
-    "log.show_resolved": "Tampilkan yang selesai",
-    "log.resolved": "Selesai",
-    "log.resolve": "Tandai selesai",
-    "log.resolve_all": "Tandai semua selesai (terfilter)",
-    "log.resolved_n": "{n} log ditandai selesai.",
-    "accounts.title": "Akun",
-    "accounts.add": "Tambah Akun",
-    "accounts.label": "Label",
-    "accounts.auth_type": "Tipe Auth",
-    "accounts.api_key": "Kunci API",
-    "accounts.auth_api_key": "Kunci API",
-    "accounts.auth_oauth": "OAuth",
-    "accounts.connect_oauth": "Hubungkan OAuth",
-    "accounts.oauth_waiting": "Menunggu OAuth…",
-    "accounts.oauth_ok": "OAuth terhubung",
-    "accounts.oauth_not_configured": "OAuth belum dikonfigurasi untuk penyedia ini.",
-    "accounts.oauth_timeout": "Koneksi OAuth habis waktu. Coba lagi.",
-    "accounts.add_error": "Gagal menambah akun",
-    "accounts.delete": "Hapus",
-    "accounts.none": "Belum ada akun.",
-    "accounts.delete_confirm": "Hapus akun ini?",
-    "accounts.credential": "Kredensial",
-    "accounts.expires": "Kedaluwarsa",
-    "accounts.oauth_badge": "OAuth",
-    "accounts.provider_required": "Pilih penyedia terlebih dahulu.",
-    "nav.usage": "Pemakaian & Kuota",
-    "usage.title": "Pemakaian & Kuota",
-    "usage.quota": "Kuota",
-    "usage.summary": "Ringkasan pemakaian",
-    "usage.recent": "Pemakaian terbaru",
-    "usage.provider": "Penyedia",
-    "usage.tier": "Tingkat",
-    "usage.used": "Terpakai",
-    "usage.limit": "Batas",
-    "usage.remaining": "Sisa",
-    "usage.unlimited": "tanpa batas",
-    "usage.progress": "Progres",
-    "usage.reset": "Reset dalam",
-    "usage.window": "Jendela",
-    "usage.cost": "Biaya (est.)",
-    "usage.requests": "Permintaan",
-    "usage.tokens_in": "Token masuk",
-    "usage.tokens_out": "Token keluar",
-    "usage.model": "Model",
-    "usage.time": "Waktu",
-    "usage.range": "Rentang",
-    "usage.range.day": "Harian",
-    "usage.range.week": "Mingguan",
-    "usage.range.month": "Bulanan",
-    "usage.by_provider": "Per penyedia",
-    "usage.by_model": "Per model",
-    "usage.top_models": "Model teratas",
-    "usage.no_data": "Tidak ada data.",
-    "usage.refresh": "Segarkan",
-    "nav.analytics": "Analitik",
-    "analytics.title": "Analitik Pemakaian",
-    "analytics.range": "Rentang",
-    "analytics.group_by": "Grup berdasarkan",
-    "analytics.provider": "Penyedia",
-    "analytics.model": "Model",
-    "analytics.group": "Grup",
-    "analytics.trend": "Tren",
-    "analytics.totals": "Total",
-    "analytics.savings": "Estimasi hemat (token)",
-    "analytics.by_group": "Per grup",
-    "analytics.no_data": "Tidak ada data.",
-    "analytics.requests": "Permintaan",
-    "analytics.tokens_in": "Token masuk",
-    "analytics.tokens_out": "Token keluar",
-    "analytics.cost": "Biaya (est.)",
-    "analytics.metric": "Metrik",
-    "analytics.metric.tokens": "Token",
-    "analytics.metric.requests": "Permintaan",
-    "analytics.metric.cost": "Biaya",
-    "analytics.refresh": "Segarkan",
-    "analytics.export": "Ekspor CSV",
-    "analytics.export.ok": "Ekspor dimulai.",
-    "reqlog.title": "Log Permintaan (debug)",
-    "reqlog.enable": "Aktifkan log permintaan",
-    "reqlog.ts": "Waktu",
-    "reqlog.model": "Model",
-    "reqlog.endpoint": "Endpoint",
-    "reqlog.duration": "Durasi",
-    "reqlog.request": "Permintaan",
-    "reqlog.response": "Respons",
-    "reqlog.payload": "Muatan",
-    "reqlog.empty": "Log permintaan nonaktif atau belum ada log.",
-    "reqlog.refresh": "Segarkan",
-    "reqlog.truncated": "muatan terpotong",
-    "reqlog.enabled_ok": "Log permintaan diaktifkan.",
-    "reqlog.disabled_ok": "Log permintaan dinonaktifkan.",
-    "settings.backup.title": "Cadangkan & Pulihkan (lokal)",
-    "settings.backup.note": "Ekspor semua pengaturan ke satu file JSON, atau pulihkan dari file. Disimpan lokal — tanpa cloud.",
-    "settings.export": "Ekspor pengaturan",
-    "settings.export.ok": "Ekspor dimulai.",
-    "settings.import": "Impor pengaturan",
-    "settings.import.choose": "Pilih file",
-    "settings.import.mode": "Mode",
-    "settings.import.mode.replace": "Ganti (timpa semua)",
-    "settings.import.mode.merge": "Gabung",
-    "settings.import.confirm": "Impor mode Ganti akan menghapus SEMUA pengaturan saat ini sebelum memulihkan. Lanjutkan?",
-    "settings.import.confirm.merge": "Impor akan menggabungkan file ke pengaturan saat ini (item yang ada dipertahankan). Lanjutkan?",
-    "settings.import.done": "Impor selesai:",
-    "settings.import.invalid": "File tidak valid: bukan JSON pengaturan aigate yang benar.",
-    "settings.import.error": "Impor gagal:",
-    "settings.import.cancelled": "Impor dibatalkan.",
-    "settings.import.no_file": "Pilih file pengaturan terlebih dahulu."
+   TRANSLATION STRINGS DO NOT LIVE HERE. One file per language sits in
+   static/i18n/<code>.js and self-registers into window.I18N:
+
+     window.I18N = window.I18N || {};
+     window.I18N.ru = { "app.title": "aigate", ... };
+
+   That keeps every locale file owned by exactly one language (no shared file
+   to merge between languages) and lets this file stay small and stable.
+   Adding a language = drop i18n/<code>.js + add one row to window.LANGS.
+   tests/i18n.test.js enforces that all locale files carry the SAME key set. */
+
+(function () {
+  "use strict";
+
+  /* Namespace first, never clobber: a dictionary file may execute before or
+     after this one — both orders are valid (see the self-register snippet). */
+  window.I18N = window.I18N || {};
+
+  /* ---- Registry: single source of truth for every language picker ----
+     `code` doubles as the dictionary filename (i18n/<code>.js) and the
+     localStorage value in `aigate.locale`. Names are endonyms (each language
+     written in itself) so the labels never need re-translating.
+     zh = Simplified Chinese, zh-tw = Traditional Chinese — do not invent
+     other codes for them. */
+  window.LANGS = [
+    { code: "en", flag: "🇺🇸", nameKey: "lang.en" },
+    { code: "id", flag: "🇮🇩", nameKey: "lang.id" },
+    { code: "ru", flag: "🇷🇺", nameKey: "lang.ru" },
+    { code: "nl", flag: "🇳🇱", nameKey: "lang.nl" },
+    { code: "ja", flag: "🇯🇵", nameKey: "lang.ja" },
+    { code: "zh", flag: "🇨🇳", nameKey: "lang.zh" },
+    { code: "zh-tw", flag: "🇹🇼", nameKey: "lang.zh-tw" }
+  ];
+
+  var FALLBACK_LOCALE = "en";
+  var DICT_DIR = "i18n/";
+
+  /* Cache-buster for injected dictionary URLs. The inline preloader in
+     index.html owns the number (it is also the one writing the <script> tags);
+     this file only reads it, so the version lives in exactly one place. */
+  function dictUrl(code) {
+    var v = window.I18N_VER;
+    return DICT_DIR + code + ".js" + (v ? "?v=" + v : "");
   }
-};
 
-/**
- * Replace text of every element carrying [data-i18n] with the
- * translation from I18N[loc]. Falls back to English for missing keys.
- * @param {string} loc - locale code ("en" | "id")
- */
-function applyLocale(loc) {
-  var dict = window.I18N[loc] || window.I18N.en;
-  var fb = window.I18N.en;
-  document.querySelectorAll("[data-i18n]").forEach(function (el) {
-    var key = el.getAttribute("data-i18n");
-    el.textContent = dict[key] !== undefined ? dict[key] : (fb[key] !== undefined ? fb[key] : key);
-  });
-  // aria-label bindings (accessibility, not visible text)
-  document.querySelectorAll("[data-i18n-aria]").forEach(function (el) {
-    var key = el.getAttribute("data-i18n-aria");
-    el.setAttribute("aria-label", dict[key] !== undefined ? dict[key] : (fb[key] || key));
-  });
-  document.documentElement.setAttribute("lang", loc);
-  document.documentElement.setAttribute("data-locale", loc);
-  // Browser tab title (visible copy) — resolved through the dictionary.
-  try {
-    document.title = (dict["app.title"] !== undefined ? dict["app.title"]
-      : (fb["app.title"] !== undefined ? fb["app.title"] : "aigate"));
-  } catch (e) { /* document.title unavailable — ignore */ }
-}
+  /** Is the dictionary for `loc` present in this page? */
+  function hasLocale(loc) {
+    return !!(window.I18N && loc && window.I18N[loc]);
+  }
 
-window.applyLocale = applyLocale;
+  /**
+   * Resolve one key: locale dictionary -> English dictionary -> the key itself.
+   * Never throws, even when no dictionary has loaded at all — that is the
+   * contract that keeps the UI alive while a language file is missing.
+   */
+  function translate(key, loc) {
+    var d = window.I18N && loc && window.I18N[loc];
+    if (d && d[key] !== undefined) return d[key];
+    var en = window.I18N && window.I18N[FALLBACK_LOCALE];
+    if (en && en[key] !== undefined) return en[key];
+    return key;
+  }
 
-/* Language registry for the header dropdown: code, flag emoji, name key. */
-window.LANGS = [
-  { code: "en", flag: "🇺🇸", nameKey: "lang.en" },
-  { code: "id", flag: "🇮🇩", nameKey: "lang.id" }
-];
+  /**
+   * Replace text of every element carrying [data-i18n] / [data-i18n-aria] with
+   * the translation for `loc`, falling back to English, then to the raw key.
+   * Pure render: it never fetches anything (see setLocale for that).
+   * @param {string} loc - locale code from window.LANGS
+   */
+  function applyLocale(loc) {
+    loc = loc || FALLBACK_LOCALE;
+    document.querySelectorAll("[data-i18n]").forEach(function (el) {
+      el.textContent = translate(el.getAttribute("data-i18n"), loc);
+    });
+    // aria-label bindings (accessibility, not visible text)
+    document.querySelectorAll("[data-i18n-aria]").forEach(function (el) {
+      el.setAttribute("aria-label", translate(el.getAttribute("data-i18n-aria"), loc));
+    });
+    document.documentElement.setAttribute("lang", loc);
+    document.documentElement.setAttribute("data-locale", loc);
+    // Browser tab title (visible copy) — resolved through the dictionary.
+    try {
+      document.title = translate("app.title", loc);
+    } catch (e) { /* document.title unavailable — ignore */ }
+  }
+
+  /* ---- On-demand dictionary loading -------------------------------
+     The page loads only the ACTIVE language up front (inline preloader in
+     index.html <head>, synchronous, before app.js). Switching to a language
+     that is not loaded yet fetches its file here.
+     `inFlight` / `absent` make sure a language whose file does not exist yet
+     is probed once per page view instead of on every click. */
+  var inFlight = {};
+  var absent = {};
+
+  /**
+   * Make sure `loc`'s dictionary is loaded, then run `onReady(loaded)`.
+   * Calls `onReady` synchronously with true when the dictionary is already
+   * present, and synchronously with false when it can never be fetched
+   * (no DOM, already in flight, or already known to be absent).
+   */
+  function ensureLocale(loc, onReady) {
+    var done = typeof onReady === "function" ? onReady : function () {};
+    if (hasLocale(loc)) { done(true); return; }
+    if (!loc || inFlight[loc] || absent[loc]) { done(false); return; }
+    // The <head> preloader already fetched this file — its tags block the
+    // parser, so they are finished by now. No dictionary means that fetch
+    // failed: do not ask the server a second time in the same page view.
+    if ((window.I18N_PRELOAD || []).indexOf(loc) >= 0) { absent[loc] = true; done(false); return; }
+    if (typeof document === "undefined" || !document.createElement) { done(false); return; }
+
+    inFlight[loc] = true;
+    var script = document.createElement("script");
+    script.src = dictUrl(loc);
+    script.async = true;
+    script.onload = function () {
+      delete inFlight[loc];
+      // A captive portal / SPA fallback answers 200 with HTML: still no dict.
+      if (hasLocale(loc)) { done(true); }
+      else { absent[loc] = true; done(false); }
+    };
+    script.onerror = function () {
+      delete inFlight[loc];
+      absent[loc] = true;
+      done(false);
+    };
+    (document.head || document.documentElement).appendChild(script);
+  }
+
+  /**
+   * Switch the UI to `loc`: render immediately with whatever is loaded (English
+   * stands in for a missing dictionary, so there is never a raw-key flash), then
+   * re-render as soon as the language's own file arrives.
+   */
+  function setLocale(loc) {
+    applyLocale(loc);
+    if (hasLocale(loc)) return; // already loaded: nothing to fetch, nothing to re-render
+    ensureLocale(loc, function (loaded) {
+      // Guard against a slow answer for a language the user has left meanwhile.
+      if (loaded && document.documentElement.getAttribute("data-locale") === loc) {
+        applyLocale(loc);
+      }
+    });
+  }
+
+  window.applyLocale = applyLocale;
+  window.setLocale = setLocale;
+  window.translate = translate;
+  window.hasLocale = hasLocale;
+  window.ensureLocale = ensureLocale;
+})();

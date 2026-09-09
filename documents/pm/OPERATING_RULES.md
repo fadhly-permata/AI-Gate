@@ -485,3 +485,220 @@ pertama untuk fitur 1 tautan gue cancel karena handover-nya 60+ baris):
 3. Jangan minta sub-agent menulis file laporan `.md` untuk task kecil; laporan hanya untuk
    task besar/audit (aturan `.opencode/reports/**` tetap berlaku kalau memang ada laporan).
 4. Gate tes mengikuti R35: sub-agent hanya tes tertarget; suite penuh sekali oleh PM.
+
+## R39 — "Biar gak kecampur" = BRANCH baru, BUKAN repo baru; resource eksternal wajib dikonfirmasi bentuknya
+Pelajaran (2026-09-08, user: "goblok, kenapa bikin repo baru? gua kan mintanya branch baru"):
+user minta bikin dokumen wiki "biar gak kecampur" → PM menafsirkan "repo baru" secara harfiah
+dan LANGSUNG bikin `AI-Gate-docs` (private) di GitHub + tes push wiki. Yang user mau = branch
+baru di repo yang sudah ada. Akibat: resource publik/bernama tetap muncul tanpa perlu + perlu
+cleanup manual.
+
+Aturan wajib:
+1. Niat "pemisahan" ("biar gak kecampur", "jangan campur sama kode", "bikin tempat sendiri",
+   "buat versi lain") → **DEFAULT = branch baru di repo yang sudah ada** (`docs/<topik>`,
+   `feat/<topik>`, `refactor/<topik>`). Repo baru BUKAN default, walau user ketik kata "repo".
+2. R9 (implementasi tanpa konfirmasi) hanya berlaku untuk keputusan **di dalam** repo/lingkungan
+   kerja. Aksi yang **membuat resource eksternal di luar workspace** — repo GitHub, organisasi,
+   package registry, release, domain, akun, webhook — WAJIB diklarifikasi **bentuknya** dulu,
+   cukup 1 kalimat ("repo baru atau branch saja?"). Salah bikin = jejak publik + penghapusan
+   manual.
+3. Kata user ambigu vs tafsir termurah: ambil tafsir yang **paling murah dibatalkan**
+   (branch → tinggal hapus lokal; repo → harus dihapus di GitHub). Kalau ragu, tanya.
+4. Kalau terlanjur bikin resource eksternal yang SALAH: **JANGAN langsung dihapus**
+   (destruktif/ireversibel) — laporkan ke user + minta izin hapus, dan jangan dipakai/diisi.
+5. Fakta teknis yang bikin repo baru makin tidak perlu: **wiki tiap repo GitHub sudah berupa
+   repo git terpisah** (`<owner>/<repo>.wiki.git`) — file wiki tidak pernah tercampur dengan
+   `src/**`. Jadi "gak kecampur" sudah terjamin tanpa repo baru.
+
+### R39 addendum (2026-09-08, user mengulang keluhan: "goblok sih lu, pake bikin repo baru segala")
+- Keluhan yang SAMA diulang = aturan belum cukup kuat. Penguatan: **PM DILARANG menafsirkan
+  kata "repo/bikin baru" secara harfiah.** Sebelum membuat resource eksternal apa pun, PM
+  wajib menyebut **bentuknya** (branch / folder / repo) dalam 1 kalimat dan tunggu jawaban.
+- Repo `AI-Gate-docs` sudah **dihapus oleh user** (PAT PM tidak punya scope `delete_repo`).
+  Jangan pernah meninggalkan resource eksternal hasil salah-tafsir tanpa dilaporkan.
+
+## R40 — Sebelum bikin wiki/dokumentasi massal: WAJIB sajikan rencana daftar halaman dulu
+Pelajaran (2026-09-08, user: "sebelum bikin wiki, jelasin dulu rencana lu, page apa aja"):
+PM siap mendelegasi penerbitan wiki tanpa menampilkan rencana halaman → user berhentiin.
+
+Aturan wajib:
+1. Untuk pekerjaan yang menghasilkan **banyak halaman/dokumen sekaligus** (wiki, docs site,
+   API reference), PM WAJIB tampilkan dulu: **daftar halaman (judul + isi ringkas + sumber
+   file)**, **yang TIDAK ikut dipublikasi**, **bahasa**, dan **titik publikasi**.
+2. Baru setelah user ACC daftar halaman → PM dekomposisi & delegasi ke specialist.
+3. Draf ditulis di repo kode (`documents/wiki/**`), wiki cuma **hasil publikasi**; publikasi
+   ke wiki hanya terjadi setelah user bilang go (lihat juga larangan menulis wiki dari user).
+
+## R41 — README = untuk orang awam; detail teknis & path file masuk wiki
+Pelajaran (2026-09-08, review user atas draf README: "jangan terlalu teknikal… jangan nyebut-nyebut
+file apapun di readme… konteks yang ingin ditonjolkan kasih di intro, kasih ilustrasi serunya
+nge-vibe coding lewat hape. nama aplikasi 'aigate' (kecil semua)"):
+
+Aturan wajib untuk `README.md` (dan materi promosi sejenis):
+1. Bahasa **manfaat**, bukan spesifikasi. Teknologi disebut **umum & tercerna awam**
+   ("aplikasi Python biasa, jalan tanpa Docker, datanya lokal") — bukan daftar endpoint,
+   bukan nama modul, bukan arsitektur.
+2. **DILARANG menyebut path/nama file apa pun** (`src/backend/selfheal.py`, `documents/...`,
+   `pyproject.toml`, tabel "Repo layout", dsb). Detail teknis = halaman **wiki**.
+   Pengecualian: perintah menjalankan (`python run.py`) — tanpa itu produk tak bisa dicoba;
+   tetap seminimal mungkin.
+3. Konteks/nilai yang mau dijual **wajib muncul di intro** (3–5 baris pertama) **plus ilustrasi
+   adegan** yang bikin pembaca ikut ngerasain (mis. agent benerin kode sambil ditonton dari HP).
+4. Nama produk ditulis **`aigate`** — huruf kecil semua, termasuk judul.
+5. Nada ceria/kasual + emoji boleh; kejujuran tetap: klaim belum terverifikasi diberi label.
+6. PM WAJIB masukkan poin 1–5 ke handover sub-agent SEBELUM nulis, bukan setelah dikoreksi.
+
+## R42 — Dokumen publik: kultur netral + status pengujian MILIK MAINTAINER, bukan asumsi PM
+Pelajaran (2026-09-08, user: "jangan bawa kultur suatu negara… masa lu nyebut angkot. linux udah
+di test, windows juga udah di test jadi gak usah ada klaim untested. lu sok tau banget dah"):
+PM menyisipkan caveat "belum diverifikasi" untuk rute Linux/proot dan memakai adegan khas
+Indonesia (angkot) di README publik — dua-duanya keluar dari wewenang PM.
+
+Aturan wajib:
+1. Materi publik pakai **kultur netral/global**. DILARANG rujukan khas satu negara/daerah
+   (angkot, warkop, nama jalan lokal, idiom lokal, contoh mata uang lokal). Pilih gambaran
+   yang dimengerti di mana saja (bus/kereta/kopi di rumah).
+2. **Status pengujian (tested / works on X / verified) adalah keputusan MAINTAINER.** PM dan
+   sub-agent DILARANG menulis "untested / experimental / belum diverifikasi" atas dasar
+   dugaan atau karena mesin kerja PM tidak punya peralatannya. Kalau ragu → **tanya maintainer
+   1 kalimat**, jangan pasang caveat sendiri, jangan hapus klaim sendiri.
+3. Kalau maintainer menyatakan sudah dites → tulis sebagai **sudah dites**, buang marker
+   `TODO-VERIFY`, dan catat sumbernya di `documents/pm/` ("dikonfirmasi maintainer, tanggal")
+   supaya sesi berikutnya tidak memasang caveat lagi.
+4. Sebaliknya: klaim yang belum pernah dikonfirmasi maintainer tetap tidak boleh dilebihkan.
+   Netral = faktual, bukan penuh tanda tanya.
+
+## R43 — Varian bahasa = TULISAN ASLI dalam bahasa itu, bukan hasil terjemahan; kalimat wajib jelas
+Pelajaran (2026-09-08, user soal varian README id: "dih bahasa lu absurd dan ambigu banget.
+benerin dong kalimatnya, tapi tetep dengan nada kasual. btw, lu jangan translate dari inggris,
+boleh beda yang penting strukturnya tetep sama"):
+Sub-agent menulis `README.id.md` sebagai calque dari versi Inggris → muncul "ngeresolve",
+"request tetep kejawab", "bilang gue di mana encernya", "kalau lu suka trik begitu" — kasual tapi
+absurd dan ambigu.
+
+Aturan wajib (berlaku utk SEMUA varian bahasa: id, ru, nl, ja, zh, zh-tw):
+1. **DILARANG menerjemahkan kalimat per kalimat.** Tulis materi **asli** dalam bahasa target yang
+   kebetulan menyampaikan produk yang sama. Contoh, idiom, dan adegan **boleh berbeda** — yang
+   **sama hanya struktur seksi dan urutan informasi**.
+2. Yang tetap identik lintas bahasa: **fakta** (jumlah tool, nama produk `aigate`, perintah
+   menjalankan, URL wiki, daftar platform yang sudah dites, baris kredit). Yang bebas: kalimat,
+   metafora, adegan, penutup.
+3. **Satu kalimat = satu makna yang langsung kebaca.** Dilarang: calque struktur Inggris, kata
+   campur bahasa yang gak perlu, sapaan sok akrab, kiasan yang gantung. Kasual ≠ berantakan.
+4. Sapaan default: **impersonal atau "kamu"** untuk dokumen publik; "lu/gue" hanya kalau user
+   minta eksplisit.
+5. PM WAJIB menuliskan poin 1–4 di handover SEBELUM sub-agent menulis, dan **membaca hasil akhirnya
+   sendiri** — bukan cuma ngandelin receipt — sebelum ditampilkan ke user.
+
+### R43 addendum (2026-09-08, user: "masih banyak kalimat yang terasa janggal")
+Hasil audit PM baris-per-baris atas varian id. Pola janggal yang HARUS dihindari di semua varian
+bahasa (bukan cuma Indonesia):
+1. **Pasif kaku** ("dijalankan", "diarahkan", "diteruskan", "dilaporkan") → ganti aktif + subjek
+   jelas: "aigate menjalankan…", "kamu kirim…".
+2. **Subjek hilang** ("Sudah diuji di Linux…", "Arahkan ke project yang error:") → sebut siapa.
+3. **Reduplikasi palsu** ("akun-akun provider", "Asisten-asisten coding") → pakai bentuk tunggal
+   atau kata penghitung ("banyak asisten coding", "semua akun provider").
+4. **Nominalisasi kaku**: "pemasangan"→"pasang/install", "pengujian"→"tes", "pengerjaannya"→
+   "prosesnya", "riwayat pemakaian"→"riwayat pemakaian" boleh tapi "permintaan" utk *request*
+   JANGAN (pakai "request" — itu yang dipakai developer Indonesia).
+5. **Diksi salah rasa**: "provider mati" → "provider sedang bermasalah/down"; "Tema terang dan
+   gelap" → "mode terang dan gelap"; "terpasang dan berjalan native" → "bisa dipasang dan jalan".
+6. **Redundansi**: "dengan cara yang sama seperti" → "sama seperti".
+7. **Kata yang salah maksud**: "tulis satu perintah singkat" padahal yang ditulis itu instruksi ke
+   agent → "tulis satu instruksi singkat".
+8. Kalimat panjang >2 klausa + banyak "yang" bertumpuk → pecah jadi 2 kalimat.
+
+## R44 — Materi publik (wiki) TIDAK BOLEH membocorkan isi `documents/`; nada natural utk pembaca awam
+Pelajaran (2026-09-08, user: "gua gak mau isi dokumen @documents/ di umbar. cukup bahas dari halaman
+1 sampai 8 aja. kerjain satu persatu biar gua bisa review dulu. bahasa natural, ringan, asumsi
+pembacanya awam. bahasa inggris intonasi kasual. boleh pake emoji"):
+
+Wiki = materi publik untuk orang luar. `documents/` = kerja internal. Keduanya TIDAK boleh disatukan.
+
+Aturan wajib:
+1. DILARANG menyebut path/nama file di dalam `documents/**` di materi publik (wiki, README,
+   deskripsi repo, UI). Publik tidak boleh tahu struktur dokumen internal kita.
+2. DILARANG menyalin/mengutip/menterjemahkan isi `documents/**` apa pun ke wiki — termasuk tabel
+   isi, penomoran seksi, nomor keputusan (ADR-00x), nama tabel/kolom DB, dan path sumber (`src/...`).
+3. Wiki **tidak boleh berupa cerminan** `documents/`. Wiki berdiri sendiri: isinya apa yang
+   **terlihat dan terasa oleh user** (layar, perintah, hasil, batas produk).
+4. Sumber fakta wiki = **kode & perilaku nyata** (dibaca read-only oleh sub-agent), BUKAN ringkasan
+   dokumen. Yang tidak terbukti → tandai `TODO-VERIFY: <cara cek>`, jangan ditulis sebagai fakta.
+5. Nada: **natural + ringan + kasual**, bahasa Inggris, **pembaca diasumsikan awam** → setiap istilah
+   langsung dijelaskan di tempat pakai kata sehari-hari. Emoji boleh, secukupnya.
+6. Nama produk `aigate` huruf kecil; jangan tulis angka yang cepat basi (jumlah baris/komit/file).
+7. Kerjakan **satu halaman → stop → user review → ACC → baru halaman berikutnya** (R17 sekuensial).
+   DILARANG memborong semua halaman sekali jalan walau secara teknis bisa paralel.
+8. Draft disimpan di staging `documents/pm/wiki-drafts/`. **Wiki asli tidak boleh ditulis/di-push**
+   sampai user membuka larangannya.
+9. Saat menerjemahkan ke bahasa lain nanti: R43 tetap berlaku (tulisan asli, bukan calque).
+
+## R45 — Jangan pernah menulis "repo ini" di materi publik: pakai URL absolut
+Pelajaran (2026-09-08, user soal kalimat README "so this repo is where the real aigate lives":
+"gak pake link repo aslinya? ya kalo di fork bisa kebawa dong filenya, jadi ambigue nanti"):
+
+Materi publik ikut ter-**fork** dan ikut ter-**copy** — teks apa pun yang menunjuk "sini" jadi salah
+alamat di tempat lain. Bahaya ini paling gede justru di bawah lisensi permisif (MIT), yang tidak
+mewajibkan apa pun ke peng-copy.
+
+Wajib:
+1. DILARANG pakai referensi relatif-ke-diri di materi publik: "this repo", "repo ini", "the one true
+   home" tanpa alamat, "di sini", "link di atas", "file ini". Yang menunjuk **ke luar** harus URL
+   absolut: `https://github.com/fadhly-permata/AI-Gate` (wiki: `.../wiki`).
+2. Setiap kali menulis klaim identitas/resmi/asli → **sertakan alamatnya**, bukan cuma kata-kata.
+3. Tautan ke file lain di repo sendiri (varian README, gambar) boleh relatif — yang dilarang cuma
+   klaim yang bergantung pada "di mana dokumen ini berada sekarang".
+4. Link ke repo di dalam UI wajib absolut dan menunjuk repo resmi (sudah benar: sidebar
+   `index.html:152`) — supaya fork tetap menunjuk ke asal, bukan ikut menunjuk diri sendiri.
+5. URL tidak diterjemahkan: di SEMUA varian bahasa alamatnya identik (perlu dicek saat menyebar
+   kalimat lisensi ke 7 varian).
+
+## R46 — Koreksi typo/user salah ketik WAJIB, jangan diikuti
+Pelajaran (2026-09-09, user: 'bukannya ada rule kalo gua typo lu harus koreks?!'):
+user mengetik `scripts/cli-toils/` (typo dari `scripts/cli-tools/`); PM malah
+mengikuti typo itu alih-alih mengoreksi.
+
+Wajib:
+1. Bila user mengetik salah (typo / nama folder / salah ketik), PM WAJIB menunjukkan
+   bentuk yang benar dan memakai bentuk benar di seluruh komunikasi & file. JANGAN
+   diam-diam mengadopsi typo user.
+2. Kalau ragu mana yang benar, tanya SATU kalimat sebelum lanjut — jangan tebak
+   diam-diam.
+3. Koreksi cukup disisipkan ringkas ("maksud: <bentuk benar>") tanpa menghentikan
+   alur kerja; jangan pura-pura typo itu benar.
+
+## R47 — PM DILARANG asumsi/halusinasi; wajib fakta (patuh no-hallucination.md)
+Pelajaran (2026-09-09, user: 'bukannya ada rule kalo lu gak boleh asumsi & halusinasi?
+bicara selalu menggunakan fakta, data, context7, web search, atau at least konfirmasi
+ke user ya?').
+
+Wajib:
+1. Sebelum PM menegaskan perilaku tool/dependency — cara install, wiring ke aigate,
+   atau dukungan cross-platform (Termux / Windows / Linux / macOS) — PM WAJIB
+   verifikasi lewat SALAH SATU:
+   (a) baca kode nyata (codegraph → file spesifik + nomor baris),
+   (b) web search / context7 untuk fakta eksternal (npm registry, dokumentasi resmi
+       tool, dll), atau
+   (c) tanya user 1 kalimat kalau ragu.
+2. Klaim tanpa bukti = pelanggaran. Setiap pernyataan teknis wajib disertai sumber
+   (file:line / URL).
+3. Aturan ini menguatkan `.opencode/rules/no-hallucination.md`: jangan asumsi, jangan
+   halusinasi; selesaikan lewat skill (context7) / web search / tanya user.
+4. Berlaku juga untuk 23 tool sisanya (Grup A sisa + B + C): PM WAJIB verifikasi tiap
+   fakta (codegraph + web/context7 bila perlu fakta eksternal) SEBELUM menulis script
+   atau menegaskan apa pun. Kalau ragu → TANYA user, jangan tebak.
+
+## R48 — Pembuatan script WAJIB verifikasi dari >1 sumber fakta independen
+Pelajaran (2026-09-09, user: 'pastikan ya pembuatan script menggunakan sumber data &
+fakta lebih dari satu sumber'):
+Saat membuat script install/launch CLI tool (dan klaim teknis serupa), PM / specialist
+DILARANG cukup pakai SATU sumber. Wajib verifikasi dari MINIMAL 2 sumber fakta
+INDEPENDEN, misalnya kombinasi:
+  - kode aigate (`src/backend/**`, codegraph → file:line),
+  - registry npm / PyPI resmi (fakta package, binary, os/cpu/libc),
+  - dokumentasi resmi tool (docs tool tsb),
+  - GitHub releases / repo resmi tool.
+Lalu CROSS-CHECK antar sumber — kalau ada konflik, selidiki sampai konsisten. Satu sumber
+saja BELUM cukup untuk menegaskan fakta. Ini menguatkan R47 / no-hallucination.md: dari
+asumsi → fakta terverifikasi multipihak. Berlaku untuk 22 tool sisa (A3–C6) dan sesi
+berikutnya.

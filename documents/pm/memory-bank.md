@@ -37,6 +37,21 @@
 
 ## Progress
 - 2026-09-09: **Bottom-nav ponsel dirapikan (hamburger-ilang + scroll + mirror 9 view + Repo + separator grup) — SELESAI (fe-dev, 3 iterasi; DI-COMMIT 6fb210b + docs 26b087d, pushed, PR #14 open).** User lapor beruntun: (1) hamburger hide/show nge-bug di potret → ilangin; (2) menu bawah gak bisa diakses banyak → "masih gak bisa digeser / ada item di-hidden?"; (3) "tambahin link Repo + separator tiap grup". Temuan kunci: `.bottom-nav` dulu cuma 7 dari 9 view menu samping (usage+analytics gak pernah ke-render), BUKAN masalah scroll doang. Fix final (`src/frontend/**`): `#sidebarToggle{display:none}` dua shell phone; `.bottom-nav` `overflow-x:auto`+`justify-content:flex-start`+momentum; `.bn-item` `min-width:60px`; bottom-nav sekarang 9 app-view (urut spt sidebar) + 1 link Repo (no data-view → link eksternal asli) = 10 item + 4 `<span class="bn-sep">` di batas grup (Gateway|Operasi|Wawasan|Sistem|Repo); rule `.bn-sep` token `--panel-border`; cache-buster `styles.css?v=20260914`. Tablet/desktop gak kena (bottom-nav `display:none` di >600px; hamburger utuh). app.js/i18n.js GAK diubah (wiring generik + key udah ada). Verifikasi PM: `views.test.js` **25 pass** (paritas 9-view + repo-hadir + sep=4 + scroll=10 + hamburger-hidden), `git diff --check` bersih. ⚠️ **Scroll browser-asli UNVERIFIED** (no browser; jsdom gak ngukur layout) → user WAJIB tes manual di HP (R20). **TASK SUSULAN (terbuka):** suite FE penuh merah 22 fail `localStorage`/`sessionStorage` (logwindow+terminal_discard) = PRE-EXISTING/LINGKUNGAN (dibuktikan via git stash; npm ci vitest2.1.9+jsdom25.0.1), BUKAN efek perubahan → perlu qa/fe-dev benerin env tes. Detail per-file: `documents/dev/CODE_CHANGES.md` 2026-09-09 (+lanjutan).
+- 2026-09-09: **CLI Compat catalog + `cli tools` view — DONE (branch `setup/cli-tools`).** Katalog kompatibilitas per-tool × per-platform (24 tool) di `src/backend/cli_compat.py` (`CLI_COMPAT`); endpoint `GET /api/cli-tools` kini balik `current_platform` + `compat` per tool; frontend `clitools.js` render 4 badge platform (sorot platform saat ini) + warning merah bila status ∈ {broken, no_install, not_a_cli, not_wired}. Mirror `documents/pm/cli-tools-compatibility.md`. Verifikasi: py_compile + `list_cli_tools()` end-to-end (`current_platform=termux`, claude termux=`broken`) + i18n parity 7 locale hijau. Stretch print-di-script di-skip. Belum di-push (user test Windows/Linux).
+- 2026-09-09: **Anthropic `/v1/messages` inbound — DONE + DI-COMMIT + DI-MERGE KE `setup/cli-tools` (5 commit `253aae5`/`bb3b6c9`/`7f330a1`/`4986adc`/`41d24f8`, branch `feat/anthropic-inbound`).** aigate serve Anthropic-compatible `POST /v1/messages` **native** (tanpa litellm) supaya `claude-code` pakai `ANTHROPIC_BASE_URL=<aigate>/v1/messages`. Keputusan (dari `documents/architecture/anthropic-inbound-endpoint.md`): bare model id → `resolve_target` (reuse `_resolve_bare_model`, no static map); Stage 1 **non-streaming** (`stream:true`→400 `anthropic_streaming_unsupported`); **tools passthrough** (Anthropic↔OpenAI, bukan 400; extended-thinking/`cache_control` = future phase); auth terima **`Bearer` ATAU `x-api-key`** (terbuka spt chat/responses, client `x-api-key` tak diteruskan upstream). Translator baru: `anthropic_messages_request_to_openai_chat` (translator.py:630) + `openai_chat_response_to_anthropic_messages` (translator.py:718) + `AnthropicMessagesRequest` (translator.py:828) + helper inbound + extend `_translate_request_anthropic` (translator.py:183) forward tools. Router: `messages_completions` (router.py:500) + `_handle_anthropic_messages` (router.py:549) + sibling `/v1/messages/count_tokens` (router.py:658) + `/api/event_logging/batch` stub (router.py:696). `cli_presets` claude flip `LAUNCH_UNSUPPORTED`→`LAUNCH_VERIFIED` (cli_presets.py:171). `claude.sh` SUDAH di-rewire ke aigate (tanpa litellm). **QA LULUS** (`.opencode/reports/qa_anthropic_inbound_verification.md`): py_compile bersih, 11/11 pure test passed, 0 regression translator (17/17), R25 LULUS, R12 LULUS (0 `except:pass`). 9 route-level test gagal eksekusi murni env mismatch `httpx 0.28.1` vs `starlette 0.27.0` (pre-existing, BUKAN regression). Open: selaraskan `httpx<0.28` di `pyproject.toml` lalu jalanin `pytest tests/backend/test_anthropic_messages.py` di env user (R20) — belum dikerjakan.
+  **MERGE:** 2026-09-09, `feat/anthropic-inbound` di-FF-merge ke `setup/cli-tools` (sekarang di `97e5557`). Fitur tidak lagi di branch terpisah. `feat/anthropic-inbound` dibiarkan apa adanya (jangan hapus tanpa instruksi). Tidak di-push/PR.
+- 2026-09-08: **i18n 7 bahasa — DONE di branch `feat/i18n-locales` (`f7beaf9` + `c1477eb`).**
+  User minta Rusia/Belanda/Jepang/Cina, pilih **opsi B = satu file per bahasa**, dan Cina
+  **kedua varian** (zh Simplified + zh-tw Traditional). Hasil: `i18n.js` jadi registry+loader
+  (793→150 baris), kamus pindah ke `static/i18n/{en,id}.js` (pindah murni, 379 kunci),
+  +5 kamus baru (ru/nl/ja/zh/zh-tw, 379 kunci masing-masing), preloader `<head>` cuma
+  meng-load EN + bahasa aktif, dropdown bahasa dibangun dari `window.LANGS`, parity guard
+  jadi glob. **Pola delegasi: 1 task refactor (file bersama) → lalu 5 task PARALEL,
+  masing-masing cuma nulis 1 file kamus** (nol tabrakan scope + hemat waktu). Gate PM:
+  vitest **519 passed, 10.60s**; checker cepat
+  `.opencode/tools/tests/i18n-parity-check.mjs <kode>` dipakai agen biar gak pada nyalain
+  vitest barengan di HP. Backend gak perlu diubah (setting `locale` tanpa allowlist;
+  StaticFiles sudah menyajikan subdirektori). **Terjemahan belum ditinjau penutur asli.**
 - 2026-09-07 (malam): **Suite tes FE 1,5x lebih cepat — DONE (`618f7d7`, fe-dev).**
   Akar TERNAKTA bukan parse HTML doang: Termux lapor `os.cpus().length===0` → vitest
   fallback **8 fork** di HP ter-throttle. Kurva nyata: 1 fork 12.6s · **2 fork 8.3s** ·
@@ -154,6 +169,7 @@
 - 2026-09-06: Tooltip icon-only dibuat transient (tap auto-close 2 detik; Escape/outside/scroll/resize tetap menutup). State Full Page dan true Fullscreen dipisah eksplisit; hanya mode aktif yang biru, caret tidak aktif. Vitest 394 passed (21 files), terminal toolbar 62 passed.
 - 2026-09-06: Terminal Keep Screen On dikembalikan dengan ikon perangkat yang lebih jelas (`fa-mobile-screen-button`). Popover tooltip global ditambahkan untuk kontrol ikon-only; mendukung hover, focus, tap, Escape, outside click, dan kontrol dinamis. Frontend Vitest 392 passed.
 - 2026-09-06: Side menu dikelompokkan berdasarkan kebutuhan pengguna: Gateway Setup, Operations, Insights, System. EN/ID, aksesibilitas, dan test frontend diperbarui; Vitest 392 passed.
+- 2026-09-09: **CLI Tools install scripts — progress 21/24 (A1 claude + A2 opencode + A3 gemini + A4 codex + A5 antigravity + A6 phi + A7 aider + A8 goose + A9 amp + A10 qwen + A11 cline + A12 kilo + B1 openhands done + B2 swe-agent done (NO_INSTALL) + B3 open-interpreter done (OpenAI-compatible, verified, `LAUNCH_VERIFIED` cli_presets.py:196, commit `31b9a04`) + B4 autogpt done (NO_INSTALL, pesan+exit, commit `a5d1a91`) + C1 llm done (OpenAI-compatible, verified, `LAUNCH_VERIFIED` cli_presets.py:219, `pip install llm` + wiring `llm openai endpoint ... --chat/--models`, commit ini)). **GRUP A SELESAI (12/12); B1 openhands = done (OpenAI-compatible, verified, `LAUNCH_VERIFIED` cli_presets.py:190).** Lanjut Grup B (B4..B6) + Grup C (C2..C6).** Branch `setup/cli-tools`. A8 (`goose.sh`) commit `414ea06`: **NO_INSTALL** — script HANYA pesan `goose: NO_INSTALL — belum ada install terverifikasi di environment ini.` + `exit 0`, TIDAK memasang apa pun (no side-effect). Bukti `cli_presets.py:77` (`install: NO_INSTALL`) + `cli_presets.py:178` (`LAUNCH_UNSUPPORTED`/`REASON_NO_BINARY`); `TERMUX_INSTALL` tidak punya entry goose; cross-check 5 sumber (npm `goose`=Golang tak terkait, `@block/goose` 404, PyPI `goose`=SQL migration, Homebrew `goose`=pressly/goose migrasi DB, install resmi Block curl script tak punya build aarch64-android/termux terverifikasi) → TIDAK ada install terverifikasi. **A9 (`amp.sh`) commit `446f78f`: NO_INSTALL — script HANYA pesan `amp: NO_INSTALL — belum ada install terverifikasi di environment ini.` + `exit 0`, TIDAK memasang apa pun (no side-effect). Bukti `cli_presets.py:78` (`install: NO_INSTALL`) + `cli_presets.py:179` (`LAUNCH_UNSUPPORTED`/`REASON_NO_BINARY`); `TERMUX_INSTALL` tidak punya entry amp; cross-check 5 sumber (npm unscoped `amp`=library messaging tak terkait tjholowaychuk/node-amp, `@ampcode/cli` ADA tapi optional deps HANYA darwin/linux/win32 — gak ada build android/termux, PyPI `AMP`=parser matematika, Homebrew `amp`=text editor terminal amp.rs) → TIDAK ada install terverifikasi. A1 (`claude.sh`) + `_common.sh` sudah commit sebelumnya. A7 (`aider.sh`) commit `5a960e7`: install `python3 -m pip install aider-chat` (mirror `cli_presets.py:76`), wiring `OPENAI_API_BASE`+`OPENAI_API_KEY` + flags `--openai-api-base`/`--openai-api-key` ke aigate `/v1/chat/completions`, model `--model openai/<m>`; fakta `cli_presets.py:172` (`LAUNCH_VERIFIED`) + `cli_tools_router.py:355-369` (`_aider_builder`). A2 (`opencode.sh`, 122 baris) commit `f8d9f0b`: install `npm i -g opencode-ai`, wiring `OPENAI_API_BASE`+`OPENAI_API_KEY` ke aigate `/v1/chat/completions`, generate `opencode.json` di CWD. A3 (`gemini.sh`, 114 baris) native Google mode: install `npm i -g @google/gemini-cli`, launch langsung dengan kredensial Google (GEMINI_API_KEY/GOOGLE_API_KEY/OAuth) — TIDAK di-wire aigate karena `cli_presets.py:175` mark gemini `LAUNCH_UNSUPPORTED`/`REASON_GEMINI_ONLY` (aigate hanya serve OpenAI `/v1/chat/completions` + Anthropic `/v1/messages`, no Google generateContent inbound). A4 (`codex.sh`, 136 baris) commit `7f22713`: native OpenAI mode, TIDAK di-wire aigate karena `cli_presets.py:180` mark codex `LAUNCH_UNSUPPORTED`/`REASON_RESPONSES_ONLY` (aigate `/v1/responses` non-streaming only, `responses.py:227-233`; codex CLI wajib streaming). A5 (`antigravity.sh`, 69 baris) commit `2259c1c`: **NO_INSTALL** — script HANYA pesan `antigravity: NO_INSTALL — tidak ada paket CLI terverifikasi` + `exit 0`, TIDAK memasang apa pun (no side-effect). Bukti `cli_presets.py:74` (`install: NO_INSTALL`) + `cli_presets.py:176` (`LAUNCH_UNSUPPORTED`/`REASON_NOT_A_CLI`); `TERMUX_INSTALL` tidak punya entry antigravity; npm/pip/brew tidak ada rute resmi. Install: Termux `pkg install codex` (`cli_presets.py:243`) / non-Termux `npm i -g @openai/codex`. Known caveat: Termux npm `os` field tanpa `"android"`. Sisa 19 tool menyusul.
 - Inisialisasi PM agent + rules + skills selesai.
 - 2026-09-03: Enhance PRD terminal — floating control, scroll/swipe natural,
   grouping CLI tools (agentic-first, 3 grup).
@@ -197,7 +213,22 @@
   RULE BARU **R22**: tiap perubahan kode dicatat per-file di
   `documents/dev/CODE_CHANGES.md` (code↔doc align).
 
+- 2026-09-09: **CLI Tools — GRUP B SELESAI (6/6):** B1 openhands (OpenAI-compatible, verified) + B2 swe-agent/B4 autogpt (NO_INSTALL) + B3 open-interpreter (OpenAI-compatible, verified) + B5 gpt-researcher/B6 crewai (NOT_A_CLI). Progres keseluruhan cli-tools **21/24** (C1 llm done + C2 sgpt done + C3 mods done, keduanya NO_INSTALL). Lanjut Grup C (C4 oterm, C5 gptme, C6 aichat).
+- 2026-09-09: **aider.sh BUGFIX — version-guard Python 3.10–3.12** (branch `setup/cli-tools`, commit `1d1a31c`): `pip install aider-chat` gagal di device (Python 3.14.6; aider `requires_python ">=3.10,<3.13"` per PyPI 0.86.2). Skrip lama cuma `NOTE` Termux-only post-install (setelah `ensure_installed` → raw pip error). Fix: guard pre-install + `exit 1`; hapus NOTE lama; wiring launch utuh. `bash -n` clean; simulasi guard lulus (3.10/3.11/3.12 lanjut, sisanya exit 1). Catatan: spawn tool sub-agent TIDAK tersedia di sesi ini → PM edit langsung dalam scope `scripts/cli-tools/aider.sh` (deviasi R21, transparan per R29).
+
+- 2026-09-09: **openhands.sh BUGFIX — version-guard Python 3.12** (branch `setup/cli-tools`, commit `313a2c2`): `pip install openhands` (fallback) gagal di device (Python 3.14.6; openhands `requires_python ==3.12.*` per PyPI 1.16.0). Fix: guard pre-install — `have_cmd uv`→lanjut (uv fetch 3.12 sendiri); `elif python3` major.minor !=3.12→ERROR + `exit 1` TANPA install; parse-gagal→WARN. Wiring launch utuh; `bash -n` clean. **crewai.sh & gpt-researcher.sh di-VERIFIKASI = NOT_A_CLI (hanya pesan + `exit 0`, TIDAK ada `pip`/`uv install`) → version-guard TIDAK relevan, TIDAK diubah.** (R14/R35 verified.)
+
+- 2026-09-09: **cli-tools C2 sgpt + C3 mods = done (NO_INSTALL, message + exit 0, no side-effect)** — `scripts/cli-tools/sgpt.sh` + `scripts/cli-tools/mods.sh` di-commit (commit ini). Bukti `cli_presets.py:101`/`cli_presets.py:224` (sgpt: `NO_INSTALL` + `LAUNCH_UNSUPPORTED`/`REASON_INSTALL_UNVERIFIED`) dan `cli_presets.py:102`/`cli_presets.py:225` (mods: `NO_INSTALL` + `LAUNCH_UNSUPPORTED`/`REASON_NO_BINARY`); `TERMUX_INSTALL` tidak punya entry sgpt/mods; registry npm `sgpt`/`mods` = squat tak terkait, PyPI 404, GitHub `tbckr/sgpt` (Rust) & `charmbracelet/mods` (Go) gak build Termux/android-arm64. `bash -n` clean, pesan literal (TIDAK ada backtick/`$()`). Progres keseluruhan cli-tools **21/24**.
+
+- 2026-09-09: **cli-tools C4 oterm = done (OpenAI-compatible, verified)** — `scripts/cli-tools/oterm.sh` di-commit (`aea87c3`). Bukti `cli_presets.py:103` (`pip install oterm`) + `cli_presets.py:222` (`oterm` = `LAUNCH_VERIFIED`) + `cli_tools_router.py:891-917` (`_oterm_builder`: tulis `.oterm-aigate/config.json` blok `openaiCompatible.aigate` {base_url=gateway, api_key="${OPENAI_API_KEY}"}, set `OTERM_DATA_DIR=.oterm-aigate` + env `OPENAI_API_BASE`/`OPENAI_API_KEY` ke `/v1/chat/completions`). PyPI `oterm` 0.24.0 butuh Python >=3.10. Catatan Termux (known-broken, bukan blocker): `pip install oterm` di aarch64/Py3.14 diprediksi gagal build `jiter` (no Android wheel) → script handle hint + `exit 1`. `bash -n` clean; mode exec. Progres keseluruhan cli-tools **22/24**. Lanjut C5 gptme, C6 aichat.
+- 2026-09-09: **cli-tools C5 gptme = done (OpenAI-compatible, verified)** — `scripts/cli-tools/gptme.sh` di-commit (`16d36f9`). Bukti `cli_presets.py:104` (`pip install gptme`) + `cli_presets.py:223` (`gptme` = `LAUNCH_VERIFIED`) + `cli_tools_router.py:595-612` (`_gptme_builder`: env `OPENAI_BASE_URL` = gateway base [gptme baca `OPENAI_BASE_URL` BUKAN `OPENAI_API_BASE`] + `OPENAI_API_KEY` + flag `-m local/<model>` ke `/v1/chat/completions`). PyPI `gptme` 0.33.0 butuh Python `>=3.10,<3.15`. Catatan Termux (known-broken, bukan blocker): `pip install gptme` di aarch64/Py3.14 diprediksi gagal build `jiter` (no Android wheel) → script handle hint + `exit 1`. `bash -n` clean; mode exec. Progres keseluruhan cli-tools **23/24**. Sisa: C6 aichat.
+- 2026-09-09: **cli-tools C6 aichat = done (OpenAI-compatible, verified)** — `scripts/cli-tools/aichat.sh` di-commit (`1c4e592`). Bukti `cli_presets.py:105` (`cargo install aichat`) + `cli_presets.py:226` (`aichat` = `LAUNCH_VERIFIED`) + `cli_presets.py:242` (`TERMUX_INSTALL["aichat"]="pkg install aichat"`, "verified 0.30.0 runs" di Termux) + `cli_tools_router.py:469-511` (`_aichat_builder`: generate `aichat-aigate.yaml` client `aigate` openai-compatible {api_base=gateway, api_key}, set env `AICHAT_CONFIG_FILE`, model `aigate:<raw>` ke `/v1/chat/completions`). crates.io `aichat` 0.30.0 (Rust). Catatan Termux (terbukti WORKING, bukan blocker): `pkg install aichat` di Termux terbukti jalan (usable di Termux). `bash -n` clean; mode exec. **Progres keseluruhan cli-tools 24/24 (ALL DONE — A1–A12, B1–B6, C1–C6 SELESAI).**
+
 ## Decisions
+- 2026-09-08: Materi publik TIDAK boleh menulis "this repo"/"repo ini" untuk menunjuk diri sendiri —
+  teks ikut ter-fork jadi ambigu. Klaim identitas resmi wajib pakai URL absolut
+  `https://github.com/fadhly-permata/AI-Gate`. Diumumkan sebagai aturan **R45** setelah user menegur
+  kalimat README. Link UI ke repo sudah absolut (sidebar) → fork tetap menunjuk asal.
 - 2026-09-06: Semua laporan wajib berada di `.opencode/reports/**`; root-level `reports/**` dihapus dan scope QA/agent diperbaiki sesuai R23.
 - 2026-09-03: Terminal UX — swipe diubah jadi scroll (bukan navigasi TUI) karena
   TUI sering salah tangani swipe. Scroll velocity-based + damping agar natural.
@@ -235,6 +266,23 @@
   **R23**; di branch `refactor/ui` konsep yang sama = **R29** — lihat
   `documents/pm/OPERATING_RULES.md`. Saat merge #4, duplikat R23-routing `main`
   tidak dimasukkan karena sudah tercakup R29.)
+
+
+### Keputusan lisensi (2026-09-08) — user: "kita pake mit aja dulu"
+- Lisensi proyek: **MIT**, `Copyright (c) 2026 Fadhly Permata`, file `LICENSE` di branch `chore/mit-license`.
+  Badan teks diverifikasi identik byte dengan teks resmi SPDX (bukan ditulis dari ingatan).
+- Dikatakan eksplisit oleh user: **SEMENTARA**. Pemicu review lagi: sebelum rilis publik pertama /
+  sebelum kontribusi luar masuk / kalau ada yang ngomersialkan klon. Salinan MIT yang sudah tersebar
+  tidak bisa ditarik balik; naik ke copyleft nanti hanya melindungi versi ke depan.
+- Efek: larangan kata "free / open source" di materi publik DICABUT.
+- 2026-09-08: user memilih urutan **B** (lisensi naik SETELAH PR #10). PR #10 ternyata sudah merged
+  (8b72f84, 7 varian README ikut masuk main) → lisensi naik sebagai **PR #11** (clean, 9 commit).
+  Catatan: klaim "open source" TIDAK pernah tayang di main tanpa LICENSE, jadi gak ada publikasi
+  yang menyesatkan selama proses ini. Alasan "repo ini satu-satunya
+  sumber resmi" ikut ditulis, karena MIT tidak mewajibkan apa pun ke peng-copy.
+- Ketaatan pihak ketiga: notis MIT xterm.js (di-vendor) disimpan di `THIRD_PARTY_NOTICES.md`; versi
+  xterm TIDAK tercatat di repo → masih utang (WL.4). Font Awesome cuma lewat CDN (tidak didistribusikan),
+  tapi memuat CDN = icons mati tanpa internet + request keluar → bertentangan dengan klaim privasi (WL.5).
 
 ## Open risks
 - Agent file business-analyst / system-analyst / tech-architect SUDAH dibuat tapi
@@ -280,3 +328,62 @@
 - RULE BARU **R28**: baca kode HARUS lewat codegraph dulu (dapet path + line) baru baca
   file yg bersangkutan — hemat token, hindari broad grep/Explore. Reinit via
   `codegraph init` kalau index usang. Berlaku utk PM + semua sub-agent.
+
+## Dokumen wiki — keputusan (2026-09-08)
+- Kerja dokumen wiki jalan di **branch `docs/wiki`** (basis `origin/main`) di repo ini.
+  BUKAN repo terpisah — user mengoreksi (R39). Wiki GitHub sendiri sudah berupa repo git
+  terpisah (`AI-Gate.wiki.git`), jadi file wiki toh gak pernah nyampur sama `src/**`.
+- Kendala terverifikasi: fitur Wiki tidak bisa dinyalakan lewat API (`PATCH has_wiki`
+  diabaikan GitHub) → perlu 1 klik web UI (Settings → Features → Wikis). **SUDAH dilakukan
+  user (2026-09-08)** — wiki hidup di branch `master`, halaman awal `Home.md`. Izin tulis
+  diverifikasi lewat `git push --dry-run` (diterima, 0 byte ditulis) → auto-commit siap.
+- **BATAS IKAT dari user:** jangan menulis/meng-push apa pun ke wiki sampai izin turun.
+  Boleh: baca, clone, probe/dry-run.
+- Rencana tooling (belum dikerjakan): script publisher di `.opencode/tools/docs/wiki/`
+  (idempoten, wajib ada `--dry-run`), token dari `gh auth token` / `.env` (rule secrets,
+  gak di-hardcode), sumber konten = `.md` di branch `docs/wiki` ini; wiki = hasil publikasi.
+- Repo `fadhly-permata/AI-Gate-docs` (private) = **artefak salah**, tidak dipakai. User sudah
+  perintahkan hapus, tapi **terblokir**: PAT gak punya scope `delete_repo` (HTTP 403).
+  Menunggu user hapus lewat web atau menambah scope.
+
+### Konfirmasi maintainer (sumber kebenaran — jangan pasang caveat lagi)
+- 2026-09-08, user: **aigate SUDAH DITES di Linux, Windows, dan Android/Termux**, termasuk
+  menjalankan distro Linux penuh di dalam HP. Materi publik menulis ini sebagai fakta teruji;
+  DILARANG muncul kata "untested/experimental/belum diverifikasi" untuk hal ini (R42).
+- Nama produk ditulis **`aigate`** (huruf kecil semua), termasuk judul README.
+- README: bahasa **Inggris**, kultur **netral** (tanpa rujukan khas negara/daerah), nada ceria +
+  emoji, **tanpa path/nama file** (pengecualian `run.py` di perintah), detail teknis dialihkan ke
+  wiki → https://github.com/fadhly-permata/AI-Gate/wiki
+- Kalimat penutup README yang di-ACC user: "Try it, break it, and tell me where it hurts."
+  + baris kredit terakhir: "Made with ❤️ by Fadhly Permata".
+
+### Fakta wajib soal daftar CLI tool (berlaku README + semua varian + halaman wiki)
+- Jumlah preset saat ini **24** (dihitung dari `src/backend/cli_presets.py`: 12 agentic +
+  6 autonomous + 6 chat/shell). Sebut angkanya **cukup satu kali** per dokumen.
+- **Daftarnya masih dikembangkan** — wajib ditulis sebagai catatan: versi berikutnya bisa
+  menambah/mengubah tool (sebagian preset belum punya jalur install di semua platform).
+  EN: "The list is still growing — future versions may add or change tools."
+  ID: "Daftarnya masih terus dikembangkan — versi berikutnya bisa menambah atau mengubah tool
+  yang tersedia."
+
+### Baris bahasa di README (konvensi lintas varian)
+- Sumber daftar bahasa = registry aplikasi: `src/frontend/static/i18n.js` (`LANGS`) — 7 kode:
+  `en id ru nl ja zh zh-tw` dengan bendera 🇺🇸🇮🇩🇷🇺🇳🇱🇯🇵🇨🇳🇹🇼 dan **endonym** (English,
+  Bahasa Indonesia, Русский, Nederlands, 日本語, 简体中文, 繁體中文) yang TIDAK diterjemahkan.
+- Setiap file README (root + semua varian) wajib punya 1 baris `🌐 …` tepat setelah intro;
+  bahasa dokumen itu sendiri ditebalkan tanpa link.
+- Path relatif: dari root → `documents/readme-variants/README.<kode>.md`; antar varian → cukup
+  `README.<kode>.md`; dari varian ke root → `../../README.md`.
+- Varian yang belum dibuat = link mati → PR jangan di-merge sampai 6 varian ada.
+
+### Peta file kerja wiki (2026-09-08) — baca ini dulu kalau sesi putus
+- Rencana + batas konten + pertanyaan terbuka → `documents/pm/wiki-plan.md`
+- Task list hidup (W0.x / W1.1–W1.8 / W2.x) → `documents/pm/wiki-backlog.md`
+- Draft per halaman (staging, BUKAN wiki asli) → `documents/pm/wiki-drafts/`
+- Aturan terikat: **R44** (publik tidak membocorkan `documents/`, sumber fakta = kode/perilaku,
+  sekuensial satu-per-satu) + R43 (varian bahasa = tulisan asli) + R39 (branch `docs/wiki`).
+
+### CLI-tools script bugs (2026-09-09) — DONE
+- 4 bug nyata di `scripts/cli-tools/` diverifikasi & dibenerin: aichat.sh (`pkg install -y`, `export AICHAT_CONFIG_FILE` + `exec $BIN $@`), codex.sh (`pkg install -y`), oterm.sh (`export OTERM_DATA_DIR` + `exec $BIN $@`). Kelas bug: (a) `pkg install` tanpa `-y` abort di non-interaktif; (b) `exec VAR=val $BIN` → quoted assignment dibaca sebagai command name (exit 127).
+- Re-test aichat sukses (EXIT 0). Env Termux read-only `/etc/apt` (hope2333-mirrorlist) blokir install/uninstall via pkg — di luar script.
+- Commit: `61d64337b686a8b5ee0f58d17d52807119922d0a`.
