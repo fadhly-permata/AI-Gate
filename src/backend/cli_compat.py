@@ -5,29 +5,25 @@ launcher panel (``src/frontend/static/clitools.js``) renders one status badge
 per platform for every tool and highlights the platform the gateway is actually
 running on.
 
-DATA LIVES IN ``cli_compat.json`` (shipped next to this file). This module is a
-thin loader: it reads that JSON at import time and exposes the same public API
-the rest of the codebase already depends on, so the cross-platform harness
-(``scripts/cli-tools/compat-test.sh``) can write a platform column
-programmatically — without parsing Python.
+This module is intentionally DATA-ONLY and framework-free:
 
-Public API (stable, do not rename without updating callers):
-  * ``CLI_COMPAT``        — ``tool -> platform -> {status, note, source}``.
-  * ``PLATFORMS``         — the canonical platform key order.
-  * ``current_platform()``— detects the platform from Python (authoritative; the
-    shell helpers in ``scripts/cli-tools/_common.sh`` detect it too, but the UI
-    must agree with the server, so we detect it here).
-  * ``compat_for(name)``  — safe lookup returning an ``unknown`` row per platform
-    for unknown tools (fail-open, never raises).
+* ``CLI_COMPAT`` — ``tool -> platform -> {status, note, source}``.
+* ``PLATFORMS`` — the canonical platform key order.
+* ``current_platform()`` — detects the platform from Python (authoritative; the
+  shell helpers in ``scripts/cli-tools/_common.sh`` detect it too, but the UI
+  must agree with the server, so we detect it here).
+* ``compat_for(name)`` — safe lookup returning an ``unknown`` row per platform
+  for unknown tools (fail-open, never raises).
 
 Status vocabulary (stable codes, shared with the frontend):
-  * ``verified``     — confirmed working on this platform, wired to aigate.
-  * ``installable``  — can be installed + launched here (not yet confirmed live).
-  * ``broken``       — install/build fails or the binary cannot run on this platform.
-  * ``no_install``   — no verified install path for this platform.
-  * ``not_a_cli``    — library/framework, not a launchable terminal CLI.
-  * ``not_wired``    — installs, but runs in a mode aigate does not serve.
-  * ``unknown``      — not yet tested on this platform (user fills in later).
+
+* ``verified``     — confirmed working on this platform, wired to aigate.
+* ``installable``  — can be installed + launched here (not yet confirmed live).
+* ``broken``       — install/build fails or the binary cannot run on this platform.
+* ``no_install``   — no verified install path for this platform.
+* ``not_a_cli``    — library/framework, not a launchable terminal CLI.
+* ``not_wired``    — installs, but runs in a mode aigate does not serve.
+* ``unknown``      — not yet tested on this platform (user fills in later).
 
 ``termux`` is seeded from on-device verification (Termux/aarch64, Python 3.14.6,
 2026-09). The other three platforms are left ``unknown`` for the user to fill in
@@ -36,23 +32,17 @@ for the seeded rows so they are easy to find and update.
 
 Cross-checked against ``cli_presets.LAUNCH_SUPPORT`` (launch wiring) — note the
 two are DIFFERENT axes:
-  * ``LAUNCH_SUPPORT`` = "does aigate have a launch builder + does the tool speak
-    the gateway's OpenAI/Anthropic wire format" (code-level).
-  * ``CLI_COMPAT``    = "does the tool actually install/run on THIS platform"
-    (runtime/install-level). A tool can be ``LAUNCH_VERIFIED`` yet ``broken`` here
-    (e.g. ``aider`` has a builder but needs Python 3.12 on a 3.14 device).
+* ``LAUNCH_SUPPORT`` = "does aigate have a launch builder + does the tool speak
+  the gateway's OpenAI/Anthropic wire format" (code-level).
+* ``CLI_COMPAT``    = "does the tool actually install/run on THIS platform"
+  (runtime/install-level). A tool can be ``LAUNCH_VERIFIED`` yet ``broken`` here
+  (e.g. ``aider`` has a builder but needs Python 3.12 on a 3.14 device).
 """
 
 from __future__ import annotations
 
-import json
-import os
 import platform
 from typing import Dict
-
-# Resolve the JSON next to this file so `import cli_compat` works both as
-# `backend.cli_compat` and as a bare `cli_compat` from `src/backend`.
-_STATUS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cli_compat.json")
 
 # Reuse the authoritative Termux detector so detection agrees with install routing.
 # Imported lazily inside :func:`current_platform` (not at module load) so that
@@ -92,56 +82,153 @@ def _unknown_compat() -> Dict[str, Dict[str, str]]:
     return {p: _unknown_row() for p in PLATFORMS}
 
 
-def _row(status: str, note: str, source: str = _SEEDED_SOURCE) -> Dict[str, str]:
-    return {"status": status, "note": note, "source": source}
+def _row(status: str, note: str) -> Dict[str, str]:
+    return {"status": status, "note": note, "source": _SEEDED_SOURCE}
 
 
-def _load_compat() -> Dict[str, Dict[str, Dict[str, str]]]:
-    """Build ``CLI_COMPAT`` from ``cli_compat.json``.
+# Blank templates for the three not-yet-tested platforms.
+_LIN = _unknown_row()
+_WIN = _unknown_row()
+_MAC = _unknown_row()
 
-    Only the CURRENT platform column for each tool is ever overwritten (by the
-    harness); other platforms are preserved verbatim. Missing platforms fall
-    back to an ``unknown`` row so the shape stays uniform.
-    """
-    try:
-        with open(_STATUS_FILE, "r", encoding="utf-8") as fh:
-            data = json.load(fh)
-    except FileNotFoundError as exc:  # pragma: no cover - file always ships
-        raise FileNotFoundError(
-            f"cli_compat.json not found at {_STATUS_FILE}; "
-            "it must ship next to cli_compat.py"
-        ) from exc
-
-    compat: Dict[str, Dict[str, Dict[str, str]]] = {}
-    for tool, platforms in data.get("compat", {}).items():
-        compat[tool] = {}
-        for p in PLATFORMS:
-            row = platforms.get(p)
-            if not isinstance(row, dict):
-                compat[tool][p] = _unknown_row()
-            else:
-                compat[tool][p] = {
-                    "status": row.get("status", STATUS_UNKNOWN),
-                    "note": row.get("note", ""),
-                    "source": row.get("source", "unknown"),
-                }
-    return compat
-
-
+# --------------------------------------------------------------------------- #
 # CLI_COMPAT — tool name -> platform -> {status, note, source}
-# Loaded from cli_compat.json (single source of truth).
-CLI_COMPAT: Dict[str, Dict[str, Dict[str, str]]] = _load_compat()
+# Only `termux` is seeded from device testing; the rest stay `unknown`.
+# --------------------------------------------------------------------------- #
+CLI_COMPAT: Dict[str, Dict[str, Dict[str, str]]] = {
+    # ----- Group A: agentic coding -----
+    "claude": {
+        "termux": _row(STATUS_BROKEN,
+                       "npm @anthropic-ai/claude-code has no Android binary; npm is dead on Termux."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+    "opencode": {
+        "termux": _row(STATUS_BROKEN,
+                       "npm opencode-ai has no Android binary; npm is dead on Termux."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+    "codex": {
+        "termux": _row(STATUS_NOT_WIRED,
+                       "NOT_WIRED — runs native OpenAI Responses API; aigate has no streaming responses inbound."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+    "gemini": {
+        "termux": _row(STATUS_NOT_WIRED,
+                       "NOT_WIRED — runs native Google mode; aigate serves OpenAI/Anthropic only."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+    "antigravity": {
+        "termux": _row(STATUS_NO_INSTALL,
+                       "NO_INSTALL — no verified CLI package (npm squat / 404)."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+    "phi": {
+        "termux": _row(STATUS_NO_INSTALL,
+                       "NO_INSTALL — no verified CLI package (npm squat / PyPI unrelated)."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+    "aider": {
+        "termux": _row(STATUS_BROKEN,
+                       "pip install aider-chat needs Python 3.10-3.12 (device is 3.14); version guard exits."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+    "goose": {
+        "termux": _row(STATUS_NO_INSTALL,
+                       "NO_INSTALL — no Android/Termux binary for Block's goose."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+    "amp": {
+        "termux": _row(STATUS_NO_INSTALL,
+                       "NO_INSTALL — @ampcode/cli has no Android/Termux build."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+    "qwen": {
+        "termux": _row(STATUS_BROKEN,
+                       "npm @qwen-code/qwen-code has no Android binary; npm is dead on Termux."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+    "cline": {
+        "termux": _row(STATUS_BROKEN,
+                       "npm cline has no Android binary; npm is dead on Termux."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+    "kilo": {
+        "termux": _row(STATUS_BROKEN,
+                       "npm @kilocode/cli has no Android binary; npm is dead on Termux."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+    # ----- Group B: autonomous agents -----
+    "openhands": {
+        "termux": _row(STATUS_BROKEN,
+                       "pip install openhands needs Python 3.12 (device is 3.14); version guard exits."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+    "swe-agent": {
+        "termux": _row(STATUS_NO_INSTALL,
+                       "NO_INSTALL — PyPI 404; Docker/conda setup impractical on Termux."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+    "open-interpreter": {
+        "termux": _row(STATUS_BROKEN,
+                       "pip install open-interpreter is heavy but reportedly installable on Termux (Py3.14)."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+    "autogpt": {
+        "termux": _row(STATUS_NO_INSTALL,
+                       "NO_INSTALL — official AutoGPT is a Docker platform; PyPI 'autogpt' is an unrelated squat."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+    "gpt-researcher": {
+        "termux": _row(STATUS_NOT_A_CLI,
+                       "NOT_A_CLI — pip package is a library/backend only; no launchable binary."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+    "crewai": {
+        "termux": _row(STATUS_NOT_A_CLI,
+                       "NOT_A_CLI — console script is a framework scaffolder/runner requiring a project in CWD."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+    # ----- Group C: chat & shell -----
+    "llm": {
+        "termux": _row(STATUS_BROKEN,
+                       "pip install llm fails building 'jiter' (no Android wheel, Py3.14)."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+    "sgpt": {
+        "termux": _row(STATUS_NO_INSTALL,
+                       "NO_INSTALL — npm squat / PyPI 404 / Go binary has no Android build."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+    "mods": {
+        "termux": _row(STATUS_NO_INSTALL,
+                       "NO_INSTALL — Go binary (charmbracelet/mods) has no Android build."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+    "oterm": {
+        "termux": _row(STATUS_BROKEN,
+                       "pip install oterm fails building 'jiter' (no Android wheel, Py3.14)."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+    "gptme": {
+        "termux": _row(STATUS_BROKEN,
+                       "pip install gptme fails building 'jiter' (no Android wheel, Py3.14)."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+    "aichat": {
+        "termux": _row(STATUS_VERIFIED,
+                       "pkg install aichat (0.30.0 verified runs on Termux); OpenAI-compatible, wired to aigate."),
+        "linux": _LIN, "windows": _WIN, "macos": _MAC,
+    },
+}
 
 
 def current_platform() -> str:
     """Detect the platform aigate is running on (authoritative, from Python).
 
     Reuses :func:`backend.paths.is_termux` so the platform used for install
-    routing and the one shown in the UI are identical. Falls back to an
-    environment/path probe (mirroring ``scripts/cli-tools/_common.sh``) and then
-    ``platform.system()`` when the ``backend`` package is not importable — e.g. a
-    bare ``import cli_compat`` from ``src/backend`` outside the app, or the
-    cross-platform harness.
+    routing and the one shown in the UI are identical. Falls back to
+    ``platform.system()`` alone when the ``backend`` package is not importable
+    (e.g. a bare ``import cli_compat`` from ``src/backend`` outside the app).
     """
     try:
         from backend.paths import is_termux as _is_termux
@@ -150,19 +237,13 @@ def current_platform() -> str:
             return "termux"
     except Exception:  # noqa: BLE001 - backend package not on path in isolation
         pass
-    # Isolated fallback: Termux is detected by env/path, not by uname (some
-    # Termux Python builds report platform.system() == "Android").
-    if os.environ.get("TERMUX_VERSION") or os.path.isdir("/data/data/com.termux/files"):
-        return "termux"
     sysname = platform.system()
-    if sysname in ("Windows", "win32"):
+    if sysname == "Windows":
         return "windows"
     if sysname == "Darwin":
         return "macos"
     if sysname == "Linux":
         return "linux"
-    if sysname == "Android":  # Android userspace == Termux
-        return "termux"
     return "unknown"
 
 

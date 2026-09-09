@@ -1,11 +1,8 @@
 # CLI Tools — Compatibility Catalog (per-tool × per-platform)
 
-> Mirror human-readable dari `src/backend/cli_compat.json` (sumber kode otoritatif,
-> dibaca oleh `src/backend/cli_compat.py` sebagai thin-loader).
-> JANGAN edit data di sini untuk mengisi kolom — jalankan harness
-> `scripts/cli-tools/compat-test.sh` di platform bersangkutan, yang akan menulis
-> kolom platform langsung ke `cli_compat.json`. Doc lengkap + perintah ada di
-> `documents/pm/cli-tools-cross-platform-testing.md`.
+> Mirror human-readable dari `src/backend/cli_compat.py` (`CLI_COMPAT`).
+> Edit di SINI untuk mengisi kolom Linux / Windows / macOS setelah diuji di
+> masing-masing platform, lalu sinkronkan ke `cli_compat.py` (sumber kode).
 >
 > Status codes: `verified` · `installable` · `broken` · `no_install` ·
 > `not_a_cli` · `not_wired` · `unknown`.
@@ -60,17 +57,11 @@
 
 ## Catatan sinkronisasi
 
-- Sumber otoritatif kode = `src/backend/cli_compat.json` (dibaca oleh
-  `src/backend/cli_compat.py` sebagai thin-loader; `CLI_COMPAT`, `PLATFORMS`,
-  `current_platform()`, `compat_for()` tetap diekspos oleh modul tersebut).
-- Untuk mengisi kolom Linux / Windows / macOS: jalankan harness
-  `scripts/cli-tools/compat-test.sh --apply` di masing-masing platform (lihat
-  `documents/pm/cli-tools-cross-platform-testing.md`). Harness menulis kolom
-  platform saat ini ke `cli_compat.json` secara atomik dan mempertahankan kolom
-  platform lain (termasuk `termux` yang sudah di-seed). Tidak perlu edit manual.
+- Sumber otoritatif kode = `src/backend/cli_compat.py` (`CLI_COMPAT`,
+  `PLATFORMS`, `current_platform()`, `compat_for()`).
 - Perintah `cli tools` (frontend CLI Tools view) merender 4 badge per tool
   (Termux/Linux/Windows/macOS), menyorot platform saat ini (deteksi dari Python
   via `current_platform()`), dan menampilkan warning merah bila status platform
   saat ini ∈ {broken, no_install, not_a_cli, not_wired}.
-- Mengubah status di `cli_compat.json` otomatis tercermin di UI pada fetch
+- Mengubah status di `cli_compat.py` otomatis tercermin di UI pada fetch
   berikutnya (tanpa cache-buster khusus untuk data ini).
