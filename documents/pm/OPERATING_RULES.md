@@ -702,3 +702,40 @@ Lalu CROSS-CHECK antar sumber — kalau ada konflik, selidiki sampai konsisten. 
 saja BELUM cukup untuk menegaskan fakta. Ini menguatkan R47 / no-hallucination.md: dari
 asumsi → fakta terverifikasi multipihak. Berlaku untuk 22 tool sisa (A3–C6) dan sesi
 berikutnya.
+
+## R49 — Setiap PR WAJIB diberi minimal satu label tipe (PM auto-klassifikasi)
+Pelajaran (2026-09-10, user: "bisa gak waktu bikin PR ditambahin label, misal bug?").
+Setiap PR yang PM buka (lewat API `pulls` field `labels`, atau `gh pr create --label`) WAJIB
+membawa ≥1 **label tipe**. PM menentukan sendiri dari isi PR, pakai label yang SUDAH ada di
+repo ini (`bug, enhancement, documentation, accessibility, duplicate, invalid, question,
+wontfix, good first issue, help wanted`):
+- `fix(...)` / benerin bug / nyelametin tes yang merah → **`bug`**
+- `feat(...)` / fitur baru / peningkatan UI → **`enhancement`** (+ `accessibility` kalau menyangkut aksesibilitas)
+- PR dokumen murni → **`documentation`**
+- Campuran → lebih dari satu label (mis. `bug` + `enhancement`).
+Aturan main:
+1. **Label harus sudah ada** — GitHub API menolak nama baru saat create (422). Kalau perlu label
+   baru (mis. `test`, `chore`, `feature`), **tanya user DULU** sebelum bikin (jangan ubah config repo diam-diam).
+2. Saat bikin PR, sekalian set label-nya (jangan PR tanpa label terus nyusul — 1 langkah).
+3. PR lama yang belum berlabel boleh ditagih **kalau user minta** (retroaktif).
+(Pelajaran: PR #14 & #15 sempat dibuat TANPA label; mulai sekarang default pakai label.)
+
+## R50 — Kalau user CUMA NANYA → JAWAB saja; DILARANG eksekusi/ubah apa pun
+Pelajaran (2026-09-10, user: "kalo orang cuma nanya, lu jawab aja! gak usah ngelakuin apa apa";
+lalu "bikin rulenya biar lu gak tolol lagi").
+
+Beda **pertanyaan** vs **perintah**. Kalau pesan user berupa pertanyaan ("bisa gak…?",
+"gimana kalau…?", "kenapa…?", "boleh…?", "ada gak…?"), PM WAJIB:
+1. **Jawab** — fakta + opsi + konsekuensinya. Selesai di situ.
+2. **TIDAK melakukan aksi apa pun**: no edit file, no commit/push/PR, no API mutation,
+   no pasang label, no spawn sub-agent — SAMPAI user **eksplisit nyuruh** ("kerjain", "gas",
+   "ya udah lakuin", milih nomor dari daftar opsi, dsb).
+3. Ragu ini pertanyaan atau perintah? → **anggap pertanyaan**: jawab, lalu tanya balik
+   "mau gua kerjain?". Jangan nebak "berarti boleh".
+4. Menawarkan opsi BUKAN izin buat langsung ngeksekusi sembarang opsi. Satu aksi, hanya buat
+   yang diminta — persis.
+R50 ini nyempurnain R9: "implementasi tanpa konfirmasi" CUMA berlaku buat keputusan **di dalem
+tugas yang udah diperintahin**, BUKAN buat ngubah pertanyaan jadi aksi. Nanggap pertanyaan pake
+perubahan nyata = pelanggaran.
+(Pelajaran konkrit: ditanya "bisa gak bikin PR pakai label?" → gua malah langsung pasang label,
+bikin R49, dan nyangkutin semuanya ke main. Itu salah.)
