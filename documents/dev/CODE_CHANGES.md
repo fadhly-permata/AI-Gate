@@ -1,5 +1,87 @@
 # Code Changes Register (code ↔ docs alignment)
 
+## 2026-09-09 (lanjutan) — Bottom-nav ponsel: mirror 9 view + link Repo + separator grup — DONE (DI-COMMIT 6fb210b+26b087d, pushed, PR #14 open)
+
+**Permintaan user (retest di HP):** (1) "menu bawah masih gak bisa digeser / ada item yang
+di-hidden?" → ternyata `.bottom-nav` cuma punya **7** dari **9** view menu samping; `usage`
+(Pemakaian & Kuota) + `analytics` (Analitik) **gak pernah di-render** di ponsel (bukan ketutup —
+gak ada tombolnya). (2) "sekalian tambahin link Repo + separator buat tiap grup menu."
+
+**Owner:** `fe-dev` (3 spawn iteratif: hamburger+scroll → tambah usage/analytics → repo+separator).
+PM verifikasi tiap ronde + jalanin tes.
+
+### Perubahan akhir (semua `src/frontend/**`; menimpa sebagian ronde-1 di bawah)
+- `static/index.html` `.bottom-nav` (kini ~baris 1143-1170): **9 app view** urutan sama dgn
+  sidebar + **1 link Repo** (icon-only `fa-brands fa-github`, `target=_blank rel=noopener`,
+  **TANPA `data-view`** → guard `app.js:1679` biarin dia jadi link eksternal asli;
+  `app.js:1464` tetap kasih tooltip; `syncBottomNav` guard `!!view` bikin dia gak pernah `.active`)
+  = **10 `.bn-item`**. Ditambah **4 `<span class="bn-sep" aria-hidden="true">`** di batas grup:
+  endpoints→terminal, cli→usage, analytics→settings, settings→repo (Gateway|Operasi|Wawasan|Sistem|Repo).
+- `static/styles.css`: rule BARU `.bn-sep { flex:0 0 auto; width:1px; align-self:center;
+  height:26px; margin:0 2px; background: var(--panel-border); }` setelah blok `.bn-item`
+  (token-only → ikut tema gelap/terang). Deklarasi `.bottom-nav`/`.bn-item` ronde-1 UTUH
+  (overflow-x:auto + justify-content:flex-start + `-webkit-overflow-scrolling:touch` + min-width:60px).
+- cache-buster `index.html:17`: `styles.css?v=20260913` → **`?v=20260914`** (styles.css nambah rule nyata).
+- `tests/views.test.js`: guard lama "repo TIDAK ada di bottom-nav / count=9" **dibalik** → repo
+  HADIR (`.bn-item[href*="github"]`, href/target/rel/no-data-view benar), count **10**; parity test
+  pakai `.bottom-nav .bn-item[data-view]` (9 view; repo non-data-view gak nyumbang `null`); scroll
+  test `10 × 60 = 600 > 360`; **+ tes baru** `.bn-sep` count === 4 + cek tiap pembatas duduk di
+  batas grup yg benar (pasangan `data-i18n-aria` tetangga) + kontrak CSS `.bn-sep`.
+
+### Verifikasi (PM)
+- `vitest run tests/views.test.js` → **25 pass** (hamburger-hidden, parity, scroll=10, sep=4).
+- `git diff --check` bersih; `index.html` ke-parse jsdom tanpa error (0 artefak markup, R24).
+- Tablet(>600px)/desktop gak kena: `.bottom-nav` base tetap `display:none`, sidebar + hamburger utuh.
+- ⚠️ **Layout & horizontal-scroll browser-asli BELUM terbukti** — no browser di box, jsdom gak
+  ngukur flex/`@media`. WAJIB pass manual di HP: geser menu bawah sampe ikon GitHub keliatan &
+  kebuka, pastiin 4 garis tipis (separator) tampil, tap Pemakaian/Analitik/Repo berfungsi. (R20)
+- Task susulan terpisah (masih terbuka, dari ronde-1): suite FE penuh merah 22 fail
+  `localStorage`/`sessionStorage` (logwindow + terminal_discard) — lingkungan (npm ci vitest 2.1.9 +
+  jsdom 25.0.1), BUKAN regresi UI.
+
+## 2026-09-09 — Phone shell: hamburger disembunyikan + bottom-nav scroll horizontal — DONE (DI-COMMIT 6fb210b, pushed, PR #14 open)
+
+**Permintaan user:** di ponsel (mode potret) tombol hamburger hide/show sidemenu nge-bug →
+hilangkan saja; sidemenu yang pindah ke bawah bikin banyak menu gak bisa diakses → buat
+scrollable ke samping. Pastikan tablet & desktop tidak terpengaruh.
+
+**Owner:** `fe-dev` (perubahan CSS-only). Verifikasi: PM (audit diff + bukti stash).
+
+### Perubahan (semua di `src/frontend/**`)
+- `static/styles.css`:
+  - `.bottom-nav` (rule BASE, ~baris 565): `justify-content: space-around` → `flex-start`,
+    tambah `overflow-x: auto` + `-webkit-overflow-scrolling: touch`. Alasannya di rule base
+    supaya KEDUA shell phone mewarisi seragam; di tablet/desktop `.bottom-nav` `display:none`
+    → tidak kena. `flex-start` itu penting: baris `space-around`/centered yang overflow
+    menumpahkan ke DUA sisi → item pertama ikut tak terjangkau.
+  - `.bn-item` (base, ~baris 575): tambah `min-width: 60px` di atas `flex: 1 1 0` → 7 ikon
+    mengisi rata saat muat, overflow→scroll saat tidak (7×60=420 > 360), tak pernah ke-squeeze/ke-clip.
+  - blok `@media (max-width: 600px)` (phone shell, ~baris 645): tambah `#sidebarToggle { display: none; }`.
+  - `body[data-device="phone"]` (~baris 671): tambah `#sidebarToggle { display: none; }` (mirror simulasi).
+  - +3 komentar niat (d strip oleh helper `stylesCss()` di tes → tak mengganggu assert teks CSS).
+- `static/index.html:17`: cache-buster `styles.css?v=20260912` → `?v=20260913`.
+- `tests/views.test.js`: +`describe("phone shell — hamburger hidden, bottom nav scrollable")`
+  (2 tes). jsdom tak mengevaluasi `@media`/layout flex, jadi tes meng-assert TEKS rule
+  (konvensi sama dgn cek sticky-footer); ekstraksi blok `@media` pakai brace-matching supaya
+  `#sidebarToggle{display:none}` NON-scoped tak bisa lolos sbg "didalam query". Guard positif:
+  tepat 2 rule `#sidebarToggle` se-file, dan blok tablet `@media (max-width:960px)` tak boleh nyentuhnya.
+
+### Verifikasi
+- `vitest run tests/views.test.js` → **23 pass** (21 lama + 2 baru). Sapuan fe-dev 15 file yang
+  membaca `styles.css` → **299 pass**. `git diff --check` bersih; working tree = 3 file itu saja.
+- Gate PM (suite FE penuh) **merah 22 fail** `localStorage`/`sessionStorage` undefined di
+  `logwindow.test.js` + `terminal_discard.test.js`. **Dibuktikan BUKAN efek perubahan ini:**
+  ke-3 file di-`git stash` → pada tree bersih 2 file itu tetap gagal identik (22 fail / 29 pass).
+  = regresi LINGKUNGAN: `src/frontend/node_modules` sempat kosong, `npm ci` menarik
+  vitest 2.1.9 + jsdom 25.0.1; probe: jsdom butuh url ber-origin supaya `localStorage` tersedia.
+  → TASK SUSULAN terpisah (qa/fe-dev infra) di luar scope UI ini.
+
+### Open (keputusan user, belum dikerjakan)
+- Chrome scrollbar non-overlay muncul saat simulasi phone di desktop (memakan tinggi baris 56px);
+  di Android/iOS berupa overlay → tak terlihat. YAGNI, sengaja belum disembunyikan.
+- Tak ada affordance bahwa nav bisa digeser (fade/peek/scroll-snap) — butuh keputusan desain.
+- `#sidebarToggle` masih di DOM + handler `app.js:1611` masih bind/persist ke `SIDEBAR_KEY`
+  (collapsed-state laten sampai user balik ke tablet/desktop) — kosmetik.
 ## 2026-09-09 — feat: catalog kompatibilitas per-tool × per-platform + tampilan `cli tools` (branch `setup/cli-tools`) — DONE
 
 **Tujuan:** rancang & implementasi katalog kompatibilitas 24 CLI tool aigate across

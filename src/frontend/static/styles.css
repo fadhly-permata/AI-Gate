@@ -561,22 +561,31 @@ body.sidebar-collapsed .nav-item {
 
 /* ===== Device simulation (B4.2) + responsiveness ===== */
 
-/* Mobile bottom navigation — hidden unless phone simulation or narrow viewport. */
+/* Mobile bottom navigation — hidden unless phone simulation or narrow viewport.
+   Scrolls SIDEWAYS when the icons do not fit (every view must stay reachable),
+   so justify-content stays flex-start: a centred/space-around row would overflow
+   on both ends and push the first item out of reach. */
 .bottom-nav {
   display: none;
   align-items: center;
-  justify-content: space-around;
+  justify-content: flex-start;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   background: var(--sidebar-bg);
   color: var(--sidebar-fg);
   border-top: 1px solid var(--panel-border);
   z-index: 20;
 }
 
+/* min-width beats flex-shrink: the icons fill the row evenly when every tap
+   target fits, and overflow into a scroll when they don't — never squeezed or
+   clipped. */
 .bn-item {
   display: flex;
   align-items: center;
   justify-content: center;
   flex: 1 1 0;
+  min-width: 60px;
   height: 100%;
   color: var(--sidebar-fg);
   text-decoration: none;
@@ -586,6 +595,19 @@ body.sidebar-collapsed .nav-item {
 
 .bn-item:hover { color: var(--sidebar-fg-hover); }
 .bn-item.active { color: var(--accent-contrast); background: var(--sidebar-active); }
+
+/* Vertical group divider, mirroring the sidebar sections (Gateway | Operations
+   | Insights | System | Repo). Hairline-thin and never a tap target; fixed
+   height + align-self so it neither stretches nor gets squeezed by the row.
+   Invisible on tablet/desktop because .bottom-nav itself is display:none. */
+.bn-sep {
+  flex: 0 0 auto;
+  width: 1px;
+  align-self: center;
+  height: 26px;
+  margin: 0 2px;
+  background: var(--panel-border);
+}
 
 .settings-dev-note {
   margin: 6px 0 0;
@@ -615,7 +637,9 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; gap: 6
 }
 
 /* Phone — real narrow viewport OR device simulation = phone: NON-AdminLTE shell.
-   Sidebar hidden, content single full-width column, bottom nav (icons only). */
+   Sidebar hidden (so #sidebarToggle is hidden too: it would toggle nothing and its
+   tap is dead there), content single full-width column, bottom nav (icons only).
+   The body[data-device="phone"] rules below mirror this shell for simulation. */
 @media (max-width: 600px) {
   :root { --ws-pad: 12px; }
   .layout {
@@ -635,6 +659,7 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; gap: 6
     grid-row: 3;
     height: 56px;
   }
+  #sidebarToggle { display: none; }
   .settings-card, .welcome-card { max-width: 100%; }
   .cli-tools { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
   .data-table { display: block; overflow-x: auto; white-space: nowrap; }
@@ -659,6 +684,7 @@ body[data-device="phone"] .bottom-nav {
   grid-row: 3;
   height: 56px;
 }
+body[data-device="phone"] #sidebarToggle { display: none; }
 body[data-device="phone"] .settings-card,
 body[data-device="phone"] .welcome-card { max-width: 100%; }
 body[data-device="phone"] .cli-tools { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
