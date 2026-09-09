@@ -401,6 +401,29 @@
 
 **Status: DONE — OpenAI-compatible (verified).** gptme di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → gptme forward model apa adanya. Commit `16d36f9`. Progres keseluruhan cli-tools: **23/24**.
 
+## CLI Tools C6: aichat install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/aichat.sh` (C6 aichat).
+
+**Fakta kode (cross-check):**
+- `cli_presets.py:105` = `_cargo("aichat")` → `cargo install aichat` (install string fallback).
+- `cli_presets.py:226` = `"aichat": LaunchSupport(LAUNCH_VERIFIED, REASON_NONE)` — aichat = verified, OpenAI-compatible.
+- `cli_presets.py:242` = `TERMUX_INSTALL["aichat"]="pkg install aichat"` — rute Termux override ("verified 0.30.0 runs" di Termux).
+- `cli_tools_router.py:469-511` = `_aichat_builder` — wiring: generate config `aichat-aigate.yaml` (client `aigate` openai-compatible, `api_base`=gateway, `api_key`), set env `AICHAT_CONFIG_FILE`, model `aigate:<raw>` ke aigate `/v1/chat/completions`.
+- crates.io `aichat` 0.30.0 (Rust).
+
+**Script behavior:** install via `pkg install aichat` (override `TERMUX_INSTALL`) dengan fallback `cargo install aichat`; launch **OpenAI-compatible** — generate `aichat-aigate.yaml` (client `aigate` openai-compatible, `api_base`=gateway, `api_key`), set env `AICHAT_CONFIG_FILE`, model `aigate:<raw>` ke `/v1/chat/completions`.
+
+**Catatan Termux (terbukti WORKING, bukan blocker):** `pkg install aichat` di Termux terbukti jalan (usable di Termux, "verified 0.30.0 runs") — rute install resmi via `pkg`, fallback `cargo` kalau pkg tidak ada.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/aichat.sh` → clean; perms `-rwx------` (exec).
+
+**Status: DONE — OpenAI-compatible (verified).** aichat di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → aichat forward model apa adanya. Commit `1c4e592`. Progres keseluruhan cli-tools: **24/24**.
+
+## ===== GRUP C SELESAI (6/6) =====
+
+ Semua 6 tool Grup C (`chat_shell`) — C1 llm, C2 sgpt, C3 mods, C4 oterm, C5 gptme, C6 aichat — SELESAI (script install/launch + wiring/NO_INSTALL sesuai preset). **SEMUA 24 TOOL SELESAI** (A1–A12, B1–B6, C1–C6). Progres keseluruhan cli-tools: **24/24 (ALL DONE)**.
+
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
 bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.
