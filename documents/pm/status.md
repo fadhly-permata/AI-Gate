@@ -1,5 +1,43 @@
 # PM Status
 
+## R51 — kredensial cuma dari `.env` (user koreksi: "dari tadi lu nabrak rule melulu") — 2026-09-10 (PM)
+**Pelanggaran gua:** `.opencode/rules/secrets.md` udah bilang "API key / JWT / PAT / token →
+store in `.env`; never hardcode; never commit". Tapi pas `git push --delete` gagal (git nggak
+manggil `.env`, dan sesi ini nggak punya TTY), gua: (a) nyimpulkan user harus nyediain kredensial,
+(b) malah nawarin nyimpen token polos di `~/.git-credentials` / pindah SSH — dua-duanya nabrak
+spirit rule. Faktanya **`.env` di root UDAH ADA**: 1 variabel `GITHUB_TOKEN`, classic PAT 40 char,
+scope `repo, workflow, write:packages`, permission repo `admin`+`push` (cek lewat header API),
+identik dengan `$GITHUB_TOKEN` env (dibuktikan pakai hash pendek, nilai nggak dicetak), dan
+`.env` udah ke-gitignore + belum pernah ke-track.
+**Verifikasi kemampuan:** `git -c credential.helper='!f(){echo username=x-access-token; echo password=$GITHUB_TOKEN; };f' ls-remote origin HEAD`
+→ sukses (bukti `git push` bisa jalan tanpa nyimpen kredensial ke disk).
+**Aturan baru R51** (OPERATING_RULES.md): 1) ambil kredensial dari `.env`; 2) sebelum ngaku
+"nggak bisa/nggak punya akses" WAJIB cek `.opencode/rules/*.md` + `.env` dulu; 3) DILARANG bikin
+penyimpanan kredensial baru tanpa user minta — pakai helper sekali-pakai inline; 4) nilai
+kredensial nggak pernah dicetak; 5) `.env` nggak pernah di-commit; 6) token ditolak → lapor fakta +
+minta keputusan user.
+**Aksi (perintah user: "kerjain nomor 2 lalu nomor 1"):** tulis R51 + mirror ke memory-bank &
+state.md (`rules_ref` → R1–R51, `mode: refactor-ui`) → commit → push `refactor/ui` pakai token
+dari `.env` (helper inline, nol penulisan ke disk).
+
+## Branch hygiene 2026-09-10 — hapus `fix/fe-test-env` (lokal + GitHub), kerja pindah ke `refactor/ui` (PM)
+User: "hapus branch ini dari local dan github, kita pindah ke branch refactor ui".
+**Temuan sebelum eksekusi:** branch itu punya 2 commit yang BELUM ada di `main` maupun
+`refactor/ui` = aturan **R49** + **R50** dan catatannya (`e87ad53`, `2c5b70b`). Kode perbaikan
+tes FE (`95d46e4`) sudah aman di `origin/main` lewat PR #15. Working tree bersih, tidak ada stash.
+**Keputusan user (opsi 1 = aman):** selamatkan doc dulu, baru hapus.
+- `git checkout refactor/ui` → `git cherry-pick e87ad53 2c5b70b`. Konflik di `state.md` +
+  `status.md` (checkpoint/heading lama vs baru) → PM resolv **union, buang checkpoint lama yang
+  sudah disuperseded** ("PR #14 open / scroll UNVERIFIED" → fakta baru: merged + sudah dites HP).
+  Hasil: `7665074` (R49) + `c5fc038` (R50). `git diff fix/fe-test-env refactor/ui -- OPERATING_RULES.md`
+  = **kosong** → isi rules identik, tidak ada yang hilang.
+- Lokal: `git branch -D fix/fe-test-env` (butuh `-D`: setelah cherry-pick SHA-nya beda, `-d` nolak).
+- Remote: `git push --delete` GAGAL (tidak ada TTY/credential helper; `gh` tidak terpasang) →
+  hapus via GitHub API pakai `$GITHUB_TOKEN` → **HTTP 204**; `git remote prune origin` beres.
+- Status sekarang: aktif di `refactor/ui`, **ahead 2** dari `origin/refactor/ui` (2 commit doc itu
+  BELUM di-push — butuh ACC user). Sisa branch: main, refactor/ui, setup/cli-tools,
+  feat/anthropic-inbound (lokal saja), docs/wiki, docs/readme-main, feat/i18n-locales (remote saja).
+
 ## Preferensi: setiap PR berlabel tipe (R49) — 2026-09-10 (PM)
 User minta PR SELALU pakai label (contoh `bug`). Jadi aturan **R49**: PM auto-klassif
 `bug`/`enhancement`/`documentation` (pakai label yang udah ada di repo; label baru butuh ACC user).

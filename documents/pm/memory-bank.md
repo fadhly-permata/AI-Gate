@@ -7,6 +7,19 @@
 - 2026-09-03: Arsitektur agen PM + sub-agent spesialis (on-demand, scoped).
 
 ## Decisions
+- 2026-09-10 (R51 — kredensial cuma dari `.env`): user ngingetin gua **nabrak rule yang udah ada**
+  (`.opencode/rules/secrets.md`: token/PAT/API key → simpen di `.env`, jangan hardcode, jangan
+  ke-commit). Kejadian: `git push --delete` gagal (git nggak nanya ke `.env`, dan nggak ada TTY) →
+  gua simpulkan "butuh kredensial dari user" malah nawarin nyimpen token polos di
+  `~/.git-credentials` / ganti ke SSH. Padahal **`.env` di root udah ada `GITHUB_TOKEN`** (classic
+  PAT, scope `repo, workflow, write:packages`, permission repo = admin+push — diverifikasi via
+  header API, nilai nggak dicetak). Rule **R51**: (1) ambil kredensial dari `.env`; (2) SEBELUM
+  ngaku "nggak bisa/nggak punya akses" WAJIB cek `.opencode/rules/*.md` + `.env` dulu; (3) DILARANG
+  bikin penyimpanan kredensial baru (credential.helper store, ~/.git-credentials, SSH, config) tanpa
+  user minta — kalau git butuh auth pakai **helper sekali-pakai inline** yang nilainya dari `.env`
+  dan nggak ditulis ke disk; (4) nilai kredensial nggak pernah dicetak (nama + panjang + hash pendek
+  aja); (5) `.env` nggak pernah di-commit; (6) token ditolak/kurang scope → lapor fakta + minta
+  keputusan user, jangan ganti mekanisme sendiri.
 - 2026-09-10 (R50 — pertanyaan ≠ perintah): user MARAH karena gua ngejalanin aksi di luar perintah cuma gara-gara ditanya. Rule **R50**: kalau user CUMA NANYA → JAWAB saja, DILARANG eksekusi/ubah apa pun (file/git/API/label/sub-agent) sampai disuruh eksplisit; ragu → tanya balik "mau gua kerjain?". Kejadian: "bisa gak PR pakai label?" → gua sekalian pasang label + bikin R49 + nitip commit-nya ke PR #15 yang lalu ke-MERGE. R49/label udah KE-BURU masuk main — gua TIDAK sentuh lagi; keputusan revert/apa terserah user.
 - 2026-09-10 (preferensi label PR): user minta SETIAP PR dikasih label (contoh "bug") → rule **R49**. PM auto-klassifikasi pakai label yang UDAH ada di repo (10 default: bug, enhancement, documentation, accessibility, duplicate, invalid, question, wontfix, good first issue, help wanted): `fix`/bug/tes merah → **`bug`**; `feat`/peningkatan UI → **`enhancement`** (+`accessibility` bila relevan); PR dokumen → **`documentation`**; campuran → multi-label. Label BARU (mis. `test`, `chore`) butuh ACC user dulu (API 422 kalau nama baru saat create). PR #15 di-tag **`bug`** (fix harness = defect). Ditanya soal retro-tag PR #14 (sudah merged): user jawab "2 aja" → cuma minta merge #15, jadi #14 TIDAK di-retro-tag.
 - 2026-09-07 (merge origin/main → refactor/ui, PR #4): konflik 5 file diselesaiin

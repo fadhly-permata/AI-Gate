@@ -739,3 +739,34 @@ tugas yang udah diperintahin**, BUKAN buat ngubah pertanyaan jadi aksi. Nanggap 
 perubahan nyata = pelanggaran.
 (Pelajaran konkrit: ditanya "bisa gak bikin PR pakai label?" → gua malah langsung pasang label,
 bikin R49, dan nyangkutin semuanya ke main. Itu salah.)
+
+## R51 — Kredensial: SATU sumber = `.env`; dilarang ngaku "gak punya akses" / nyebar penyimpanan
+Pelajaran (2026-09-10, user: "bukannya ada rule semua kredensial ditaro di file .env dan tiap lu
+butuh kredensial lu bakal ambil dari situ" → "dari tadi lu nabrak rule melulu").
+
+Aturan yang SUDAH ada dan gua lewatin: `.opencode/rules/secrets.md` —
+"API key / JWT / PAT / token / alike. Store in `.env`. Never hardcode in code. Never commit."
+
+Sejak sekarang PM WAJIB:
+1. **Ambil kredensial dari `.env` di root repo** (`GITHUB_TOKEN`, dsb.) — itu satu-satunya rumah
+   kredensial di proyek ini. Variabel yang sama juga boleh dipakai dari environment kalau isinya
+   identik (verifikasi lewat hash, BUKAN lewat cetak nilai).
+2. **Sebelum nyimpulin "nggak bisa" / "nggak punya akses" / "harus login interaktif"**, cek DULU
+   `.opencode/rules/*.md` + `.env`. Ngaku tidak mampu tanpa ngecek = pelanggaran, dan bikin user
+   ngulang instruksi.
+3. **DILARANG nawarin atau bikin penyimpanan kredensial di tempat lain** — `git config
+   credential.helper store`, nulis `~/.git-credentials`, mindahin remote ke SSH, nulis token ke
+   config/opencode.json, dsb. — KECUALI user minta eksplisit. Kalau git butuh auth, pakai
+   **helper sekali-pakai inline** (`git -c credential.helper='!f(){...}'`) yang nilainya dibaca
+   dari `.env` dan **nggak pernah ditulis ke disk**.
+4. **Nilai kredensial nggak pernah dicetak** ke log/output/transkrip. Cukup nama variabel +
+   panjang + prefix aman (`ghp_…`) + hash pendek buat bukti identitas.
+5. `.env` **nggak pernah di-commit** (udah ke-`gitignore`; tetap cek `git status` sebelum commit
+   biar nggak kebanjiran file sensitif).
+6. Kalau token ternyata kurang scope / ditolak API: **lapor faktanya** (endpoint, status code,
+   scope yang ada) dan minta keputusan user — jangan langsung mutusin ganti mekanisme.
+R51 ini ngiket R24/R25 (sumber daya eksternal) dan jalan bareng R46/R48: klaim kemampuan harus
+berdasarkan fakta yang dicek, bukan asumsi.
+(Pelajaran konkrit: `git push --delete` gagal karena git nggak nanya ke `.env` → gua simpulkan
+"perlu kredensial dari user" dan malah nawarin nyimpen token polos di disk. Padahal PAT-nya udah
+ada, kuat, dan tinggal disuapin ke git.)
