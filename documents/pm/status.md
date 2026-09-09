@@ -1,5 +1,25 @@
 # PM Status
 
+## Anthropic `/v1/messages` inbound — 2026-09-09 (PM integrasi, branch `feat/anthropic-inbound`)
+
+**Tugas:** INTEGRASI (bukan implementasi ulang). Semua kode sudah ditulis specialist (tech-architect/be-dev/fullstack-dev/qa); PM hanya commit + dokumentasi. Tidak ada `src/**` atau `scripts/**` yang diubah PM.
+
+**Commits (5, Conventional, R19/R36):** `253aae5` feat(gateway), `bb3b6c9` test(backend), `7f330a1` docs(architecture), `4986adc` fix(cli-tools), `41d24f8` docs(reports). Staged per-file (tanpa `git add -A`); working tree bersih setelah commit.
+
+**Keputusan (dari desain `documents/architecture/anthropic-inbound-endpoint.md`):**
+- Model mapping: **bare model id** dilewat apa adanya ke `resolve_target` (reuse `_resolve_bare_model`); tanpa static map (DRY/YAGNI).
+- Streaming: **Stage 1 = non-streaming only** — `stream:true` ditolak 400 `anthropic_streaming_unsupported` (translated format tak bisa stream).
+- Tools: **passthrough (bukan 400)** — Anthropic `tools`/`tool_use`/`tool_result`/`tool_choice` ↔ OpenAI; extended-thinking & `cache_control` di-doc sebagai future phase.
+- Auth: **terima `Bearer` ATAU `x-api-key`** (plug-and-play untuk claude-code), terbuka spt chat/responses; client `x-api-key` gak diteruskan ke upstream.
+
+**Verifikasi PM (R14/R35):** `python -m py_compile` 3 file backend → clean; `bash -n claude.sh` → clean. Tidak jalanin suite penuh (batas sandbox, sesuai R20).
+
+**QA:** `qa-engineer` → status **LULUS** (`.opencode/reports/qa_anthropic_inbound_verification.md`): py_compile bersih + import OK, 11/11 pure test passed, 0 regression translator (17/17), R25 principle review LULUS, R12 LULUS (0 `except:pass`). 9 route-level test gagal eksekusi murni env mismatch `httpx 0.28.1` vs `starlette 0.27.0` (pre-existing, BUKAN bug kode).
+
+**claude.sh:** SUDAH di-rewire (`4986adc`) — buang litellm, arahkan claude-code langsung ke aigate `/v1/messages` (`ANTHROPIC_BASE_URL`=gateway root, `ANTHROPIC_API_KEY`=`AIGATE_KEY`).
+
+**Open risk:** route-level integration test belum ke-cover runtime di sandbox (env dep mismatch). Fix = selaraskan `httpx<0.28` di `pyproject.toml` lalu jalanin di env user (R20). Bukan blocker commit.
+
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
 bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.

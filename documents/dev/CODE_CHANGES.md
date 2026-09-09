@@ -1,5 +1,41 @@
 # Code Changes Register (code ↔ docs alignment)
 
+## 2026-09-09 — feat: aigate Anthropic `/v1/messages` inbound (kayak litellm) — DONE (5 commit: `253aae5` `bb3b6c9` `7f330a1` `4986adc` `41d24f8`, branch `feat/anthropic-inbound`)
+
+**Tujuan:** aigate serve Anthropic-compatible `POST /v1/messages` **native** (tanpa litellm di tengah) supaya `claude-code` bisa `ANTHROPIC_BASE_URL=<aigate>/v1/messages`. Referensi desain: `documents/architecture/anthropic-inbound-endpoint.md`.
+
+### `src/backend/gateway/translator.py` (+445 baris)
+- NEW `anthropic_messages_request_to_openai_chat(payload)` (L630): Anthropic Messages request → OpenAI chat payload. Tolak `stream:true` → `anthropic_streaming_unsupported`; tolak `thinking.enabled` → `anthropic_unsupported_field`; `system` (str|blocks) → leading system message; `messages` via `_anthropic_to_openai_messages` (L469); `tools` via `_anthropic_tools_to_openai_tools` (L576); `tool_choice` via `_anthropic_tool_choice_to_openai` (L597); inject default `max_tokens`; `temperature/top_p/top_k/stop_sequences` pass-through.
+- NEW `openai_chat_response_to_anthropic_messages(chat_result, request_model)` (L718): OpenAI chat response → Anthropic Messages envelope (`type/role/model/content[text|tool_use]/stop_reason/usage`); `finish_reason`→`stop_reason` via `_anthropic_stop_reason` (L375) + `_openai_finish_to_anthropic` (L619); id→`msg_<base>`.
+- NEW `class AnthropicMessagesRequest(_BaseModel)` (L828, Pydantic v1, `extra="allow"`): validasi shape (model/messages/max_tokens/stream).
+- NEW helper inbound: `_anthropic_to_openai_messages` (L469), `_anthropic_system_to_text` (L561), `_anthropic_tools_to_openai_tools` (L576), `_anthropic_tool_choice_to_openai` (L597), `_anthropic_stop_reason` (L375), `_openai_finish_to_anthropic` (L619).
+- EXTEND `_translate_request_anthropic` (L183): kini forward OpenAI `tools`/`tool_choice` ke upstream anthropic (double-translation round-trip) via NEW `_openai_tools_to_anthropic` (L233) + `_openai_tool_choice_to_anthropic` (L253); additif, behavior lama tetap.
+- NEW konstanta kode stabil: `ANTHROPIC_STREAMING_UNSUPPORTED_CODE`, `ANTHROPIC_UNSUPPORTED_FIELD_CODE`, `ANTHROPIC_MISSING_MODEL_CODE`.
+
+### `src/backend/gateway/router.py` (+230 baris)
+- NEW `@router.post("/v1/messages")` → `messages_completions` (L500): B5.6 wrapper (timing + `_record_request_log_safe`) + render error berbentuk Anthropic (`_anthropic_error_response` L648 / `_anthropic_error_body` L643) — deviasi per-surface yang didokumentasi (§2.4 design).
+- NEW `async def _handle_anthropic_messages(request, ctx)` (L549): mirror `_handle_responses`; parse → `anthropic_messages_request_to_openai_chat` → `resolve_target` (TargetNotFound→`model_not_found`) → combo/adapter → `_record_usage_safe` → `openai_chat_response_to_anthropic_messages`; reuse pipeline chat/responses tanpa duplikasi.
+- NEW sibling routes (litellm parity): `@router.post("/v1/messages/count_tokens")` → `messages_count_tokens` (L658, estimasi heuristic UTF-8÷4, `output_tokens:0`) + `@router.post("/api/event_logging/batch")` → `event_logging_batch` (L696, stub `202 Accepted` + `{}`).
+- Auth: terbuka spt chat/responses; terima **`Authorization: Bearer` ATAU `x-api-key`** (Decision 4.4); client `x-api-key` TIDAK diteruskan ke upstream (aigate punya egress cred sendiri).
+
+### `src/backend/cli_presets.py`
+- Flip `LAUNCH_SUPPORT["claude"]` (L171): `LAUNCH_UNSUPPORTED, REASON_ANTHROPIC_ONLY` → `LAUNCH_VERIFIED` (aigate kini serve inbound /v1/messages).
+- Perbarui comment block (~L152–160): claude kini native Anthropic Messages via aigate (tanpa litellm); `gemini` tetap unsupported.
+
+### `tests/backend/test_anthropic_messages.py` (BARU, 508 baris)
+- 20 test: 11 pure-function (L50,67,78,106,125,148,160,172,181,202,233) + 9 route-level (L344,363,374,391,403,415,438,454,462).
+- QA: 11 pure **PASSED**; 9 route **FAILED** murni gara-gara env mismatch `httpx 0.28.1` vs `starlette 0.27.0` (pre-existing, BUKAN regression — terkonfirmasi di `test_gateway.py` pre-existing yang sama persis gagal).
+
+### `scripts/cli-tools/claude.sh` (−37/+32)
+- Re-wire: buang chain litellm; `claude-code` diarahkan langsung ke aigate `/v1/messages` (`ANTHROPIC_BASE_URL` = gateway root dari `load_gateway_config`, `ANTHROPIC_API_KEY` = `AIGATE_KEY`). Reachability probe ke aigate `/v1/models` (bukan `/health/liveliness` litellm).
+
+### `documents/architecture/anthropic-inbound-endpoint.md` (BARU) + `.opencode/reports/qa_anthropic_inbound_verification.md` (BARU)
+- Desain (tech-architect) + laporan QA (status **LULUS**): py_compile bersih, 11/11 pure test passed, 0 regression translator (17/17), principle review R25 LULUS, R12 LULUS (0 `except: pass`); 9 route test gagal eksekusi murni env mismatch.
+
+**Verifikasi PM (cepat, R14/R35):** `python -m py_compile src/backend/gateway/translator.py src/backend/gateway/router.py src/backend/cli_presets.py` → **clean**; `bash -n scripts/cli-tools/claude.sh` → **clean**. (Tidak jalanin suite penuh — batas sandbox; lihat QA report §6.)
+
+**Open risk (bukan blocker):** 9 route-level integration test belum ke-cover runtime di sandbox gara-gara mismatch dep `httpx`/`starlette` (pre-existing). Rekomendasi: selaraskan `httpx<0.28` di `pyproject.toml`, lalu jalanin `pytest tests/backend/test_anthropic_messages.py` di env user agar jalur route handler + adapter anthropic sungguhan ter-cover (R20).
+
 ## 2026-09-09 — cli-tools install/launch scripts (branch `setup/cli-tools`) — IN PROGRESS
 
 **Permintaan user:** buat install+launch script per CLI tool (24 tool, 3 grup) di `scripts/cli-tools/`,
