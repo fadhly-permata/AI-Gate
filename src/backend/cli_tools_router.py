@@ -39,6 +39,7 @@ from backend.cli_presets import (
     install_command_for,
     launch_support_for,
 )
+from backend.cli_compat import compat_for, current_platform
 from backend.log import log_info
 from backend.models import CLITool, CLIToolGroup, Endpoint, Provider, ProviderModel
 from backend.paths import extra_path_dirs as _extra_path_dirs_impl
@@ -74,6 +75,11 @@ class ToolDTO(BaseModel):
     # ``resolve``. ``launch_reason`` is a stable code the frontend translates.
     launch_mode: str = "pending"
     launch_reason: str = ""
+    # Per-platform compatibility (see ``backend.cli_compat``). Keyed by platform
+    # name ("termux"/"linux"/"windows"/"macos"); each value is
+    # {"status", "note", "source"}. The frontend highlights the platform the
+    # gateway is actually running on and warns on broken/no_install/etc.
+    compat: Dict[str, dict] = {}
 
     class Config:
         pass
@@ -175,6 +181,7 @@ def _tool_to_dto(tool: CLITool, termux: Optional[bool] = None) -> ToolDTO:
         enabled=bool(tool.enabled),
         launch_mode=support.mode,
         launch_reason=support.reason,
+        compat=compat_for(tool.name),
     )
 
 
@@ -1025,7 +1032,7 @@ def list_cli_tools() -> dict:
         f"listed {len(data)} cli tool group(s)",
         source=LOG_SOURCE,
     )
-    return {"object": "list", "data": data}
+    return {"object": "list", "data": data, "current_platform": current_platform()}
 
 
 @router.post("/api/cli-tools/resolve")

@@ -1596,6 +1596,33 @@ body.log-visible .workspace {
   opacity: 0.55;
   cursor: help;
 }
+/* Compatibility badges per platform (CLI Tools view). */
+.cli-tool-cell { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.cli-compat { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
+.cli-compat-chip {
+  font-size: 10px; line-height: 1.1; padding: 2px 5px; border-radius: 4px;
+  border: 1px solid var(--panel-border, #ddd); color: #555; background: var(--bg, #fff);
+  white-space: nowrap;
+}
+.cli-compat-current { outline: 2px solid var(--accent, #3b82f6); font-weight: 700; color: #111; }
+.cli-compat-legend {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+  font-size: 12px; color: var(--fg, #333); margin-bottom: 4px;
+}
+.cli-compat-warn {
+  font-size: 11px; line-height: 1.2; text-align: center; padding: 3px 5px; border-radius: 4px;
+  color: #b00020; background: rgba(220,0,32,0.07); border: 1px solid rgba(220,0,32,0.18);
+}
+[data-theme="dark"] .cli-compat-warn { color: #ff9a9a; background: rgba(255,80,80,0.12); border-color: rgba(255,80,80,0.25); }
+[data-theme="dark"] .cli-compat-chip { color: #bbb; border-color: var(--panel-border, #444); }
+/* Status colors (chip background/border/text by compatibility status). */
+.cli-status-verified { background: #e6f4ea; border-color: #34a853; color: #196c34; }
+.cli-status-installable { background: #e8f0fe; border-color: #4285f4; color: #1a56b0; }
+.cli-status-broken { background: #fce8e8; border-color: #ea4335; color: #a50e0e; }
+.cli-status-no_install { background: #fef7e0; border-color: #f9ab00; color: #8a6d00; }
+.cli-status-not_a_cli { background: #eceff1; border-color: #90a4ae; color: #455a64; }
+.cli-status-not_wired { background: #f3e8fd; border-color: #a142f4; color: #6a1b9a; }
+.cli-status-unknown { background: #f1f3f4; border-color: #dadce0; color: #80868b; }
 .cli-hint {
   margin: 0 0 10px;
   padding: 8px 10px;
