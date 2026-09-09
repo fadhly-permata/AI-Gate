@@ -163,6 +163,27 @@
 
 **Status: DONE — OpenAI-compatible (verified).** cline di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → cline forward model apa adanya. Commit `d931921`.
 
+## CLI Tools A12: kilo install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/kilo.sh` (A12 kilo).
+
+**Fakta kode (cross-check, R47/R48):**
+- `cli_presets.py:81` = `{"name":"kilo","binary":"kilo","install": _npm("@kilocode/cli")}` — install string `npm install -g @kilocode/cli`, bin `kilo`.
+- `cli_presets.py:183` = `"kilo": LaunchSupport(LAUNCH_VERIFIED)` — kilo = verified, OpenAI-compatible.
+- `cli_tools_router.py:616-729` = `_kilo_builder` — wiring trusted additive config `KILO_CONFIG`=`.kilo/aigate-kilo.json` (provider `"aigate"` via `npm: "@ai-sdk/openai-compatible"`, `options.baseURL`=gateway, `options.apiKey`=`{env:OPENAI_API_KEY}`), env `OPENAI_API_BASE`+`OPENAI_API_KEY`, flag `-m aigate/<model>` (priority 1); catatan Termux no-android di `:687-689`.
+- npm `@kilocode/cli@7.5.16`: bin `kilo`, `os:["darwin","linux","win32"]` (TIDAK ada `"android"`) → known-broken di Termux/aarch64.
+
+**Script behavior:** install idempoten via `ensure_installed` → `npm install -g @kilocode/cli`; launch **OpenAI-compatible** — tulis `KILO_CONFIG` (secret TIDAK ke disk, resolved via `{env:OPENAI_API_KEY}`), set `OPENAI_API_BASE`+`OPENAI_API_KEY`, dan bila `AIGATE_MODEL` disetel → `model` key `aigate/<model>` + flag `-m aigate/<model>`.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/kilo.sh` → clean; perms `-rwx------` (exec).
+
+**Known-broken (bukan blocker):** npm `@kilocode/cli` TIDAK punya variant binary `android` → terpasang tapi gagal jalan di Termux/aarch64 (sama pola claude/codex/cline/amp). Script tetap memasang; tool bisa jadi tidak bisa dijalankan di perangkat ini.
+
+**Status: DONE — OpenAI-compatible (verified).** kilo di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → kilo forward model apa adanya. Commit `2a194cc`.
+
+## ===== GRUP A SELESAI (12/12) =====
+Semua 12 tool Grup A (`agentic_coding`) — A1 claude, A2 opencode, A3 gemini, A4 codex, A5 antigravity, A6 phi, A7 aider, A8 goose, A9 amp, A10 qwen, A11 cline, A12 kilo — SELESAI (script install/launch + wiring/NO_INSTALL sesuai preset). Lanjut ke **Grup B** (B1..B6) dan **Grup C** (C1..C6). Progres keseluruhan cli-tools: **12/24**.
+
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
 bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.
