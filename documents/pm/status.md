@@ -57,6 +57,20 @@
 
 **Status: DONE — native OpenAI mode.** codex launch **native** + warning (TIDAK di-wire aigate — butuh streaming Responses API yang belum ada). Script tidak set env palsu ke aigate.
 
+## CLI Tools A5: antigravity install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/antigravity.sh` (A5 antigravity).
+
+**Fakta kode (cross-check 3 sumber independen, R47/R48):**
+- `cli_presets.py:74` = `{"name":"antigravity","binary":"antigravity","install": NO_INSTALL}` — aigate menandai antigravity `NO_INSTALL` (NO_INSTALL didefinisikan di `cli_presets.py:45` = echo no-op).
+- `cli_presets.py:176` = `"antigravity": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NOT_A_CLI)` — antigravity BUKAN CLI yang bisa di-launch.
+- `TERMUX_INSTALL` map (`cli_presets.py:241-244`) HANYA berisi `aichat` + `codex` — TIDAK ada entry antigravity.
+- npm registry `antigravity` = placeholder squat (v0.0.0, "placeholder for the haters"); `@anthropic/antigravity` 404; PyPI `antigravity` milik pihak lain (Fabien Schwob); Homebrew formula `antigravity` 404. Konklusi: TIDAK ada rute install resmi (npm/pip/brew).
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/antigravity.sh` → clean; mode `-rwx------` (exec). Script source `_common.sh` (read-only helpers) lalu log pesan `antigravity: NO_INSTALL — tidak ada paket CLI terverifikasi` + `exit 0` — TIDAK memasang apa pun (no side-effect).
+
+**Status: DONE — NO_INSTALL (message + exit 0).** antigravity TIDAK di-install (sesuai keputusan user untuk tool `NO_INSTALL`); script hanya pesan + keluar 0. Commit `2259c1c`.
+
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
 bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.
