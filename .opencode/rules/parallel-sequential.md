@@ -40,14 +40,14 @@ decision for multi-agent work must come from the user, not a PM default.
   parallel).
 
 ## Session persistence (R16)
-- The user's choice is recorded in `pm/state.md` under `multiagent_mode`
+- The user's choice is recorded in `documents/pm/state.md` under `multiagent_mode`
   (value: `parallel` | `sequential`).
 - Once chosen, REUSE it for every subsequent multi-agent task in the SAME session
   — do NOT ask again within that session.
 - NEW session: the choice does NOT carry over. PM MUST ask again at the start of a
   new session (treat `multiagent_mode` as unset if it wasn't recorded for the
   current run). Reset it to `ask` / clear it when a new session begins.
-- Also record the choice in `pm/status.md` for traceability.
+- Also record the choice in `documents/pm/status.md` for traceability.
 
 ## Output
 After the user chooses (or once a session choice is known), proceed with that mode.
