@@ -271,6 +271,26 @@
 
 **Status: DONE — NOT_A_CLI (message + exit 0, no side-effect).** gpt-researcher pip-installable & resmi (`cli_presets.py:92`, PyPI v0.16.0), TAPI tanpa biner CLI (`cli_presets.py:197-204` = `LAUNCH_UNSUPPORTED`/`REASON_NOT_A_CLI`; PyPI no `console_scripts`; docs cuma `python cli.py <query>` yang butuh query & exit). aigate gak punya builder → `resolve()` 409. BUKAN murni `NO_INSTALL`, tapi gak bisa di-launch sebagai CLI. Script: pesan + `exit 0`, TIDAK install apa pun yg bisa di-spawn. Commit `cd346b4`.
 
+## CLI Tools B6: crewai install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/crewai.sh` (B6 crewai).
+
+**Fakta kode (cross-check ≥3 sumber independen, R47/R48):**
+- `cli_presets.py:93` = `{"name":"crewai","binary":"crewai","install": _pip("crewai")}` → aigate memang punya install string terverifikasi `pip install crewai` (paket ADA & RESMI — BUKAN `NO_INSTALL` seperti autogpt/swe-agent).
+- `cli_presets.py:205-215` = `"crewai": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_NOT_A_CLI)` — aigate menandai crewai BUKAN CLI yang bisa di-launch. Komentar asli: console script exists, but it is a framework project scaffolder/runner; `crewai run`/`chat` run the Crew/Flow DEFINED BY THE PROJECT in the CWD; neither takes model/base-url/prompt at launch; in empty dir both error out.
+- `cli_tools_router.py` `_LAUNCH_BUILDERS` (~:976-988) TIDAK punya entry `crewai` / `_crewai_builder` → `resolve()` masuk cabang `support.mode != LAUNCH_VERIFIED` → 409 `tool_unsupported`. Env `OPENAI_API_BASE`/`OPENAI_API_KEY` (~:1081-1084) TIDAK PERNAH sampai ke crewai.
+- PyPI `crewai` v1.15.20 (crewAIInc): wheel `entry_points.txt` punya `[console_scripts] crewai = crewai_cli.cli:crewai` → `pip install` MENGHASILKAN biner `crewai` di PATH (install VALID). TAPI biner itu scaffolder/runner framework, BUKAN chat assistant; `requires_python ">=3.10,<3.14"`.
+- Docs resmi (docs.crewai.com Quickstart + github.com/crewAIInc/crewAI): `crewai create flow / install / run / chat / login / deploy` beroperasi pada PROYEK di CWD; `crewai chat`/`run` membaca config crew di direktori tsb dan TIDAK menerima argumen model/base-url/prompt di launch. Konfigurasi LLM (OpenAI-compatible) ditulis di kode proyek atau env `OPENAI_API_KEY`/`OPENAI_API_BASE_URL` — BUKAN surface CLI. Di direktori kosong `crewai run`/`chat` error.
+
+**Script behavior:** source `_common.sh` (read-only helpers `detect_os`/`detect_pm`/`load_gateway_config` + `log_msg`) lalu log pesan penjelasan (pip-installable tapi NOT_A_CLI) + `exit 0` — TIDAK memasang/menjalankan apa pun yang bisa di-spawn (no side-effect, idempoten). Sengaja TIDAK menjalankan `pip install crewai` / `crewai run`/`chat` agar tidak memasang/scaffold proyek yang tak bisa di-launch, atau menjalankan perintah yang butuh proyek di CWD.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/crewai.sh` → clean; mode `-rwx------` (exec `100755`); eksekusi langsung → `exit 0`, TIDAK memasang apa pun.
+
+**Status: DONE — NOT_A_CLI (message + exit 0, no side-effect).** crewai pip-installable & resmi (`cli_presets.py:93`, PyPI v1.15.20 `console_scripts` `crewai = crewai_cli.cli:crewai`), TAPI framework scaffolder/runner yang butuh proyek di CWD & gak ada flag `--model`/`--base-url` (gak launchable sbg aigate CLI); aigate gak punya builder → `resolve()` 409. BUKAN murni `NO_INSTALL`, tapi gak bisa di-launch sebagai CLI. Script: pesan + `exit 0`, TIDAK install apa pun yg bisa di-spawn. Commit `150475f`.
+
+## ===== GRUP B SELESAI (6/6) =====
+ Semua 6 tool Grup B (`autonomous_agents`) — B1 openhands, B2 swe-agent, B3 open-interpreter, B4 autogpt, B5 gpt-researcher, B6 crewai — SELESAI (script install/launch + wiring/NO_INSTALL/NOT_A_CLI sesuai preset). Lanjut ke **Grup C** (C1..C6). Progres keseluruhan cli-tools: **18/24**.
+
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
 bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.
