@@ -1310,3 +1310,28 @@ Commit: `61d64337b686a8b5ee0f58d17d52807119922d0a`
 
 ### Catatan
 Bukti "kode lama masih aktif" tidak berlaku: tidak ada proses produk yang disentuh. Perubahan config agen baru terasa setelah **user restart opencode** (aturan: config dimuat sekali saat start).
+
+## 2026-09-10 — langkah ⑥+⑧: pindah berkas `documents/pm/**` + normalisasi folder laporan — DONE
+
+### Pindah (semua `git mv`, isi tidak diubah)
+- `documents/pm/cli-tools-install-backlog.md` → `documents/plan/cli-tools-install-backlog.md`
+- `documents/pm/wiki-plan.md` → `documents/plan/wiki-plan.md` · `documents/pm/wiki-backlog.md` → `documents/plan/wiki-backlog.md`
+- `documents/pm/cli-tools-compatibility.md` → `documents/config/cli-tools-compatibility.md`
+- 4 handover root `documents/pm/handover-*.md` → `documents/pm/handovers/` (jadi 9 berkas satu folder)
+- `documents/pm/status.md` 202.175 B → 11.018 B aktif; entri lama 191.477 B → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md`
+- `documents/pm/memory-bank.md` 51.882 B → 21.896 B aktif; Progress lama 25.740 B → `archive/memory-bank-progress-lama.md`; heading `## Decisions (arsip lama)` 4.660 B → `archive/memory-bank-decisions-lama.md` ( heading dobel 3x jadi 1 aktif + 1 penunjuk)
+- Rujukan hidup ikut dibetulkan: `business-analyst.md:11`, `documents/plan/wiki-plan.md:4,100`, `documents/plan/wiki-backlog.md:4`, `memory-bank.md:423-424`, `state.md:8,15`. Histori (`CODE_CHANGES.md:139`, entri `status.md` lama) sengaja TIDAK ditulis ulang.
+
+### Normalisasi laporan (⑧)
+- `.opencode/reports/2026-09-03/{build,plan,qa,revise-docs,setup}/` → `.opencode/reports/20260903/…` (11 berkas `git mv`)
+- `20260903/docs/revise_native_run.md` → `0627_revise_native_run.md` (waktu dari add-commit `92106bb` 06:27; isi dokumen tulis 07:00 — selisih dicatat)
+- root `.opencode/reports/qa_anthropic_inbound_verification.md` → `20260909/qa/0718_qa_anthropic_inbound_verification.md` (waktu add-commit `41d24f8`; dokumen tidak memuat jam)
+- Duplikat identik dihapus: `2026-09-03/qa/2026-09-03_b4_3_qa.md` == `qa/1350_b4_3_qa.md` (diff byte-identik; satu tetap tinggal)
+- `task-report.md` diperbaiki: klausul "folder lama dibekukan" → "folder dinormalisasi `git mv`, asal jam tercatat"
+
+### Verifikasi
+- Total byte terpelihara: status 202.175 → 11.018 + 191.477 = 202.495 (+320 B header arsip). memory-bank 51.882 → 21.896 + 25.740 + 4.660 = 52.296 (+414 B header arsip).
+- `git ls-files .opencode/reports` = 28 berkas; `git status` = 13 R + 1 D, nol isi berubah.
+- `grep` sitatan path laporan lama di berkas ter-track = 0 (tidak ada rujukan putus).
+- Gate: `python3 .opencode/tools/governance/rules-index.py` → LOLOS; utang format laporan **0** (sebelumnya 14).
+- `documents/pm/` akhir: 8 entri (`OPERATING_RULES.md`, `state.md`, `status.md`, `memory-bank.md`, `bugs.md`, `handovers/`, `wiki-drafts/`, `archive/`) — `wiki-drafts/` TIDAK disentuh (R44 ayat 8 staging wajib).

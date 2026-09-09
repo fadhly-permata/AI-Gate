@@ -33,4 +33,9 @@ Write early (grab plan). Update after done (fill actual). Plan many step -> log 
 ## Ownership & path hygiene (absorbs old R23; K2 mediation 2026-09-10)
 Whoever executes the task writes its own report — PM and specialists alike. Report = work paperwork, not product implementation, so it never widens any scope.
 Path root `.opencode/reports/` holds no loose file: every report lives at `[yyyymmdd]/[task_type]/[hhmm]_[slug].md`.
-Folders predating 2026-09-10 keep their old names (provenance, do not rename history). New reports: `[yyyymmdd]` only.
+Report folders use `[yyyymmdd]` (no dashes). Legacy folders were normalized on 2026-09-10 by `git mv`
+(history kept; every file already had a `[hhmm]_` prefix except two, renamed to their recorded time:
+`20260903/docs/0627_revise_native_run.md` from the report body's own start time, and
+`20260909/qa/0718_qa_anthropic_inbound_verification.md` from that file's git add-commit time).
+One identical duplicate report (`2026-09-03/qa/2026-09-03_b4_3_qa.md` == `qa/1350_b4_3_qa.md`) removed.
+Gate: `python3 .opencode/tools/governance/rules-index.py` lists non-conforming reports (0 now).
