@@ -167,6 +167,7 @@
 - 2026-09-06: Tooltip icon-only dibuat transient (tap auto-close 2 detik; Escape/outside/scroll/resize tetap menutup). State Full Page dan true Fullscreen dipisah eksplisit; hanya mode aktif yang biru, caret tidak aktif. Vitest 394 passed (21 files), terminal toolbar 62 passed.
 - 2026-09-06: Terminal Keep Screen On dikembalikan dengan ikon perangkat yang lebih jelas (`fa-mobile-screen-button`). Popover tooltip global ditambahkan untuk kontrol ikon-only; mendukung hover, focus, tap, Escape, outside click, dan kontrol dinamis. Frontend Vitest 392 passed.
 - 2026-09-06: Side menu dikelompokkan berdasarkan kebutuhan pengguna: Gateway Setup, Operations, Insights, System. EN/ID, aksesibilitas, dan test frontend diperbarui; Vitest 392 passed.
+- 2026-09-09: **CLI Tools install scripts — progress 2/24 (A1 claude + A2 opencode done).** Branch `setup/cli-tools`. A1 (`claude.sh`) + `_common.sh` sudah commit sebelumnya. A2 (`opencode.sh`, 122 baris) commit `f8d9f0b`: install `npm i -g opencode-ai`, wiring `OPENAI_API_BASE`+`OPENAI_API_KEY` ke aigate `/v1/chat/completions`, generate `opencode.json` di CWD. Known caveat: Termux npm `os` field tanpa `"android"`. Sisa 22 tool menyusul.
 - Inisialisasi PM agent + rules + skills selesai.
 - 2026-09-03: Enhance PRD terminal — floating control, scroll/swipe natural,
   grouping CLI tools (agentic-first, 3 grup).

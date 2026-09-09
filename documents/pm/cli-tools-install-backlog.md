@@ -32,7 +32,7 @@ Kolom `Launch` = status di `LAUNCH_SUPPORT` (konteks, bukan bagian script).
 | # | Tool | Binary | Install (pkg/PM) | Dep (pkg/PM) | Launch | Status |
 |---|------|--------|------------------|--------------|--------|--------|
 | A1 | claude | claude | `npm i -g @anthropic-ai/claude-code` | nodejs (npm) | unsupported (anthropic_only) | done |
-| A2 | opencode | opencode | `npm i -g opencode-ai` | nodejs (npm) | verified | todo |
+| A2 | opencode | opencode | `npm i -g opencode-ai` | nodejs (npm) | verified | done |
 | A3 | codex | codex | `pkg install codex` (override) / `npm i -g @openai/codex` | nodejs (npm) atau pkg | unsupported (responses_only) | todo |
 | A4 | gemini | gemini | `npm i -g @google/gemini-cli` | nodejs (npm) | unsupported (gemini_only) | todo |
 | A5 | antigravity | antigravity | `NO_INSTALL` (no-op) | — | unsupported (not_a_cli) | todo |

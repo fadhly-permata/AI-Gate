@@ -22,6 +22,18 @@
 
 **Open risk:** route-level integration test belum ke-cover runtime di sandbox (env dep mismatch). Fix = selaraskan `httpx<0.28` di `pyproject.toml` lalu jalanin di env user (R20). Bukan blocker commit.
 
+## CLI Tools A2: opencode install/launch script — 2026-09-09 (fullstack-dev -> PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt fullstack-dev untuk `scripts/cli-tools/opencode.sh` (A2 opencode).
+
+**Receipt fullstack-dev:** install via `npm i -g opencode-ai`, wiring via `OPENAI_API_BASE` + `OPENAI_API_KEY` ke aigate `/v1/chat/completions`, generate `opencode.json` di CWD. Sumber: `cli_presets.py:71`, `cli_tools_router.py:1082-1083`, `cli_tools_router.py:417-431`.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/opencode.sh` -> clean. Commit `f8d9f0b`.
+
+**Known caveat:** Termux npm registry `os` field tidak ada `"android"`, tapi binary musl bisa jalan native di Bionic.
+
+**Status: DONE.**
+
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
 bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.

@@ -54,7 +54,14 @@ wiring ke selected model/combo seperti aigate, cross-platform (Termux/Win/Linux/
   di aigate (`LAUNCH_SUPPORT`), tidak ada OpenAI-compatible builder, jadi TIDAK dipaksa wiring gateway
   (cerminkan behavior `resolve()` → 409). Catatan Termux/aarch64: npm tak pasang binary arm64 → bisa mati saat run.
 
-Status: A1 claude = done (script). `_common.sh` = done. Sisa A2..A12, B1..B6, C1..C6 menyusul per tool.
+### `scripts/cli-tools/opencode.sh` (BARU, 122 baris)
+- Install+launch script untuk **opencode** (A2). Install via `npm i -g opencode-ai` (idempoten via `ensure_installed`).
+- Launch: wiring `OPENAI_API_BASE` + `OPENAI_API_KEY` ke aigate `/v1/chat/completions` (dari `load_gateway_config`), generate `opencode.json` di CWD sebelum launch.
+- Referensi sumber: `cli_presets.py:71` (preset opencode), `cli_tools_router.py:1082-1083` (wiring env vars), `cli_tools_router.py:417-431` (generate config).
+- Known caveat Termux: npm registry `os` field tidak berisi `"android"` → binary musl bisa jalan native di Bionic tapi npm skip install optional deps per-platform.
+- Verifikasi: `bash -n scripts/cli-tools/opencode.sh` → **clean**.
+
+Status: A1 claude = done (script). A2 opencode = done (script). `_common.sh` = done. Sisa A3..A12, B1..B6, C1..C6 menyusul per tool.
 
 
 ## 2026-09-08 — i18n: satu file per bahasa + 5 bahasa baru (ru, nl, ja, zh, zh-tw) — DONE (`f7beaf9` + `c1477eb`, branch `feat/i18n-locales`)
