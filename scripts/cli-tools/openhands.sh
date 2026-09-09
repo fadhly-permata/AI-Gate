@@ -90,6 +90,36 @@ detect_os
 detect_pm
 load_gateway_config   # aigate gateway base (AIGATE_BASE) + internal key (AIGATE_KEY)
 
+# --- openhands / Python version guard (runs BEFORE any pip/uv install) ---
+# openhands PyPI requires_python ==3.12.* (verified S2 in header; openhands 1.16.0).
+# `python3 -m pip install openhands` resolves ONLY on Python 3.12 and FAILS on
+# 3.13/3.14 ("requires a different Python: X not in '==3.12.*'"). uv, however,
+# fetches its own managed 3.12 interpreter (official recommended route, S3), so it
+# works regardless of the system python. Refuse early (exit 1) only when uv is
+# absent AND system python is not 3.12 — clear message, no raw pip failure.
+if have_cmd uv; then
+  log_msg "uv detected — akan pakai 'uv tool install openhands --python 3.12' (kelola 3.12 sendiri)."
+elif have_cmd python3; then
+  pyver="$(python3 -c 'import sys;print("%d.%d" % sys.version_info[:2])' 2>/dev/null || true)"
+  py_maj="${pyver%%.*}"
+  py_min="${pyver#*.}"; py_min="${py_min%%[!0-9]*}"
+  if [ -n "$py_maj" ] && [ -n "$py_min" ]; then
+    if [ "$py_maj" -eq 3 ] && [ "$py_min" -eq 12 ]; then
+      log_msg "python3 = $pyver (cocok dengan openhands requires_python ==3.12.*); pip route OK."
+    else
+      log_msg "ERROR: openhands butuh persis Python 3.12 (PyPI requires_python ==3.12.*);"
+      log_msg "       device ini pakai Python ${pyver}."
+      log_msg "       Saran: pasang Python 3.12 (mis. 'pkg install python3.12', pyenv, atau venv 3.12),"
+      log_msg "       ATAU pasang uv (https://docs.astral.sh/uv/) agar openhands pakai 3.12 sendiri, lalu re-run."
+      exit 1
+    fi
+  else
+    log_msg "WARN: gagal parse 'python3 --version' (didapat '${pyver}'); tetap coba install."
+  fi
+else
+  log_msg "WARN: python3 tidak ditemukan; tidak bisa cek versi Python sebelum install."
+fi
+
 BIN="openhands"
 
 log_msg "os=$AIGATE_OS pm=$AIGATE_PM gateway_base=$AIGATE_BASE"
