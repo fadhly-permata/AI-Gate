@@ -1,5 +1,25 @@
 # PM Status
 
+## CLI Compat catalog + `cli tools` view — 2026-09-09 (PM eksekusi langsung, branch `setup/cli-tools`)
+
+**Task:** rancang & implementasi katalog kompatibilitas per-tool × per-platform (24 CLI tool) + tampilkan di perintah `cli tools` (frontend CLI Tools view) dengan badge per-platform, sorot platform saat ini, & warning merah untuk status broken/no_install/not_a_cli/not_wired di platform saat ini.
+
+**Deviasi proses (transparan, R29):** tool spawn sub-agent (`Task`) TIDAK tersedia di environment sesi ini → PM eksekusi langsung dengan batas file ketat (`src/backend/**`, `src/frontend/**`, `documents/pm/**`, `documents/dev/CODE_CHANGES.md`). Sesuai preseden di `status.md` (bugfix aider.sh/openhands.sh). Bukan pelanggaran fungsional R21/R29.
+
+**File dikerjakan:**
+- BARU `src/backend/cli_compat.py` — `CLI_COMPAT` + `current_platform()` + `compat_for()`.
+- MODIFY `src/backend/cli_tools_router.py` — `ToolDTO.compat`, `_tool_to_dto`, `list_cli_tools` → +`current_platform`.
+- MODIFY `src/frontend/static/clitools.js` — badge per-platform + legend + warning.
+- MODIFY `src/frontend/static/styles.css` — style badge status.
+- MODIFY `src/frontend/static/i18n/{en,id,ja,nl,ru,zh,zh-tw}.js` — +13 key `cli.compat/platform/status`.
+- BARU `documents/pm/cli-tools-compatibility.md` — mirror human-readable.
+
+**Verifikasi:** py_compile bersih; `import cli_compat` (bare + PYTHONPATH) OK; `list_cli_tools()` end-to-end → `current_platform=termux`, claude termux=`broken`; `node --check clitools.js` OK; i18n parity 7 locale 0 missing/0 extra/0 empty; `clitools.test.js` assertions ditrace manual tetap valid. Vitest penuh TIDAK dijalankan (no node_modules di sandbox).
+
+**Stretch (step 5): SKIP** — print catatan kompatibilitas di `scripts/cli-tools/*.sh` di-skip (user izinkan skip kalau ribet; 24 script + guard sudah cukup kompleks, fitur utama sudah ter-cover di view).
+
+**Status: DONE — DI-COMMIT (lihat receipt PM).** Belum di-push (user butuh push untuk test Windows/Linux).
+
 ## CLI Tools B1: openhands.sh version-guard bugfix — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
 
 **Task:** BUGFIX `scripts/cli-tools/openhands.sh` — `pip install openhands` (fallback) error di device ini (Python 3.14.6; openhands `requires_python ==3.12.*` per PyPI 1.16.0). uv route (`uv tool install openhands --python 3.12`) managed sendiri 3.12-nya, tapi device ini gak punya uv → pip route gagal.

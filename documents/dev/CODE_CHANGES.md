@@ -1,5 +1,70 @@
 # Code Changes Register (code ↔ docs alignment)
 
+## 2026-09-09 — feat: catalog kompatibilitas per-tool × per-platform + tampilan `cli tools` (branch `setup/cli-tools`) — DONE
+
+**Tujuan:** rancang & implementasi katalog kompatibilitas 24 CLI tool aigate across
+Termux/Linux/Windows/macOS, lalu tampilkan di perintah `cli tools` (frontend CLI
+Tools view) berupa badge status per platform dengan platform saat ini disorot +
+warning merah bila tool tidak kompatibel di platform saat ini.
+
+**Catatan proses (transparan, R29):** tool `Task`/spawn sub-agent TIDAK tersedia di
+environment sesi ini (sama seperti sesi-sesi lalu, lihat `status.md`), sehingga PM
+eksekusi langsung dengan batas file yang ketat (`src/backend/**` + `src/frontend/**`
++ `documents/pm/**` + `documents/dev/CODE_CHANGES.md` sesuai instruksi task). Bukan
+pelanggaran fungsional R21/R29 — deviasi alat, dicatat di sini.
+
+### `src/backend/cli_compat.py` (BARU)
+- `CLI_COMPAT: dict[str, dict[str, dict]]` — `tool -> platform -> {status, note, source}`.
+  Kolom `termux` di-seed dari fakta on-device (Termux aarch64, Py3.14.6, 2026-09);
+  `linux`/`windows`/`macos` = `unknown` (user isi nanti).
+- Status per Termux: verified=aichat (1); broken=claude,opencode,aider,qwen,cline,
+  kilo,llm,oterm,gptme,openhands,open-interpreter (11); no_install=antigravity,phi,
+  goose,amp,swe-agent,autogpt,sgpt,mods (8); not_a_cli=gpt-researcher,crewai (2);
+  not_wired=gemini,codex (2).
+- Konstanta: `PLATFORMS=("termux","linux","windows","macos")`, `WARN_STATUSES`,
+  `STATUS_*`; helper `current_platform()` (reuse `backend.paths.is_termux`, lazy
+  import) + `compat_for(name)`.
+- Import `is_termux` **lazy** (di dalam `current_platform`) agar `import cli_compat`
+  bebas dependency (jalankan dari `src/backend` maupun `src` dengan PYTHONPATH).
+
+### `src/backend/cli_tools_router.py` (MODIFY)
+- Import `from backend.cli_compat import compat_for, current_platform`.
+- `ToolDTO` (+L64): tambah field `compat: Dict[str, dict] = {}`.
+- `_tool_to_dto` (+L163): isi `compat=compat_for(tool.name)`.
+- `list_cli_tools` (L1000): response jadi `{"object","data","current_platform": current_platform()}`.
+
+### `src/frontend/static/clitools.js` (MODIFY)
+- `loadCliTools` (+L174): ambil `data.current_platform`, teruskan ke `renderGroups`.
+- Helpers baru: `COMPAT_PLATFORMS`, `COMPAT_WARN`, `platformLabel`, `statusLabel`,
+  `renderCompatStrip` (4 badge per tool, platform saat ini `.cli-compat-current`),
+  `renderCompatWarn` (warning merah bila status platform saat ini ∈ WARN_STATUSES),
+  `renderCompatLegend` (legend sekali di atas grup).
+- `renderGroups(groups, currentPlatform)` (+L257): tiap tool dibungkus `.cli-tool-cell`
+  (button + strip badge + warning opsional); `.cli-tool` tetap di button sehingga
+  test `clitools.test.js` tetap valid.
+
+### `src/frontend/static/styles.css` (MODIFY, +L1599)
+- Kelas baru: `.cli-tool-cell`, `.cli-compat`, `.cli-compat-chip`, `.cli-compat-current`,
+  `.cli-compat-legend`, `.cli-compat-warn` (light + dark), dan `.cli-status-{verified,
+  installable, broken, no_install, not_a_cli, not_wired, unknown}`.
+
+### `src/frontend/static/i18n/{en,id,ja,nl,ru,zh,zh-tw}.js` (MODIFY)
+- +13 key (`cli.compat.legend`, `cli.compat.warn_label`, `cli.platform.*`,
+  `cli.status.*`). en/id diterjemahkan; 5 lain mirror EN (parity tetap hijau —
+  cek `.opencode/tools/tests/i18n-parity-check.mjs` → semua locale 0 missing/0 extra/
+  0 empty).
+
+### `documents/pm/cli-tools-compatibility.md` (BARU)
+- Mirror human-readable (tabel tool × platform + ringkasan + catatan sinkronisasi ke `cli_compat.py`).
+
+**Verifikasi (R14/R35):**
+- Backend: `python3 -m py_compile` bersih; `import cli_compat` (bare & `PYTHONPATH=src`)
+  OK; `current_platform()`→`termux`; `list_cli_tools()` end-to-end (DB ada di device)
+  balik `current_platform=termux` + per-tool `compat` (claude termux=`broken`).
+- Frontend: `node --check clitools.js` OK; locale files tereksekusi bersih via parity
+  checker; `clitools.test.js` assertions ditrace manual tetap valid (struktur DOM selamat).
+  **Suite vitest penuh TIDAK dijalankan** (no `node_modules` di sandbox) — batas env.
+
 ## 2026-09-09 — BUGFIX: aider.sh guard Python 3.10–3.12 (branch `setup/cli-tools`) — DONE (commit `1d1a31c`)
 
 **Bug:** user lapor `scripts/cli-tools/aider.sh` → `pip install aider-chat` error saat dijalankan di device ini.
