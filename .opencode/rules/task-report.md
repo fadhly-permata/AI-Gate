@@ -29,3 +29,8 @@ Write early (grab plan). Update after done (fill actual). Plan many step -> log 
 ## Status Akhir
 [Berhasil / Gagal / Sebagian] - [penjelasan singkat]
 ```
+
+## Ownership & path hygiene (absorbs old R23; K2 mediation 2026-09-10)
+Whoever executes the task writes its own report — PM and specialists alike. Report = work paperwork, not product implementation, so it never widens any scope.
+Path root `.opencode/reports/` holds no loose file: every report lives at `[yyyymmdd]/[task_type]/[hhmm]_[slug].md`.
+Folders predating 2026-09-10 keep their old names (provenance, do not rename history). New reports: `[yyyymmdd]` only.
