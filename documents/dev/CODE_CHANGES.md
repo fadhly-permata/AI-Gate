@@ -61,7 +61,14 @@ wiring ke selected model/combo seperti aigate, cross-platform (Termux/Win/Linux/
 - Known caveat Termux: npm registry `os` field tidak berisi `"android"` → binary musl bisa jalan native di Bionic tapi npm skip install optional deps per-platform.
 - Verifikasi: `bash -n scripts/cli-tools/opencode.sh` → **clean**.
 
-Status: A1 claude = done (script). A2 opencode = done (script). `_common.sh` = done. Sisa A3..A12, B1..B6, C1..C6 menyusul per tool.
+### `scripts/cli-tools/gemini.sh` (BARU, 114 baris)
+- Install + launch script untuk **gemini** (A3). Install idempoten via `ensure_installed` → `npm i -g @google/gemini-cli` (alternatif `brew install gemini-cli` di macOS/Linux).
+- Launch **native Google mode**: gemini CLI hanya bicara Google `generateContent` (auth `GEMINI_API_KEY`/`GOOGLE_API_KEY`/`GOOGLE_CLOUD_PROJECT`, atau interactive OAuth via browser). TIDAK di-wire ke aigate.
+- Fakta kunci (cross-check R47/R48, ≥2 sumber): aigate HANYA serve OpenAI `/v1/chat/completions` + Anthropic `/v1/messages` — TIDAK ada inbound Google `generateContent` (`cli_presets.py:156-158`). Maka gemini di-mark `LAUNCH_UNSUPPORTED` / `REASON_GEMINI_ONLY` di `cli_presets.py:175`, dan tidak ada `_gemini_builder` di `cli_tools_router.py` (builder dimulai ~`:976`, hanya opencode dkk). Script sadar ini: TIDAK menyetel `ANTHROPIC_BASE_URL`/`OPENAI_API_BASE` palsu (gemini CLI mengabaikannya → no-op), melainkan launch native + warn.
+- `GEMINI_MODEL` di-forward dari `AIGATE_MODEL` bila ada; reachability probe ke aigate `/v1/models` cuma warning (gemini tetap tidak dirutekan). Caveat Termux: bundle pure-JS (`bin=bundle/gemini.js`, node≥20) jalan di Bionic; optional `node-pty` tidak ada build arm64 → PTY degrade tapi CLI tetap launch.
+- Verifikasi: `bash -n scripts/cli-tools/gemini.sh` → **clean**; `chmod` `-rwx------`.
+
+Status: A1 claude = done (script). A2 opencode = done (script). A3 gemini = done (script, native Google mode, unsupported by aigate). `_common.sh` = done. Sisa A4..A12, B1..B6, C1..C6 menyusul per tool.
 
 
 ## 2026-09-08 — i18n: satu file per bahasa + 5 bahasa baru (ru, nl, ja, zh, zh-tw) — DONE (`f7beaf9` + `c1477eb`, branch `feat/i18n-locales`)

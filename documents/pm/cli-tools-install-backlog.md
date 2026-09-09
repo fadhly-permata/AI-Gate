@@ -33,8 +33,8 @@ Kolom `Launch` = status di `LAUNCH_SUPPORT` (konteks, bukan bagian script).
 |---|------|--------|------------------|--------------|--------|--------|
 | A1 | claude | claude | `npm i -g @anthropic-ai/claude-code` | nodejs (npm) | unsupported (anthropic_only) | done |
 | A2 | opencode | opencode | `npm i -g opencode-ai` | nodejs (npm) | verified | done |
-| A3 | codex | codex | `pkg install codex` (override) / `npm i -g @openai/codex` | nodejs (npm) atau pkg | unsupported (responses_only) | todo |
-| A4 | gemini | gemini | `npm i -g @google/gemini-cli` | nodejs (npm) | unsupported (gemini_only) | todo |
+| A3 | gemini | gemini | `npm i -g @google/gemini-cli` | nodejs (npm) | unsupported (gemini_only) | done |
+| A4 | codex | codex | `pkg install codex` (override) / `npm i -g @openai/codex` | nodejs (npm) atau pkg | unsupported (responses_only) | todo |
 | A5 | antigravity | antigravity | `NO_INSTALL` (no-op) | — | unsupported (not_a_cli) | todo |
 | A6 | phi | phi | `NO_INSTALL` (no-op) | — | unsupported (install_unverified) | todo |
 | A7 | aider | aider | `pip install aider-chat` | python (pip) | verified | todo |
@@ -43,6 +43,8 @@ Kolom `Launch` = status di `LAUNCH_SUPPORT` (konteks, bukan bagian script).
 | A10 | qwen | qwen | `npm i -g @qwen-code/qwen-code` | nodejs (npm) | verified | todo |
 | A11 | cline | cline | `npm i -g cline` | nodejs (npm) | verified | todo |
 | A12 | kilo | kilo | `npm i -g @kilocode/cli` | nodejs (npm) | verified | todo |
+
+> **A3 gemini = done (2026-09-09):** install idempoten `npm i -g @google/gemini-cli` (alt `brew install gemini-cli`). Launch **native Google mode** — TIDAK di-wire aigate: `cli_presets.py:175` mark gemini `LAUNCH_UNSUPPORTED`/`REASON_GEMINI_ONLY` (aigate hanya serve OpenAI `/v1/chat/completions` + Anthropic `/v1/messages`, no Google generateContent inbound). Script sadar ini → tidak set `ANTHROPIC_BASE_URL`/`OPENAI_API_BASE` palsu (gemini CLI mengabaikannya → no-op).
 
 ## Grup B — Autonomous Software Agents (`autonomous_agents`)
 

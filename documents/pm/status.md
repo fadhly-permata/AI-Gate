@@ -34,6 +34,16 @@
 
 **Status: DONE.**
 
+## CLI Tools A3: gemini install/launch script — 2026-09-09 (fullstack-dev -> PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt fullstack-dev untuk `scripts/cli-tools/gemini.sh` (A3 gemini).
+
+**Receipt fullstack-dev (R47/R48, ≥2 sumber):** install idempoten `npm i -g @google/gemini-cli` (alt `brew install gemini-cli`); launch **native Google mode** (auth `GEMINI_API_KEY`/`GOOGLE_API_KEY`/`GOOGLE_CLOUD_PROJECT` atau OAuth browser). Sumber: `cli_presets.py:73` (install string), `cli_presets.py:156-158` (komentar: gateway exposes no Google generateContent inbound), `cli_presets.py:175` (`"gemini": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_GEMINI_ONLY)`), `cli_tools_router.py:976` (no gemini builder), npm registry `@google/gemini-cli@0.59.0`, GitHub README google-gemini/gemini-cli, docs geminicli.com.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/gemini.sh` -> clean; perms `-rwx------`.
+
+**Status: DONE — native Google mode.** gemini TIDAK di-rute aigate (bukti `cli_presets.py:175` = `LAUNCH_UNSUPPORTED`/`REASON_GEMINI_ONLY`); aigate hanya serve OpenAI `/v1/chat/completions` + Anthropic `/v1/messages`. Script sengaja tidak set `ANTHROPIC_BASE_URL`/`OPENAI_API_BASE` palsu (gemini CLI mengabaikannya → no-op).
+
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
 bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.
