@@ -126,4 +126,13 @@ Kolom `Launch` = status di `LAUNCH_SUPPORT` (konteks, bukan bagian script).
 ## Item kerja lintas-tool (dibuat sekali, dipakai semua)
 - [x] `_common.sh` — helper lintas-platform: `detect_os`/`detect_pm` (Termux/Linux→pkg/apt, Mac→brew, Windows→WSL/Git Bash/winget/choco), `load_gateway_config` (baca `~/.aigate/aigate.db`, fallback default `http://localhost:8080/v1` + `aigate-local`), `have_cmd`, `ensure_installed` (idempoten via `command -v`), `log_msg`. Dibuat pertama kali bersama A1 (claude).
 - [ ] Keputusan lokasi folder script (lihat pertanyaan PM ke user).
-- [ ] (Opsional) `install-all.sh` / one-liner `curl ... | bash` master.
+  - [ ] (Opsional) `install-all.sh` / one-liner `curl ... | bash` master.
+
+---
+
+## 2026-09-09 — Bug fix script install/launch (aichat/codex/oterm)
+- **aichat (C6):** `pkg install aichat` → `pkg install -y aichat`; launch `exec AICHAT_CONFIG_FILE=$AICHAT_CONFIG_FILE $BIN $@` → `export AICHAT_CONFIG_FILE; exec $BIN $@`. Re-test `aichat --help` → EXIT 0 (config `aichat-aigate.yaml` ke-generate, exec jalan).
+- **codex:** `pkg install codex` → `pkg install -y codex`.
+- **oterm (C4):** launch `exec OTERM_DATA_DIR=$OTERM_DATA_DIR $BIN $@` → `export OTERM_DATA_DIR; exec $BIN $@`.
+- `bash -n` ketiga file clean. Dynamic launch codex/oterm TIDAK diuji penuh di Termux (codex butuh Google key/REPL; oterm `pip install` gagal native build jiter — by design, BUKAN script bug).
+- Commit: `61d64337b686a8b5ee0f58d17d52807119922d0a`.

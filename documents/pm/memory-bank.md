@@ -380,3 +380,8 @@
 - Draft per halaman (staging, BUKAN wiki asli) → `documents/pm/wiki-drafts/`
 - Aturan terikat: **R44** (publik tidak membocorkan `documents/`, sumber fakta = kode/perilaku,
   sekuensial satu-per-satu) + R43 (varian bahasa = tulisan asli) + R39 (branch `docs/wiki`).
+
+### CLI-tools script bugs (2026-09-09) — DONE
+- 4 bug nyata di `scripts/cli-tools/` diverifikasi & dibenerin: aichat.sh (`pkg install -y`, `export AICHAT_CONFIG_FILE` + `exec $BIN $@`), codex.sh (`pkg install -y`), oterm.sh (`export OTERM_DATA_DIR` + `exec $BIN $@`). Kelas bug: (a) `pkg install` tanpa `-y` abort di non-interaktif; (b) `exec VAR=val $BIN` → quoted assignment dibaca sebagai command name (exit 127).
+- Re-test aichat sukses (EXIT 0). Env Termux read-only `/etc/apt` (hope2333-mirrorlist) blokir install/uninstall via pkg — di luar script.
+- Commit: `61d64337b686a8b5ee0f58d17d52807119922d0a`.

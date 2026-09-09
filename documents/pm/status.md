@@ -2259,3 +2259,12 @@ User jawab "b" (naikkan lisensi SETELAH PR #10). Cek gerbang: PR #10 ternyata **
 - GATE berikutnya: user me-review & merge PR #11. Setelah merge → (a) label lisensi muncul di
   GitHub, (b) WL.2a sebarkan 1 kalimat ke 7 varian (URL tidak diterjemahkan), (c) wiki lanjut
   halaman 1 ACC → halaman 2.
+
+## 2026-09-09 — fix 4 bug script cli-tools (aichat/codex/oterm) — DONE
+User: 'PM tugas: fix 4 bug...'. PM verifikasi 4 line via grep/read, edit langsung (scope ketat scripts/cli-tools/{aichat,codex,oterm}.sh; TIDAK ubah src/**/tests/**). Tidak ada sub-agent spesialis di-spawn — tool Task tidak tersedia di sesi ini, jadi PM eksekusi langsung untuk task mekanis & preskriptif ini.
+- Fix: (1) aichat.sh:118 `pkg install -y aichat`; (2) aichat.sh:207 `export AICHAT_CONFIG_FILE; exec $BIN $@`; (3) codex.sh:71 `pkg install -y codex`; (4) oterm.sh:175 `export OTERM_DATA_DIR; exec $BIN $@`.
+- `bash -n` ketiga file → clean.
+- Re-test aichat di folder terisolasi (`~/aichat-retest`): `aichat.sh --help` → skip install → tulis config → `exec aichat --help` cetak usage → EXIT 0. Bukti exec fix jalan.
+- codex/oterm hanya `bash -n` + pola benar (launch penuh gak bisa di Termux: codex butuh key/REPL, oterm pip native build gagal — by design, BUKAN bug).
+- Cleanup: retest dir dihapus; `pkg uninstall aichat` gagal (env read-only /etc/apt) tapi binary sdh hilang dari PATH.
+- Commit script: `61d64337b686a8b5ee0f58d17d52807119922d0a`. Docs di-commit terpisah.

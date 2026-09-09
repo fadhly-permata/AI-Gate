@@ -1118,3 +1118,22 @@ reload (fresh `tabs` Map + `activeId`). Covers:
   `~/.codegraph/bundles/linux-arm64-1.6.0` — hilang kalau dihapus. Bukan file repo;
   tidak ikut commit. (Catatan lama soal xnuinside/codegraph sudah tidak berlaku — itu
   tool salah yg sudah di-uninstall.)
+
+## 2026-09-09 — fix 4 bug cli-tools (aichat/codex/oterm) — DONE
+
+### Perubahan (scripts/cli-tools/)
+- `aichat.sh:118` — `INSTALL_CMD=(pkg install aichat)` → `(pkg install -y aichat)` (hindari prompt konfirmasi `pkg` di shell non-interaktif yang abort).
+- `aichat.sh:207` — `exec AICHAT_CONFIG_FILE=$AICHAT_CONFIG_FILE $BIN $@` (assignment di-quote utuh) → `export AICHAT_CONFIG_FILE` lalu `exec $BIN $@`. Old form: bash anggap assignment itu nama command → 'command not found' (exit 127). Var sudah di-set sejak line 124, export aman.
+- `codex.sh:71` — `INSTALL_CMD=(pkg install codex)` → `(pkg install -y codex)` (tambah -y).
+- `oterm.sh:175` — `exec OTERM_DATA_DIR=$OTERM_DATA_DIR $BIN $@` → `export OTERM_DATA_DIR` lalu `exec $BIN $@`. Kelas bug sama dgn aichat; `OTERM_DATA_DIR` sudah di-set di line 117 (.oterm-aigate), export aman.
+
+### Verifikasi
+- `bash -n` ketiga file → SYNTAX OK (clean).
+- Re-test aichat (bukti exec fix): folder terisolasi `~/aichat-retest`, `bash .../aichat.sh --help` → `already installed: aichat` (skip install idempoten) → tulis `aichat-aigate.yaml` → `exec aichat --help` cetak usage → EXIT_CODE=0. Tanpa fix, exec lama gagal exit 127.
+- codex/oterm: `bash -n` OK + pola `export VAR; exec $BIN` benar. Dynamic launch penuh TIDAK diverifikasi di Termux (codex butuh Google key/REPL; oterm pip native build gagal — by design, BUKAN bug).
+- Cleanup: `rm -rf ~/aichat-retest` OK; `pkg uninstall -y aichat` gagal (exit 100) krn env read-only `/etc/apt` (upgrade hope2333-mirrorlist) — di luar script; binary aichat sdh hilang dari PATH.
+
+### Catatan env (di luar repo, BUKAN bug script)
+- `pkg` di env ini gagal tulis `/etc/apt` (Read-only file system) saat upgrade hope2333-mirrorlist → dpkg abort (exit 100) baik saat install maupun uninstall aichat. Tidak memengaruhi logika script.
+
+Commit: `61d64337b686a8b5ee0f58d17d52807119922d0a`
