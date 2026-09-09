@@ -200,6 +200,22 @@
 
 **Status: DONE — OpenAI-compatible (verified).** openhands di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → openhands forward model apa adanya. Catatan Python 3.12: bila `python3` = 3.13+ (`uv`/`pip` gagal resolve) → butuh venv/pyenv 3.12 (bukan blocker).
 
+## CLI Tools B2: swe-agent install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/swe-agent.sh` (B2 swe-agent).
+
+**Fakta kode (cross-check 3 sumber independen, R47/R48):**
+- `cli_presets.py:89` = `{"name":"swe-agent","binary":"swe-agent","install": NO_INSTALL}` — aigate menandai swe-agent `NO_INSTALL` (NO_INSTALL didefinisikan di `cli_presets.py:45` = echo no-op).
+- `cli_presets.py:216` = `"swe-agent": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_INSTALL_UNVERIFIED)` — swe-agent BUKAN CLI yang bisa di-launch (install tidak terverifikasi).
+- `TERMUX_INSTALL` map (`cli_presets.py:241-244`) HANYA berisi `aichat` + `codex` — TIDAK ada entry swe-agent.
+- PyPI `swe-agent` = **404** (tidak ada paket); `sweagent` (tanpa strip) = **v0.0.1** tapi library butuh **Docker + conda** (tidak praktis di Termux); GitHub setup resmi **berat** (container/conda). Cross-check 3 sumber → TIDAK ada install terverifikasi di env ini.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/swe-agent.sh` → clean; mode `-rwx------` (exec); eksekusi langsung → `exit 0`, TIDAK memasang apa pun. Script source `_common.sh` (read-only helpers) lalu log pesan `swe-agent: NO_INSTALL — belum ada install terverifikasi` + `exit 0` — TIDAK memasang apa pun (no side-effect).
+
+**Bug yang sudah dibenerin (lesson):** versi awal pesan NO_INSTALL ke-tulis pakai backtick command-substitution yang mengeksekusi `pip install swe-agent` saat pesan di-render. Sudah dibenerin → pesan murni teks statis (TIDAK ada command-substitution di pesan NO_INSTALL — aturan: pesan NO_INSTALL harus literal, jangan dibungkus backtick/`$()`).
+
+**Status: DONE — NO_INSTALL (message + exit 0).** swe-agent TIDAK di-install (sesuai keputusan user untuk tool `NO_INSTALL`); script hanya pesan + keluar 0. Commit `13a257c`.
+
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
 bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.
