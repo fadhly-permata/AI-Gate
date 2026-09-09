@@ -1,5 +1,42 @@
 # PM Status
 
+## Perapian governance — langkah (a) sensus + peta target — 2026-09-10 (PM, mode SEKUENSIAL)
+**Perintah user:** "intinya rapihin semua, tapi pastikan lu gak akan pernah nabrak rule lagi" →
+pilih **sekuensial** (R16, dicatat di `state.md:multiagent_mode`) → "lanjut" buat langkah (a).
+**Yang gua bedain dari sesi-sesi sebelumnya:** sebelum ngapa-ngapain gua **baca penuh**
+`.opencode/rules/*.md` (11 berkas, 229 baris) + indeks 51 rule. Ini yang bikin ketahuan:
+- **`task-report.md` wajib laporan ditulis DI AWAL** → dibuat:
+  `.opencode/reports/20260910/docs/0120_perapian-governance-pm.md` (Indonesia formal, sesuai
+  pengecualian `language.md:3`). Ini satu-satunya berkas baru yang gua bikin di langkah (a).
+- **`language.md:2` udah nyuruh "English caveman ultra"** buat berkas `.opencode` → jawaban gua
+  yang panjang-polin itu pelanggaran, dan "caveman" bukan fitur yang perlu dipasang: rule-nya ada.
+- **R46 (koreksi typo user itu wajib)** — juga gua lewatin barusan: user nulis
+  "operation_rule.md" (nama asli `OPERATING_RULES.md`) dan "kitq" → harusnya gua koreksi dijawab,
+  bukan ikut-ikutan. Dicatat di sini biar nggak keulang.
+- **R28 MATI:** "baca kode WAJIB lewat codegraph dulu" (`OPERATING_RULES.md:273`) tapi
+  `codegraph` tidak ada di PATH, tidak ada blok `mcp` di `opencode.json`/config global, tidak ada
+  skill/command-nya → rule ini pasti dilanggar tiap sesi sejak 2026-09-06. Butuh keputusan user:
+  pasang codegraph / ganti pakai Graphify / hapus rule-nya.
+**Angka hasil sensus (bukti, bukan kesan):** `documents/pm/` = 19 berkas / **427 KB** = 53% semua
+isi `documents/`; `status.md` **195 KB**; `OPERATING_RULES.md` 51 rule / 51 KB; `memory-bank.md`
+49 KB. `.opencode/reports/` = 27 laporan, **dua format folder** (`2026-09-03` vs `20260903`) padahal
+`task-report.md` minta `[yyyymmdd]`. Kode asli repo: 136 berkas / 51.402 baris (di luar vendor).
+**Peta target (usul, belum dieksekusi):** status.md 195 KB → 30 hari + `archive/`; 51 rule → dikelompok
+per tema + indeks auto-generate; `cli-tools-*`/`wiki-*` keluar dari `documents/pm/` (bukan wewenang PM);
+handover jadi satu folder; `.opencode/rules/` 11 → 4 berkas tema. **Yang TIDAK boleh digeser:**
+`documents/{analysis,architecture,api,config}/**` — dirujuk kode (`src/backend/models.py:5`,
+`src/backend/gateway/errors.py:8`) → R18/R22.
+**Jawaban soal plugin:** bukan plugin luar; 1 berkas lokal `.opencode/plugins/` pakai hook
+`experimental.chat.system.transform` (ditegaskan ada di biner opencode 1.17.9). Tapi sesuai **YAGNI
+(`code-quality-principles.md`) + R38**, kanal wajib-baca yang udah terbukti = `AGENTS.md` → plugin
+ditunda, jadi opsi di langkah (c).
+**Jawaban soal Graphify (graphify.net, MIT, Tree-sitter+NetworkX+Leiden):** belum perlu — penyakitnya
+dokumen, bukan keterbacaan kode; repo 51 ribu baris masih murah di-grep; prasyarat **Python 3.12 +
+uv** tidak tersedia (di sini Python 3.14.6, `uv` tidak ada). Masuk akal hanya kalau sekalian mau
+dipakai **menggantikan codegraph di R28** → itu keputusan user, bukan asumsi gua.
+**Status:** langkah (a) selesai (sensus + peta target + laporan awal). (b)(c)(d) MENUNGGU ACC user
+karena memangkas/menggabung/memindah dokumen governance.
+
 ## R51 — kredensial cuma dari `.env` (user koreksi: "dari tadi lu nabrak rule melulu") — 2026-09-10 (PM)
 **Pelanggaran gua:** `.opencode/rules/secrets.md` udah bilang "API key / JWT / PAT / token →
 store in `.env`; never hardcode; never commit". Tapi pas `git push --delete` gagal (git nggak
