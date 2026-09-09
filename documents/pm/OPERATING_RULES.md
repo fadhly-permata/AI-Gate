@@ -702,3 +702,20 @@ Lalu CROSS-CHECK antar sumber — kalau ada konflik, selidiki sampai konsisten. 
 saja BELUM cukup untuk menegaskan fakta. Ini menguatkan R47 / no-hallucination.md: dari
 asumsi → fakta terverifikasi multipihak. Berlaku untuk 22 tool sisa (A3–C6) dan sesi
 berikutnya.
+
+## R49 — Setiap PR WAJIB diberi minimal satu label tipe (PM auto-klassifikasi)
+Pelajaran (2026-09-10, user: "bisa gak waktu bikin PR ditambahin label, misal bug?").
+Setiap PR yang PM buka (lewat API `pulls` field `labels`, atau `gh pr create --label`) WAJIB
+membawa ≥1 **label tipe**. PM menentukan sendiri dari isi PR, pakai label yang SUDAH ada di
+repo ini (`bug, enhancement, documentation, accessibility, duplicate, invalid, question,
+wontfix, good first issue, help wanted`):
+- `fix(...)` / benerin bug / nyelametin tes yang merah → **`bug`**
+- `feat(...)` / fitur baru / peningkatan UI → **`enhancement`** (+ `accessibility` kalau menyangkut aksesibilitas)
+- PR dokumen murni → **`documentation`**
+- Campuran → lebih dari satu label (mis. `bug` + `enhancement`).
+Aturan main:
+1. **Label harus sudah ada** — GitHub API menolak nama baru saat create (422). Kalau perlu label
+   baru (mis. `test`, `chore`, `feature`), **tanya user DULU** sebelum bikin (jangan ubah config repo diam-diam).
+2. Saat bikin PR, sekalian set label-nya (jangan PR tanpa label terus nyusul — 1 langkah).
+3. PR lama yang belum berlabel boleh ditagih **kalau user minta** (retroaktif).
+(Pelajaran: PR #14 & #15 sempat dibuat TANPA label; mulai sekarang default pakai label.)

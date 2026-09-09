@@ -7,6 +7,7 @@
 - 2026-09-03: Arsitektur agen PM + sub-agent spesialis (on-demand, scoped).
 
 ## Decisions
+- 2026-09-10 (preferensi label PR): user minta SETIAP PR dikasih label (contoh "bug") → rule **R49**. PM auto-klassifikasi pakai label yang UDAH ada di repo (10 default: bug, enhancement, documentation, accessibility, duplicate, invalid, question, wontfix, good first issue, help wanted): `fix`/bug/tes merah → **`bug`**; `feat`/peningkatan UI → **`enhancement`** (+`accessibility` bila relevan); PR dokumen → **`documentation`**; campuran → multi-label. Label BARU (mis. `test`, `chore`) butuh ACC user dulu (API 422 kalau nama baru saat create). PR #15 di-tag **`bug`** (fix harness = defect). Ditanya soal retro-tag PR #14 (sudah merged): user jawab "2 aja" → cuma minta merge #15, jadi #14 TIDAK di-retro-tag.
 - 2026-09-07 (merge origin/main → refactor/ui, PR #4): konflik 5 file diselesaiin
   (merge commit `6000b2c`). (a) **Tabrakan rule nomor**: `main` nambah R23=routing, kita
   udah punya R23=reports → routing `main` udah dicakup **R29** kita, duplikat gak

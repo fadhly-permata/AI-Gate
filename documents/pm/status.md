@@ -1,5 +1,13 @@
 # PM Status
 
+## Preferensi: setiap PR berlabel tipe (R49) — 2026-09-10 (PM)
+User minta PR SELALU pakai label (contoh `bug`). Jadi aturan **R49**: PM auto-klassif
+`bug`/`enhancement`/`documentation` (pakai label yang udah ada di repo; label baru butuh ACC user).
+Aksi: PR #15 di-tag **`bug`** via API. PR #14 (sudah merged) TIDAK di-retro-tag (user "2 aja").
+PR #15 di-MERGE ke main (merge commit; label `bug` ikut ke log). Catatan governance R49 di-
+COMMIT ke branch `fix/fe-test-env` supaya ikut ke-main lewat merge PR ini (sebelumnya PR #15
+tanpa label — pelajaran).
+
 ## Harness tes FE — 22 fail `localStorage` (Node≥22.4 webstorage shadowing) — 2026-09-09 (fe-dev, PM-verified, DI-COMMIT 95d46e4, PR #15 open)
 **Asal (#3 sesi bottom-nav):** suite FE penuh merah 22 fail `window.localStorage`/`sessionStorage` undefined
 (logwindow 21 + terminal_discard 1), repro walau file jalan sendirian.
