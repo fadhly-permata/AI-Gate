@@ -245,13 +245,183 @@ describe("sidebar Repository link — sticky footer", () => {
     expect(sidebar).toMatch(/overflow-y:\s*auto/);  // still the scroll container
   });
 
-  it("phones are unchanged: sidebar stays hidden, no repo item in .bottom-nav", () => {
+  it("phones reach the repo too: sidebar hidden, repo link added to .bottom-nav", () => {
     expect(css).toMatch(/@media \(max-width: 600px\)[\s\S]{0,400}\.sidebar\s*\{\s*display:\s*none/);
     expect(ruleBlock(/(^|\n)body\[data-device="phone"\] \.sidebar\s*\{[^}]*\}/))
       .toMatch(/display:\s*none/);
-    expect(doc.querySelector('.bottom-nav a[href*="github"]')).toBeNull();
-    // 7 = current bottom-nav items; guards that the repo link was NOT added here.
-    expect(doc.querySelectorAll(".bottom-nav .bn-item")).toHaveLength(7);
+    // Request 2026-09-09: the sticky sidebar footer stays the tablet/desktop
+    // entry point, but the phone shell (sidebar hidden) must also reach the
+    // repo — icon-only as the last .bn-item, a real external link.
+    const navRepo = doc.querySelector('.bottom-nav a.bn-item[href*="github"]');
+    expect(navRepo, "repo link present in .bottom-nav").not.toBeNull();
+    expect(navRepo.getAttribute("href")).toBe(REPO_URL);
+    expect(navRepo.getAttribute("target")).toBe("_blank");
+    const navRel = (navRepo.getAttribute("rel") || "").split(/\s+/);
+    expect(navRel).toContain("noopener");
+    expect(navRel).toContain("noreferrer");
+    // No data-view -> app.js keeps native link behaviour (binding above).
+    expect(navRepo.hasAttribute("data-view")).toBe(false);
+    // 9 app views + repo = 10 items in the bottom nav.
+    expect(doc.querySelectorAll(".bottom-nav .bn-item")).toHaveLength(10);
+  });
+});
+
+/* ===== Phone shell: hamburger hidden, bottom nav scrolls sideways =====
+   User report 2026-09-09: on the phone shell the sidebar is replaced by
+   .bottom-nav, so #sidebarToggle toggles nothing (dead tap) and the icons were
+   squeezed to ~50px each — the last ones unreachable. Fix = hide the hamburger
+   in BOTH phone contexts and let the nav scroll horizontally instead of clip.
+   Retest the same day: menus still "unreachable", because .bottom-nav only had
+   7 of the sidebar's 9 app views — usage and analytics were never rendered on a
+   phone. Fix = mirror the sidebar 1:1; 9 x min-width overflows a 360px row, so
+   the scroll rule above is now what makes the LAST item reachable.
+    jsdom evaluates neither @media nor flex layout, so the rule TEXT is the
+    contract (same approach as the sticky-footer checks above).
+    Follow-up 2026-09-09: the repo link joined the nav as a 10th icon-only
+    item, and .bn-sep dividers were added at the sidebar's group boundaries —
+    the nav now mirrors the grouping, not just the item list. */
+describe("phone shell — hamburger hidden, bottom nav scrollable", () => {
+  const PHONE_QUERY = "@media (max-width: 600px)";
+  const TABLET_QUERY = "@media (max-width: 960px)";
+  const NARROW_PHONE_PX = 360;  // smallest phone viewport we design for
+
+  /** Index just past the "}" matching the "{" at `open`; -1 when unbalanced. */
+  function blockEnd(text, open) {
+    let depth = 0;
+    for (let i = open; i < text.length; i += 1) {
+      if (text[i] === "{") depth += 1;
+      else if (text[i] === "}" && (depth -= 1) === 0) return i + 1;
+    }
+    return -1;
+  }
+
+  /** Inner text of every @media block whose header contains `query`. */
+  function mediaBodies(query) {
+    const bodies = [];
+    let i = css.indexOf(query);
+    while (i !== -1) {
+      const open = css.indexOf("{", i);
+      const end = blockEnd(css, open);
+      if (end !== -1) bodies.push(css.slice(open + 1, end - 1));
+      i = css.indexOf(query, i + query.length);
+    }
+    return bodies;
+  }
+
+  // The file has two 600px blocks; the phone SHELL is the one that hides the
+  // sidebar (the other only tucks the app subtitle away).
+  const phoneShell = () => mediaBodies(PHONE_QUERY).find(function (body) {
+    return /\.sidebar\s*\{/.test(body);
+  });
+
+  it("hides #sidebarToggle in both phone shells and nowhere else", function () {
+    const shell = phoneShell();
+    expect(shell, "phone-shell @media block found").toBeTruthy();
+    expect(shell).toMatch(/\.sidebar\s*\{\s*display:\s*none/);       // nothing left to toggle
+    expect(shell).toMatch(/#sidebarToggle\s*\{\s*display:\s*none/);  // so the button goes too
+    expect(ruleBlock(/(^|\n)body\[data-device="phone"\] #sidebarToggle\s*\{[^}]*\}/))
+      .toMatch(/display:\s*none/);                                   // simulation shell mirrors it
+    // display:none takes it out of layout AND the tab order, so the dead tap in
+    // app.js can never fire on a phone. Exactly one rule per phone context:
+    expect(css.match(/#sidebarToggle\s*\{/g), "two phone shells = two rules").toHaveLength(2);
+    // Tablet (>600px) keeps the AdminLTE sidebar, so the hamburger must stay.
+    const tablet = mediaBodies(TABLET_QUERY);
+    expect(tablet, "single tablet block").toHaveLength(1);
+    expect(tablet[0]).toMatch(/--sidebar-w:/);                       // really the tablet block
+    expect(tablet[0]).not.toMatch(/#sidebarToggle/);
+  });
+
+  it("renders EVERY sidebar view in the bottom nav (no phone-unreachable menu)", function () {
+    // Root cause of the 2026-09-09 retest: usage + analytics existed in the
+    // sidebar only, so on a phone they were literally never rendered. Compare the
+    // two lists (same order too: the nav is the phone mirror of the menu).
+    const sidebarViews = Array.from(
+      doc.querySelectorAll(".sidebar .nav-item[data-view]")
+    ).map(function (item) { return item.getAttribute("data-view"); });
+    // [data-view] only: the repo link is also a .bn-item but is an external
+    // anchor, not a view — including it would inject a null into the mirror.
+    const navViews = Array.from(doc.querySelectorAll(".bottom-nav .bn-item[data-view]")).map(function (item) {
+      return item.getAttribute("data-view");
+    });
+    expect(sidebarViews).toEqual([
+      "providers", "combos", "proxies", "endpoints", "terminal", "cli",
+      "usage", "analytics", "settings"
+    ]);
+    expect(navViews).toEqual(sidebarViews);
+    // Every mirrored item keeps the shared i18n aria key, so its label is
+    // localized in both locales (app.js binds taps generically by data-view).
+    navViews.forEach(function (v) {
+      const item = doc.querySelector('.bottom-nav .bn-item[data-view="' + v + '"]');
+      expect(item.getAttribute("data-i18n-aria")).toBe("nav." + v);
+      expect(window.I18N.en["nav." + v]).toBeTruthy();
+      expect(window.I18N.id["nav." + v]).toBeTruthy();
+    });
+  });
+
+  it("scrolls .bottom-nav sideways so all 10 items stay reachable", function () {
+    const shell = phoneShell();
+    expect(shell, "phone-shell @media block found").toBeTruthy();
+    const nav = ruleBlock(/(^|\n)\.bottom-nav\s*\{[^}]*\}/);
+    expect(nav, ".bottom-nav base rule present").not.toBeNull();
+    expect(nav).toMatch(/overflow-x:\s*auto/);                   // scroll, never clip
+    expect(nav).toMatch(/-webkit-overflow-scrolling:\s*touch/);  // momentum in mobile webviews
+    expect(nav).toMatch(/justify-content:\s*flex-start/);        // centring would overflow BOTH ends
+    expect(nav).toMatch(/align-items:\s*center/);                // vertical centring untouched
+    const item = ruleBlock(/(^|\n)\.bn-item\s*\{[^}]*\}/);
+    const minTap = item && item.match(/min-width:\s*(\d+)px/);
+    expect(minTap, ".bn-item keeps a min-width (overflow -> scroll, no squeeze)").not.toBeNull();
+    expect(Number(minTap[1]), "still a comfortable tap target").toBeGreaterThanOrEqual(44);
+    expect(item).toMatch(/justify-content:\s*center/);           // icon stays centred in its cell
+    // flex-shrink must NOT be able to win over min-width, or the items squeeze
+    // back into the viewport and the scroll disappears (the reported symptom).
+    expect(item).toMatch(/flex:\s*1 1 0/);
+    const items = doc.querySelectorAll(".bottom-nav .bn-item");
+    expect(items).toHaveLength(10);
+    // 10 x 60px = 600px > 360px (separators only add width): the row cannot
+    // fit, so it must scroll — and no item can shrink below the tap target,
+    // i.e. none is clipped out of reach.
+    expect(items.length * Number(minTap[1])).toBeGreaterThan(NARROW_PHONE_PX);
+    // Both phone shells only switch the nav ON; undoing the base row would kill
+    // the scroll again (space-around / a hidden overflow were the old bug).
+    const shellNav = shell.match(/\.bottom-nav\s*\{[^}]*\}/);
+    [shellNav && shellNav[0],
+     ruleBlock(/body\[data-device="phone"\] \.bottom-nav\s*\{[^}]*\}/)].forEach(function (rule) {
+      expect(rule, ".bottom-nav rule in the phone shell").not.toBeNull();
+      expect(rule).toMatch(/display:\s*flex/);
+      expect(rule, "no justify-content/override inside the phone shell")
+        .not.toMatch(/justify-content|overflow/);
+    });
+    // Active/hover feedback that makes the row usable survives the change.
+    expect(ruleBlock(/\.bn-item\.active\s*\{[^}]*\}/)).toMatch(/background:/);
+  });
+
+  it("divides the nav into the sidebar's groups with 4 separators", function () {
+    // Gateway | Operations | Insights | System | Repo = 5 clusters -> 4 dividers.
+    const seps = doc.querySelectorAll(".bottom-nav .bn-sep");
+    expect(seps, "one separator at every group boundary").toHaveLength(4);
+    seps.forEach(function (sep) {
+      // Decorative: keep it out of the accessible name of the nav.
+      expect(sep.getAttribute("aria-hidden")).toBe("true");
+    });
+    // Count alone is not enough: each divider must sit at a real boundary,
+    // mirroring the sidebar .nav-section edges (aria keys identify the sides).
+    const boundaries = Array.from(seps).map(function (sep) {
+      return [sep.previousElementSibling.getAttribute("data-i18n-aria"),
+              sep.nextElementSibling.getAttribute("data-i18n-aria")];
+    });
+    expect(boundaries).toEqual([
+      ["nav.endpoints", "nav.terminal"],  // Gateway  -> Operations
+      ["nav.cli", "nav.usage"],           // Operations -> Insights
+      ["nav.analytics", "nav.settings"],  // Insights -> System
+      ["nav.settings", "nav.repo"]        // System   -> Repo
+    ]);
+    // jsdom has no layout: the rule text carries the visible-divider contract.
+    const rule = ruleBlock(/(^|\n)\.bn-sep\s*\{[^}]*\}/);
+    expect(rule, ".bn-sep base rule present").not.toBeNull();
+    expect(rule).toMatch(/flex:\s*0 0 auto/);                 // never squeezed by the row
+    expect(rule).toMatch(/width:\s*1px/);                     // hairline
+    expect(rule).toMatch(/background:\s*var\(--panel-border\)/); // token, light+dark aware
+    expect(rule).not.toMatch(/#[0-9a-fA-F]{3,8}/);            // no new hex
   });
 });
 

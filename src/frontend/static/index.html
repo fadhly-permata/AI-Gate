@@ -14,7 +14,7 @@
   <script defer src="vendor/xterm/xterm.js"></script>
   <script defer src="vendor/xterm/xterm-addon-fit.js"></script>
 
-  <link rel="stylesheet" href="styles.css?v=20260912" />
+  <link rel="stylesheet" href="styles.css?v=20260914" />
 </head>
 <body>
   <div class="layout">
@@ -1135,7 +1135,11 @@
       </div>
 
       <!-- Mobile bottom navigation (B4.2): shown only on phone device
-           simulation or real narrow viewports. Icons only, non-AdminLTE shell. -->
+           simulation or real narrow viewports. Icons only, non-AdminLTE shell.
+           Mirrors the sidebar 1:1 — its 9 app views plus the repository link
+           (icon-only, no data-view = stays a real external link), with .bn-sep
+           dividers at the group boundaries. The row overflows and scrolls
+           sideways so every item stays reachable. -->
       <nav class="bottom-nav" aria-label="Mobile navigation">
         <a class="bn-item" href="#" data-view="providers"
            data-i18n-aria="nav.providers"><i class="fa fa-server"></i></a>
@@ -1145,12 +1149,23 @@
            data-i18n-aria="nav.proxies"><i class="fa fa-network-wired"></i></a>
         <a class="bn-item" href="#" data-view="endpoints"
            data-i18n-aria="nav.endpoints"><i class="fa fa-plug"></i></a>
+        <span class="bn-sep" aria-hidden="true"></span>
         <a class="bn-item" href="#" data-view="terminal"
            data-i18n-aria="nav.terminal"><i class="fa fa-terminal"></i></a>
         <a class="bn-item" href="#" data-view="cli"
            data-i18n-aria="nav.cli"><i class="fa fa-screwdriver-wrench"></i></a>
+        <span class="bn-sep" aria-hidden="true"></span>
+        <a class="bn-item" href="#" data-view="usage"
+           data-i18n-aria="nav.usage"><i class="fa fa-chart-line"></i></a>
+        <a class="bn-item" href="#" data-view="analytics"
+           data-i18n-aria="nav.analytics"><i class="fa fa-chart-column"></i></a>
+        <span class="bn-sep" aria-hidden="true"></span>
         <a class="bn-item" href="#" data-view="settings"
            data-i18n-aria="nav.settings"><i class="fa fa-gear"></i></a>
+        <span class="bn-sep" aria-hidden="true"></span>
+        <a class="bn-item" href="https://github.com/fadhly-permata/AI-Gate"
+           target="_blank" rel="noopener noreferrer"
+           aria-label="aigate Repo" data-i18n-aria="nav.repo"><i class="fa-brands fa-github"></i></a>
       </nav>
     </div>
 
