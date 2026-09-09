@@ -145,9 +145,22 @@ langsung oleh kode (mis. `src/backend/models.py:5`, `src/backend/gateway/errors.
 tidak boleh dipindah tanpa memperbaiki rujukan tersebut (R18, R22).
 
 ## Status Akhir
-Sebagian — langkah (a)(b)(c)(d)(⑥)(⑧) selesai; (e) terblokir environment. langkah (a) selesai (sensus + peta target), laporan dibuat lebih dahulu sesuai
-`task-report.md`. Langkah (b) baru pada tahap **desain** (`system-analyst`, berkas
-`documents/analysis/2026-09-10-rules-consolidation.md`, commit `40ae85e`): 52 rule terpetakan ke
-10 tema tanpa kehilangan isi, 10 konflik tercatat dengan usulan penengah, dan urutan eksekusi
-①–⑧ diajukan. Eksekusi (b) menunggu putusan pengguna untuk ① (pemilik tulis `.opencode/rules/**`)
-dan ② (setuju rujukan basi dibetulkan lebih dulu), karena menyentuh konfigurasi agen.
+Sebagian — dengan satu langkah terblokir environment.
+
+- **Selesai:** (a) sensus + peta target; (b) konsolidasi rule — v1 52 rule/52.698 byte diarsipkan utuh,
+  v2 aktif 50 rule/10 tema A–J/11.463 byte (−78%); (c) kanal wajib-baca — `AGENTS.md` 12 aturan always-on
+  + `opencode.json` `instructions` menunjuk buku rule; (d) gaya tulis caveman ultra untuk `.md` dan bahasa
+  normal untuk komunikasi (R52 → I7 + `language.md`); ① 39 baris rujukan hantu di 15 berkas config;
+  ② kepemilikan tulis `.opencode/rules/**` diberikan user ke PM; ⑤ gerbang
+  `.opencode/tools/governance/rules-index.py` — 11 pemeriksaan **LOLOS**; ⑥ 8 berkas pindah keluar
+  `documents/pm/` (19 berkas → 8 entri) plus pemisahan arsip `status.md`/`memory-bank.md`;
+  ⑧ 14 berkas laporan dinormalisasi ke `[yyyymmdd]/[jenis]/[hhmm]_*` (utang gate jadi 0) dan satu
+  duplikat byte-identik dihapus.
+- **Terblokir (e):** Graphify berhasil dipasang dan `graphify --help` berjalan, tetapi pada Android/Termux
+  binding grammar Python gagal dimuat (`dlopen … tree_sitter_python_external_scanner_create`), sehingga
+  `graphify update` menghasilkan graf kosong (0 node, 0 tepi) dan tidak dapat menjadi kanal pencarian kode.
+  Aturan C4 sengaja tetap berkondisi agar tidak menuliskan klaim yang belum benar. Venv percobaan dihapus.
+- **Sisa:** push ke `origin/refactor/ui` (langkah terakhir sesuai perintah), dan keputusan user soal
+  tiga pilihan kanal graf (buat `graph.json` di mesin lain / tetap tanpa graf / bangun ulang binding).
+- **Syarat aktif:** konfigurasi agen yang berubah (AGENTS.md, opencode.json, agent, skill, rule) baru
+  terpakai setelah pengguna merestart opencode.
