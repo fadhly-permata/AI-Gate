@@ -687,3 +687,18 @@ Wajib:
 4. Berlaku juga untuk 23 tool sisanya (Grup A sisa + B + C): PM WAJIB verifikasi tiap
    fakta (codegraph + web/context7 bila perlu fakta eksternal) SEBELUM menulis script
    atau menegaskan apa pun. Kalau ragu → TANYA user, jangan tebak.
+
+## R48 — Pembuatan script WAJIB verifikasi dari >1 sumber fakta independen
+Pelajaran (2026-09-09, user: 'pastikan ya pembuatan script menggunakan sumber data &
+fakta lebih dari satu sumber'):
+Saat membuat script install/launch CLI tool (dan klaim teknis serupa), PM / specialist
+DILARANG cukup pakai SATU sumber. Wajib verifikasi dari MINIMAL 2 sumber fakta
+INDEPENDEN, misalnya kombinasi:
+  - kode aigate (`src/backend/**`, codegraph → file:line),
+  - registry npm / PyPI resmi (fakta package, binary, os/cpu/libc),
+  - dokumentasi resmi tool (docs tool tsb),
+  - GitHub releases / repo resmi tool.
+Lalu CROSS-CHECK antar sumber — kalau ada konflik, selidiki sampai konsisten. Satu sumber
+saja BELUM cukup untuk menegaskan fakta. Ini menguatkan R47 / no-hallucination.md: dari
+asumsi → fakta terverifikasi multipihak. Berlaku untuk 22 tool sisa (A3–C6) dan sesi
+berikutnya.
