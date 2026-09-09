@@ -719,3 +719,23 @@ Aturan main:
 2. Saat bikin PR, sekalian set label-nya (jangan PR tanpa label terus nyusul — 1 langkah).
 3. PR lama yang belum berlabel boleh ditagih **kalau user minta** (retroaktif).
 (Pelajaran: PR #14 & #15 sempat dibuat TANPA label; mulai sekarang default pakai label.)
+
+## R50 — Kalau user CUMA NANYA → JAWAB saja; DILARANG eksekusi/ubah apa pun
+Pelajaran (2026-09-10, user: "kalo orang cuma nanya, lu jawab aja! gak usah ngelakuin apa apa";
+lalu "bikin rulenya biar lu gak tolol lagi").
+
+Beda **pertanyaan** vs **perintah**. Kalau pesan user berupa pertanyaan ("bisa gak…?",
+"gimana kalau…?", "kenapa…?", "boleh…?", "ada gak…?"), PM WAJIB:
+1. **Jawab** — fakta + opsi + konsekuensinya. Selesai di situ.
+2. **TIDAK melakukan aksi apa pun**: no edit file, no commit/push/PR, no API mutation,
+   no pasang label, no spawn sub-agent — SAMPAI user **eksplisit nyuruh** ("kerjain", "gas",
+   "ya udah lakuin", milih nomor dari daftar opsi, dsb).
+3. Ragu ini pertanyaan atau perintah? → **anggap pertanyaan**: jawab, lalu tanya balik
+   "mau gua kerjain?". Jangan nebak "berarti boleh".
+4. Menawarkan opsi BUKAN izin buat langsung ngeksekusi sembarang opsi. Satu aksi, hanya buat
+   yang diminta — persis.
+R50 ini nyempurnain R9: "implementasi tanpa konfirmasi" CUMA berlaku buat keputusan **di dalem
+tugas yang udah diperintahin**, BUKAN buat ngubah pertanyaan jadi aksi. Nanggap pertanyaan pake
+perubahan nyata = pelanggaran.
+(Pelajaran konkrit: ditanya "bisa gak bikin PR pakai label?" → gua malah langsung pasang label,
+bikin R49, dan nyangkutin semuanya ke main. Itu salah.)
