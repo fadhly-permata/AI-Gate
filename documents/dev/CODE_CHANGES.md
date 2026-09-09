@@ -18,6 +18,20 @@
 
 **Verifikasi PM (R14/R35):** `bash -n scripts/cli-tools/aider.sh` → **clean**; mode `-rwx------` (exec). Simulasi guard: 3.10/3.11/3.12 → lanjut install; 3.9/3.13/3.14/3.14.6/2.7/4.0 → `exit 1`. (Tidak jalanin install beneran — batas sandbox, sesuai brief.)
 
+## 2026-09-09 — BUGFIX: openhands.sh guard Python 3.12 (branch `setup/cli-tools`) — DONE (commit `313a2c2`)
+
+**Bug:** `scripts/cli-tools/openhands.sh` → `pip install openhands` (fallback route) error di device ini (Python 3.14.6; openhands `requires_python ==3.12.*` per PyPI 1.16.0) → pip tolak `"requires a different Python: 3.14.6 not in '==3.12.*'"`. Route utama `uv tool install openhands --python 3.12` mengelola 3.12 sendiri (gak peduli system python), TAPI device ini gak punya `uv` → pip route gagal.
+
+**Fix (`scripts/cli-tools/openhands.sh`, +30 baris):** tambah **version-guard SEBELUM** `ensure_installed`:
+- `if have_cmd uv` (= `command -v uv`) → lanjut (uv fetch managed 3.12 sendiri, gak peduli system python).
+- `elif have_cmd python3` → parse major.minor (`sys.version_info[:2]`); kalau **bukan persis 3.12** → `log_msg "ERROR: openhands butuh persis Python 3.12 ..."` + saran (`pkg install python3.12`/pyenv/venv/uv) lalu **`exit 1` TANPA jalanin install**.
+- `else` / parse-gagal → WARN (best-effort, tetap lanjut).
+Guard cross-platform (parse `sys.version_info`), idempoten, `set -euo pipefail` + `_common.sh` tetap. Wiring launch (`LLM_BASE_URL`/`LLM_API_KEY` + `LLM_MODEL=openai/<m>` + flag `--override-with-envs`) **tetap utuh**.
+
+**Verifikasi PM (R14/R35):** `bash -n scripts/cli-tools/openhands.sh` → **clean**; mode `-rwx------` (exec). Simulasi guard (uv absen): 3.12 → lanjut pip; 3.13/3.14/3.14.6/3.11/3.10/3.9/2.7/4.0 → `exit 1`. (Tidak jalanin install beneran — batas sandbox, sesuai brief.)
+
+**Konfirmasi NOT_A_CLI (crewai.sh / gpt-researcher.sh):** di-READ SELURUHNYA — kedua script TIDAK menjalankan `pip install`/`uv tool install` (cuma `log_msg` + `exit 0`, status `LAUNCH_UNSUPPORTED`/`REASON_NOT_A_CLI`). Tidak ada install step yang bisa gagal versi → **version-guard TIDAK ditambahkan, TIDAK diubah**. (Hipotesis awal terbukti: openhands = install → butuh guard; crewai/gpt-researcher = NOT_A_CLI → guard gak relevan.)
+
 ## 2026-09-09 — feat: aigate Anthropic `/v1/messages` inbound (kayak litellm) — DONE (5 commit: `253aae5` `bb3b6c9` `7f330a1` `4986adc` `41d24f8`, branch `feat/anthropic-inbound`)
 
 **Tujuan:** aigate serve Anthropic-compatible `POST /v1/messages` **native** (tanpa litellm di tengah) supaya `claude-code` bisa `ANTHROPIC_BASE_URL=<aigate>/v1/messages`. Referensi desain: `documents/architecture/anthropic-inbound-endpoint.md`.

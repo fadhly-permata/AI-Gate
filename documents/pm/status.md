@@ -1,5 +1,17 @@
 # PM Status
 
+## CLI Tools B1: openhands.sh version-guard bugfix — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Task:** BUGFIX `scripts/cli-tools/openhands.sh` — `pip install openhands` (fallback) error di device ini (Python 3.14.6; openhands `requires_python ==3.12.*` per PyPI 1.16.0). uv route (`uv tool install openhands --python 3.12`) managed sendiri 3.12-nya, tapi device ini gak punya uv → pip route gagal.
+
+**Fix (PM, scope ketat `scripts/cli-tools/openhands.sh`):** version-guard pre-install (+30 baris): `have_cmd uv` → lanjut (uv fetch 3.12 sendiri); `elif python3` major.minor != 3.12 → `log_msg "ERROR: openhands butuh persis Python 3.12 ..."` + saran `pkg install python3.12`/pyenv/venv/uv + `exit 1` TANPA jalanin pip; parse-gagal/python3-hilang → WARN (best-effort). Wiring launch (`LLM_BASE_URL`/`LLM_API_KEY` + `LLM_MODEL=openai/<m>` + `--override-with-envs`) tetap utuh; idempoten via `ensure_installed`; `set -euo pipefail` + `_common.sh` tetap.
+
+**Verifikasi PM (R14/R35):** `bash -n scripts/cli-tools/openhands.sh` → clean; mode `-rwx------` (exec). Simulasi guard (uv absen): 3.12 → lanjut; 3.13/3.14/3.14.6/3.11/3.10/3.9/2.7/4.0 → exit 1.
+
+**Konfirmasi NOT_A_CLI (crewai.sh / gpt-researcher.sh):** di-READ SELURUHNYA — keduanya TIDAK ada `pip install`/`uv tool install` (hanya `log_msg` + `exit 0`, NOT_A_CLI). Tidak ada install step → version-guard TIDAK relevan → TIDAK diubah (sesuai boundary).
+
+**Status: DONE — commit `313a2c2`.**
+
 ## CLI Tools A7: aider.sh version-guard bugfix — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
 
 **Task:** BUGFIX `scripts/cli-tools/aider.sh` — `pip install aider-chat` error saat dijalankan di device ini (Python 3.14.6).
