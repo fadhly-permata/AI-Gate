@@ -2,6 +2,23 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 2026-09-10 04:07 — Banner halaman Fase 3: fe-dev spawned + diterima, fitur di-COMMIT (ProjectManager)
+- ACC user: "oke kerjain" = 8 draf ID + opsi A + bentuk Opsi B. Delegasi: fe-dev (sudah ter-generate, reuse)
+  via `opencode run --agent fe-dev` — ONE spawn, handover file di luar repo (scope: index.html, styles.css,
+  7 kamus; 56 entri kamus sudah ditulis PM di handover; DILARANG sentuh JS/tests/git).
+- Receipt fe-dev: 9 berkas, 8 blok anak pertama, CSS `--accent` card tokens, self-check parity 35 tes hijau.
+- AUDIT PM (bukan terima buta): git diff per berkas = sesuai spesifikasi; verifikasi independen —
+  (1) regex per-section: 8 view banner=True first_child=True, welcome+terminal banner=False;
+  (2) `rg -c page_desc.` = 8 di TIAP 7 kamus (400 kunci/kamus); (3) vitest PENUH 23 berkas/523 tes LULUS
+  (10,21 s, = baseline → 0 regresi); (4) render-check jsdom (applyLocale + kamus ASLI): 7/7 locale 8/8
+  banner terisi teks kamus, welcome+terminal nihil → LULUS; (5) glyph fa-circle-info terbukti ada di
+  FA 6.5.1 yang dimuat index.html:42. Skrip scratch dihapus (B5). Gate rules-index LOLOS.
+- TIDAK TERBUKTI: browser nyata (playwright crash di Termux, tanpa biner browser) → user WAJIB lihat
+  sendiri (G3/R20). Deviasi: nol. Catatan fe-dev diteruskan: banner full-width vs kartu settings 540px.
+- COMMIT: `a9c7f3b` feat(ui) 9 berkas (+146/−7), explicit staging (no -A). TIDAK di-push (workflow butuh
+  perintah user; PR #17 masih terbuka). Laporan: `.opencode/reports/20260910/implementation/0405_banner-halaman-implementasi.md`
+  + receipt fe-dev `.opencode/reports/20260910/dev/0357_banner-halaman-fe-receipt.md`.
+
 ## 2026-09-10 03:40 — Banner halaman Fase 2: draf copy 8 halaman selesai, tunggu ACC user (ProjectManager)
 - User: teksnya dibikinin tim ("ya justru itu, buatin dong teksnya") → asumsi Fase 1 (teks dari user) DICABUT user.
 - PM baca penuh 8 section + modul JS + model backend (models.py, usage_router.py, selfheal.py, proxy_selector.py) → 8 draf ID ≤140 char, semua klaim berbukti file:line.

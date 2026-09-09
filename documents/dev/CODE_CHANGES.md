@@ -1395,3 +1395,22 @@ Bukti "kode lama masih aktif" tidak berlaku: tidak ada proses produk yang disent
 - Jalan yang tersisa (butuh keputusan user): (i) generate `graph.json` di mesin Linux/x86 lalu query
   lokal di HP (`graphify path/explain --graph <file>` jalan tanpa LLM/tanpa grammar),
   (ii) tetap tanpa graf (C4 berkondisi), (iii) coba build binding grammar lebih dalam (tidak dijamin).
+
+## 2026-09-10 — Banner tujuan halaman (fitur `banner-halaman`, fe-dev, commit ini)
+- `src/frontend/static/index.html` (+40): 8 blok `.page-banner` jadi anak pertama 8 view —
+  settings :175, providers :280, combos :417, proxies :449, endpoints :481, usage :514,
+  analytics :611, cli :792. welcome+terminal BERSIH (verifikasi per-section, bukan asumsi).
+  fallback inline = teks EN (konvensi berkas). Ikon `fa-circle-info` — ada di FA 6.5.1 yang
+  sudah dimuat (index.html:42; bukti: unduh + grep `fa-circle-info:before`).
+- `src/frontend/static/styles.css` (+43, di :458–490): satu set `.page-banner` — flex, ikon
+  `--accent`, kartu token (`--panel/--panel-border/--radius/--shadow/--fg`), none-fixed,
+  @media 600px stack. Cahah/gelap otomatis (cuma variabel).
+- `src/frontend/static/i18n/{en,id,ru,nl,ja,zh,zh-tw}.js` (+9/−1 per berkas): 8 kunci baru
+  `page_desc.{settings,providers,combos,proxies,endpoints,usage,analytics,cli}` SERENTAK di 7
+  kamus → 56 entri, tiap kamus 400 kunci, parity guard i18n.test.js lolos (35 tes).
+  id = draf user-ACC verbatim; 6 bahasa lain = draf terjemahan (BELUM ditinjau penutur asli).
+- Nol perubahan JS app (app.js dkk). Gate PM: vitest penuh 23 berkas/523 tes HIJAU (10,21 s,
+  = baseline, 0 regresi) + render-check jsdom (applyLocale asli + kamus asli): 7/7 locale,
+  8/8 banner terisi, welcome+terminal nihil → LULUS. Browser nyata TIDAK tersedia di Termux
+  (playwright crash, tanpa biner) → visual masih butuh mata user sendiri. Laporan:
+  `.opencode/reports/20260910/implementation/0405_banner-halaman-implementasi.md`.
