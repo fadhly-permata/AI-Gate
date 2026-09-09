@@ -1308,3 +1308,90 @@ reload (fresh `tabs` Map + `activeId`). Covers:
 - `pkg` di env ini gagal tulis `/etc/apt` (Read-only file system) saat upgrade hope2333-mirrorlist → dpkg abort (exit 100) baik saat install maupun uninstall aichat. Tidak memengaruhi logika script.
 
 Commit: `61d64337b686a8b5ee0f58d17d52807119922d0a`
+
+## 2026-09-10 — perapian governance: rule v2 + kanal wajib-baca + gate (BUKAN kode produk) — DONE
+
+### Perubahan (config & dokumen, nol `src/**` / `tests/**`)
+- `documents/pm/archive/OPERATING_RULES-v1-52rules.md` — rename (git mv) dari `documents/pm/OPERATING_RULES.md`; teks v1 52 rule utuh 52.698 B.
+- `documents/pm/OPERATING_RULES.md` — BARU v2: 50 rule / 10 tema A–J / 11.463 B (−78%). 8 rule duplikat dihapus dari sini (rumah tunggal `.opencode/rules/*`), sisanya ≤4 baris + sitatan `[R#]`. F4 ditambahkan (klaim ukuran wajib sebut alat+satuan).
+- `AGENTS.md` — ditulis ulang: 4 ayat routing dipertahankan + blok "ALWAYS-ON RULES" 12 baris (pointer tema) + rujukan gate + aturan bahasa. 1.866 → 3.896 B (kanal auto-inject tiap sesi).
+- `opencode.json` — += `"instructions": ["documents/pm/OPERATING_RULES.md"]` (kanal injeksi rule; skema diverifikasi ke https://opencode.ai/config.json → `Config.instructions: [string]`).
+- `.opencode/rules/agent-boundaries.md` — PM WRITE += `.opencode/rules/**` (grant user 2026-09-10) + `pm-orchestration/**` + `AGENTS.md`; subseksi "Task reports" (K2: pelaksana tulis laporannya sendiri); baris `tech-architect` dipindah ke dalam tabel (sebelumnya tabel pecah).
+- `.opencode/rules/{secrets,no-hallucination,commands,task-report,language}.md` — serap clause dari rule lama (R51/R47/R7/R23/R52).
+- `.opencode/skills/pm-orchestration/SKILL.md` — §6 "Record Protocol" ditulis (dulu `ProjectManager.md:30` menunjuk skill `pm-postmortem` yang TIDAK ADA → pointer hantu).
+- `.opencode/agents/ProjectManager.md` — pointer hantu dibetulkan: `pm-postmortem` → Record Protocol §6; `fullstack-skill` → `fullstack-dev-skill`; `docs/*` → `documents/*`.
+- 39 baris rujukan `pm/...` dan `docs/...` di 15 berkas hidup → `documents/pm/...` / `documents/...`. Berkas laporan lama (`.opencode/reports/**`) TIDAK disentuh (provenance).
+- `.opencode/tools/governance/rules-index.py` — BARU, gate 11 pemeriksaan (stdlib only).
+- `documents/analysis/2026-09-10-rules-consolidation.md` — desain (tulisan system-analyst, bukan PM).
+
+### Verifikasi
+- `python3 .opencode/tools/governance/rules-index.py` → **LOLOS**, exit 0; 11 PASS (index 50 rule/10 tema; coverage mapped=52 unique=52 dup=[]; range R1..R52 tanpa celah; size 11.463 ≤ 20.480; themes 10 ≤ 10; rule_lines tidak ada >4; archive 52 rule/52.698 B; live_paths tidak ada rusak; no_stale_refs tidak ada `pm/` basi; citations_resolve 52 sitatan terselesaikan semua).
+- `python3 .opencode/tools/governance/rules-index.py --json` → valid (keys: rules/themes/totals/checks/report_format_debt).
+- `python3 -m py_compile .opencode/tools/governance/rules-index.py` → OK; `__pycache__` dihapus lagi (B5).
+- `python3 -m json.tool opencode.json` → valid; `instructions` terbaca.
+- `git diff --cached --check` bersih di tiap commit; tidak ada berkas `src/**`/`tests/**` yang berubah; `.env` tetap tak ter-track.
+- Sisa utang TERBUKT (bukan gagal, dicatat): 14 berkas laporan tidak sesuai pola `[yyyymmdd]/[jenis]/[hhmm]_*.md` (K10); Graphify belum terpasang → C4 berkondisi; `documents/pm/**` belum dipindah (langkah ⑥).
+
+### Catatan
+Bukti "kode lama masih aktif" tidak berlaku: tidak ada proses produk yang disentuh. Perubahan config agen baru terasa setelah **user restart opencode** (aturan: config dimuat sekali saat start).
+
+## 2026-09-10 — langkah ⑥+⑧: pindah berkas `documents/pm/**` + normalisasi folder laporan — DONE
+
+### Pindah (semua `git mv`, isi tidak diubah)
+- `documents/pm/cli-tools-install-backlog.md` → `documents/plan/cli-tools-install-backlog.md`
+- `documents/pm/wiki-plan.md` → `documents/plan/wiki-plan.md` · `documents/pm/wiki-backlog.md` → `documents/plan/wiki-backlog.md`
+- `documents/pm/cli-tools-compatibility.md` → `documents/config/cli-tools-compatibility.md`
+- 4 handover root `documents/pm/handover-*.md` → `documents/pm/handovers/` (jadi 9 berkas satu folder)
+- `documents/pm/status.md` 202.175 B → 11.018 B aktif; entri lama 191.477 B → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md`
+- `documents/pm/memory-bank.md` 51.882 B → 21.896 B aktif; Progress lama 25.740 B → `archive/memory-bank-progress-lama.md`; heading `## Decisions (arsip lama)` 4.660 B → `archive/memory-bank-decisions-lama.md` ( heading dobel 3x jadi 1 aktif + 1 penunjuk)
+- Rujukan hidup ikut dibetulkan: `business-analyst.md:11`, `documents/plan/wiki-plan.md:4,100`, `documents/plan/wiki-backlog.md:4`, `memory-bank.md:423-424`, `state.md:8,15`. Histori (`CODE_CHANGES.md:139`, entri `status.md` lama) sengaja TIDAK ditulis ulang.
+
+### Normalisasi laporan (⑧)
+- `.opencode/reports/2026-09-03/{build,plan,qa,revise-docs,setup}/` → `.opencode/reports/20260903/…` (11 berkas `git mv`)
+- `20260903/docs/revise_native_run.md` → `0627_revise_native_run.md` (waktu dari add-commit `92106bb` 06:27; isi dokumen tulis 07:00 — selisih dicatat)
+- root `.opencode/reports/qa_anthropic_inbound_verification.md` → `20260909/qa/0718_qa_anthropic_inbound_verification.md` (waktu add-commit `41d24f8`; dokumen tidak memuat jam)
+- Duplikat identik dihapus: `2026-09-03/qa/2026-09-03_b4_3_qa.md` == `qa/1350_b4_3_qa.md` (diff byte-identik; satu tetap tinggal)
+- `task-report.md` diperbaiki: klausul "folder lama dibekukan" → "folder dinormalisasi `git mv`, asal jam tercatat"
+
+### Verifikasi
+- Total byte terpelihara: status 202.175 → 11.018 + 191.477 = 202.495 (+320 B header arsip). memory-bank 51.882 → 21.896 + 25.740 + 4.660 = 52.296 (+414 B header arsip).
+- `git ls-files .opencode/reports` = 28 berkas; `git status` = 13 R + 1 D, nol isi berubah.
+- `grep` sitatan path laporan lama di berkas ter-track = 0 (tidak ada rujukan putus).
+- Gate: `python3 .opencode/tools/governance/rules-index.py` → LOLOS; utang format laporan **0** (sebelumnya 14).
+- `documents/pm/` akhir: 8 entri (`OPERATING_RULES.md`, `state.md`, `status.md`, `memory-bank.md`, `bugs.md`, `handovers/`, `wiki-drafts/`, `archive/`) — `wiki-drafts/` TIDAK disentuh (R44 ayat 8 staging wajib).
+
+## 2026-09-10 — langkah (e): coba pasang Graphify di Termux → DIBLOKIR environment — BLOCKED (bukan DONE)
+
+### Yang dipasang (semua DI LUAR repo — nol berkas proyek berubah)
+- `pkg install -y python-numpy tree-sitter` → `numpy 2.4.4` OK, CLI `tree-sitter 0.26.13` OK.
+  (dpkg tetap error di paket tak terkait `hope2333-mirrorlist` = read-only /etc/apt, sudah tercatat di memory-bank.)
+- venv terisolasi `~/tmp/graphify-venv` (`--system-site-packages` biar numpy kepakai) →
+  `pip install tree-sitter>=0.23,<0.26 networkx rapidfuzz` → ketiganya import OK.
+- `pip install --no-deps graphifyy` → **0.9.57** terpasang; entry `graphify` + `graphify-mcp` ADA;
+  `graphify --help` → exit 0 (perintah: install/uninstall/path/explain/update/cluster-only/watch/clone/merge-*).
+
+### Uji nyata (bukti, bukan asumsi)
+- Fixture `~/tmp/grf-test/mod.py` (1 file .py) → `graphify update` exit 0 TAPI:
+  `warning: 1 .py file(s) contributed nothing to the graph because a dependency is missing:
+  tree_sitter_python not installed. (#1745)` → hasil **0 nodes / 0 edges / 0 communities**.
+- Sebab: binding Python grammar gagal dimuat di Android/Termux:
+  `ImportError: dlopen failed: cannot locate symbol
+   "tree_sitter_python_external_scanner_create" ... _binding.abi3.so`
+- Sudah dicoba: `tree-sitter-python` versi apa adanya (0.25.0) dan dipin `<0.26` (force-reinstall) → SAMA.
+  Tersedia di Termux hanya grammar level-C (`tree-sitter-python`, `-javascript`, dst.) bukan binding Python-nya.
+- Konsekuensi: untuk repo ini (Python 334 file + JS frontend) Graphify menghasilkan graf KOSONG → tidak bisa
+  jadi kanal pencarian kode di HP ini sekarang.
+
+### Versi terverifikasi identitas tool (2 sumber, sesuai F3)
+- PyPI `graphifyy` 0.9.57, `requires_python >=3.10` (BUKAN 3.12 kaku seperti tertulis di graphify.net).
+- GitHub `Graphify-Labs/graphify` → API: **Apache-2.0**, default branch `v8`; situs claiming **MIT** dan
+  "3.7k+ stars". Dua angka di situs TIDAK cocok dengan API (API: Apache-2.0). Kalau nanti dipakai,
+  cek ulang lisensinya sebelum masuk daftar pihak ketiga (`THIRD_PARTY_NOTICES.md`).
+
+### Keputusan
+- `OPERATING_RULES.md` C4 tetap **berkondisi** ("kanal graf hanya wajib bila terpasang"). Tidak menulis
+  rule yang belum benar. R28 lama tetap arsip/mati.
+- venv percobaan DIHAPUS (B5): `rm -rf ~/tmp/graphify-venv ~/tmp/grf-test`.
+- Jalan yang tersisa (butuh keputusan user): (i) generate `graph.json` di mesin Linux/x86 lalu query
+  lokal di HP (`graphify path/explain --graph <file>` jalan tanpa LLM/tanpa grammar),
+  (ii) tetap tanpa graf (C4 berkondisi), (iii) coba build binding grammar lebih dalam (tidak dijamin).

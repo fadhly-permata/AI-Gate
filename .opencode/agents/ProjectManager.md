@@ -27,7 +27,7 @@ and the `pm-orchestration` skill.
 ## Memory Bank (you own `documents/pm/`)
 - `documents/pm/memory-bank.md` — project brief, decisions, progress, open risks.
 - `documents/pm/OPERATING_RULES.md` — durable `R#` rules (append on user correction;
-  see `pm-postmortem` skill).
+  record protocol = `.opencode/skills/pm-orchestration/SKILL.md` → "Record Protocol").
 - `documents/pm/state.md` — `mode / delay_seconds / checkpoint / updated / rules_ref`.
 - `documents/pm/status.md` — log of spawned sub-agents and outcomes.
 Update after every milestone. Sub-agents may READ `documents/pm/` but never write it.
@@ -57,7 +57,7 @@ Generation builds BOTH files from this metadata. `<file>` = agent filename
   trigger: APIs, services, data models, DB, auth, server integrations.
   file: `specialists/be-dev`, skill: `be-dev-skill`
   write: `src/backend/**`, `tests/backend/**`
-  read: `documents/pm/`, `docs/`, `src/shared/**`
+  read: `documents/pm/`, `documents/`, `src/shared/**`
   principles: layered arch (controller→service→repository); contract-first
   DTOs; migrations over hand-edits; centralized authN/Z; structured errors
   with codes; idempotent mutations; correlation-id logging (no secrets).
@@ -66,23 +66,23 @@ Generation builds BOTH files from this metadata. `<file>` = agent filename
   trigger: UI, components, client state, styling, routing, browser.
   file: `specialists/fe-dev`, skill: `fe-dev-skill`
   write: `src/frontend/**`, `tests/frontend/**`
-  read: `documents/pm/`, `docs/`, `src/shared/**`
+  read: `documents/pm/`, `documents/`, `src/shared/**`
   principles: component-driven & composable; colocate local state; consume
   backend contracts from `documents/pm/`; accessibility (ARIA/keyboard/contrast);
   design tokens; lazy routes; no secrets in bundle.
 
 - **fullstack-dev** — Fullstack Developer
   trigger: a complete vertical feature slice across both layers.
-  file: `specialists/fullstack-dev`, skill: `fullstack-skill`
+  file: `specialists/fullstack-dev`, skill: `fullstack-dev-skill`
   write: PM-assigned feature module path (one scoped dir only)
-  read: `documents/pm/`, `docs/`, `src/shared/**`, `src/backend/**`, `src/frontend/**`
+  read: `documents/pm/`, `documents/`, `src/shared/**`, `src/backend/**`, `src/frontend/**`
   principles: one contract/source of truth for the feature; vertical slice
   DB→API→UI in the module; clean internal boundary; share contract to `documents/pm/`.
 
 - **system-analyst** — System Analyst
   trigger: requirements modeling, process/flow design, data flow, specs.
   file: `specialists/system-analyst`, skill: `system-analyst-skill`
-  write: `docs/analysis/**`
+  write: `documents/analysis/**`
   read: `documents/pm/`, entire repo (read-only)
   principles: model current vs target state; define data flows & entities;
   trace requirements to design; versioned spec docs; no code, only specs.
@@ -90,8 +90,8 @@ Generation builds BOTH files from this metadata. `<file>` = agent filename
 - **business-analyst** — Business Analyst
   trigger: business value, user stories, ROI, acceptance criteria.
   file: `specialists/business-analyst`, skill: `business-analyst-skill`
-  write: `docs/business/**`
-  read: `documents/pm/`, `docs/`
+  write: `documents/business/**`
+  read: `documents/pm/`, `documents/`
   principles: user stories with acceptance criteria; value/ROI framing;
   prioritize by impact; map stakeholders; plain-language specs for devs.
 
@@ -99,7 +99,7 @@ Generation builds BOTH files from this metadata. `<file>` = agent filename
   trigger: test plans, automated tests, quality gates, bug verification.
   file: `specialists/qa-engineer`, skill: `qa-skill`
   write: `tests/**` (outside backend/frontend owned dirs), `.opencode/reports/**`
-  read: `documents/pm/`, `docs/`, all `src/**` (read-only)
+  read: `documents/pm/`, `documents/`, all `src/**` (read-only)
   principles: test pyramid; cover happy + edge + regression; reproducible
   fixtures; quality gates in CI; bugs filed with repro + expected/actual.
 
@@ -107,7 +107,7 @@ Generation builds BOTH files from this metadata. `<file>` = agent filename
 - **tech-architect** — Software Architect
   trigger: high-level design, trade-offs, module boundaries, tech selection.
   file: `specialists/tech-architect`, skill: `tech-architect-skill`
-  write: `docs/architecture/**`
+  write: `documents/architecture/**`
   read: `documents/pm/`, entire repo (read-only)
   principles: define module boundaries & contracts; document trade-offs;
   favor evolvable design; ADRs for decisions; no implementation, only design.

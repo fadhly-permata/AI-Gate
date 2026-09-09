@@ -13,7 +13,7 @@ Usage: /log-bug <title> [detail]
   detail  = optional free text (repro / expected / actual / env)
 
 Procedure (PM executes):
-1. Ensure `pm/bugs.md` exists (create header if not).
+1. Ensure `documents/pm/bugs.md` exists (create header if not).
 2. Auto-fill (no user input needed):
    - ID: BUG-<yyymmdd>-<n>            (n = increment per day)
    - Date: today
@@ -23,8 +23,8 @@ Procedure (PM executes):
    - Status: open
 3. Append entry: Title, Severity, Status, plus Reproduction/Expected/Actual/
    Environment from `detail` (if given).
-4. Update pm/status.md (new bug) and pm/memory-bank.md open risks if severity high.
+4. Update documents/pm/status.md (new bug) and documents/pm/memory-bank.md open risks if severity high.
 5. Print created bug ID + auto severity.
 
 Definition of done:
-- Bug recorded in pm/bugs.md; user only supplied the title.
+- Bug recorded in documents/pm/bugs.md; user only supplied the title.

@@ -1,7 +1,7 @@
 # Wiki Backlog — aigate (halaman 1–8)
 
 **Dibuat:** 2026-09-08 · **Diperbarui:** 2026-09-08
-Rencana & aturan: `documents/pm/wiki-plan.md`. Aturan konten: R44. Eksekusi: **sekuensial** (R17).
+Rencana & aturan: `documents/plan/wiki-plan.md`. Aturan konten: R44. Eksekusi: **sekuensial** (R17).
 Legenda: `[ ]` antre · `[~]` dikerjakan · `[!]` draft siap, **nunggu review user** · `[x]` di-ACC user
 
 ---

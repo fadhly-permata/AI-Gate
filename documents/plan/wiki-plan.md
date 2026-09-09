@@ -1,7 +1,7 @@
 # Wiki Plan — aigate (halaman 1–8)
 
 **Dibuat:** 2026-09-08 · **Diperbarui:** 2026-09-08 · **Branch kerja:** `docs/wiki`
-**Backlog task:** `documents/pm/wiki-backlog.md` · **Aturan konten:** `OPERATING_RULES.md` R44
+**Backlog task:** `documents/plan/wiki-backlog.md` · **Aturan konten:** `OPERATING_RULES.md` R44
 
 ---
 
@@ -97,4 +97,4 @@ ada → (c) klaim tak terbukti ditandai `TODO-VERIFY: <cara cek>`, DILARANG neba
 → review → `5 CLI Tools` → review → `6 API` → review → `7 Terminal` → review → `8 Providers & Combos`
 → review → **baru** pikirkan publish + terjemahan.
 
-Progress live ada di `documents/pm/wiki-backlog.md`. Kalau sesi putus, baca file itu + `state.md`.
+Progress live ada di `documents/plan/wiki-backlog.md`. Kalau sesi putus, baca file itu + `state.md`.
