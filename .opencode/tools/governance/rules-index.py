@@ -131,7 +131,21 @@ def main():
     gate("live_paths", not broken, "path rusak: %s" % (broken or "tidak ada"))
     gate("no_stale_refs", not stale, "rujukan pm/ basi: %s" % (stale or "tidak ada"))
 
-    # 7 utang format laporan (dibuat di luar rule) -> peringatan, bukan kegagalan
+    # 8 sitatan R# di berkas hidup harus terselesaikan (exist di arsip v1 ATAU dipetakan rule aktif)
+    cited, unresolved = set(), []
+    live = [rp, Path("AGENTS.md")] + sorted(Path(".opencode/rules").glob("*.md")) \
+        + sorted(Path(".opencode/commands").glob("*.md")) + sorted(Path(".opencode/skills").rglob("*.md")) \
+        + sorted(Path(".opencode/agents").rglob("*.md"))
+    for f in live:
+        if not f.is_file():
+            continue
+        for tok in re.findall(r"(?<![\w-])R(\d{1,3})\b", f.read_text()):
+            cited.add("R" + tok)
+    unresolved = sorted(c for c in cited if c not in olds and c not in active_ids)
+    gate("citations_resolve", not unresolved,
+         "%d sitatan R# ; tak terselesaikan: %s" % (len(cited), unresolved or "tidak ada"))
+
+    # 9 utang format laporan (dibuat di luar rule) -> peringatan, bukan kegagalan
     debt = []
     for f in Path(".opencode/reports").rglob("*.md"):
         s = str(f).replace("\\", "/")

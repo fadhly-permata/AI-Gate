@@ -5,6 +5,7 @@ Dihasilkan 2026-09-10 dari 52 rule v1. Teks v1 utuh: `documents/pm/archive/OPERA
 Teks v1 (R1–R52, 52.698 byte) diarsipkan utuh: `documents/pm/archive/OPERATING_RULES-v1-52rules.md`.
 Rule kanonik agen ada di `.opencode/rules/*.md` — tidak diulang di sini (DRY).
 Tambah rule baru = 1 baris perintah + 1 baris alasan; pelajaran panjang masuk arsip.
+Sitatan `[R#]` = ID lama: teks lengkapnya di arsip v1; peta lama->baru di `documents/analysis/2026-09-10-rules-consolidation.md` §1.
 
 ## A — Routing, delegasi, siklus agen
 A1 Semua input user masuk PM dulu; main thread dilarang sentuh `src/**`|`tests/**`|`documents/**`. Alasan: eksekusi tanpa rute = tanpa boundary/receipt. [R29] → `AGENTS.md:3-18`, `.opencode/rules/request-routing.md`.
