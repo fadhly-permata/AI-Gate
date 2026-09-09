@@ -171,3 +171,67 @@ Sumber: `documents/pm/memory-bank.md` seksi `## Progress`. Yang aktif = entri te
 - 2026-09-09: **cli-tools C4 oterm = done (OpenAI-compatible, verified)** — `scripts/cli-tools/oterm.sh` di-commit (`aea87c3`). Bukti `cli_presets.py:103` (`pip install oterm`) + `cli_presets.py:222` (`oterm` = `LAUNCH_VERIFIED`) + `cli_tools_router.py:891-917` (`_oterm_builder`: tulis `.oterm-aigate/config.json` blok `openaiCompatible.aigate` {base_url=gateway, api_key="${OPENAI_API_KEY}"}, set `OTERM_DATA_DIR=.oterm-aigate` + env `OPENAI_API_BASE`/`OPENAI_API_KEY` ke `/v1/chat/completions`). PyPI `oterm` 0.24.0 butuh Python >=3.10. Catatan Termux (known-broken, bukan blocker): `pip install oterm` di aarch64/Py3.14 diprediksi gagal build `jiter` (no Android wheel) → script handle hint + `exit 1`. `bash -n` clean; mode exec. Progres keseluruhan cli-tools **22/24**. Lanjut C5 gptme, C6 aichat.
 - 2026-09-09: **cli-tools C5 gptme = done (OpenAI-compatible, verified)** — `scripts/cli-tools/gptme.sh` di-commit (`16d36f9`). Bukti `cli_presets.py:104` (`pip install gptme`) + `cli_presets.py:223` (`gptme` = `LAUNCH_VERIFIED`) + `cli_tools_router.py:595-612` (`_gptme_builder`: env `OPENAI_BASE_URL` = gateway base [gptme baca `OPENAI_BASE_URL` BUKAN `OPENAI_API_BASE`] + `OPENAI_API_KEY` + flag `-m local/<model>` ke `/v1/chat/completions`). PyPI `gptme` 0.33.0 butuh Python `>=3.10,<3.15`. Catatan Termux (known-broken, bukan blocker): `pip install gptme` di aarch64/Py3.14 diprediksi gagal build `jiter` (no Android wheel) → script handle hint + `exit 1`. `bash -n` clean; mode exec. Progres keseluruhan cli-tools **23/24**. Sisa: C6 aichat.
 - 2026-09-09: **cli-tools C6 aichat = done (OpenAI-compatible, verified)** — `scripts/cli-tools/aichat.sh` di-commit (`1c4e592`). Bukti `cli_presets.py:105` (`cargo install aichat`) + `cli_presets.py:226` (`aichat` = `LAUNCH_VERIFIED`) + `cli_presets.py:242` (`TERMUX_INSTALL["aichat"]="pkg install aichat"`, "verified 0.30.0 runs" di Termux) + `cli_tools_router.py:469-511` (`_aichat_builder`: generate `aichat-aigate.yaml` client `aigate` openai-compatible {api_base=gateway, api_key}, set env `AICHAT_CONFIG_FILE`, model `aigate:<raw>` ke `/v1/chat/completions`). crates.io `aichat` 0.30.0 (Rust). Catatan Termux (terbukti WORKING, bukan blocker): `pkg install aichat` di Termux terbukti jalan (usable di Termux). `bash -n` clean; mode exec. **Progres keseluruhan cli-tools 24/24 (ALL DONE — A1–A12, B1–B6, C1–C6 SELESAI).**
+
+### Selisih hasil merge `origin/main` (2026-09-10) — entri versi main yang tidak ada di berkas aktif
+Dua entri pertama = redaksi lain dari peristiwa yang sama (sudah ada di berkas aktif/arsip); dua terakhir
+sudah digantikan (path `documents/pm/wiki-*` -> `documents/plan/wiki-*`). Disimpan biar riwayat kata-katanya utuh.
+
+- 2026-09-09: **Harness tes FE dibenerin — 22 fail `localStorage` (mask Node≥22.4) — SELESAI (fe-dev, DI-COMMIT `95d46e4`, PR #15 open).** Isu #3 sesi bottom-nav. Akar (dikoreksi fe-dev; hipotesis awal PM `jsdom.url` GUGUR — vitest udah default url localhost:3000): **Node v26 punya global `localStorage`/`sessionStorage` webstorage sendiri** (getter `undefined` tanpa `--localstorage-file`); vitest 2.1.9 gak nyalin storage jsdom ke global krn namanya udah ada + gak masuk KEYS allow-list → tes lihat stub Node; `sessionStorage` Node jalan jadi cuma 22 (localStorage) kena. Fix (harness doang `src/frontend/**`): setupFile baru `tests/helpers/jsdom-storage.js` (re-point globalThis → storage window jsdom, guarded/configurable) + prepend di `vitest.config.js`. 0 tes dihapus/dilemahkan, 0 kode produksi, package.json tetap, isolate:false+maxForks:2 utuh. **GATE PM: `vitest run` 523 pass / 0 fail** (dulu 22 fail). PR #15 `fix/fe-test-env -> main` (base main pasca-merge #14). CAVEAT: bergantung `globalThis.jsdom` (dijaga) → re-run gate tiap Node/vitest/isolate berubah. Detail: CODE_CHANGES.md 2026-09-09 + `documents/pm/handovers/handover-20260909-fe-test-env.md`.
+- 2026-09-09: **Bottom-nav ponsel dirapikan (hamburger-ilang + scroll + mirror 9 view + Repo + separator grup) — SELESAI (fe-dev, 3 iterasi; DI-COMMIT 6fb210b + docs 26b087d, pushed, PR #14 MERGED (a1777f1).** User lapor beruntun: (1) hamburger hide/show nge-bug di potret → ilangin; (2) menu bawah gak bisa diakses banyak → "masih gak bisa digeser / ada item di-hidden?"; (3) "tambahin link Repo + separator tiap grup". Temuan kunci: `.bottom-nav` dulu cuma 7 dari 9 view menu samping (usage+analytics gak pernah ke-render), BUKAN masalah scroll doang. Fix final (`src/frontend/**`): `#sidebarToggle{display:none}` dua shell phone; `.bottom-nav` `overflow-x:auto`+`justify-content:flex-start`+momentum; `.bn-item` `min-width:60px`; bottom-nav sekarang 9 app-view (urut spt sidebar) + 1 link Repo (no data-view → link eksternal asli) = 10 item + 4 `<span class="bn-sep">` di batas grup (Gateway|Operasi|Wawasan|Sistem|Repo); rule `.bn-sep` token `--panel-border`; cache-buster `styles.css?v=20260914`. Tablet/desktop gak kena (bottom-nav `display:none` di >600px; hamburger utuh). app.js/i18n.js GAK diubah (wiring generik + key udah ada). Verifikasi PM: `views.test.js` **25 pass** (paritas 9-view + repo-hadir + sep=4 + scroll=10 + hamburger-hidden), `git diff --check` bersih. ⚠️ **Scroll browser-asli UNVERIFIED** (no browser; jsdom gak ngukur layout) → user WAJIB tes manual di HP (R20). **TASK SUSULAN (terbuka):** suite FE penuh merah 22 fail `localStorage`/`sessionStorage` (logwindow+terminal_discard) = PRE-EXISTING/LINGKUNGAN (dibuktikan via git stash; npm ci vitest2.1.9+jsdom25.0.1), BUKAN efek perubahan → perlu qa/fe-dev benerin env tes. Detail per-file: `documents/dev/CODE_CHANGES.md` 2026-09-09 (+lanjutan).
+- 2026-09-08: Materi publik TIDAK boleh menulis "this repo"/"repo ini" untuk menunjuk diri sendiri —
+  teks ikut ter-fork jadi ambigu. Klaim identitas resmi wajib pakai URL absolut
+  `https://github.com/fadhly-permata/AI-Gate`. Diumumkan sebagai aturan **R45** setelah user menegur
+  kalimat README. Link UI ke repo sudah absolut (sidebar) → fork tetap menunjuk asal.
+- 2026-09-06: Semua laporan wajib berada di `.opencode/reports/**`; root-level `reports/**` dihapus dan scope QA/agent diperbaiki sesuai R23.
+- 2026-09-03: Terminal UX — swipe diubah jadi scroll (bukan navigasi TUI) karena
+  TUI sering salah tangani swipe. Scroll velocity-based + damping agar natural.
+  KOREKSI 2026-09-05: keputusan lama bikin swipe MATI di TUI (alt-buffer tidak
+  punya scrollback, `term.scrollLines()` no-op di sana) dan terasa tidak natural
+  di shell (arah dibalik + lompat per velocity). Sekarang swipe = event `wheel`
+  sintetis ke elemen xterm -> xterm yang mapping: buffer normal scroll 1:1,
+  alt-buffer kirim cursor key / mouse-wheel report ke aplikasi. Momentum rAF +
+  friction. Tombol TUI jadi passthrough eksplisit (gesture mentah ke app).
+  Doc diselaraskan: PRD §2.5.1, FSD §2.5.1, ux/TERMINAL_UX §2.
+- 2026-09-03: CLI tool presets dikelompokkan; prioritas agentic CLI (claude, opencode, codex, gemini, antigravity, phi, aider, goose, amp, qwen, cline,
+  kilo, dst). Dapat diperluas via YAML/JSON.
+  KOREKSI 2026-09-05: (1) semua install pakai `pip install <nama>` padahal nama
+  PyPI-nya milik proyek lain (codex=web server komik, gemini=framework DB
+  genetika, claude-code=stub reserved, aichat=proyek lain) -> install string
+  sekarang diverifikasi ke registry npm/PyPI (npm untuk CLI Node). (2) guard
+  seed "skip kalau tabel sudah berisi" bikin semua fix preset jadi dead code ->
+  jadi UPSERT idempoten (kolom preset disegarkan, `enabled` + baris user utuh).
+  (3) flag tebakan (`claude openai-compatible`) dihapus: bentuk launch milik
+  builder. (4) registry `LAUNCH_SUPPORT` (verified/pending/unsupported + reason
+  code) = sumber kebenaran di kode, bukan kolom DB; UI mencoret nama yang belum
+  verified, `resolve` menolak 409. Builder per-tool: satu per satu, 1 commit/tool.
+- 2026-09-03 (TSD ADRs): GUI = web UI lokal (FastAPI static + xterm.js);
+  PTY = ptyprocess/pywinpty + xterm.js via WebSocket; swipe exception =
+  SwipeException registry + per-tab tui_mode.
+  - ADR-007 (secrets): RESOLVED — app lokal, simpan di file biasa TANPA enkripsi,
+    UI tidak perlu redaksi/masking. (putus 2026-09-03)
+  - ADR-008 (proxy binding): RESOLVED — binding di level Endpoint; Endpoint
+    menunjuk ke Combo (Endpoint -> Combo). (putus 2026-09-03)
+- 2026-09-06: Semua input user diroute ke `@ProjectManager` sebagai entrypoint
+  tunggal melalui `.opencode/rules/request-routing.md`; instruksi priority lebih
+  tinggi tetap berlaku.
+- 2026-09-06: Durable request-routing rule selesai dibuat. (Di `main` dinomori
+  **R23**; di branch `refactor/ui` konsep yang sama = **R29** — lihat
+  `documents/pm/OPERATING_RULES.md`. Saat merge #4, duplikat R23-routing `main`
+  tidak dimasukkan karena sudah tercakup R29.)
+### Keputusan lisensi (2026-09-08) — user: "kita pake mit aja dulu"
+- Lisensi proyek: **MIT**, `Copyright (c) 2026 Fadhly Permata`, file `LICENSE` di branch `chore/mit-license`.
+  Badan teks diverifikasi identik byte dengan teks resmi SPDX (bukan ditulis dari ingatan).
+- Dikatakan eksplisit oleh user: **SEMENTARA**. Pemicu review lagi: sebelum rilis publik pertama /
+  sebelum kontribusi luar masuk / kalau ada yang ngomersialkan klon. Salinan MIT yang sudah tersebar
+  tidak bisa ditarik balik; naik ke copyleft nanti hanya melindungi versi ke depan.
+- Efek: larangan kata "free / open source" di materi publik DICABUT.
+- 2026-09-08: user memilih urutan **B** (lisensi naik SETELAH PR #10). PR #10 ternyata sudah merged
+  (8b72f84, 7 varian README ikut masuk main) → lisensi naik sebagai **PR #11** (clean, 9 commit).
+  Catatan: klaim "open source" TIDAK pernah tayang di main tanpa LICENSE, jadi gak ada publikasi
+  yang menyesatkan selama proses ini. Alasan "repo ini satu-satunya
+  sumber resmi" ikut ditulis, karena MIT tidak mewajibkan apa pun ke peng-copy.
+- Ketaatan pihak ketiga: notis MIT xterm.js (di-vendor) disimpan di `THIRD_PARTY_NOTICES.md`; versi
+  xterm TIDAK tercatat di repo → masih utang (WL.4). Font Awesome cuma lewat CDN (tidak didistribusikan),
+  tapi memuat CDN = icons mati tanpa internet + request keluar → bertentangan dengan klaim privasi (WL.5).
+- Rencana + batas konten + pertanyaan terbuka → `documents/pm/wiki-plan.md`
+- Task list hidup (W0.x / W1.1–W1.8 / W2.x) → `documents/pm/wiki-backlog.md`

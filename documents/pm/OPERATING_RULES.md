@@ -1,8 +1,6 @@
 # PM Operating Rules v2 (konsolidasi 10 tema)
-Dihasilkan 2026-09-10 dari 52 rule v1. Teks v1 utuh: `documents/pm/archive/OPERATING_RULES-v1-52rules.md`
-(52.698 byte). Desain + peta lama->baru + tabel konflik: `documents/analysis/2026-09-10-rules-consolidation.md`.
-# PM Operating Rules v2 (konsolidasi 10 tema)
-Teks v1 (R1–R52, 52.698 byte) diarsipkan utuh: `documents/pm/archive/OPERATING_RULES-v1-52rules.md`.
+Dihasilkan 2026-09-10 dari 52 rule v1 (52.698 byte) — teks lama utuh: `documents/pm/archive/OPERATING_RULES-v1-52rules.md`.
+Desain + peta lama->baru + tabel konflik: `documents/analysis/2026-09-10-rules-consolidation.md`.
 Rule kanonik agen ada di `.opencode/rules/*.md` — tidak diulang di sini (DRY).
 Tambah rule baru = 1 baris perintah + 1 baris alasan; pelajaran panjang masuk arsip.
 Sitatan `[R#]` = ID lama: teks lengkapnya di arsip v1; peta lama->baru di `documents/analysis/2026-09-10-rules-consolidation.md` §1.

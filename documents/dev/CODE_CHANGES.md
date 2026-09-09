@@ -1,6 +1,30 @@
 # Code Changes Register (code ↔ docs alignment)
 
-## 2026-09-09 (lanjutan) — Bottom-nav ponsel: mirror 9 view + link Repo + separator grup — DONE (DI-COMMIT 6fb210b+26b087d, pushed, PR #14 open)
+## 2026-09-09 — Harness tes FE: `localStorage` ke-mask global Node (PR #15, branch fix/fe-test-env) — DONE (DI-COMMIT 95d46e4, PR #15 open)
+
+**Asal:** isu tertunda (#3) dari sesi bottom-nav ponsel — suite FE penuh merah **22 fail**
+`window.localStorage`/`sessionStorage` undefined (`logwindow.test.js` 21 + `terminal_discard.test.js` 1),
+repro walau satu file dijalankan sendirian.
+**Akar (fe-dev, dibuktikan empiris):** **Node v26.4.0** (≥22.4) nyediain global webstorage
+`globalThis.localStorage`/`sessionStorage` sendiri; getter-nya `undefined` tanpa `--localstorage-file`.
+Vitest 2.1.9 nyalin properti storage jsdom ke global CUMA kalau namanya belum ada / masuk KEYS allow-list —
+`localStorage` gak masuk → tes lihat stub Node. `sessionStorage` Node kebetulan jalan → pas 22 (pemakai
+localStorage) yang kena. (BUKAN `npm ci`; hipotesis PM `environmentOptions.jsdom.url` = no-op — vitest udah
+default url `http://localhost:3000`.)
+
+### Perubahan (murni harness `src/frontend/**`; 0 tes dihapus/dilemahkan; 0 kode produksi; `package.json` tetap)
+- `src/frontend/tests/helpers/jsdom-storage.js` (BARU, setupFile PERTAMA): re-point `globalThis.localStorage`/
+  `sessionStorage` ke storage milik window jsdom (getter delegasi; `configurable:true` biar swap sessionStorage
+  terminal_discard tetap jalan; no-op kalau `globalThis.jsdom` absen → gagal nyaring, bukan diem).
+- `src/frontend/vitest.config.js`: `setupFiles` di-depan-in `./tests/helpers/jsdom-storage.js` (+ komentar).
+  `isolate:false` + `maxForks:2` UTUH. Menghilangkan dependensi urutan file `isolate:false` (`settings.test.js`
+  tadinya ikut gagal saat jalan sendiri, ke-mask stub tetangga).
+
+### Verifikasi (PM jalanin ulang, R35)
+- `node node_modules/.bin/vitest run` → **23 file / 523 tes PASS, 0 fail** (11.32s). Sebelum: 22 fail.
+- CAVEAT: bergantung exposure semi-dokumentasi `globalThis.jsdom` (dijaga) — re-run gate tiap Node/vitest/isolate berubah.
+
+## 2026-09-09 (lanjutan) — Bottom-nav ponsel: mirror 9 view + link Repo + separator grup — DONE (DI-COMMIT 6fb210b+26b087d, pushed, PR #14 MERGED a1777f1)
 
 **Permintaan user (retest di HP):** (1) "menu bawah masih gak bisa digeser / ada item yang
 di-hidden?" → ternyata `.bottom-nav` cuma punya **7** dari **9** view menu samping; `usage`
@@ -39,7 +63,7 @@ PM verifikasi tiap ronde + jalanin tes.
   `localStorage`/`sessionStorage` (logwindow + terminal_discard) — lingkungan (npm ci vitest 2.1.9 +
   jsdom 25.0.1), BUKAN regresi UI.
 
-## 2026-09-09 — Phone shell: hamburger disembunyikan + bottom-nav scroll horizontal — DONE (DI-COMMIT 6fb210b, pushed, PR #14 open)
+## 2026-09-09 — Phone shell: hamburger disembunyikan + bottom-nav scroll horizontal — DONE (DI-COMMIT 6fb210b, pushed, PR #14 MERGED a1777f1)
 
 **Permintaan user:** di ponsel (mode potret) tombol hamburger hide/show sidemenu nge-bug →
 hilangkan saja; sidemenu yang pindah ke bawah bikin banyak menu gak bisa diakses → buat
