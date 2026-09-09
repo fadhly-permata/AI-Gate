@@ -383,6 +383,24 @@
 
 **Status: DONE — OpenAI-compatible (verified).** oterm di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → oterm forward model apa adanya. Commit `aea87c3`. Progres keseluruhan cli-tools: **22/24**.
 
+## CLI Tools C5: gptme install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/gptme.sh` (C5 gptme).
+
+**Fakta kode (cross-check):**
+- `cli_presets.py:104` = `_pip("gptme")` → `pip install gptme` (install string).
+- `cli_presets.py:223` = `"gptme": LaunchSupport(LAUNCH_VERIFIED, REASON_NONE)` — gptme = verified, OpenAI-compatible.
+- `cli_tools_router.py:595-612` = `_gptme_builder` — wiring env `OPENAI_BASE_URL` (= gateway base; gptme membaca `OPENAI_BASE_URL` BUKAN `OPENAI_API_BASE`) + `OPENAI_API_KEY` ke aigate `/v1/chat/completions` + flag `-m local/<model>`.
+- PyPI `gptme` 0.33.0 butuh Python `>=3.10,<3.15`.
+
+**Script behavior:** install idempoten via `ensure_installed` → `pip install gptme`; launch **OpenAI-compatible** — set env `OPENAI_BASE_URL`+`OPENAI_API_KEY` (dari `load_gateway_config`) + flag `-m local/<AIGATE_MODEL>` ke aigate `/v1/chat/completions`.
+
+**Catatan Termux (known-broken, bukan blocker):** di Termux/aarch64 + Python 3.14, `pip install gptme` diprediksi gagal build `jiter` (tidak ada wheel Android) → script handle hint + `exit 1` (TIDAK memasang, pesan jelas).
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/gptme.sh` → clean; perms `-rwx------` (exec).
+
+**Status: DONE — OpenAI-compatible (verified).** gptme di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → gptme forward model apa adanya. Commit `16d36f9`. Progres keseluruhan cli-tools: **23/24**.
+
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
 bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.
