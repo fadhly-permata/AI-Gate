@@ -120,7 +120,15 @@ wiring ke selected model/combo seperti aigate, cross-platform (Termux/Win/Linux/
 - Verifikasi: `bash -n scripts/cli-tools/phi.sh` → **clean**; mode `-rwx------` (exec);
   eksekusi langsung → `exit 0`, TIDAK memasang apa pun.
 
-Status: A1 claude = done (script). A2 opencode = done (script). A3 gemini = done (script, native Google mode, unsupported by aigate). **A4 codex = done (script, native OpenAI mode, unsupported by aigate — butuh streaming Responses API yang belum ada).** **A5 antigravity = done (script, NO_INSTALL — message + exit 0, no side-effect).** **A6 phi = done (script, NO_INSTALL — message + exit 0, no side-effect).** `_common.sh` = done. Sisa A7..A12, B1..B6, C1..C6 menyusul per tool. (Progress: **6/24**.)
+### `scripts/cli-tools/aider.sh` (BARU, 94 baris)
+- Install + launch script untuk **aider** (A7). Install idempoten via `ensure_installed` → `python3 -m pip install aider-chat` (mirror `pip install aider-chat` per `cli_presets.py:76`).
+- Launch **OpenAI-compatible** — aider bicara Chat Completions ke aigate (`/v1/chat/completions`). Wiring persis mirip `_aider_builder` (`cli_tools_router.py:355-369`): `aider --openai-api-base <base> --openai-api-key <key> [--model openai/<model>]` (aider menempelkan `/chat/completions` ke base URL otomatis).
+- Env injection (setiap tool dapat ini, `cli_tools_router.py:1081-1084`): `OPENAI_API_BASE=<base>` + `OPENAI_API_KEY=<key>`; `AIGATE_MODEL` di-forward sebagai `--model openai/<AIGATE_MODEL>` bila disetel.
+- Fakta kunci (cross-check): aider = `LAUNCH_VERIFIED` di `cli_presets.py:172`; PyPI `aider-chat` 0.86.2 pure-python (`py3-none-any`, lintas-platform), butuh Python 3.10–3.12 (`requires_python` gagal resolve di 3.13+). `_aider_builder` TIDAK emit config file → script juga pakai flags CLI (no `aider.conf.yml`).
+- Reachability probe best-effort ke aigate `/v1/models` (warning bila gateway mati/ga reachable); aider akan gagal connect bila aigate belum nyala.
+- Verifikasi: `bash -n scripts/cli-tools/aider.sh` → **clean**; mode `-rwx------` (exec).
+
+Status: A1 claude = done (script). A2 opencode = done (script). A3 gemini = done (script, native Google mode, unsupported by aigate). **A4 codex = done (script, native OpenAI mode, unsupported by aigate — butuh streaming Responses API yang belum ada).** **A5 antigravity = done (script, NO_INSTALL — message + exit 0, no side-effect).** **A6 phi = done (script, NO_INSTALL — message + exit 0, no side-effect).** **A7 aider = done (script, OpenAI-compatible via aigate `/v1/chat/completions`, verified — `LAUNCH_VERIFIED` at `cli_presets.py:172`).** `_common.sh` = done. Sisa A8..A12, B1..B6, C1..C6 menyusul per tool. (Progress: **7/24**.)
 
 
 ## 2026-09-08 — i18n: satu file per bahasa + 5 bahasa baru (ru, nl, ja, zh, zh-tw) — DONE (`f7beaf9` + `c1477eb`, branch `feat/i18n-locales`)

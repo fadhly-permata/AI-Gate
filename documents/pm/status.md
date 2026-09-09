@@ -85,6 +85,23 @@
 
 **Status: DONE — NO_INSTALL (message + exit 0).** phi TIDAK di-install (sesuai keputusan user untuk tool `NO_INSTALL`); script hanya pesan + keluar 0. Commit `3135e32`.
 
+## CLI Tools A7: aider install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/aider.sh` (A7 aider).
+
+**Bukti kode (cross-check):**
+- `cli_presets.py:76` = `pip install aider-chat` (install string).
+- `cli_presets.py:172` = `"aider": LaunchSupport(LAUNCH_VERIFIED, REASON_NONE)` — aider = verified, OpenAI-compatible.
+- `cli_tools_router.py:355-369` = `_aider_builder` — bentuk launch: `aider --openai-api-base <base> --openai-api-key <key> [--model openai/<model>]`, forward ke aigate `/v1/chat/completions` (aider menempelkan `/chat/completions` ke base URL).
+- `cli_tools_router.py:1081-1084` = env injection `OPENAI_API_BASE` + `OPENAI_API_KEY` yang tiap tool terima.
+- PyPI `aider-chat` 0.86.2 pure-python (`py3-none-any`), `requires_python ">=3.10,<3.13"` (gagal resolve di Python 3.13+). Termux caveat: kalau `python3` = 3.13+, `pip install` gagal → butuh venv/pyenv 3.10–3.12.
+
+**Script behavior:** install idempoten via `ensure_installed` → `python3 -m pip install aider-chat`; launch wiring persis mirip `_aider_builder` (flags CLI, TIDAK generate config file); `AIGATE_MODEL` di-forward sebagai `--model openai/<AIGATE_MODEL>`; reachability probe best-effort ke aigate `/v1/models` (warning bila gateway mati).
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/aider.sh` → clean; perms `-rwx------` (exec). `git status` hanya berisi `aider.sh` + dokumen PM (working tree bersih selain itu).
+
+**Status: DONE — OpenAI-compatible (verified).** aider di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → aider forward model apa adanya. Commit `5a960e7`.
+
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
 bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.
