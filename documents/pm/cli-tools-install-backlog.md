@@ -36,7 +36,7 @@ Kolom `Launch` = status di `LAUNCH_SUPPORT` (konteks, bukan bagian script).
 | A3 | gemini | gemini | `npm i -g @google/gemini-cli` | nodejs (npm) | unsupported (gemini_only) | done |
 | A4 | codex | codex | `pkg install codex` (override) / `npm i -g @openai/codex` | nodejs (npm) atau pkg | unsupported (responses_only) | done |
 | A5 | antigravity | antigravity | `NO_INSTALL` (no-op) | — | unsupported (not_a_cli) | done |
-| A6 | phi | phi | `NO_INSTALL` (no-op) | — | unsupported (install_unverified) | todo |
+| A6 | phi | phi | `NO_INSTALL` (no-op) | — | unsupported (install_unverified) | done |
 | A7 | aider | aider | `pip install aider-chat` | python (pip) | verified | todo |
 | A8 | goose | goose | `NO_INSTALL` (no-op) | — | unsupported (no_binary) | todo |
 | A9 | amp | amp | `NO_INSTALL` (no-op) | — | unsupported (no_binary) | todo |
@@ -47,6 +47,7 @@ Kolom `Launch` = status di `LAUNCH_SUPPORT` (konteks, bukan bagian script).
 > **A3 gemini = done (2026-09-09):** install idempoten `npm i -g @google/gemini-cli` (alt `brew install gemini-cli`). Launch **native Google mode** — TIDAK di-wire aigate: `cli_presets.py:175` mark gemini `LAUNCH_UNSUPPORTED`/`REASON_GEMINI_ONLY` (aigate hanya serve OpenAI `/v1/chat/completions` + Anthropic `/v1/messages`, no Google generateContent inbound). Script sadar ini → tidak set `ANTHROPIC_BASE_URL`/`OPENAI_API_BASE` palsu (gemini CLI mengabaikannya → no-op).
 > **A4 codex = done (2026-09-09):** install idempoten `pkg install codex` (Termux, tur-repo bionic) / `npm i -g @openai/codex` (non-Termux; npm `@openai/codex` v0.153.4 ada optional dep `linux-arm64`). Launch **native OpenAI mode** + warning — TIDAK di-wire aigate: `cli_presets.py:180` mark codex `LAUNCH_UNSUPPORTED`/`REASON_RESPONSES_ONLY`. aigate punya inbound `/v1/responses` (`router.py:342`) tapi **non-streaming only** (`responses.py:227-233`: `stream:true` → tolak `responses_streaming_unsupported`), sedangkan codex CLI **wajib streaming** → tak bisa di-rute. Script sadar ini → tidak set env palsu ke aigate. Commit `7f22713`.
 > **A5 antigravity = done (2026-09-09):** **NO_INSTALL** — script HANYA menampilkan pesan `antigravity: NO_INSTALL — tidak ada paket CLI terverifikasi` lalu `exit 0`, TIDAK memasang apa pun (no side-effect). Bukti `cli_presets.py:74` (`install: NO_INSTALL`) + `cli_presets.py:176` (`LAUNCH_UNSUPPORTED`/`REASON_NOT_A_CLI`); `TERMUX_INSTALL` tidak punya entry antigravity; npm registry `antigravity` = placeholder squat (v0.0.0), PyPI milik pihak lain, Homebrew 404 → tidak ada rute install resmi. Sesuai keputusan user untuk tool `NO_INSTALL`. Commit `2259c1c`.
+> **A6 phi = done (2026-09-09):** **NO_INSTALL** — script HANYA menampilkan pesan `phi: NO_INSTALL — belum ada install terverifikasi di environment ini.` lalu `exit 0`, TIDAK memasang apa pun (no side-effect). Bukti `cli_presets.py:75` (`install: NO_INSTALL`) + `cli_presets.py:177` (`LAUNCH_UNSUPPORTED`/`REASON_INSTALL_UNVERIFIED`); `TERMUX_INSTALL` tidak punya entry phi; npm `phi` = squat lama (v0.0.2, 2013), PyPI `phi` = library functional programming (cgarciae, bukan CLI), Homebrew formula `phi` 404 → tidak ada rute install resmi. Sesuai keputusan user untuk tool `NO_INSTALL`. Commit `3135e32`.
 
 ## Grup B — Autonomous Software Agents (`autonomous_agents`)
 

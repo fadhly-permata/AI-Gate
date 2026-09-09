@@ -71,6 +71,20 @@
 
 **Status: DONE — NO_INSTALL (message + exit 0).** antigravity TIDAK di-install (sesuai keputusan user untuk tool `NO_INSTALL`); script hanya pesan + keluar 0. Commit `2259c1c`.
 
+## CLI Tools A6: phi install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/phi.sh` (A6 phi).
+
+**Fakta kode (cross-check 3 sumber independen, R47/R48):**
+- `cli_presets.py:75` = `{"name":"phi","binary":"phi","install": NO_INSTALL}` — aigate menandai phi `NO_INSTALL` (NO_INSTALL didefinisikan di `cli_presets.py:45` = echo no-op).
+- `cli_presets.py:177` = `"phi": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_INSTALL_UNVERIFIED)` — phi BUKAN CLI yang bisa di-launch (install tak terverifikasi).
+- `TERMUX_INSTALL` map (`cli_presets.py:241-244`) HANYA berisi `aichat` + `codex` — TIDAK ada entry phi.
+- npm `phi` = squat lama (v0.0.2, 2013, tak terkait); PyPI `phi` = library functional programming (cgarciae, bukan CLI); Homebrew formula `phi` 404. Konklusi: TIDAK ada rute install resmi (npm/pip/brew).
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/phi.sh` → clean; mode `-rwx------` (exec); eksekusi langsung → `exit 0`, TIDAK memasang apa pun. Script source `_common.sh` (read-only helpers) lalu log pesan `phi: NO_INSTALL — belum ada install terverifikasi` + `exit 0` — TIDAK memasang apa pun (no side-effect).
+
+**Status: DONE — NO_INSTALL (message + exit 0).** phi TIDAK di-install (sesuai keputusan user untuk tool `NO_INSTALL`); script hanya pesan + keluar 0. Commit `3135e32`.
+
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
 bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.

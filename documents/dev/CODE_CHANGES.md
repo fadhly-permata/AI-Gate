@@ -101,7 +101,26 @@ wiring ke selected model/combo seperti aigate, cross-platform (Termux/Win/Linux/
   + `log_msg`) lalu log pesan + `exit 0`. Tidak ada `ensure_installed`/install command.
 - Verifikasi: `bash -n scripts/cli-tools/antigravity.sh` → **clean**; mode `-rwx------` (exec).
 
-Status: A1 claude = done (script). A2 opencode = done (script). A3 gemini = done (script, native Google mode, unsupported by aigate). **A4 codex = done (script, native OpenAI mode, unsupported by aigate — butuh streaming Responses API yang belum ada).** **A5 antigravity = done (script, NO_INSTALL — message + exit 0, no side-effect).** `_common.sh` = done. Sisa A6..A12, B1..B6, C1..C6 menyusul per tool.
+### `scripts/cli-tools/phi.sh` (BARU) — **A6 phi = NO_INSTALL (message + exit 0, no side-effect)**
+- TIDAK memasang apa pun (sesuai keputusan user utk tool `NO_INSTALL`): script hanya
+  menampilkan pesan lalu `exit 0` (no-op, idempoten, tanpa side-effect).
+- Pesan: `phi: NO_INSTALL — belum ada install terverifikasi di environment ini.`
+- Fakta kunci (cross-check 3 sumber independen, R47/R48):
+  - `cli_presets.py:75` → `{"name":"phi","binary":"phi","install": NO_INSTALL}`
+    (NO_INSTALL didefinisikan di `cli_presets.py:45` = echo no-op).
+  - `cli_presets.py:177` → `"phi": LaunchSupport(LAUNCH_UNSUPPORTED, REASON_INSTALL_UNVERIFIED)`
+    — aigate menandai phi BUKAN CLI yang bisa di-launch (install tidak terverifikasi).
+  - `TERMUX_INSTALL` map (`cli_presets.py:241-244`) HANYA berisi `aichat` + `codex` —
+    TIDAK ada entry phi → di Termux pun tak ada rute install terverifikasi.
+  - npm `phi` = squat lama (v0.0.2, 2013, tak terkait); PyPI `phi` = library functional
+    programming (cgarciae, bukan CLI); Homebrew formula `phi` 404. Konklusi: TIDAK ada
+    rute install resmi (npm/pip/brew).
+- Script source `_common.sh` (read-only: `detect_os`/`detect_pm`/`load_gateway_config`
+  + `log_msg`) lalu log pesan + `exit 0`. Tidak ada `ensure_installed`/install command.
+- Verifikasi: `bash -n scripts/cli-tools/phi.sh` → **clean**; mode `-rwx------` (exec);
+  eksekusi langsung → `exit 0`, TIDAK memasang apa pun.
+
+Status: A1 claude = done (script). A2 opencode = done (script). A3 gemini = done (script, native Google mode, unsupported by aigate). **A4 codex = done (script, native OpenAI mode, unsupported by aigate — butuh streaming Responses API yang belum ada).** **A5 antigravity = done (script, NO_INSTALL — message + exit 0, no side-effect).** **A6 phi = done (script, NO_INSTALL — message + exit 0, no side-effect).** `_common.sh` = done. Sisa A7..A12, B1..B6, C1..C6 menyusul per tool. (Progress: **6/24**.)
 
 
 ## 2026-09-08 — i18n: satu file per bahasa + 5 bahasa baru (ru, nl, ja, zh, zh-tw) — DONE (`f7beaf9` + `c1477eb`, branch `feat/i18n-locales`)
