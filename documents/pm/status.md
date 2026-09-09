@@ -130,6 +130,22 @@
 
 **Status: DONE — NO_INSTALL (message + exit 0).** amp TIDAK di-install (sesuai keputusan user untuk tool `NO_INSTALL`); script hanya pesan + keluar 0. Commit `446f78f`.
 
+## CLI Tools A10: qwen install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/qwen.sh` (A10 qwen).
+
+**Fakta kode (cross-check):**
+- `cli_presets.py:79` = `npm i -g @qwen-code/qwen-code` (install string).
+- `cli_presets.py:181` = `"qwen": LaunchSupport(LAUNCH_VERIFIED, REASON_NONE)` — qwen = verified, OpenAI-compatible.
+- `cli_tools_router.py:526-567` = `_qwen_builder` — wiring `OPENAI_API_BASE` + `OPENAI_API_KEY` ke aigate `/v1/chat/completions` + generate `.qwen/settings.json` (`modelProviders.openai` `baseUrl`=gateway, `envKey`=`OPENAI_API_KEY`, `security.auth.selectedType`=`openai`). Endpoint `/v1/chat/completions`.
+- npm `@qwen-code/qwen-code` v0.23.1 pure-JS butuh Node >=22.
+
+**Script behavior:** install idempoten via `ensure_installed` → `npm i -g @qwen-code/qwen-code`; launch **OpenAI-compatible** — wiring `OPENAI_API_BASE` + `OPENAI_API_KEY` (dari `load_gateway_config`) + generate `.qwen/settings.json`, endpoint `/v1/chat/completions`.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/qwen.sh` → clean; perms `-rwx------` (exec). `git status` hanya berisi `qwen.sh` + dokumen PM (working tree bersih selain itu).
+
+**Status: DONE — OpenAI-compatible (verified).** qwen di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → qwen forward model apa adanya. Commit `73478a0`.
+
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
 bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.
