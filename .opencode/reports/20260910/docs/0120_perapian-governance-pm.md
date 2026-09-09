@@ -101,7 +101,7 @@ Dibaca penuh sebelum bertindak (11 berkas `.opencode/rules/*.md`, 229 baris; ind
   `pm/` basi; 52 sitatan `R#` terselesaikan; 14 laporan tercatat sebagai utang format (peringatan).
   `py_compile` bersih; `__pycache__` dihapus. Commit `8e59d87` + `c82d567`.
 - [02:25] langkah ⑦ (kanal wajib-baca) → selesai. `AGENTS.md` ditulis ulang: 12 aturan always-on
-  bergaya caveman ultra + pointer tema + rujukan gerbang (1.866 -> 3.247 byte). `opencode.json`
+  bergaya caveman ultra + pointer tema + rujukan gerbang (1.866 -> 3.896 byte). `opencode.json`
   ditambah `"instructions": ["documents/pm/OPERATING_RULES.md"]` supaya 50 rule ikut ter-inject;
   bentuk field diverifikasi ke skema resmi https://opencode.ai/config.json sebelum menulis
   (`Config.instructions` = array of string) dan `python3 -m json.tool` lolos. Commit `223c83b`.

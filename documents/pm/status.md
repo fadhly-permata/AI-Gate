@@ -51,7 +51,7 @@
   di 15 berkas config — sumber salah baca paling sering; (5) `.opencode/skills/pm-orchestration/SKILL.md`
   §6 Record Protocol ditulis beneran (sebelumnya pointer ke skill yang nggak ada).
 - Verification: gate exit 0; `grep` rujukan `pm/` basi = 0 di berkas hidup; `wc -c` per kanal
-  (AGENTS.md 3.247 B; rules v2 11.463 B; `.opencode/rules/` 12.669 B); `py_compile` + `json.tool`
+  (AGENTS.md 3.896 B; rules v2 11.463 B; `.opencode/rules/` 12.669 B); `py_compile` + `json.tool`
   bersih; `git diff --check` bersih; `src/**` & `tests/**` nol berubah.
 - **User WAJIB restart opencode** supaya AGENTS.md / opencode.json / agent / skill yang baru kebaca.
 

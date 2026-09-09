@@ -1290,7 +1290,7 @@ Commit: `61d64337b686a8b5ee0f58d17d52807119922d0a`
 ### Perubahan (config & dokumen, nol `src/**` / `tests/**`)
 - `documents/pm/archive/OPERATING_RULES-v1-52rules.md` — rename (git mv) dari `documents/pm/OPERATING_RULES.md`; teks v1 52 rule utuh 52.698 B.
 - `documents/pm/OPERATING_RULES.md` — BARU v2: 50 rule / 10 tema A–J / 11.463 B (−78%). 8 rule duplikat dihapus dari sini (rumah tunggal `.opencode/rules/*`), sisanya ≤4 baris + sitatan `[R#]`. F4 ditambahkan (klaim ukuran wajib sebut alat+satuan).
-- `AGENTS.md` — ditulis ulang: 4 ayat routing dipertahankan + blok "ALWAYS-ON RULES" 12 baris (pointer tema) + rujukan gate + aturan bahasa. 1.866 → 3.247 B (kanal auto-inject tiap sesi).
+- `AGENTS.md` — ditulis ulang: 4 ayat routing dipertahankan + blok "ALWAYS-ON RULES" 12 baris (pointer tema) + rujukan gate + aturan bahasa. 1.866 → 3.896 B (kanal auto-inject tiap sesi).
 - `opencode.json` — += `"instructions": ["documents/pm/OPERATING_RULES.md"]` (kanal injeksi rule; skema diverifikasi ke https://opencode.ai/config.json → `Config.instructions: [string]`).
 - `.opencode/rules/agent-boundaries.md` — PM WRITE += `.opencode/rules/**` (grant user 2026-09-10) + `pm-orchestration/**` + `AGENTS.md`; subseksi "Task reports" (K2: pelaksana tulis laporannya sendiri); baris `tech-architect` dipindah ke dalam tabel (sebelumnya tabel pecah).
 - `.opencode/rules/{secrets,no-hallucination,commands,task-report,language}.md` — serap clause dari rule lama (R51/R47/R7/R23/R52).
