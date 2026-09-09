@@ -1,5 +1,41 @@
 # PM Status
 
+## Bottom-nav ponsel — hamburger, scroll, mirror 9 view + Repo + separator — 2026-09-09 (fe-dev 3 iterasi, PM-verified, BELUM di-commit)
+**Request user (berantai):**
+1. Di ponsel (potret) tombol hamburger hide/show sidemenu nge-bug → hilangkan; tablet & desktop
+   tidak boleh kena.
+2. "Sidemenu yang pindah ke bawah bikin banyak menu gak ke-access → bikin scrollable ke samping."
+   Retest: "masih gak bisa digeser / mungkin ada item yang di-hidden?"
+3. "Sekalian tambahin link Repo + separator buat tiap grup item menu."
+
+**Temuan proses:** spawn ronde-1 ke-cancel (limit provider) tapi CSS+cache-buster udah ke-apply
+(uncommitted) → fe-dev audit & lanjut. **Akar keluhan #2 = bukan scroll:** `.bottom-nav` cuma
+punya 7 dari 9 view menu samping (`usage` + `analytics` gak pernah di-render). Mode: single-
+specialist (fe-dev) → R16 tidak kepanggil.
+
+**Task list:**
+- [x] T1 fe-dev: `#sidebarToggle{display:none}` dua shell phone; `.bottom-nav` `overflow-x:auto`+
+      `justify-content:flex-start`+momentum; `.bn-item` `min-width:60px`. (cache-buster lalu naik lagi, lihat T5)
+- [x] T2 PM verifikasi ronde-1: audit diff; views 23 pass; sapuan 15 file styles.css 299 pass.
+- [x] T3 PM gate suite penuh → **22 fail `localStorage`/`sessionStorage`** (logwindow + terminal_discard).
+      **Bukti pre-existing:** 3 file di-`git stash`, tree bersih tetap gagal identik (22/29).
+      Akar = LINGKUNGAN (node_modules sempat kosong → `npm ci` vitest 2.1.9 + jsdom 25.0.1), BUKAN UI.
+- [x] T4 fe-dev: tambah `usage`+`analytics` ke `.bottom-nav` → mirror 9 app view (parity test).
+- [x] T5 fe-dev: tambah **link Repo** (item ke-10, no data-view → link eksternal asli) + **4 `.bn-sep`**
+      di batas grup (Gateway|Operasi|Wawasan|Sistem|Repo); rule `.bn-sep` token `--panel-border`;
+      cache-buster `styles.css?v=20260914`. app.js/i18n.js gak diubah (wiring generik).
+- [x] T6 PM verifikasi akhir: `views.test.js` **25 pass** (hamburger-hidden, paritas 9-view,
+      repo-hadir, sep=4 + batas, scroll=10); `git diff --check` bersih; markup ke-parse jsdom (0 artefak).
+
+**Keputusan/open:**
+- Belum di-commit (user belum minta). Rekomendasi: commit UI-change (tes-nya hijau) TERPISAH dari fix env.
+- ⚠️ **Scroll browser-asli UNVERIFIED** (no browser di box; jsdom gak ngukur flex/@media) → user
+  WAJIB pass manual di HP: geser bottom-nav sampe ikon GitHub, cek 4 separator tampil, tap usage/analytics/repo.
+- TASK SUSULAN (di luar scope UI): benerin env tes FE biar `localStorage` tersedia lagi
+  (qa/fe-dev; kandidat: `environmentOptions.jsdom.url` di vitest.config.js / align dep).
+- Open desain (nunggu user): hide chrome scrollbar di preview desktop (YAGNI), affordance "nav bisa digeser",
+  `#sidebarToggle` masih di DOM (kosmetik).
+
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
 bentrok 5 file. `git merge --no-ff origin/main` → commit merge `6000b2c`, push OK.
