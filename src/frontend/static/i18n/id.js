@@ -399,5 +399,13 @@ window.I18N.id = {
     "settings.import.invalid": "File tidak valid: bukan JSON pengaturan aigate yang benar.",
     "settings.import.error": "Impor gagal:",
     "settings.import.cancelled": "Impor dibatalkan.",
-    "settings.import.no_file": "Pilih file pengaturan terlebih dahulu."
+    "settings.import.no_file": "Pilih file pengaturan terlebih dahulu.",
+    "page_desc.settings": "Atur port, tema, bahasa, mode pengembang, dan tampilan perangkat; lalu cadangkan atau pulihkan semua pengaturan dari satu berkas.",
+    "page_desc.providers": "Daftarkan layanan AI sumber model Anda, isi kunci API atau OAuth, temukan daftarnya, dan pantau pemakaian tiap penyedia.",
+    "page_desc.combos": "Gabungkan beberapa Penyedia dan model jadi satu alamat dengan aturan cadangan otomatis atau pembagian beban; atur prioritas dan bobotnya.",
+    "page_desc.proxies": "Kelompokkan beberapa proxy dan tentukan cara pemakaiannya diputar, supaya panggilan keluar tidak menumpuk pada satu jalur.",
+    "page_desc.endpoints": "Atur alamat gerbang lokal tempat aplikasi memanggil model: port, kunci akses, tujuan Penyedia/Kombo, proxy keluar, dan hemat token.",
+    "page_desc.usage": "Pantau sisa kuota dan hitungan mundur reset tiap Penyedia, serta ringkas pemakaian permintaan, token, dan biaya dari harian sampai bulanan.",
+    "page_desc.analytics": "Lihat tren pemakaian, total dan rincian biaya per model atau Penyedia, ekspor CSV, serta log permintaan mentah untuk keperluan perbaikan.",
+    "page_desc.cli": "Jalankan alat CLI AI lewat tab terminal dari halaman ini, cek catatan kompatibilitasnya, dan gunakan Self-Heal untuk perbaikan."
 };

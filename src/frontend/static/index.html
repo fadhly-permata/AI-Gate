@@ -172,6 +172,11 @@
 
       <!-- Settings view (B1.3) -->
       <section class="view" data-view="settings">
+        <div class="page-banner">
+          <i class="fa fa-circle-info" aria-hidden="true"></i>
+          <p class="page-banner-text" data-i18n="page_desc.settings">Configure how aigate runs — port, theme, language, developer mode, device view — then back up or restore every setting from one file.</p>
+        </div>
+
         <div class="card settings-card">
           <h2 class="settings-title" data-i18n="nav.settings">Settings</h2>
           <form id="settingsForm" class="settings-form" autocomplete="off">
@@ -272,6 +277,11 @@
 
       <!-- Providers view (B2.2) -->
       <section class="view" data-view="providers">
+        <div class="page-banner">
+          <i class="fa fa-circle-info" aria-hidden="true"></i>
+          <p class="page-banner-text" data-i18n="page_desc.providers">Register the AI services behind your models, add API keys or OAuth accounts, discover their model lists, and track each provider's usage.</p>
+        </div>
+
         <!-- List + add -->
         <div class="card providers-card">
           <div class="providers-head">
@@ -404,6 +414,11 @@
 
       <!-- Combos view (B2.4) -->
       <section class="view" data-view="combos">
+        <div class="page-banner">
+          <i class="fa fa-circle-info" aria-hidden="true"></i>
+          <p class="page-banner-text" data-i18n="page_desc.combos">Combine several providers and models into one address with automatic-failover or load-balancing rules; set members, priority, and weights here.</p>
+        </div>
+
         <div class="card combos-card">
           <div class="providers-head">
             <h2 class="providers-title" data-i18n="combos.title">Combos</h2>
@@ -431,6 +446,11 @@
 
       <!-- Proxy Pools view (B2.3) -->
       <section class="view" data-view="proxies">
+        <div class="page-banner">
+          <i class="fa fa-circle-info" aria-hidden="true"></i>
+          <p class="page-banner-text" data-i18n="page_desc.proxies">Group several proxies and choose how they rotate, so outgoing calls don't pile up on a single route.</p>
+        </div>
+
         <div class="card proxies-pool-card">
           <div class="providers-head">
             <h2 class="providers-title" data-i18n="proxies.title">Proxy Pools</h2>
@@ -458,6 +478,11 @@
 
       <!-- Endpoints view (B2.5) -->
       <section class="view" data-view="endpoints">
+        <div class="page-banner">
+          <i class="fa fa-circle-info" aria-hidden="true"></i>
+          <p class="page-banner-text" data-i18n="page_desc.endpoints">Set the local gateway address your apps call models through: port, access key, provider or combo target, egress proxy, and token saving.</p>
+        </div>
+
         <div class="card endpoints-card">
           <div class="providers-head">
             <h2 class="providers-title" data-i18n="endpoints.title">Endpoints</h2>
@@ -486,6 +511,11 @@
 
       <!-- Usage & Quota view (B5.5): quota panel + summary + recent usage -->
       <section class="view" data-view="usage">
+        <div class="page-banner">
+          <i class="fa fa-circle-info" aria-hidden="true"></i>
+          <p class="page-banner-text" data-i18n="page_desc.usage">Watch each provider's remaining quota and reset countdown, and review request, token, and cost summaries from daily to monthly.</p>
+        </div>
+
         <!-- Quota panel -->
         <div class="card usage-quota-card">
           <div class="providers-head">
@@ -578,6 +608,11 @@
       <!-- Analytics view (B5.6, PRD §2.4.3): usage analytics dashboard +
            request log viewer (debug). Vanilla CSS bar chart — no chart lib. -->
       <section class="view" data-view="analytics">
+        <div class="page-banner">
+          <i class="fa fa-circle-info" aria-hidden="true"></i>
+          <p class="page-banner-text" data-i18n="page_desc.analytics">View usage trends, totals, and cost breakdowns per model or provider, export CSV, and read raw request logs for troubleshooting.</p>
+        </div>
+
         <!-- Usage Analytics dashboard -->
         <div class="card analytics-card">
           <div class="providers-head">
@@ -754,6 +789,11 @@
 
       <!-- CLI Tools view (B3.4): preset groups A/B/C + launch modal -->
       <section class="view" data-view="cli">
+        <div class="page-banner">
+          <i class="fa fa-circle-info" aria-hidden="true"></i>
+          <p class="page-banner-text" data-i18n="page_desc.cli">Launch AI CLI tools in a terminal tab from this page, check their compatibility notes, and use Self-Heal for repairs.</p>
+        </div>
+
         <div class="card cli-card">
           <h2 class="cli-title" data-i18n="nav.cli">CLI Tools</h2>
           <p class="settings-msg" id="cliLoadMsg" role="status" aria-live="polite"></p>

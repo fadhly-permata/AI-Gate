@@ -400,5 +400,13 @@ window.I18N["zh-tw"] = {
     "settings.import.invalid": "檔案無效：不是有效的 aigate 設定 JSON。",
     "settings.import.error": "匯入失敗：",
     "settings.import.cancelled": "匯入已取消。",
-    "settings.import.no_file": "請先選擇設定檔案。"
+    "settings.import.no_file": "請先選擇設定檔案。",
+    "page_desc.settings": "在這裡調整 aigate 的執行設定——連接埠、主題、語言、開發者模式、裝置預覽——並可用單一檔案備份或復原全部設定。",
+    "page_desc.providers": "在此登記提供模型的 AI 服務，填寫 API 金鑰或 OAuth 帳戶，探索模型清單，並追蹤每個供應者的用量。",
+    "page_desc.combos": "將多個供應者和模型依自動備援或負載平衡規則合併為一個位址，並在此設定成員、優先權與權重。",
+    "page_desc.proxies": "把多個代理歸成一組並設定輪替方式，避免對外請求都擠在一條通道上。",
+    "page_desc.endpoints": "設定應用呼叫模型的本地閘道位址：連接埠、存取金鑰、供應者或組合目標、出口代理與權杖節省。",
+    "page_desc.usage": "追蹤每個供應者的剩餘配額與重置倒數，並按日、週、月彙總請求、權杖與費用用量。",
+    "page_desc.analytics": "查看用量趨勢、總計與依模型或供應者的費用明細，匯出 CSV，並查閱原始請求記錄以利排障。",
+    "page_desc.cli": "透過本頁的終端機分頁啟動 AI CLI 工具，檢視相容性說明，並使用 Self-Heal 進行修復。"
 };

@@ -397,5 +397,13 @@ window.I18N.en = {
     "settings.import.invalid": "Invalid file: not a valid aigate settings JSON.",
     "settings.import.error": "Import failed:",
     "settings.import.cancelled": "Import cancelled.",
-    "settings.import.no_file": "Choose a settings file first."
+    "settings.import.no_file": "Choose a settings file first.",
+    "page_desc.settings": "Configure how aigate runs — port, theme, language, developer mode, device view — then back up or restore every setting from one file.",
+    "page_desc.providers": "Register the AI services behind your models, add API keys or OAuth accounts, discover their model lists, and track each provider's usage.",
+    "page_desc.combos": "Combine several providers and models into one address with automatic-failover or load-balancing rules; set members, priority, and weights here.",
+    "page_desc.proxies": "Group several proxies and choose how they rotate, so outgoing calls don't pile up on a single route.",
+    "page_desc.endpoints": "Set the local gateway address your apps call models through: port, access key, provider or combo target, egress proxy, and token saving.",
+    "page_desc.usage": "Watch each provider's remaining quota and reset countdown, and review request, token, and cost summaries from daily to monthly.",
+    "page_desc.analytics": "View usage trends, totals, and cost breakdowns per model or provider, export CSV, and read raw request logs for troubleshooting.",
+    "page_desc.cli": "Launch AI CLI tools in a terminal tab from this page, check their compatibility notes, and use Self-Heal for repairs."
 };

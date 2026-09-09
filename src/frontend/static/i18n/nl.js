@@ -391,5 +391,13 @@ window.I18N.nl = {
     "settings.import.invalid": "Ongeldig bestand: geen geldige aigate-instellingen-JSON.",
     "settings.import.error": "Import mislukt:",
     "settings.import.cancelled": "Import geannuleerd.",
-    "settings.import.no_file": "Kies eerst een instellingenbestand."
+    "settings.import.no_file": "Kies eerst een instellingenbestand.",
+    "page_desc.settings": "Stel in hoe aigate werkt — poort, thema, taal, ontwikkelaarsmodus, apparaatweergave — en maak een back-up van alle instellingen of herstel ze.",
+    "page_desc.providers": "Registreer de AI-diensten achter je modellen, voeg API-sleutels of OAuth-accounts toe, ontdek hun modellen en volg het verbruik per provider.",
+    "page_desc.combos": "Combineer meerdere providers en modellen tot één adres met automatische fallback- of loadbalance-regels; stel hier leden, prioriteit en gewicht in.",
+    "page_desc.proxies": "Groepeer meerdere proxy's en kies hoe ze roleren, zodat uitgaande oproepen niet op één route terechtkomen.",
+    "page_desc.endpoints": "Stel het lokale gateway-adres in waar je apps modellen oproepen: poort, toegangssleutel, provider-of-combodoel, uitgaande proxy en tokenbesparing.",
+    "page_desc.usage": "Bekijk het resterende quotum en de reset-afteller per provider en vat verbruik van verzoeken, tokens en kosten samen van dag tot maand.",
+    "page_desc.analytics": "Bekijk gebruikstrends, totalen en kostenspecificatie per model of provider, exporteer CSV en open ruwe requestlogs voor problemen.",
+    "page_desc.cli": "Start AI-CLI-tools vanuit een terminaltab op deze pagina, bekijk hun compatibiliteitsnotities en gebruik Self-Heal voor reparaties."
 };

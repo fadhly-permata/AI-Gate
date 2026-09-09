@@ -446,6 +446,49 @@ body.sidebar-collapsed .nav-item {
   color: var(--muted);
 }
 
+/* ===== Page-purpose banner =====
+   A calm, static info strip rendered as the FIRST block of a management view
+   (welcome + terminal intentionally have none). It reuses the card tokens so it
+   reads as part of the same surface family, with a single accent edge + icon to
+   signal "info" rather than an alert. Visibility needs no new rule: the banner
+   lives inside the section, so .view / .view.is-active (above) already toggles
+   it with the page. Uses only existing theme variables — light/dark both work
+   with zero extra rules; no fixed/sticky positioning, so the bottom nav stays
+   uncovered on phone and the banner simply flows as the first scrolling block. */
+.page-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  margin: 0 0 18px;
+  padding: 14px 18px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.page-banner > i {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--accent);
+  font-size: 16px;
+}
+
+.page-banner-text {
+  margin: 0;
+  color: var(--fg);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Narrow: stack the icon above the sentence so the text keeps full width. */
+@media (max-width: 600px) {
+  .page-banner { flex-direction: column; gap: 6px; padding: 12px 14px; }
+  .page-banner > i { margin-top: 0; }
+}
+
 /* ===== Settings panel (B1.3) ===== */
 .settings-card { max-width: 540px; }
 

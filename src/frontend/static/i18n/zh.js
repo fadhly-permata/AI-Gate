@@ -398,5 +398,13 @@ window.I18N.zh = {
     "settings.import.invalid": "文件无效：不是有效的 aigate 设置 JSON。",
     "settings.import.error": "导入失败：",
     "settings.import.cancelled": "导入已取消。",
-    "settings.import.no_file": "请先选择设置文件。"
+    "settings.import.no_file": "请先选择设置文件。",
+    "page_desc.settings": "在这里调整 aigate 的运行设置——端口、主题、语言、开发者模式、设备预览——并可用单个文件备份或恢复全部设置。",
+    "page_desc.providers": "在此登记为你提供模型的 AI 服务，填写 API 密钥或 OAuth 账户，发现模型列表，并跟踪每个提供商的用量。",
+    "page_desc.combos": "将多个提供商和模型按自动备用或负载均衡规则合并为一个地址，并在此设置成员、优先级与权重。",
+    "page_desc.proxies": "把多个代理归成一组并设定轮换方式，避免对外请求都挤在一条通道上。",
+    "page_desc.endpoints": "设置应用调用模型的本地网关地址：端口、访问密钥、提供商或组合目标、出口代理与令牌节省。",
+    "page_desc.usage": "跟踪每个提供商的剩余配额与重置倒计时，并按天、周、月汇总请求、令牌和费用用量。",
+    "page_desc.analytics": "查看用量趋势、总计与按模型或提供商的费用明细，导出 CSV，并查阅原始请求日志用于排障。",
+    "page_desc.cli": "通过本页的终端标签页启动 AI CLI 工具，查看兼容性说明，并使用 Self-Heal 进行修复。"
 };
