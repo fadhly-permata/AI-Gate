@@ -62,12 +62,14 @@ Kolom `Launch` = status di `LAUNCH_SUPPORT` (konteks, bukan bagian script).
 
 | # | Tool | Binary | Install (pkg/PM) | Dep (pkg/PM) | Launch | Status |
 |---|------|--------|------------------|--------------|--------|--------|
-| B1 | openhands | openhands | `pip install openhands` (butuh Python 3.12) | python (pip) | verified | todo |
+| B1 | openhands | openhands | `uv tool install openhands` (butuh Python 3.12) / `pip install openhands` (fallback) | python (uv/pip) | verified | done |
 | B2 | swe-agent | swe-agent | `NO_INSTALL` (no-op) | — | unsupported (install_unverified) | todo |
 | B3 | open-interpreter | interpreter | `pip install open-interpreter` | python (pip) | verified | todo |
 | B4 | autogpt | autogpt | `NO_INSTALL` (no-op) | — | unsupported (install_unverified) | todo |
 | B5 | gpt-researcher | gpt-researcher | `pip install gpt-researcher` | python (pip) | unsupported (not_a_cli) | todo |
 | B6 | crewai | crewai | `pip install crewai` | python (pip) | unsupported (not_a_cli) | todo |
+
+> **B1 openhands = done (2026-09-09):** install pilih `uv` dulu (`uv tool install openhands`, butuh Python 3.12), fallback `ensure_installed` → `pip install openhands` (fakta `cli_presets.py:88` = `pip install openhands`). Launch **OpenAI-compatible** — openhands forward ke aigate `/v1/chat/completions` (wiring persis mirip `_openhands_builder` di `cli_tools_router.py:960-972`: set env `LLM_BASE_URL`+`LLM_API_KEY`+`LLM_MODEL=openai/<model>` ke gateway, flag `--override-with-envs`). Bukti `cli_presets.py:190` = `openhands` = `LAUNCH_VERIFIED` (OpenAI-compatible). PyPI `openhands` v1.16.0 pure-python tapi butuh **Python 3.12** (`requires_python` gagal resolve di 3.13+ → `uv`/`pip` gagal bila `python3` = 3.13+; butuh venv/pyenv 3.12) — known-broken di 3.13+, bukan blocker. `bash -n` clean; mode exec.
 
 ## Grup C — Chat & Shell Assistants (`chat_shell`)
 

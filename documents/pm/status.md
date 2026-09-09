@@ -182,7 +182,23 @@
 **Status: DONE — OpenAI-compatible (verified).** kilo di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → kilo forward model apa adanya. Commit `2a194cc`.
 
 ## ===== GRUP A SELESAI (12/12) =====
-Semua 12 tool Grup A (`agentic_coding`) — A1 claude, A2 opencode, A3 gemini, A4 codex, A5 antigravity, A6 phi, A7 aider, A8 goose, A9 amp, A10 qwen, A11 cline, A12 kilo — SELESAI (script install/launch + wiring/NO_INSTALL sesuai preset). Lanjut ke **Grup B** (B1..B6) dan **Grup C** (C1..C6). Progres keseluruhan cli-tools: **12/24**.
+ Semua 12 tool Grup A (`agentic_coding`) — A1 claude, A2 opencode, A3 gemini, A4 codex, A5 antigravity, A6 phi, A7 aider, A8 goose, A9 amp, A10 qwen, A11 cline, A12 kilo — SELESAI (script install/launch + wiring/NO_INSTALL sesuai preset). Lanjut ke **Grup B** (B1..B6) dan **Grup C** (C1..C6). Progres keseluruhan cli-tools: **12/24**.
+
+## CLI Tools B1: openhands install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/openhands.sh` (B1 openhands).
+
+**Fakta kode (cross-check):**
+- `cli_presets.py:88` = `_pip("openhands")` → `pip install openhands` (install string).
+- `cli_presets.py:190` = `"openhands": LaunchSupport(LAUNCH_VERIFIED, REASON_NONE)` — openhands = verified, OpenAI-compatible.
+- `cli_tools_router.py:960-972` = `_openhands_builder` — wiring env `LLM_BASE_URL` + `LLM_API_KEY` + `LLM_MODEL=openai/<model>` ke aigate `/v1/chat/completions` + flag `--override-with-envs`.
+- PyPI `openhands` v1.16.0 pure-python tapi butuh **Python 3.12** (`requires_python` gagal resolve di 3.13+).
+
+**Script behavior:** install pilih `uv` dulu (`uv tool install openhands`, butuh Python 3.12), fallback `ensure_installed` → `pip install openhands`; launch **OpenAI-compatible** — set `LLM_BASE_URL` + `LLM_API_KEY` (dari `load_gateway_config`) + `LLM_MODEL=openai/<AIGATE_MODEL>` ke aigate `/v1/chat/completions`, flag `--override-with-envs`.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/openhands.sh` → clean; perms `-rwx------` (exec). `git status` hanya berisi `openhands.sh` + dokumen PM (working tree bersih selain itu).
+
+**Status: DONE — OpenAI-compatible (verified).** openhands di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → openhands forward model apa adanya. Catatan Python 3.12: bila `python3` = 3.13+ (`uv`/`pip` gagal resolve) → butuh venv/pyenv 3.12 (bukan blocker).
 
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)
