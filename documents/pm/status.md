@@ -289,7 +289,25 @@
 **Status: DONE — NOT_A_CLI (message + exit 0, no side-effect).** crewai pip-installable & resmi (`cli_presets.py:93`, PyPI v1.15.20 `console_scripts` `crewai = crewai_cli.cli:crewai`), TAPI framework scaffolder/runner yang butuh proyek di CWD & gak ada flag `--model`/`--base-url` (gak launchable sbg aigate CLI); aigate gak punya builder → `resolve()` 409. BUKAN murni `NO_INSTALL`, tapi gak bisa di-launch sebagai CLI. Script: pesan + `exit 0`, TIDAK install apa pun yg bisa di-spawn. Commit `150475f`.
 
 ## ===== GRUP B SELESAI (6/6) =====
- Semua 6 tool Grup B (`autonomous_agents`) — B1 openhands, B2 swe-agent, B3 open-interpreter, B4 autogpt, B5 gpt-researcher, B6 crewai — SELESAI (script install/launch + wiring/NO_INSTALL/NOT_A_CLI sesuai preset). Lanjut ke **Grup C** (C1..C6). Progres keseluruhan cli-tools: **18/24**.
+ Semua 6 tool Grup B (`autonomous_agents`) — B1 openhands, B2 swe-agent, B3 open-interpreter, B4 autogpt, B5 gpt-researcher, B6 crewai — SELESAI (script install/launch + wiring/NO_INSTALL/NOT_A_CLI sesuai preset). Lanjut ke **Grup C** (C1..C6). **C1 llm = done (OpenAI-compatible, verified — `LAUNCH_VERIFIED` at `cli_presets.py:219`).** Progres keseluruhan cli-tools: **19/24**.
+
+## CLI Tools C1: llm install/launch script — 2026-09-09 (PM integrasi, branch `setup/cli-tools`)
+
+**Tugas:** INTEGRASI receipt untuk `scripts/cli-tools/llm.sh` (C1 llm).
+
+**Fakta kode (cross-check):**
+- `cli_presets.py:100` = `_pip("llm")` → `pip install llm` (install string).
+- `cli_presets.py:219` = `"llm": LaunchSupport(LAUNCH_VERIFIED, REASON_NONE)` — llm = verified, OpenAI-compatible.
+- `cli_tools_router.py:570-592` = `_llm_builder` — wiring `llm openai endpoint <base> [-m <model>] --key <key> --chat` (atau `--models` bila tanpa model) ke aigate `/v1/chat/completions`; env `OPENAI_API_BASE`+`OPENAI_API_KEY` di-inject.
+- PyPI `llm` 0.35 (simonw), `requires_python >=3.10`.
+
+**Script behavior:** install idempoten via `ensure_installed` → `pip install llm`; launch **OpenAI-compatible** — set env `OPENAI_API_BASE`+`OPENAI_API_KEY` (dari `load_gateway_config`) + jalankan `llm openai endpoint <base> [-m <model>] --key <key> --chat` (atau `--models` bila tanpa model) ke aigate `/v1/chat/completions`.
+
+**Known-broken (bukan blocker):** di Termux/aarch64 + Python 3.14, `pip install llm` gagal build `jiter` (tidak ada wheel Android, butuh `pkg install rust`) → install bisa gagal di perangkat ini; script tetap memasang.
+
+**Verifikasi PM:** `bash -n scripts/cli-tools/llm.sh` → clean; perms `-rwx------` (exec). `git status` hanya berisi `llm.sh` + dokumen PM (working tree bersih selain itu).
+
+**Status: DONE — OpenAI-compatible (verified).** llm di-wire ke aigate `/v1/chat/completions` (`LAUNCH_VERIFIED`); aigate serve OpenAI-compatible inbound → llm forward model apa adanya.
 
 ## Merge origin/main → refactor/ui (resolusi konflik PR #4) — 2026-09-07 (PM-owned)
 PR #4 conflict "must be resolved". `main` (2 commit: 5a3f6e7 group-sidebar + 3de89c6 PR#3)

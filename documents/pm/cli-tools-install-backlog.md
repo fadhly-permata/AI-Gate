@@ -84,12 +84,14 @@ Kolom `Launch` = status di `LAUNCH_SUPPORT` (konteks, bukan bagian script).
 
 | # | Tool | Binary | Install (pkg/PM) | Dep (pkg/PM) | Launch | Status |
 |---|------|--------|------------------|--------------|--------|--------|
-| C1 | llm | llm | `pip install llm` | python (pip) | verified | todo |
+| C1 | llm | llm | `pip install llm` | python (pip) | verified | done |
 | C2 | sgpt | sgpt | `NO_INSTALL` (no-op) | — | unsupported (install_unverified) | todo |
 | C3 | mods | mods | `NO_INSTALL` (no-op) | — | unsupported (no_binary) | todo |
 | C4 | oterm | oterm | `pip install oterm` | python (pip) | verified | todo |
 | C5 | gptme | gptme | `pip install gptme` | python (pip) | verified | todo |
 | C6 | aichat | aichat | `pkg install aichat` (override) / `cargo install aichat` | pkg (atau rust/cargo) | verified | todo |
+
+> **C1 llm = done (2026-09-09):** install idempoten `pip install llm` (fakta `cli_presets.py:100` = `_pip("llm")` → `pip install llm`); launch **OpenAI-compatible** — llm forward ke aigate `/v1/chat/completions` (wiring persis mirip `_llm_builder` di `cli_tools_router.py:570-592`: `llm openai endpoint <base> [-m <model>] --key <key> --chat` (atau `--models` bila tanpa model) + env `OPENAI_API_BASE`+`OPENAI_API_KEY`). Bukti `cli_presets.py:219` = `llm` = `LAUNCH_VERIFIED` (OpenAI-compatible). PyPI `llm` 0.35 (simonw) butuh Python >=3.10. **Catatan Termux (known-broken, bukan blocker):** di Termux/aarch64 + Python 3.14, `pip install llm` gagal build `jiter` (tidak ada wheel Android, butuh `pkg install rust`) → install bisa gagal di perangkat ini. `bash -n` clean; mode exec.
 
 ---
 
