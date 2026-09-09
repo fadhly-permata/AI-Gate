@@ -11,7 +11,9 @@
 #       platform-independent (py3-none-any). Installs with `pip install
 #       aider-chat` on Termux / Linux / macOS / Windows(WSL).
 #     * requires_python = ">=3.10,<3.13". On Python 3.13+ the resolver FAILS
-#       (no compatible wheel). Use a venv / pyenv on 3.10-3.12 if 3.13 is active.
+#       (no compatible wheel). The script now refuses to install on Python
+#       <3.10 or >=3.13 (see the version guard near the top) and exits 1 with a
+#       clear message instead of a raw pip error. Use a venv / pyenv on 3.10-3.12.
 #
 # LAUNCH WIRING: aider speaks OpenAI-compatible Chat Completions. aigate serves
 #   it natively at /v1/chat/completions (aider appends /chat/completions to the
@@ -44,6 +46,31 @@ detect_os
 detect_pm
 load_gateway_config   # aigate gateway base (AIGATE_BASE) + internal key (AIGATE_KEY)
 
+# --- aider / Python version guard (runs BEFORE any pip install) ---
+# aider-chat is pure-python but its PyPI requires_python is ">=3.10,<3.13"
+# (verified: aider-chat 0.86.2). On Python 3.13+ pip cannot resolve a compatible
+# release, and building old pinned deps (e.g. aiohttp 3.8.4 sdist) also fails on
+# 3.14. Refuse early with a clear message instead of handing the user a raw pip error.
+if have_cmd python3; then
+  pyver="$(python3 -c 'import sys;print("%d.%d" % sys.version_info[:2])' 2>/dev/null || true)"
+  py_maj="${pyver%%.*}"
+  py_min="${pyver#*.}"; py_min="${py_min%%[!0-9]*}"
+  if [ -n "$py_maj" ] && [ -n "$py_min" ]; then
+    # Supported: Python 3.10, 3.11, 3.12 only.
+    if [ "$py_maj" -lt 3 ] || [ "$py_maj" -gt 3 ] || \
+       { [ "$py_maj" -eq 3 ] && { [ "$py_min" -lt 10 ] || [ "$py_min" -gt 12 ]; }; }; then
+      log_msg "ERROR: aider needs Python 3.10–3.12; this device has Python ${pyver}."
+      log_msg "       Install a compatible interpreter (e.g. 'pkg install python3.11',"
+      log_msg "       pyenv, or a venv on 3.10–3.12) and re-run this script inside it."
+      exit 1
+    fi
+  else
+    log_msg "WARN: could not parse 'python3 --version' (got '${pyver}'); attempting install anyway."
+  fi
+else
+  log_msg "WARN: python3 not found; cannot check Python version before pip install."
+fi
+
 BIN="aider"
 INSTALL_CMD=(python3 -m pip install aider-chat)
 
@@ -53,17 +80,6 @@ log_msg "os=$AIGATE_OS pm=$AIGATE_PM gateway_base=$AIGATE_BASE"
 if ! ensure_installed "$BIN" "${INSTALL_CMD[@]}"; then
   log_msg "could not install aider on this platform; aborting launch."
   exit 1
-fi
-
-# Factual Termux / Python caveat (PyPI requires_python verified: >=3.10,<3.13).
-# aider-chat has no Python 3.13 wheel, so `pip install` fails to resolve there.
-if [ "$AIGATE_OS" = "termux" ]; then
-  if have_cmd python3; then
-    pyver="$(python3 -c 'import sys;print("%d.%d" % sys.version_info[:2])' 2>/dev/null || true)"
-    case "$pyver" in
-      3.13|3.14|3.1[5-9]) log_msg "NOTE (Termux): python3 is $pyver but aider-chat requires >=3.10,<3.13 — install will fail. Use a venv/pyenv on 3.10-3.12." ;;
-    esac
-  fi
 fi
 
 # --- aider -> aigate wiring (OpenAI Chat Completions) ----
