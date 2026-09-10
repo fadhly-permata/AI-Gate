@@ -40,6 +40,12 @@ from backend.models import (
     ProviderAccount,
     ProviderModel,
 )
+from backend.oauth import (
+    DEFAULT_FALLBACK_STRATEGY,
+    DEFAULT_STICKY_ROUND_ROBIN_LIMIT,
+    ROUTING_STRATEGIES,
+    clamp_sticky_limit,
+)
 
 LOG_SOURCE = "backend.providers.router"
 
@@ -57,6 +63,11 @@ class ProviderCreate(BaseModel):
     enabled: Optional[bool] = True
     custom_headers: Optional[Dict[str, Any]] = None
     default_model: Optional[str] = None
+    # Provider multi-account routing (9router adoption). Optional with the
+    # contract defaults; ``sticky_round_robin_limit`` only matters for
+    # 'round-robin' and is clamped to >= 1.
+    fallback_strategy: Optional[str] = DEFAULT_FALLBACK_STRATEGY
+    sticky_round_robin_limit: Optional[int] = DEFAULT_STICKY_ROUND_ROBIN_LIMIT
 
     class Config:
         pass
@@ -70,6 +81,9 @@ class ProviderUpdate(BaseModel):
     enabled: Optional[bool] = None
     custom_headers: Optional[Dict[str, Any]] = None
     default_model: Optional[str] = None
+    # None = leave unchanged (partial update); validated + clamped below.
+    fallback_strategy: Optional[str] = None
+    sticky_round_robin_limit: Optional[int] = None
 
     class Config:
         pass
@@ -94,6 +108,10 @@ class ProviderDTO(BaseModel):
     enabled: bool
     custom_headers: Dict[str, Any]
     default_model: Optional[str] = None
+    # Routing contract (always present on read; normalized so a pre-migration
+    # NULL row can never break the DTO).
+    fallback_strategy: str = DEFAULT_FALLBACK_STRATEGY
+    sticky_round_robin_limit: int = DEFAULT_STICKY_ROUND_ROBIN_LIMIT
     models: List[ModelDTO]
 
     class Config:
@@ -137,6 +155,8 @@ def _provider_to_dto(session: Session, provider: Provider) -> ProviderDTO:
         enabled=bool(provider.enabled),
         custom_headers=_decode_headers(provider.custom_headers),
         default_model=provider.default_model,
+        fallback_strategy=provider.fallback_strategy or DEFAULT_FALLBACK_STRATEGY,
+        sticky_round_robin_limit=clamp_sticky_limit(provider.sticky_round_robin_limit),
         models=[
             ModelDTO(
                 id=m.id,
@@ -153,6 +173,33 @@ def _not_found(message: str, code: str = "provider_not_found") -> JSONResponse:
     return JSONResponse(
         status_code=404,
         content={"error": {"message": message, "type": "not_found", "code": code}},
+    )
+
+
+def _bad_request(message: str, code: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=400,
+        content={
+            "error": {
+                "message": message,
+                "type": "invalid_request_error",
+                "code": code,
+            }
+        },
+    )
+
+
+def _strategy_error(strategy: Optional[str]) -> Optional[JSONResponse]:
+    """Reject a ``fallback_strategy`` outside the supported enum (None = unset).
+
+    The enum is the 9router account-level set only — no weighted / least-load /
+    latency / cost strategy exists at that level, so none is accepted here.
+    """
+    if strategy is None or strategy in ROUTING_STRATEGIES:
+        return None
+    return _bad_request(
+        f"fallback_strategy must be one of {list(ROUTING_STRATEGIES)}",
+        "invalid_fallback_strategy",
     )
 
 
@@ -377,8 +424,16 @@ def list_providers() -> dict:
 
 
 @router.post("/api/providers", status_code=201)
-async def create_provider(req: ProviderCreate) -> dict:
+async def create_provider(req: ProviderCreate) -> Any:
     """Create a provider; best-effort auto-discover models afterward."""
+    invalid_strategy = _strategy_error(req.fallback_strategy)
+    if invalid_strategy is not None:
+        log_warning(
+            f"create_provider: rejected fallback_strategy "
+            f"{req.fallback_strategy!r}",
+            source=LOG_SOURCE,
+        )
+        return invalid_strategy
     provider = Provider(
         name=req.name,
         type=req.type,
@@ -387,6 +442,8 @@ async def create_provider(req: ProviderCreate) -> dict:
         enabled=bool(req.enabled),
         custom_headers=_encode_headers(req.custom_headers),
         default_model=req.default_model,
+        fallback_strategy=req.fallback_strategy or DEFAULT_FALLBACK_STRATEGY,
+        sticky_round_robin_limit=clamp_sticky_limit(req.sticky_round_robin_limit),
     )
     with SessionLocal() as session:
         session.add(provider)
@@ -420,6 +477,14 @@ def get_provider(provider_id: int) -> Any:
 
 @router.put("/api/providers/{provider_id}")
 def update_provider(provider_id: int, req: ProviderUpdate) -> Any:
+    invalid_strategy = _strategy_error(req.fallback_strategy)
+    if invalid_strategy is not None:
+        log_warning(
+            f"update_provider: rejected fallback_strategy "
+            f"{req.fallback_strategy!r}",
+            source=LOG_SOURCE,
+        )
+        return invalid_strategy
     with SessionLocal() as session:
         provider = session.get(Provider, provider_id)
         if provider is None:
@@ -451,6 +516,14 @@ def update_provider(provider_id: int, req: ProviderUpdate) -> Any:
         if req.default_model is not None:
             provider.default_model = req.default_model
             changed.append("default_model")
+        if req.fallback_strategy is not None:
+            provider.fallback_strategy = req.fallback_strategy
+            changed.append("fallback_strategy")
+        if req.sticky_round_robin_limit is not None:
+            provider.sticky_round_robin_limit = clamp_sticky_limit(
+                req.sticky_round_robin_limit
+            )
+            changed.append("sticky_round_robin_limit")
 
         session.commit()
         session.refresh(provider)

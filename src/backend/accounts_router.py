@@ -2,8 +2,9 @@
 
 Endpoints:
 
-* ``GET  /api/accounts?provider_id=`` — list a provider's accounts.
+* ``GET  /api/accounts?provider_id=`` — list a provider's accounts (priority asc).
 * ``POST /api/accounts``             — create an account (api_key | oauth).
+* ``PUT  /api/accounts/{id}``        — update routing ``priority``.
 * ``DELETE /api/accounts/{id}``     — delete an account.
 * ``POST /api/oauth/<provider>/start``    — begin OAuth flow; return authorize URL.
 * ``GET  /api/oauth/<provider>/callback`` — exchange code -> store token.
@@ -55,6 +56,22 @@ class AccountCreate(BaseModel):
     refresh_token: Optional[str] = ""
     expires_at: Optional[str] = None  # ISO-8601 string
     enabled: Optional[bool] = True
+    # Selection order for provider-account routing (9router 'fill-first'):
+    # LOWER number = tried first; ties broken by id asc.
+    priority: Optional[int] = 0
+
+    class Config:
+        pass
+
+
+class AccountUpdate(BaseModel):
+    """Updatable account fields (partial; None = leave unchanged).
+
+    ``priority`` is the routing knob this feature adds. ``label`` / ``enabled``
+    are NOT accepted here — out of scope, kept out per YAGNI.
+    """
+
+    priority: Optional[int] = None
 
     class Config:
         pass
@@ -69,6 +86,9 @@ class AccountDTO(BaseModel):
     has_oauth_token: bool
     expires_at: Optional[str]  # ISO-8601 string or null
     enabled: bool
+    priority: int
+    # Read-only: set by the selection engine, never accepted from the client.
+    last_used_at: Optional[str]  # ISO-8601 string or null
 
     class Config:
         pass
@@ -109,6 +129,9 @@ def _account_to_dto(account: ProviderAccount) -> AccountDTO:
         has_oauth_token=bool(account.oauth_token),
         expires_at=_dt_to_iso(account.expires_at),
         enabled=bool(account.enabled),
+        # NULL from a pre-migration row reads as the contract default 0.
+        priority=account.priority if account.priority is not None else 0,
+        last_used_at=_dt_to_iso(account.last_used_at),
     )
 
 
@@ -176,7 +199,7 @@ def list_accounts(provider_id: Optional[str] = Query(None)) -> Any:
         rows = (
             session.query(ProviderAccount)
             .filter_by(provider_id=pid)
-            .order_by(ProviderAccount.id.asc())
+            .order_by(ProviderAccount.priority.asc(), ProviderAccount.id.asc())
             .all()
         )
         data = [_account_to_dto(a).dict() for a in rows]
@@ -210,6 +233,7 @@ def create_account(req: AccountCreate) -> Any:
             refresh_token=req.refresh_token or "",
             expires_at=_parse_dt(req.expires_at),
             enabled=bool(req.enabled),
+            priority=int(req.priority) if req.priority is not None else 0,
         )
         session.add(account)
         session.commit()
@@ -218,6 +242,31 @@ def create_account(req: AccountCreate) -> Any:
     log_info(
         f"created account {account.id} for provider {req.provider_id} "
         f"(auth_type={req.auth_type})",
+        source=LOG_SOURCE,
+    )
+    return dto
+
+
+@router.put("/api/accounts/{account_id}")
+def update_account(account_id: int, req: AccountUpdate) -> Any:
+    """Update an account's routing ``priority`` (partial).
+
+    ``last_used_at`` is deliberately NOT writable here — the selection engine
+    owns it. 404 envelope when the account is missing.
+    """
+    with SessionLocal() as session:
+        account = session.get(ProviderAccount, account_id)
+        if account is None:
+            return _error(404, f"account {account_id} not found", "account_not_found")
+        changed: list = []
+        if req.priority is not None:
+            account.priority = int(req.priority)
+            changed.append("priority")
+        session.commit()
+        session.refresh(account)
+        dto = _account_to_dto(account).dict()
+    log_info(
+        f"updated account {account_id}: {', '.join(changed) or 'no fields'}",
         source=LOG_SOURCE,
     )
     return dto

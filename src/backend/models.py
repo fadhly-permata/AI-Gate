@@ -58,6 +58,14 @@ class Provider(Base):
     custom_headers: Mapped[str] = mapped_column(String, default="{}")
     # Default model hint for this provider (nullable; free-form provider model id).
     default_model: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    # Provider multi-account routing (adopted from 9router, account-level set
+    # ONLY — no weighted/least-load/latency/cost strategy exists there).
+    # Allowed: 'fill-first' (highest-priority available account wins) |
+    # 'round-robin' (sticky: stay on one account for
+    # ``sticky_round_robin_limit`` consecutive calls, then advance).
+    fallback_strategy: Mapped[str] = mapped_column(String, default="fill-first")
+    # Sticky length for 'round-robin'. Clamped to >= 1 at selection time.
+    sticky_round_robin_limit: Mapped[int] = mapped_column(Integer, default=3)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     models: Mapped[list["ProviderModel"]] = relationship(back_populates="provider")
@@ -86,6 +94,11 @@ class ProviderAccount(Base):
     (``auth_type='oauth'``): ``oauth_token``, ``refresh_token``,
     ``expires_at``. Tokens are stored in **plaintext** (ADR-007) — no
     encryption, no masking, returned as-is by the API.
+
+    ``priority`` + ``last_used_at`` drive provider-account routing selection
+    (9router adoption): ``backend.oauth`` orders accounts by priority asc
+    (id asc tie-break) and uses ``last_used_at`` for the sticky round-robin
+    advance.
     """
 
     __tablename__ = "provider_accounts"
@@ -102,6 +115,15 @@ class ProviderAccount(Base):
     refresh_token: Mapped[str] = mapped_column(String, default="")
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Account-selection order (9router 'fill-first'): LOWER number = tried
+    # first; ties broken by ``id`` asc.
+    priority: Mapped[int] = mapped_column(Integer, default=0)
+    # Drives the sticky round-robin advance (least-recently-used first).
+    # None = never selected. Persisted (the consecutive-use counter itself is
+    # in-memory — see ``backend.oauth``).
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, nullable=True
+    )
 
     provider: Mapped["Provider"] = relationship(back_populates="accounts")
 
