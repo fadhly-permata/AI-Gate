@@ -34,6 +34,9 @@ D2 Setelah ada perintah: jalan tanpa konfirmasi; ambiguitas → ambil default + 
 D3 Istilah yang bisa dua level ("terminal" = fitur aigate, bukan terminal OS) → cek repo dulu atau klarifikasi 1 kalimat; jangan jawab di level salah. [R30]
 D4 Niat "pemisahan" default = branch, bukan repo. Resource eksternal (repo/registry/domain/akun/webhook) wajib disebut bentuknya + tunggu jawaban. Terlanjur salah bikin → lapor, jangan hapus sendiri. [R39]
 D5 Typo user wajib dikoreksi ke bentuk benar; jangan diikuti; ragu → tanya 1 kalimat. [R46]
+D6 Fitur UI baru: PM WAJIB tayangkan 1 lembar desain (denah blok + alternatif + alasan) dan dapat ACC user
+   SEBELUM spawn fe-dev. Kontrak data/API bukan pengganti persetujuan interaksi; tes hijau bukan ACC desain.
+   Desain ditolak user → desain ulang + ACC lagi, jangan tambal-sulam di kode.
 
 ## E — Mode eksekusi & kecepatan proses
 E1 Sebelum kerja multi-agen/panjang: tawarkan paralel vs sekuensial; pilihan berlaku satu sesi, sesi baru tanya lagi; scope overlap → paksa sekuensial. Detail: `.opencode/rules/parallel-sequential.md`; state = `documents/pm/state.md` key `multiagent_mode`. [R16]

@@ -2,6 +2,36 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260911-0645 — PM decides wrong → user correction recorded (ProjectManager)
+
+### Violation
+- Rule broken: tidak ada rule yang dilanggar secara harfiah — lubang Proses: `documents/pm/OPERATING_RULES.md` §D
+  hanya mengatur "tanya vs perintah" + default ambigu (D2), TIDAK ada kewajiban menayangkan DESAIN UI ke user
+  sebelum dibangun. PM mengunci 5 default ambigu sendiri lalu spawn fe-dev; hasil dibangun + di-COMMIT
+  (`d1ff215`) tanpa satu pun gambar/denah dilihat user.
+- What PM did: menyerahkan kontrak DATA (kolom/endpoint/semantik mesin) dan memperlakukannya seolah kontrak
+  INTERAKSI; gate hijau 547 tes dianggap "cukup" padahal tidak mengukur tata letak.
+
+### Correction
+- Durable rule captured: **D6** — fitur UI baru wajib 1 lembar desain (denah blok + alternatif + alasan) + ACC user
+  SEBELUM spawn fe-dev; kontrak data ≠ persetujuan interaksi; tes hijau ≠ ACC desain; ditolak → desain ulang, bukan tambal.
+- Decision: user menilai desain multi-akun hasil tahap-2 **berantakan** ("desain multi akun berantakan amat").
+  Audit PM atas realisasi `d1ff215` (bukti `file:line`): (1) DUA permukaan untuk satu penyedia — akun di tab modal
+  (`index.html:899-946`) tapi rincian pemakaian di kartu detail (`:311-349`) → tumpang tindih;
+  (2) modal induk menampung CRUD sub-entitas penuh: form tambah 5 baris (`:912-927`) + tabel **6 kolom**
+  (`:933-945`) termasuk Credential teks polos panjang → remuk di modal sempit/HP;
+  (3) Prioritas = angka telanjang, tanpa naik/turun (`:939`, `app.js:1275-1277`);
+  (4) tab Akun `aria-disabled` saat tambah → harus simpan dulu, hint `#provTabHint` gampang kelewat;
+  (5) combobox model diisi SENYAP tanpa indikator muat/gagal (`app.js:1147-1198`) — terasa "hilang";
+  (6) kolom "Models" di daftar penyedia tetap ada padahal panel model dihapus → angka tanpa penjelasan (`app.js:782`).
+  ARAH redesign diajukan ke user (3 opsi) — eksekusi DITAHAN sampai user pilih (D1/D6).
+
+### Prevention
+- Mechanism: rule **D6** (gerbang desain-ACC sebelum spawn fe-dev) + tahap berikutnya WAJIB lewat lembar desain di
+  `documents/pm/handovers/` dulu; pilihan layout sub-entitas (halaman vs kartu vs panel) jadi bagian wajib lembar desain.
+- Verification: sebelum spawn fe-dev, PM menunjukkan denah blok + alternatif ke user dan mencatat jawabannya di
+  `state.md`; gate `rules-index.py` tetap exit 0 (51 rule, 10 tema).
+
 ## 2026-09-11 06:35 — TAHAP 2 fe-dev multiakun 9router: UI ber-tab + strategi + discovery diam-diam — HIJAU gate (ProjectManager ← fe-dev)
 - ACC user = "1" → fase layar dimulai. Spawn `fe-dev` (Task tool, sesi `ses_f72729e77ffe6H48p0dNBL0Jyn`) — agen & skill SUDAH ada → reuse, nol generasi.
 - Handover: kontrak tahap-1 (laporan 1351 §KONTRAK) + peta `file:line` hasil pembacaan ULANG PM (anchor checkpoint lama
