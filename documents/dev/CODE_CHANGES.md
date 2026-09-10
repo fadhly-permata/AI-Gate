@@ -1414,3 +1414,40 @@ Bukti "kode lama masih aktif" tidak berlaku: tidak ada proses produk yang disent
   8/8 banner terisi, welcome+terminal nihil → LULUS. Browser nyata TIDAK tersedia di Termux
   (playwright crash, tanpa biner) → visual masih butuh mata user sendiri. Laporan:
   `.opencode/reports/20260910/implementation/0405_banner-halaman-implementasi.md`.
+
+## 2026-09-10 — Gerbang backend multi-akun 9router: review a237414 + tes (fitur `multiakun-9router`, peran be-dev in-session, commit 03d9b6e)
+- `src/backend/oauth.py` (+20/−7): SKIP kredensial kosong — defect review: kontrak "skip yang
+  unavailable" belum menangkap `api_key=""` (diteruskan mentah upstream). Jalur pin: kredensial
+  kosong → log + fallback strategi (bukan return ""); jalur strategi: kandidat kosong → lanjut.
+  Sekalian hapus variabel `account_id` ganda di pin (return langsung `pinned.id`). Docstring
+  langkah-5 diperbarui. Bukti: oauth.py:404-419 (pin), :442-456 (strategi).
+- `tests/backend/test_account_routing.py` BARUS (28 tes): mesin fill-first (prioritas asc, id asc
+  tie-break, skip raise/kosong, fallback legacy, enum tak dikenal=fail-safe), round-robin STICKY
+  (default 3; limit DARI KOLOM: 1/2; clamp 0→1; matriks clamp_sticky_limit; last_used_at persist;
+  urutan bertahan restart; kandidat gagal tidak makan streak), pin x-connection-id (menang atas
+  2 strategi; unknown/disabled/asing/token-gagal → fallback tanpa error; wrapper meneruskan pin;
+  resolve_target → ResolvedTarget.account_id), parsing header (absen/kosong/non-int/valid), DTO
+  rute provider/account (+validasi 400 invalid_fallback_strategy, clamp di PUT, PUT priority,
+  404 account_not_found, urutan list), migrasi self-heal idempoten 2× pada DB skema-lama dengan
+  default mendarat di baris lama.
+- Gate: suite penuh `python3 -m pytest tests/backend -q` = 526 passed, 1 skipped, 0 failed (40,63 s).
+  Laporan: `.opencode/reports/20260910/qa/1351_backend-gate-multiakun-9router.md` (+kontrak tahap-1).
+
+## 2026-09-10 — Pembersihan 4 merah PRE-EXISTING suite cli-tools (fitur terpisah `cli-tools-preexisting-red`, commit f986d51)
+- Bukti pre-existing: 4 gagal terulang IDENTIK di baseline c3a2241 (a237414~1, worktree terpisah)
+  → bukan regresi WIP; milik pekerjaan anthropic-inbound/cli-compat yang lalu.
+- `src/backend/cli_compat.py` (+9/−2): `except Exception: pass` di current_platform melanggar R12
+  (ketahuan guard AST test_logging) → debug-log stdlib `logging` + `import logging` (modul tetap
+  framework-free by design, TIDAK import backend.log).
+- `src/backend/cli_tools_router.py` (+30): `_claude_builder` BARUS + registrasi `"claude"` —
+  resolve in-app hanya inject OPENAI_* yang DIABAIKAN claude-code (gap nyata, ketahuan guard
+  test_every_verified_preset). Form = meniru scripts/cli-tools/claude.sh:64-83 (terbukti jalan):
+  ANTHROPIC_BASE_URL=root gateway (strip trailing slash + suffix /v1; CLI menambah /v1/messages
+  sendiri) + ANTHROPIC_API_KEY + ANTHROPIC_MODEL/--model opsional; prefix env per-perintah (pola
+  _openhands_builder), tidak persist config. Masking key di log tetap (replace ctx.key).
+- `tests/backend/test_cli_tools.py` (+32/−2): ToolDTO += kunci `compat` (ditambah katalog 36b71ad);
+  claude `("verified","")` (bukan unsupported/anthropic_only — flip sengaja pekerjaan inbound);
+  hapus kasus param claude basi (refusal tetap dicakup codex/antigravity/gpt-researcher/crewai);
+  + unit test `_claude_builder` (root-strip /v1, model-absen).
+- Diverifikasi: test_cli_tools+test_logging hijau; suite penuh hijau (di atas). BELUM di-exercise:
+  spawn claude-code sungguhan via terminal in-app (butuh biner + PTY live) — jujur di laporan.

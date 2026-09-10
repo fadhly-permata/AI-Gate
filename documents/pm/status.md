@@ -2,6 +2,21 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 2026-09-10 13:52 — GERBANG BACKEND multiakun 9router: HIJAU (ProjectManager + peran be-dev in-session)
+- Perintah user: review a237414 + jalankan suite, JANGAN ke fe-dev sebelum hijau (sekuensial, izin edit backend tersirat).
+- Jujur soal spawn: tool Task TIDAK tersedia di sesi ini → delegasi be-dev DIEMULKAN in-session; kerja tetap
+  ketat scope be-dev (hanya src/backend/** + tests/backend/**), aturan be-dev-skill + code-quality dibaca dulu.
+- Review 8 file a237414 vs kontrak: cocok; 1 defect nyata (kredensial kosong dianggap usable) + 1 kemasan
+  (variabel ganda di jalur pin) → OAuth diperbaiki. Bukti per-baris di laporan.
+- Tes mesin strategi BELUM ADA sama sekali → ditulis 28 (test_account_routing.py), hijau.
+- Run awal: 4 failed / 494 passed → 4 merah dibuktikan PRE-EXISTING (reproduksi IDENTIK di baseline c3a2241
+  via `git worktree` terpisah; worktree dibersihkan) → diperbaiki di commit TERPISAH f986d51 termasuk
+  gap nyata claude-launch-in-app (builder _claude_builder form claude.sh; spawn live belum di-exercise).
+- Run final: **526 passed, 1 skipped, 0 failed** (perintah: `python3 -m pytest tests/backend -q`).
+- Commit lokal refactor/ui: **03d9b6e** (fitur+tes) + **f986d51** (pembersihan). TIDAK push (tak diminta).
+- Laporan + kontrak tahap-1 resmi: `.opencode/reports/20260910/qa/1351_backend-gate-multiakun-9router.md`.
+- FE DEV BELUM DISPAWN — menunggu ACC user (instruksi + aturan sekuensial). state.md → mode BACKEND-HIJAU-NUNGGU-ACC-FE-DEV.
+
 ## 2026-09-10 04:35 — CHECKPOINT WIP pindah perangkat (HP -> TABLET): backend be-dev belum diverifikasi (ProjectManager)
 - be-dev tahap1 DIINTERUPSI user sebelum balik receipt, TAPI sempat nulis perubahan: 506 baris / 8 file `src/backend/**` (accounts_router, combo_routing, config/db, gateway/resolver, gateway/router, models, oauth, providers_router).
 - JUJUR: KOREKSI pernyataan PM sebelumnya "kode tidak berubah" = SALAH — backend KE-ubah. Yang terverifikasi BARU `py_compile` 8 file (sintaks OK). BELUM: pytest, diff review, kontrak final.

@@ -4,6 +4,21 @@
 (empty — diisi PM saat task pertama)
 
 ## Decisions
+- 2026-09-10 (GERBANG BACKEND multiakun 9router — HIJAU): user perintah eksplisit "review a237414 lalu
+  jalankan suite, jangan ke fe-dev sebelum hijau" → izin edit backend tersirat. Review per-file: kontrak
+  PM-kunci COCOK semua (kolom/migrasi/urutan/sticky/limit-dari-kolom/last_used_at/legacy fallback; nol
+  sentuh Combo+discovery+FE; nol SQL-format). 1 defect nyata ketahuan: kredensial KOSONG (`api_key=""`)
+  lolos sebagai "usable" → engine kini skip (03d9b6e). 28 tes mesin routing ditulis (belum ada sama sekali).
+  Suite awal 4 failed/494 passed → 4 merah TERBUKTI pre-existing (reproduksi identik di baseline c3a2241
+  via worktree; milik pekerjaan anthropic-inbound/cli-compat: R12 except-kosong cli_compat + claude
+  VERIFIED tanpa builder in-app = gap NYATA) → dibersihkan TERPISAH f986d51 (builder claude sungguhan,
+  form claude.sh:64-83; spawn live belum di-exercise). Final: **526 passed, 1 skipped, 0 failed**.
+  Default ambigu yang PM ambil (dicatat, user boleh veto): (1) pre-existing merah IKUT dibetihin karena
+  gerbang user minta "hijau" dan scope-nya be-dev; (2) strategi tak dikenal di DB lama = fail-safe
+  fill-first (bukan error); (3) `PUT /api/accounts/{id}` (hanya `priority`) diakui sebagai tambahan
+  kontrak — perlu biar priority bisa ditulis; (4) header pin diabaikan untuk combo (sesuai teks kontrak).
+  Kontrak tahap-1 RESMI: `.opencode/reports/20260910/qa/1351_backend-gate-multiakun-9router.md`.
+  Commit lokal `refactor/ui`: 03d9b6e + f986d51, TIDAK push. **STATUS: TUNGGU ACC user → tahap2 fe-dev.**
 - 2026-09-10 (MERGE main + PR #17): user "ok" -> `origin/main` digabung ke `refactor/ui`. Bentrok 4 berkas
   (`OPERATING_RULES.md`, `memory-bank.md`, `state.md`, `status.md`) diselesaiin dengan kebijakan:
   **v2 + arsip aktif menang, salinan versi main diarsipin** — diverifikasi **0 baris konten ilang**
@@ -93,6 +108,13 @@
 
 ## Progress
 [entri lama dipindah ke `documents/pm/archive/memory-bank-progress-lama.md` — tidak dihapus]
+- 2026-09-10: **GERBANG BACKEND multiakun 9router SELESAI — HIJAU.** Review a237414 beres (kontrak cocok;
+  defect "skip kredensial kosong" diperbaiki), 28 tes mesin routing BARUS, 4 merah pre-existing dibersihkan
+  terpisah (termasuk builder claude in-app yang sebelumnya cuma klaim verified). Suite penuh
+  `python3 -m pytest tests/backend -q` = 526 passed / 1 skipped / 0 failed. Commit lokal 03d9b6e + f986d51
+  (belum push). Kontrak tahap-1 + tabel temuan: laporan `1351_backend-gate-multiakun-9router.md`.
+  MENUNGGU ACC user untuk tahap2 fe-dev (modal ber-tab + discovery diam-diam). BELUM: exercise nyata
+  (gateway live/DB nyata/spawn claude).
 - 2026-09-10: **BANNER TUJUAN HALAMAN — Fase 0+1 SELESAI, TUNGGU USER.** User minta banner "tujuan halaman"
   di semua halaman KECUALI home + terminal; teks bakal dikasih user per halaman (belum dikasih → dilarang
   karang). PM inventarisasi read-only (nol sub-agent, nol perubahan src): SPA 1 berkas
