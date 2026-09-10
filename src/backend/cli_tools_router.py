@@ -979,9 +979,38 @@ def _openhands_builder(ctx: _LaunchCtx) -> str:
     return " ".join(env + parts)
 
 
+# --------------------------------------------------------------------------- #
+# claude (Claude Code) — Anthropic-native inbound form, verified by
+# scripts/cli-tools/claude.sh: the gateway serves POST /v1/messages natively
+# (no litellm middleman), and claude-code APPENDS "/v1/messages" to
+# ANTHROPIC_BASE_URL itself, so the gateway ROOT (never the /v1 base) is
+# exported. Model is optional (claude's own default applies when absent); when
+# present it is sent verbatim — aigate's /v1/messages resolves the ref
+# (provider:/combo:/bare), mirroring the script's ANTHROPIC_MODEL + --model.
+# Per-command env prefix only; nothing is persisted to the user's config.
+# --------------------------------------------------------------------------- #
+def _claude_builder(ctx: _LaunchCtx) -> str:
+    """claude-code's Anthropic Messages form pointing at the gateway root."""
+    root = ctx.base.rstrip("/")
+    if root.endswith("/v1"):
+        root = root[: -len("/v1")]
+    env = [
+        f"ANTHROPIC_BASE_URL={shlex.quote(root)}",
+        f"ANTHROPIC_API_KEY={shlex.quote(ctx.key)}",
+    ]
+    parts: List[str] = [ctx.binary_name]
+    if ctx.default_flags:
+        parts.append(ctx.default_flags)
+    if ctx.model:
+        env.append(f"ANTHROPIC_MODEL={shlex.quote(ctx.model)}")
+        parts += ["--model", shlex.quote(ctx.model)]
+    return " ".join(env + parts)
+
+
 # binary_name -> builder. Anything absent uses ``_generic_builder``.
 _LAUNCH_BUILDERS: Dict[str, Callable[[_LaunchCtx], str]] = {
     "aider": _aider_builder,
+    "claude": _claude_builder,
     "opencode": _opencode_builder,
     "aichat": _aichat_builder,
     "qwen": _qwen_builder,

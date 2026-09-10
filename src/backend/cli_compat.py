@@ -41,6 +41,7 @@ two are DIFFERENT axes:
 
 from __future__ import annotations
 
+import logging
 import platform
 from typing import Dict
 
@@ -235,8 +236,15 @@ def current_platform() -> str:
 
         if _is_termux():
             return "termux"
-    except Exception:  # noqa: BLE001 - backend package not on path in isolation
-        pass
+    except Exception as exc:  # noqa: BLE001 - backend package not on path in isolation
+        # R12: log, never swallow. This module is framework-free by design
+        # (bare-importable outside the app), so it logs via stdlib logging
+        # rather than backend.log — the fallback below is the real behavior.
+        logging.getLogger(__name__).debug(
+            "backend.paths.is_termux unavailable (%s); "
+            "falling back to platform.system()",
+            exc,
+        )
     sysname = platform.system()
     if sysname == "Windows":
         return "windows"
