@@ -2,6 +2,18 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 2026-09-10 04:35 — CHECKPOINT WIP pindah perangkat (HP -> TABLET): backend be-dev belum diverifikasi (ProjectManager)
+- be-dev tahap1 DIINTERUPSI user sebelum balik receipt, TAPI sempat nulis perubahan: 506 baris / 8 file `src/backend/**` (accounts_router, combo_routing, config/db, gateway/resolver, gateway/router, models, oauth, providers_router).
+- JUJUR: KOREKSI pernyataan PM sebelumnya "kode tidak berubah" = SALAH — backend KE-ubah. Yang terverifikasi BARU `py_compile` 8 file (sintaks OK). BELUM: pytest, diff review, kontrak final.
+- KEPUTUSAN: user mau pindah tablet + minta commit&push -> simpan state sbg WIP checkpoint (BUKAN klaim selesai) supaya tablet bisa pull.
+- NEXT di tablet: review diff be-dev -> jalankan pytest suite (mesin strategi + migrasi idempoten) -> hijau? -> PM terbitkan kontrak -> baru tahap2 fe-dev.
+
+## 2026-09-10 04:20 — Fitur baru: Provider multi-account strategy (adopsi 9router) — rencana diACC, tahap1 be-dev jalan (ProjectManager)
+- User minta: rotasi/fallback multi-akun DI DALAM jendela Tambah/Edit Provider (tab "Akun"), hapus panel Discover Models.
+- Riset otoritatif source 9router (decolua/9router @eb712ca) via sub-agent general: akun-level = fill-first + round-robin(sticky) + pin x-connection-id SAJA (bukan weighted/random). Dilaporkan jujur ke user (skala adopsi kecil; nilai riil = bisa DIPILIH + sticky + pin + backoff).
+- Keputusan user: adopsi strategi 9router apa adanya; discovery opsi (a) hapus UI tetap panggil diam-diam; Combo utuh; eksekusi SEKUENSIAL.
+- Kontrak PM-kunci ditulis di state.md checkpoint. Tahap1 = be-dev (DB migration idempoten + mesin select + DTO), hasilkan kontrak di receipt. Tahap2 = fe-dev (modal ber-tab + hapus panel + wire) SETELAH kontrak PM tayang.
+
 ## 2026-09-10 04:07 — Banner halaman Fase 3: fe-dev spawned + diterima, fitur di-COMMIT (ProjectManager)
 - ACC user: "oke kerjain" = 8 draf ID + opsi A + bentuk Opsi B. Delegasi: fe-dev (sudah ter-generate, reuse)
   via `opencode run --agent fe-dev` — ONE spawn, handover file di luar repo (scope: index.html, styles.css,
