@@ -2,6 +2,28 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 2026-09-11 06:35 — TAHAP 2 fe-dev multiakun 9router: UI ber-tab + strategi + discovery diam-diam — HIJAU gate (ProjectManager ← fe-dev)
+- ACC user = "1" → fase layar dimulai. Spawn `fe-dev` (Task tool, sesi `ses_f72729e77ffe6H48p0dNBL0Jyn`) — agen & skill SUDAH ada → reuse, nol generasi.
+- Handover: kontrak tahap-1 (laporan 1351 §KONTRAK) + peta `file:line` hasil pembacaan ULANG PM (anchor checkpoint lama
+  masih valid; commit banner `a9c7f3b` tidak menggeser `#provModal:849`) + 5 default ambigu dikunci PM + definisi selesai.
+- Realisasi 1 putaran, 13 berkas `src/frontend/**`: modal `#provModal` ber-tab ARIA (Provider|Akun), `#provStrategy`
+  (enum dua) + `#provStickyLimit` (tampil hanya round-robin), akun pindah ke tab + kolom Prioritas (PUT `{priority}` saja)
+  & Terakhir-dipakai baca-saja, UI discovery dihapus tapi `/discover` tetap jalan diam-diam (penjaga balapan + gagal
+  senyap `console.warn`, BUKAN telan error), jalur masuk kartu detail dipindah ke tombol nama (B5.5 pemakaian tetap terjangkau).
+- GATE PM MANDIRI (bukan klaim sub-agent): vitest **23 berkas / 547 tes LOLOS** (baseline 523 → +24), paritas i18n
+  `zh` 411 kunci hilang 0, `git diff --check` bersih, `git status` = 14 berkas semua `src/frontend/**`
+  (NOL `src/backend/**`, NOL `combos.js`), 0 warna hex baru di CSS, rujukan UI discovery lama di `static/**` = 0.
+- TINDAK LANJUT: `fe-dev` melaporkan sendiri `e2e/b5_features.mjs` terpengaruh → didelegasikan ulang (batas 1 berkas),
+  diseuaikan ke UI baru, `node --check` exit 0. Playwright TIDAK dijalankan (nol browser di Termux) — jujur.
+- INSIDEN LINGKUP (dilaporkan jujur, diverifikasi PM): satu suntingan sempat menyentuh komentar `static/app.js` di luar
+  batas "hanya e2e" → dibatalkan ke teks tergates; PM cek ulang `node --check` + vitest tetap 547 hijau. Nol dampak fungsional;
+  TIDAK ada aturan baru (pelanggaran kecil, terdeteksi & dipulihkan oleh mekanisme receipt+gate, bukan pola berulang).
+- Keputusan PM: 4 kunci i18n lama (`providers.discover|no_models|model_id|model_name`) jadi tak terpakai → DITAHAN, tidak di-purge.
+- Catatan paperwork: `task-report.md` minta pelaksana menulis laporan sendiri, tapi akar tulis `fe-dev` = `src/frontend/**`
+  ( `.opencode/rules/agent-boundaries.md`) → laporan ditulis PM dari receipt. Dua aturan bertabrakan; perlu putusan user.
+- BELUM: dijalankan di aplikasi nyata (G3; perlu muat ulang server = keputusan user J6) + uji mata tab di HP; push; PR #17.
+- Laporan: `.opencode/reports/20260911/implementation/0633_ui-multiakun-tahap2-implementasi.md`. Register per berkas: `documents/dev/CODE_CHANGES.md`.
+
 ## 2026-09-10 13:52 — GERBANG BACKEND multiakun 9router: HIJAU (ProjectManager + peran be-dev in-session)
 - Perintah user: review a237414 + jalankan suite, JANGAN ke fe-dev sebelum hijau (sekuensial, izin edit backend tersirat).
 - Jujur soal spawn: tool Task TIDAK tersedia di sesi ini → delegasi be-dev DIEMULKAN in-session; kerja tetap

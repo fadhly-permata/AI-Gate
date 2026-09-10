@@ -1451,3 +1451,71 @@ Bukti "kode lama masih aktif" tidak berlaku: tidak ada proses produk yang disent
   + unit test `_claude_builder` (root-strip /v1, model-absen).
 - Diverifikasi: test_cli_tools+test_logging hijau; suite penuh hijau (di atas). BELUM di-exercise:
   spawn claude-code sungguhan via terminal in-app (butuh biner + PTY live) — jujur di laporan.
+
+## 2026-09-11 — UI strategi multi-akun TAHAP 2 (fe-dev; branch refactor/ui, BELUM push)
+
+**Asal:** ACC user ("1") atas tahap-2 fitur adopsi 9router. Kontrak =
+`.opencode/reports/20260910/qa/1351_backend-gate-multiakun-9router.md` §KONTRAK.
+Eksekutor: `fe-dev` (Task tool, 2 putaran). Laporan:
+`.opencode/reports/20260911/implementation/0633_ui-multiakun-tahap2-implementasi.md`.
+Batas lingkup dijaga: **nol `src/backend/**`, nol `combos.js`** (keputusan user terkunci).
+
+### Perubahan (14 berkas `src/frontend/**`)
+- `static/index.html` (+155/−125): kartu detail provider dibersihkan (:311-328) — `#provDiscoverBtn`,
+  `#provModelMsg`, `#provModelsTable`/`#provModelsBody`, dan subseksi akun DIHAPUS dari kartu;
+  `#provModal` jadi ber-tab (tablist `#provTabList` :797, panel Provider + panel Akun :888-927,
+  kontrol baru `#provStrategy`/`#provStickyRow`/`#provStickyLimit`, `#accPriority` :918-919,
+  hint `#provTabHint`); Cancel keluar dari `<form>`; cache-buster `styles.css?v=20260914→20260915`.
+- `static/app.js` (+266/−39): tab ARIA + roving tabindex + panah/Home/End (:858-960); `openAddModal` menonaktifkan
+  tab Akun + hint (:962-981); `openEditModal` mengisi 2 field strategi, mengaktifkan tab Akun,
+  memanggil discovery DIAM-DIAM (:983-1026); `saveProvider` mengirim `fallback_strategy` selalu dan
+  `sticky_round_robin_limit` hanya saat `round-robin`, clamp ≥1/default 3 (:1073-1090);
+  `openDetail(id, skipDiscover)` + `discoverModels(id,{quiet})` dengan penjaga balapan `discoverSeq`
+  dan gagal senyap → `console.warn` (BUKAN `except: pass` — R12) (:1123-1198); `renderAccounts`
+  += kolom Prioritas (input number, commit-on-change) + Terakhir dipakai (`never_used` bila null)
+  (:1240-1323); `updateAccountPriority` = `PUT /api/accounts/{id}` body `{priority}` SAJA
+  (:1327-1338); `addAccount` kirim `priority` default 0 (:1341-1383); sel Nama jadi tombol masuk
+  detail `.prov-name-btn` (:786-808, pengganti aksi kebab `discover` yang dihapus); kebab = edit+delete.
+- `static/styles.css` (+51): `.modal-tabs`, `.modal-tab`(+`is-active`/`aria-disabled`/`focus-visible`),
+  `.prov-tabpanel[hidden]`, `.prov-name-btn`, `.acc-priority`, `.acc-never` (:1079-1131).
+  **Nol warna hex baru** — semua token existing → mode gelap otomatis (dibuktikan `git diff | grep -c '#hex'` = 0).
+- `static/i18n/{en,id,ru,nl,ja,zh,zh-tw}.js` (+11 @ 7): kunci baru `providers.tabs_label`,
+  `providers.tab_provider`, `providers.tab_accounts`, `providers.strategy`,
+  `providers.strategy_fill_first`, `providers.strategy_round_robin`, `providers.sticky_limit`,
+  `accounts.priority`, `accounts.last_used`, `accounts.never_used`, `accounts.save_first`.
+  Paritas 7/7: `i18n-parity-check.mjs zh` = 411 kunci, hilang 0, thừa 0.
+- `tests/providers.test.js` (15→32 tes): muatan tablist, akun di panel modal, UI discovery hilang,
+  enum select, kartu detail bersih, perilaku tab (klik + panah/Home/End + wrap), `saveProvider`
+  (+2 field, omit saat fill-first, clamp), `openEditModal` memanggil `/discover` senyap tanpa
+  pesan/tabel + gagal senyap tak mem-block, limit sticky tersembunyi saat fill-first, balapan
+  respons basi, `discoverModels` legacy tetap dipertahankan.
+- `tests/accounts.test.js` (8→17 tes): DTO += priority/last_used_at; kolom baru + colspan 6;
+  PUT `{priority}` saja (tanpa `last_used_at`) + muat ulang; no-op tidak mengirim PUT; 404 inline;
+  POST menyertakan `priority`.
+- `tests/row-actions.test.js`: kebab kini `["edit","delete"]` + assert tombol nama.
+- `e2e/b5_features.mjs` (tindak lanjut, DIDELEGASIKAN ULANG karena `fe-dev` melaporkan sendiri
+  terpengaruh): jalur B5.1 ditulis ulang ke UI baru — detail via `.prov-name-btn.js-prov-detail`,
+  akun via kebab `edit` → `#provModal` → `#provTabAccounts` → `#provPanelAccounts`, plus assert
+  `#accPriority` (number, min 0) + `.acc-priority` per baris; komentar alur :13-19 diperbarui.
+  `node --check` exit 0. `android.mjs`/`smoke.spec.js` terverifikasi tidak terpengaruh (level API).
+
+### Gate PM (mandiri, bukan klaim sub-agent)
+`node node_modules/.bin/vitest run` = **23 berkas / 547 tes LOLOS** (baseline 523 → +24);
+`git diff --check` bersih; `git status --short` = 14 berkas semuanya `src/frontend/**`;
+rujukan `provModelsTable|provDiscoverBtn|provModelsBody` di `static/**` = 0; banner
+`page_desc.providers` utuh; `node --check` app.js + b5_features.mjs exit 0.
+
+### Insiden lingkup (dilaporkan jujur oleh fe-dev, diverifikasi PM)
+Satu suntingan sempat menyentuh komentar `static/app.js` (3 baris non-fungsional) di luar batas
+"HANYA e2e" → dibatalkan ke teks persis tergates; PM memverifikasi ulang `node --check` + vitest
+547 hijau. Nol dampak fungsional.
+
+### Yang TIDAK diubah (keputusan PM, dicatat di laporan)
+4 kunci i18n lama jadi tak terpakai (`providers.discover`, `providers.no_models`,
+`providers.model_id`, `providers.model_name`) → DITAHAN, tidak di-purge (endpoint `/discover` masih
+dipanggil diam-diam; purging = riuh 7 berkas tanpa nilai tes). Boleh dicabut user.
+
+### BELUM diverifikasi
+Aplikasi nyata (butuh muat ulang server oleh user — J6, keputusan user) + uji mata papan ketik/tab
+di HP (G3); Playwright belum dijalankan; terjemahan 6 bahasa belum ditinjau penutur;
+commit belum di-push; PR #17 masih terbuka.

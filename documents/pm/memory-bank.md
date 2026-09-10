@@ -4,6 +4,31 @@
 (empty — diisi PM saat task pertama)
 
 ## Decisions
+- 2026-09-11 (TAHAP 2 UI multiakun 9router — SELESAI tingkat tes): ACC user ("1") → spawn `fe-dev` (agen+skill sudah
+  ada → reuse, nol generasi; Task tool TERSEDIA di sesi ini, beda dari sesi backend kemarin). Handover memuat kontrak
+  tahap-1 + peta `file:line` yang diverifikasi ULANG PM sebelum tulis (anchor checkpoint lama masih valid). Hasil: modal
+  provider ber-tab ARIA `[Provider|Akun]` (keyboard panah/Home/End, roving tabindex), pemilih strategi
+  (`fill-first`|`round-robin`) + limit sticky yang hanya tampil saat round-robin, akun pindah ke tab dengan kolom
+  Prioritas (commit-on-change → `PUT /api/accounts/{id}` berisi `{priority}` SAJA, `last_used_at` tidak dikirim) dan
+  kolom "Terakhir dipakai" baca-saja, **UI discovery dihapus** (`#provModelsTable`/`#provDiscoverBtn`/`#provModelMsg` +
+  aksi kebab `discover`) TAPI `/discover` tetap dipanggil DIAM-DIAM dengan penjaga balapan dan kegagalan senyap
+  (`console.warn`, bukan menelan error — R12). KORBAN YANG DISELAMATKAN: aksi kebab `discover` tadinya satu-satunya jalur
+  masuk kartu detail → subsection pemakaian B5.5 (`usage.js`) jadi tak terjangkau; fe-dev memindahkannya ke tombol nama
+  provider (`.prov-name-btn`) — diterima PM (nol sentuh modul lain, keyboard-reachable). Combo TIDAK disentuh
+  (`combos.js:353` utuh) sesuai keputusan terkunci user. **GATE PM MANDIRI**: vitest **23 berkas / 547 tes LOLOS**
+  (baseline 523 → +24), paritas i18n 411 kunci × 7 kamus (hilang 0), `git diff --check` bersih, 14 berkas semua
+  `src/frontend/**`, 0 warna hex baru, rujukan UI discovery lama di `static/**` = 0. Default ambigu PM kunci (diterima):
+  (1) aksi kebab discover ikut dihapus, fungsi `discoverModels` + ekspor `window.aigate.discoverModels` tetap ada;
+  (2) `last_used_at===null` → teks "belum pernah"; (3) priority dikirim pada event `change`, bukan tiap ketikan;
+  (4) TIDAK ada kontrol pin `x-connection-id` di UI tahap ini; (5) CSS tab pakai token existing + cache-buster
+  `styles.css?v=20260915`. UTANG DITAHAN: 4 kunci i18n lama jadi tak terpakai (`providers.discover|no_models|model_id|
+  model_name`) → tidak di-purge (endpoint `/discover` masih dipakai diam-diam; purging = riuh 7 berkas tanpa nilai tes) —
+  user boleh cabut. TEMUAN RULE TABELING: `task-report.md` minta PELAKSANA menulis laporannya sendiri, tapi akar tulis
+  `fe-dev` dibatasi `src/frontend/**` oleh `agent-boundaries.md` → laporan ditulis PM dari receipt; dua rule bertabrakan,
+  butuh putusan user.   Insiden lingkup kecil dilaporkan jujur oleh fe-dev (sempat menyentuh komentar `app.js` lalu dibatalkan)
+  → diverifikasi PM, nol dampak, TIDAK dibuatkan rule baru (bukan pola berulang; gate receipt+vitest sudah menangkap).
+  BELUM: exercise aplikasi nyata (G3) + muat ulang server (J6 = keputusan user) + uji mata tab di HP + push + PR #17.
+  Laporan: `.opencode/reports/20260911/implementation/0633_ui-multiakun-tahap2-implementasi.md`.
 - 2026-09-10 (GERBANG BACKEND multiakun 9router — HIJAU): user perintah eksplisit "review a237414 lalu
   jalankan suite, jangan ke fe-dev sebelum hijau" → izin edit backend tersirat. Review per-file: kontrak
   PM-kunci COCOK semua (kolom/migrasi/urutan/sticky/limit-dari-kolom/last_used_at/legacy fallback; nol
@@ -108,6 +133,13 @@
 
 ## Progress
 [entri lama dipindah ke `documents/pm/archive/memory-bank-progress-lama.md` — tidak dihapus]
+- 2026-09-11: **TAHAP 2 UI multiakun 9router SELESAI — HIJAU di tingkat tes.** fe-dev spawned (reuse agen+skill), 2 putaran.
+  Modal provider ber-tab ARIA (Provider|Akun) + pemilih strategi + limit sticky kondisional + kolom Prioritas/Last-used di
+  tab akun; UI discovery dihapus, `/discover` jalan diam-diam; jalur masuk kartu detail pindah ke tombol nama. Combo &
+  backend nol sentuh. Gate PM: vitest 23 berkas/**547 tes** LOLOS (+24 dari baseline 523), paritas i18n 411×7, diff-check
+  bersih, 14 berkas semua `src/frontend/**`. e2e `b5_features.mjs` disesuaikan (belum dijalankan — nol browser).
+  MENUNGGU USER: muat ulang server + uji mata di HP (G3), keputusan push, review PR #17.
+  Laporan: `.opencode/reports/20260911/implementation/0633_ui-multiakun-tahap2-implementasi.md`.
 - 2026-09-10: **GERBANG BACKEND multiakun 9router SELESAI — HIJAU.** Review a237414 beres (kontrak cocok;
   defect "skip kredensial kosong" diperbaiki), 28 tes mesin routing BARUS, 4 merah pre-existing dibersihkan
   terpisah (termasuk builder claude in-app yang sebelumnya cuma klaim verified). Suite penuh
