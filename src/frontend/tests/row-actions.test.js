@@ -23,7 +23,7 @@ describe("kebab action menu + lang dropdown", () => {
     expect(html).not.toContain('class="lang-btn"');
   });
 
-  it("providers row kebab opens menu with edit/discover/delete", () => {
+  it("providers row kebab opens menu with edit/delete (discover removed, stage-2)", () => {
     document.body.innerHTML = '<table><tbody id="provTableBody"></tbody></table>';
     window.aigate.renderProviders([
       { id: "p1", name: "OpenAI", type: "openai-compatible", base_url: "u", enabled: true, models: [] }
@@ -35,10 +35,17 @@ describe("kebab action menu + lang dropdown", () => {
     expect(menu).toBeTruthy();
     const actions = Array.from(menu.querySelectorAll("[data-action]"))
       .map((b) => b.getAttribute("data-action"));
-    expect(actions).toEqual(["edit", "discover", "delete"]);
+    expect(actions).toEqual(["edit", "delete"]);
     expect(menu.textContent).toContain("Edit");
-    expect(menu.textContent).toContain("Discover Models");
     expect(menu.textContent).toContain("Delete");
+    // The old "Discover Models" action is gone: discovery runs silently from
+    // openEditModal/openDetail now.
+    expect(menu.querySelector('[data-action="discover"]')).toBeNull();
+    // The name cell is the detail entry point (button = keyboard reachable).
+    const nameBtn = document.querySelector("#provTableBody .js-prov-detail");
+    expect(nameBtn).toBeTruthy();
+    expect(nameBtn.tagName).toBe("BUTTON");
+    expect(nameBtn.getAttribute("data-id")).toBe("p1");
   });
 
   it("updateLangUI renders flag + localized name in trigger and menu", () => {

@@ -1076,6 +1076,57 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
   font-size: 20px;
 }
 
+/* ===== Provider modal tabs (stage-2: Provider | Accounts) =====
+   Token-only colors so the dark theme follows automatically. Roving-tablist
+   pattern: .is-active marks the selected tab; JS keeps aria in sync. */
+.modal-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--panel-border);
+  margin-bottom: 16px;
+}
+
+.modal-tab {
+  padding: 8px 14px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: none;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition);
+}
+.modal-tab:hover { color: var(--fg); }
+.modal-tab.is-active { color: var(--accent); border-bottom-color: var(--accent); }
+.modal-tab[aria-disabled="true"] { color: var(--muted); opacity: 0.5; cursor: not-allowed; }
+.modal-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.prov-tabpanel { display: block; }
+.prov-tabpanel[hidden] { display: none; }
+
+/* Provider-table name cell doubles as the detail-card entry button. */
+.prov-name-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--transition);
+}
+.prov-name-btn:hover { color: var(--accent); text-decoration: underline; }
+.prov-name-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Accounts tab: per-row priority stepper stays table-compact (base
+   .form-input is sized for form rows, not cells). */
+.acc-priority { width: 72px; min-width: 0; max-width: none; padding: 4px 6px; }
+.acc-never { color: var(--muted); }
+
 /* ===== Terminal view (B3.1) — ONE COHESIVE PANEL =====
    The tab strip and the terminal surface are two rows of a single framed panel
    (.terminal-body): shared dark surface colour, one 1px seam between them, and

@@ -10,10 +10,13 @@
 // Yang di-drive (semua selector diverifikasi dari app.js / index.html /
 // usage.js / analytics.js — bukan asumsi):
 //   seed   : POST /api/providers + POST /api/accounts (via page.evaluate fetch)
-//   B5.1   : nav providers -> baris #provTableBody -> menu aksi (kebab) ->
-//            item "discover" -> #provDetail -> #accountsBody "e2e-acc".
-//            CATATAN: semua aksi baris kini lewat menu kebab (.js-row-menu),
-//            konsisten dgn Combos/Proxy Pools/Endpoints.
+//   B5.1   : nav providers -> baris #provTableBody -> tombol .prov-name-btn ->
+//            #provDetail (kartu detail bersih: judul + Edit/Delete + usage);
+//            lalu kebab (.js-row-menu) -> item "edit" -> #provModal -> tab
+//            #provTabAccounts -> panel #provPanelAccounts berisi #accountsBody
+//            dengan baris "e2e-acc" + form add (termasuk kolom #accPriority).
+//            CATATAN stage-2: item kebab "discover" + tabel model hilang —
+//            discovery kini berjalan diam-diam dan akun pindah ke tab modal.
 //   B5.5   : nav usage -> #quotaTableBody tr.quota-row (provider seed muncul,
 //            kemungkinan "unlimited") + #usageTotals .usage-stat
 //   B5.6   : nav analytics -> #analyticsChart .trend-col >= 1 +
@@ -124,7 +127,7 @@ async function gotoView(pg, view) {
   await pg.click('.nav-item[data-view="' + view + '"]');
 }
 
-/* ---- B5.1: Providers -> detail -> Accounts ---- */
+/* ---- B5.1: Providers -> detail card -> edit modal -> tab Accounts ---- */
 async function testProvidersAccounts(pg, providerId) {
   await gotoView(pg, "providers");
   const rowSel = '#provTableBody tr.prov-row[data-id="' + providerId + '"]';
@@ -133,13 +136,33 @@ async function testProvidersAccounts(pg, providerId) {
   assert((name || "").indexOf("e2e-anth") !== -1,
     "sel nama provider seed salah: " + JSON.stringify(name));
 
-  // Buka DETAIL via menu aksi (kebab) -> item "discover" (openDetail -> loadAccounts).
-  await pg.click(rowSel + " .js-row-menu");
-  await pg.waitForSelector('.row-menu .row-menu-item[data-action="discover"]', { visible: true, timeout: WAIT });
-  await pg.click('.row-menu .row-menu-item[data-action="discover"]');
+  // 1) Kartu detail: satu-satunya jalur masuk sekarang = tombol nama di baris
+  //    (app.js renderProviders -> .prov-name-btn.js-prov-detail -> openDetail).
+  await pg.click(rowSel + " .prov-name-btn.js-prov-detail");
   await pg.waitForFunction(() => {
     const d = document.getElementById("provDetail");
     return !!d && !d.hidden;
+  }, { timeout: WAIT });
+
+  // 2) Accounts pindah ke tab modal (stage-2): buka modal EDIT lewat kebab
+  //    (item "discover" sudah dihapus; kebab = edit + delete saja).
+  await pg.click(rowSel + " .js-row-menu");
+  await pg.waitForSelector('.row-menu .row-menu-item[data-action="edit"]', { visible: true, timeout: WAIT });
+  await pg.click('.row-menu .row-menu-item[data-action="edit"]');
+  await pg.waitForSelector("#provModal", { visible: true, timeout: WAIT });
+  // openEditModal mengaktifkan tab Akun (mode tambah = aria-disabled + hint);
+  // tunggu sampai modal tampil DAN tab benar-benar enabled sebelum klik.
+  await pg.waitForFunction(() => {
+    const t = document.getElementById("provTabAccounts");
+    return !!t && !t.hasAttribute("aria-disabled");
+  }, { timeout: WAIT, polling: 300 });
+
+  // Klik tab Akun -> panel #provPanelAccounts tampil (hidden dilepas).
+  await pg.click("#provTabAccounts");
+  await pg.waitForFunction(() => {
+    const t = document.getElementById("provTabAccounts");
+    const p = document.getElementById("provPanelAccounts");
+    return !!t && !!p && t.getAttribute("aria-selected") === "true" && !p.hidden;
   }, { timeout: WAIT });
 
   // Accounts section merender account seed (label + auth_type di baris sama).
@@ -153,11 +176,17 @@ async function testProvidersAccounts(pg, providerId) {
     );
   }, { timeout: WAIT, polling: 300 });
 
-  // Kontrol OAuth + form add-account ada di dalam detail.
+  // Kontrol OAuth + form add-account ada di dalam panel Accounts modal.
   await pg.waitForSelector("#provConnectOAuthBtn", { visible: true, timeout: WAIT });
-  for (const sel of ["#accountsTable", "#accLabel", "#accAuthType", "#accApiKey", "#accAddBtn"]) {
+  for (const sel of ["#accountsTable", "#accLabel", "#accAuthType", "#accApiKey", "#accPriority", "#accAddBtn"]) {
     assert(await pg.$(sel), "kontrol accounts hilang: " + sel);
   }
+  // Kolom Priority per baris (stage-2): baris seed punya stepper number min=0.
+  const hasPriorityCol = await pg.$eval(
+    '#accountsBody tr.acc-row .acc-priority',
+    (el) => el.type === "number" && el.getAttribute("min") === "0"
+  ).catch(() => false);
+  assert(hasPriorityCol, "kolom Priority (input number min=0) tidak ada di baris akun");
 }
 
 /* ---- B5.5: Usage & Quota ---- */
