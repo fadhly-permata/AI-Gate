@@ -352,8 +352,10 @@ def select_provider_credential_with_account(
        ``round-robin`` -> :func:`_round_robin_order` (sticky, then LRU);
     4. no accounts at all -> ``(provider.api_key, None)`` (legacy fallback,
        unchanged behavior);
-    5. every candidate's token unresolvable -> logged + legacy fallback, so the
-       gateway is never crashed by an OAuth refresh failure (ADR-013 fail-safe).
+    5. every candidate's token unresolvable OR empty -> logged + the account is
+       skipped ("unavailable" in the contract); all skipped -> legacy fallback,
+       so the gateway is never crashed by an OAuth refresh failure (ADR-013
+       fail-safe).
 
     A successful selection persists ``last_used_at`` (and, for ``round-robin``,
     the consecutive-use counter).
@@ -402,9 +404,21 @@ def select_provider_credential_with_account(
                     },
                 )
             else:
-                account_id = pinned.id
-                _record_account_use(provider, pinned, session, strategy)
-                return credential, account_id
+                if not credential:
+                    # Contract "skip if unavailable": an account whose stored
+                    # credential is empty is unusable — never forward "" upstream.
+                    log_error(
+                        "pinned account yielded an empty credential; falling "
+                        "back to the routing strategy",
+                        source=LOG_SOURCE,
+                        context={
+                            "provider_id": provider.id,
+                            "account_id": pinned.id,
+                        },
+                    )
+                else:
+                    _record_account_use(provider, pinned, session, strategy)
+                    return credential, pinned.id
 
     # 2-5. Strategy path.
     candidates = (
@@ -427,9 +441,21 @@ def select_provider_credential_with_account(
                 },
             )
             continue
-        account_id = account.id
+        if not credential:
+            # Contract "skip if unavailable": an empty stored credential would
+            # otherwise be forwarded upstream verbatim and fail there.
+            log_error(
+                "account yielded an empty credential; trying the next account",
+                source=LOG_SOURCE,
+                context={
+                    "provider_id": provider.id,
+                    "account_id": account.id,
+                    "strategy": strategy,
+                },
+            )
+            continue
         _record_account_use(provider, account, session, strategy)
-        return credential, account_id
+        return credential, account.id
 
     log_error(
         "no enabled provider account yielded a usable credential; "
