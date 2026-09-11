@@ -12,11 +12,11 @@ under its own terms.
 
 Files copied into this repository, under `src/frontend/static/vendor/xterm/`:
 
-| File | Role |
-| --- | --- |
-| `xterm.js` | terminal emulator core |
-| `xterm.css` | terminal styles |
-| `xterm-addon-fit.js` | fit addon (resize to container) |
+| File | Bytes | Role | sha256 (this repo) |
+| --- | ---: | --- | --- |
+| `xterm.js` | 283,404 | terminal emulator core | `f0aea0f75f48559013ae6643c2479dd737d26da42d5524e6d2b70915ae6523c7` |
+| `xterm.css` | 5,383 | terminal styles | `832f3f2c603b43ad4351ff04970150cc7a873014276db126a6065c6dd81e4872` |
+| `xterm-addon-fit.js` | 1,503 | fit addon (resize to container) | `10f3194c5f17c1786fb7d5db865c1ec8539b6736a318063fd38bdaaf7c46848f` |
 
 **License: MIT.**
 
@@ -47,14 +47,38 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-**Version note.** The exact xterm.js version of the vendored files is **not
-recorded anywhere in this repository**, so no version number is stated here; it is
-left unspecified rather than guessed. The JavaScript files are minified and carry no
-version marker, and no `package.json`, `LICENSE`, or other upstream metadata was
-committed alongside them — only `xterm.css` retains an inline license header. The
-license text above is taken from the upstream xterm.js repository (`master` branch),
-so it reflects that project's notice, not necessarily a pinned release of the
-vendored copies.
+**Version note (provenance, verified 2026-09-11).** The vendored copies are
+identified as **`xterm@5.3.0`** (core + css) and **`xterm-addon-fit@0.8.0`** (addon).
+This identification is based on **hash equality against the official npm release
+artifacts, not on any version string inside the files** — the minified JavaScript
+carries only a `version="6"` marker (a protocol/version number, not a package release
+number), and no `package.json` or upstream `LICENSE` was committed alongside the
+copies. Each vendored file is byte-for-byte identical to a file in the corresponding
+tarball:
+
+| Vendored file | Identical to | Source tarball |
+| --- | --- | --- |
+| `xterm.js` | `lib/xterm.js` in `xterm@5.3.0` | <https://registry.npmjs.org/xterm/-/xterm-5.3.0.tgz> |
+| `xterm.css` | `css/xterm.css` in `xterm@5.3.0` | <https://registry.npmjs.org/xterm/-/xterm-5.3.0.tgz> |
+| `xterm-addon-fit.js` | `lib/xterm-addon-fit.js` in `xterm-addon-fit@0.8.0` | <https://registry.npmjs.org/xterm-addon-fit/-/xterm-addon-fit-0.8.0.tgz> |
+
+Registry metadata for those tarballs, checked at verification time: `xterm@5.3.0`
+sha1 `867daf9cc826f3d45b5377320aabd996cb0fce46` (license MIT); `xterm-addon-fit@0.8.0`
+sha1 `48ca99015385141918f955ca7819e85f3691d35f` (license MIT).
+
+Two caveats are stated honestly:
+
+- The npm package name `xterm` is the predecessor of the scoped `@xterm/xterm`
+  (the project was renamed). `@xterm/xterm@5.3.0` does **not** publish the same
+  `lib/xterm.js`, so the match is against the legacy unscoped `xterm@5.3.0` artifact.
+- The MIT text reproduced above is taken from the upstream xterm.js repository
+  (`master` branch). It has **not** been compared line-by-line against the license
+  file shipped inside the `xterm@5.3.0` / `xterm-addon-fit@0.8.0` tarballs, so it
+  reflects the project's notice rather than a per-release license diff. The
+  `@license MIT` header inline in `xterm.css` is consistent with it.
+
+*Last verified 2026-09-11 against the npm registry; method: sha256 per file vs
+official tarball.*
 
 ---
 
@@ -62,13 +86,13 @@ vendored copies.
 
 Files copied into this repository, under `src/frontend/static/vendor/font-awesome/`:
 
-| File | Bytes | Role | License layer |
-| --- | ---: | --- | --- |
-| `LICENSE.txt` | 7,427 | upstream license text, redistributed with the copies | the notice itself |
-| `css/all.min.css` | 102,641 | icon classes, codepoints, `@font-face` rules | Code / MIT |
-| `webfonts/fa-brands-400.woff2` | 117,372 | brand glyph face | Fonts / OFL 1.1 |
-| `webfonts/fa-regular-400.woff2` | 25,452 | regular (400) glyph face | Fonts / OFL 1.1 |
-| `webfonts/fa-solid-900.woff2` | 156,496 | solid (900) glyph face | Fonts / OFL 1.1 |
+| File | Bytes | Role | License layer | sha256 (this repo) |
+| --- | ---: | --- | --- | --- |
+| `LICENSE.txt` | 7,427 | upstream license text, redistributed with the copies | the notice itself | `0aa8f86525273b2efa4f40f4272a188e187704252170e979dc06879adf68d43c` |
+| `css/all.min.css` | 102,641 | icon classes, codepoints, `@font-face` rules | Code / MIT | `c22cfb6520a7fdbb738632834019acf47c78b1279462c0eb4cb83bae83ecb5a7` |
+| `webfonts/fa-brands-400.woff2` | 117,372 | brand glyph face | Fonts / OFL 1.1 | `3a8924cd5203a28628716aedb5cef0943da4c3b44e3ffcee90ab06387b41c490` |
+| `webfonts/fa-regular-400.woff2` | 25,452 | regular (400) glyph face | Fonts / OFL 1.1 | `2bccecf0bc7e96cd5ce4003abeb3ae9ee4a3d19158c4e6edfd2df32d2f0d5721` |
+| `webfonts/fa-solid-900.woff2` | 156,496 | solid (900) glyph face | Fonts / OFL 1.1 | `9fc85f3a4544ab0d570c7f8f9bbb88db8d92c359b2707580ea8b07c75673eae2` |
 
 Total: 5 files, 409,388 bytes. The copies in this working tree are **byte-identical**
 to the ones already committed on branch `docs/wiki` (same five git blob hashes), so
@@ -86,9 +110,8 @@ returns **0 matches** (checked 2026-09-11). The browser fetches these assets fro
 aigate's own origin, so icons render with no network access and no third-party
 request leaves the device.
 
-**Version note (provenance debt, stated honestly).** The version string comes from
-the header comment inside the vendored stylesheet itself — the only provenance
-record this repository holds:
+**Version note (provenance, verified 2026-09-11).** The version string comes from
+the header comment inside the vendored stylesheet:
 
 ```
 /*!
@@ -98,13 +121,30 @@ record this repository holds:
  */
 ```
 
-There is **no** download record, upstream release URL, manifest, or checksum for
-these files anywhere in the repository, so "6.5.1" is reported as what upstream
-stamped into the files, and the copies have **not** been verified byte-for-byte
-against a Font Awesome Free 6.5.1 release artifact. No claim of official
-provenance is made here. This is the same class of gap the xterm.js note in
-section 1 records, and it is tracked alongside `WL.4` (version pinning) in
-`documents/plan/wiki-backlog.md`.
+That header is no longer the only provenance record. The five vendored files have
+been checked **byte-for-byte against the official release artifact** and all five
+match exactly, so "6.5.1" is now a verified release identity rather than an
+unverified self-stamp:
+
+- Source: the npm package `@fortawesome/fontawesome-free` version `6.5.1`, tarball
+  <https://registry.npmjs.org/@fortawesome/fontawesome-free/-/fontawesome-free-6.5.1.tgz>
+  (4,951,025 B). The downloaded tarball was matched to the registry metadata before
+  any file comparison — `sha512-CNy5vSwN3fsUStPRLX7fUYojyuzoEMSXPl7zSLJ8TgtRfjv24LOnOWKT2zYwaHZCJGkdyRnTmstR0P+Ah503Gw==`
+  and sha1 `55cc8410abf1003b726324661ce5b0d1c10de258`, both matching exactly — so the
+  artifact compared is the official one, not a stray copy.
+- Upstream `package.json` in that release: `name=@fortawesome/fontawesome-free`,
+  `version=6.5.1`, `license=(CC-BY-4.0 AND OFL-1.1 AND MIT)` — consistent with the
+  layered licensing recorded below.
+- Result: 5/5 files identical (per-file sha256 in the table above).
+
+The full release holds 2,126 files; aigate vendors only these 5, so this is a
+partial redistribution of a subset, not a copy of the whole package. The remaining
+Font Awesome files that `all.min.css` references but that were **deliberately not
+vendored** — and why — are itemised under "Fallbacks deliberately NOT vendored"
+below.
+
+*Last verified 2026-09-11 against the npm registry; method: sha256 per file vs
+official tarball.*
 
 Font Awesome Free's licensing is **layered**, and it is not accurate to describe
 the whole package as "MIT licensed". As written in the redistributed
@@ -160,10 +200,12 @@ blocks, each with a two-entry `src` chain — a `.woff2` first (10
 `.woff2` and four distinct `.ttf` files. Only three `.woff2` are vendored. Not
 vendored, and not fetched at runtime either:
 
-- `fa-solid-900.ttf`, `fa-regular-400.ttf`, `fa-brands-400.ttf`,
-  `fa-v4compatibility.ttf` — `woff2` wins every `src` chain in the browsers
-  aigate targets, so the truetype entries are never requested.
-- `fa-v4compatibility.woff2` — it belongs to the legacy font family
+- `fa-solid-900.ttf` (419,720 B), `fa-brands-400.ttf` (207,972 B),
+  `fa-regular-400.ttf` (68,004 B) and `fa-v4compatibility.ttf` — `woff2` wins every
+  `src` chain in the browsers aigate targets, so the truetype entries are never
+  requested. (Sizes are the files' byte counts in the 6.5.1 release; the
+  `fa-v4compatibility.ttf` size was not recorded during verification.)
+- `fa-v4compatibility.woff2` (4,792 B) — it belongs to the legacy font family
   `"FontAwesome"`. That string occurs 4 times in `all.min.css`, all of them inside
   `@font-face` blocks and none in a rule outside them (the selectors that would
   apply the legacy family live in Font Awesome's `v4-shims.css`, which is not part
@@ -218,4 +260,9 @@ part of aigate.
   the time of writing.
 - Vendored or added third-party components should be listed here at the time they
   are introduced, together with their version and upstream license text, so that
-  gaps like the xterm.js version note above are not repeated.
+  gaps like the xterm.js version note are not repeated. The xterm.js (§1) and Font
+  Awesome (§2) provenance gaps noted at first writing were later closed
+  (2026-09-11, by matching each vendored file's sha256 against the official npm
+  release artifacts); those sections now carry a dated verification note. Other
+  sections — e.g. the Python dependencies in §3 — have not received the same
+  per-file verification and their caveats still stand.
