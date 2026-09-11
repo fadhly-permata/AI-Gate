@@ -4,6 +4,45 @@
 - Sasaran: `documents/pm/OPERATING_RULES.md` dari 52 seksi rule → ≤10 tema, teks lama diarsipkan utuh.
 - Metode sensus: baca berkas nyata, tiap angka di bawah punya `file:line`. Tidak ada angka kira-kira.
 
+### Catatan status & lokasi nyata (dibubuhkan 2026-09-11 — hanya lokasi, bukan putusan)
+
+Dokumen ini titik-waktu 2026-09-10; teks §0–§8 tidak diubah. Status sekarang: **usulan sudah dieksekusi**
+(OPERATING_RULES v2 = `8e59d87`; pemindahan berkas §6 + normalisasi laporan §8 poin 8 = `6efeef8`).
+Karena itu sebagian path di bawah ini adalah **nama usulan saat penulisan**, bukan path hidup hari ini.
+Padanan nyatanya (terukur `test -e` 2026-09-11):
+
+| Path disebut di dokumen | Status nyata 2026-09-11 | Lokasi sebenarnya |
+|---|---|---|
+| `documents/pm/archive/status-2026Q3.md` (§6 baris `status.md`) | tidak pernah dibuat (nama usulan) | `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` |
+| `archive/memory-bank-log.md` (§6 baris `memory-bank.md`) | tidak pernah dibuat; dipecah dua | `documents/pm/archive/memory-bank-progress-lama.md` + `documents/pm/archive/memory-bank-decisions-lama.md` |
+| `documents/pm/handovers/archive/` (§6 baris handover) | tidak pernah dibuat | handover rata di `documents/pm/handovers/` (11 berkas, tanpa subfolder arsip) |
+| `documents/pm/cli-tools-compatibility.md` (§6, §0 rujukan `CODE_CHANGES.md:139`) | sudah pindah per usulan | `documents/config/cli-tools-compatibility.md` |
+| `documents/pm/wiki-plan.md` · `wiki-backlog.md` (§6) | sudah pindah per usulan | `documents/plan/wiki-plan.md` · `documents/plan/wiki-backlog.md` |
+| `documents/pm/cli-tools-install-backlog.md` (§6) | sudah pindah per usulan | `documents/plan/cli-tools-install-backlog.md` |
+| `.opencode/reports/2026-09-03/` (K10, §8 poin 8) | sudah dinormalisasi per usulan | `.opencode/reports/20260903/` |
+| `.opencode/tools/governance/rules-check.py` (§7, alternatif) | alternatif tidak dipakai | `.opencode/tools/governance/rules-index.py` |
+
+Tetap hidup, tidak diubah: `documents/pm/OPERATING_RULES.md`, `documents/pm/archive/OPERATING_RULES-v1-52rules.md`,
+`documents/pm/{memory-bank,state,status,bugs}.md`, `documents/pm/wiki-drafts/`, `documents/pm/handovers/`,
+`documents/{PRD.md,plan/BACKLOG.md,dev/CODE_CHANGES.md,config/CLI_CONFIG_SCHEMA.md,api/OPENAI_COMPATIBLE_CONTRACT.md,analysis/ERD.md}`,
+`.opencode/rules/*.md`, `.opencode/agents/`, `.opencode/commands/`, `.opencode/skills/`, `.opencode/tools/tests/`,
+`src/backend/{models.py,gateway/errors.py,cli_presets.py,cli_compat.py}`, `run.py`, `tests/`.
+
+Sitatan `file:baris` di §0/§2.1/§6/§7 (mis. `AGENTS.md:21`, `agent-boundaries.md:17-27`,
+`OPERATING_RULES.md:86-89`, `memory-bank.md:36-41`, `CODE_CHANGES.md:139`) = hasil ukur terhadap berkas
+**versi 2026-09-10**; `OPERATING_RULES.md` dan `memory-bank.md` sudah diganti/di-append sejak itu, jadi nomor
+barisnya historis. Teks v1 yang disitat kini tinggal di `documents/pm/archive/OPERATING_RULES-v1-52rules.md`
+(nomor baris v1 tetap sah di berkas itu). Tidak ditulis-ulang = rekaman sensus tetap jujur.
+
+Pola `docs/**` yang muncul di §2.2 baris B1 ("bukan `docs/**`") dan di K9 (write root salah
+`docs/analysis|business|architecture/**` di `ProjectManager.md` + `pm-orchestration/SKILL.md`) adalah
+**kutipan pola yang dilarang**, bukan rujukan — jangan diganti. K9 sudah dibereskan; `ProjectManager.md:85,93,110`
+dan `pm-orchestration/SKILL.md:36,37,40` kini menulis `documents/...` (terukur `rg` 2026-09-11). Sisa sitatan
+`docs/<subdir>` di `.opencode/**` tinggal 2, keduanya di laporan tugas bertanggal
+(`.opencode/reports/20260910/docs/0120_perapian-governance-pm.md:73`,
+`.opencode/reports/20260911/implementation/1850_ubah-ikon-lokal-label-tahap5-6.md:102`) = rekaman titik-waktu,
+bukan definisi hidup, jadi dibiarkan.
+
 ## 0. Koreksi sensus (bukan menyanggah fakta — hasil ukur hari ini)
 
 | Item | Angka di handover/laporan | Angka terukur sekarang | Cara ukur |

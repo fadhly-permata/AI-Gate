@@ -3,8 +3,8 @@
 **Versi:** 1.0
 **Tanggal:** 2026-09-03
 **Penulis:** Tech Architect (stand-in)
-**Sumber rujukan:** `documents/PRD.md` (PRD aigate), `docs/business/BRD.md` (BRD), `docs/analysis/FSD.md` (FSD), `docs/analysis/ERD.md` (ERD), `documents/pm/memory-bank.md`, `documents/pm/status.md`
-**Lingkup tulis:** `docs/architecture/` (per aturan specialist Tech Architect).
+**Sumber rujukan:** `documents/PRD.md` (PRD aigate), `documents/business/BRD.md` (BRD), `documents/analysis/FSD.md` (FSD), `documents/analysis/ERD.md` (ERD), `documents/pm/memory-bank.md`, `documents/pm/status.md`
+**Lingkup tulis:** `documents/architecture/` (per aturan specialist Tech Architect).
 
 ---
 
@@ -409,8 +409,8 @@ Desain dibuat *contract-first* agar item roadmap (PRD §6) menempel tanpa refact
 - TSD lengkap, konsisten dengan PRD/BRD/FSD/ERD. ✔
 - Terminal swipe/scroll & floating control didesain konkret (§3). ✔
 - Open questions FSD terresolve: swipe-exception whitelist (§3.3.1), proxy↔provider binding (§4.4), secret storage (§5.1). ✔
-- Tulis hanya di `docs/architecture/` (no cross-scope). ✔
+- Tulis hanya di `documents/architecture/` (no cross-scope). ✔
 
 ---
 
-*Dokumen ini ditulis di bawah scope `docs/architecture/` sesuai aturan specialist Tech Architect.*
+*Dokumen ini ditulis di bawah scope `documents/architecture/` sesuai aturan specialist Tech Architect.*

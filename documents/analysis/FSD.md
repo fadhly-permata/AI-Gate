@@ -4,7 +4,7 @@
 **Tanggal:** 2026-09-03 (revisi 2026-09-11)
 **Revisi 1.1 (2026-09-11):** koreksi fakta — §2.7 tidak lagi menyebut "ikon via Font Awesome CDN"; aset ikon di-vendor lokal (TSD ADR-015). §4 mencatat kebutuhan "zero external runtime" berlaku juga untuk lapisan UI dan kini terbukti terpenuhi.
 **Penulis:** System Analyst (stand-in)
-**Sumber rujukan:** `documents/PRD.md` (PRD aigate), `docs/business/BRD.md` (BRD aigate), `documents/pm/memory-bank.md`, `documents/pm/status.md`
+**Sumber rujukan:** `documents/PRD.md` (PRD aigate), `documents/business/BRD.md` (BRD aigate), `documents/pm/memory-bank.md`, `documents/pm/status.md`
 **Storage engine target:** SQLite (lihat PRD §3 — Configuration Engine)
 
 ---
@@ -16,9 +16,9 @@ Dokumen ini mendefinisikan spesifikasi fungsional target-state untuk produk **ai
 - **Deskripsi fungsional** — apa yang dilakukan fitur.
 - **Input / Output** — data yang masuk dan keluar.
 - **Process flow** — alur langkah (step list).
-- **Traceability** — pemetaan ke ID User Story di BRD (`docs/business/BRD.md`).
+- **Traceability** — pemetaan ke ID User Story di BRD (`documents/business/BRD.md`).
 
-Entitas penyimpanan (data model) dijelaskan terpisah di `ERD.md`.
+Entitas penyimpanan (data model) dijelaskan terpisah di `documents/analysis/ERD.md`.
 
 ---
 
@@ -276,7 +276,7 @@ Launcher tool CLI populer: cek ketersediaan binary (`which`/`where`); bila tiada
 #### 2.6.1 Pengelompokan Tool CLI (Grouping)
 
 **Deskripsi**
-Tool CLI dikelompokkan minimal 3 grup (A/B/C), masing-masing ≥5 preset; Grup A (agentic coding) diutamakan. Dapat diperluas via YAML/JSON (Roadmap §6).
+Tool CLI dikelompokkan minimal 3 grup (A/B/C), masing-masing ≥5 preset; Grup A (agentic coding) diutamakan. Dapat diperluas via YAML/JSON (PRD §6 Future Roadmap).
 
 | Grup | Nama | Preset (≥5) |
 | :--- | :--- | :--- |
@@ -470,4 +470,4 @@ Entitas tambahan (adopsi 9router): `ProviderAccount` (banyak akun per Provider; 
 
 ---
 
-*Dokumen ini ditulis di bawah scope `docs/analysis/` sesuai aturan specialist System Analyst.*
+*Dokumen ini ditulis di bawah scope `documents/analysis/` sesuai aturan specialist System Analyst.*
