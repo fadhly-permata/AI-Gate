@@ -176,7 +176,7 @@ describe("provider-detail page — behavior", () => {
     const calls = stubApi({ provider: PROVIDER, accounts: ACCOUNTS, discover: { ok: true, models: [] } });
     window.aigate.renderProviders([PROVIDER]);
     // Stage-4 entry path: name cell is plain text; the detail page is reached
-    // through the row kebab -> "Akun alternatif/sekunder" (first item).
+    // through the row kebab -> "Kelola akun" (providers.accounts_menu, first item).
     const name = document.querySelector("#provTableBody .prov-name");
     expect(name.querySelector("button")).toBeNull();
     name.click(); // plain text: clicking the name must NOT navigate
@@ -779,7 +779,14 @@ describe("full flow against a stateful fake backend", () => {
         const id = Number(u.split("/").pop());
         const acc = accounts.find((a) => a.id === id);
         if (!acc) return fail(404, "account_not_found");
-        acc.priority = body.priority; // contract: ONLY priority
+        // stage-5 contract: partial write of the fields the client SENT.
+        if (Object.prototype.hasOwnProperty.call(body, "api_key") &&
+            acc.auth_type === "oauth") {
+          return fail(400, "oauth_account_key_readonly");
+        }
+        ["label", "api_key", "enabled", "priority"].forEach((f) => {
+          if (Object.prototype.hasOwnProperty.call(body, f)) acc[f] = body[f];
+        });
         return answer(Object.assign({}, acc));
       }
       if (u.indexOf("/api/accounts") === 0 && method === "GET") {
@@ -865,6 +872,163 @@ describe("full flow against a stateful fake backend", () => {
     expect(document.querySelector('.view[data-view="providers"]').classList.contains("is-active")).toBe(true);
     expect(document.getElementById("provTableBody").textContent).toContain("ACME renamed");
     expect(document.querySelector("#provTableBody .prov-models").textContent).toBe("1");
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("Ubah akun (stage-5): card button -> PUT through the ONE modal", () => {
+  beforeEach(() => { withPage(); });
+  const cards = () => Array.from(document.querySelectorAll("#accList .acc-card"));
+
+  it("every account card carries a Ubah button next to Hapus", async () => {
+    stubApi({ provider: PROVIDER, accounts: ACCOUNTS, discover: { ok: true, models: [] } });
+    window.aigate.openDetail("p1");
+    await flush();
+    expect(cards()).toHaveLength(3);
+    cards().forEach((c) => {
+      const edit = c.querySelector(".acc-edit");
+      expect(edit, "Ubah button").not.toBeNull();
+      expect(edit.getAttribute("aria-label")).toBe("Edit");
+      expect(edit.getAttribute("title")).toBe("Edit");
+      expect(edit.querySelector("i.fa-pen")).not.toBeNull();
+      // same level as the existing Hapus button (both in the footer)
+      expect(c.querySelector(".acc-del")).not.toBeNull();
+    });
+    vi.unstubAllGlobals();
+  });
+
+  it("clicking Ubah opens the modal in edit mode, seeded from that account row", async () => {
+    stubApi({ provider: PROVIDER, accounts: ACCOUNTS, discover: { ok: true, models: [] } });
+    window.aigate.openDetail("p1");
+    await flush();
+    cards()[0].querySelector(".acc-edit").click(); // a1 = Primary / api_key
+    await flush();
+    const m = window.aigate.getAccountModalMode();
+    expect(m.mode).toBe("edit");
+    expect(m.id).toBe("a1");
+    expect(document.getElementById("accModal").hidden).toBe(false);
+    expect(document.getElementById("accModalTitle").textContent).toBe("Edit account");
+    expect(document.getElementById("accAddBtn").textContent).toBe("Save changes");
+    expect(document.getElementById("accLabel").value).toBe("Primary");
+    expect(document.getElementById("accApiKey").value).toBe("sk-one");
+    expect(document.getElementById("accEnabled").checked).toBe(true);
+    // add-time fields are hidden in edit mode
+    expect(document.getElementById("accPriorityRow").hidden).toBe(true);
+    expect(document.getElementById("accEnabledRow").hidden).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
+  it("editing an api_key account PUTs {label, api_key, enabled} — no priority/auth_type/last_used", async () => {
+    const calls = stubApi({ provider: PROVIDER, accounts: ACCOUNTS, discover: { ok: true, models: [] } });
+    window.aigate.openDetail("p1");
+    await flush();
+    calls.length = 0;
+    cards()[0].querySelector(".acc-edit").click(); // a1
+    document.getElementById("accLabel").value = "Primary 2";
+    document.getElementById("accApiKey").value = "sk-one-renamed";
+    document.getElementById("accEnabled").checked = false;
+    document.getElementById("accForm").dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    await flush();
+    await flush();
+    const put = calls.find((c) => c.method === "PUT" && c.url === "/api/accounts/a1");
+    expect(put, "account PUT").toBeTruthy();
+    expect(JSON.parse(put.body)).toEqual({ label: "Primary 2", api_key: "sk-one-renamed", enabled: false });
+    vi.unstubAllGlobals();
+  });
+
+  it("editing an oauth account PUTs {label, enabled} only (no api_key -> no 400)", async () => {
+    const calls = stubApi({ provider: PROVIDER, accounts: ACCOUNTS, discover: { ok: true, models: [] } });
+    window.aigate.openDetail("p1");
+    await flush();
+    calls.length = 0;
+    cards()[2].querySelector(".acc-edit").click(); // a3 = OAuth
+    // the key row is hidden and the explanatory note shows instead
+    expect(document.getElementById("accApiKeyRow").hidden).toBe(true);
+    expect(document.getElementById("accOauthNote").hidden).toBe(false);
+    document.getElementById("accLabel").value = "OAuth renamed";
+    document.getElementById("accForm").dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    await flush();
+    await flush();
+    const put = calls.find((c) => c.method === "PUT" && c.url === "/api/accounts/a3");
+    expect(JSON.parse(put.body)).toEqual({ label: "OAuth renamed", enabled: true });
+    vi.unstubAllGlobals();
+  });
+
+  it("success closes the modal and re-reads the server order (moveAccount pattern)", async () => {
+    const calls = stubApi({ provider: PROVIDER, accounts: ACCOUNTS, discover: { ok: true, models: [] } });
+    window.aigate.openDetail("p1");
+    await flush();
+    calls.length = 0;
+    cards()[0].querySelector(".acc-edit").click();
+    document.getElementById("accForm").dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    await flush();
+    await flush();
+    expect(document.getElementById("accModal").hidden).toBe(true);
+    // a GET /api/accounts re-read happened after the PUT
+    expect(calls.some((c) => c.method === "GET" && c.url.indexOf("/api/accounts?") === 0)).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it("a rejected save keeps the modal open with the reason inline", async () => {
+    // PUT -> 400 (e.g. a rogue oauth_account_key_readonly the UI normally prevents)
+    vi.stubGlobal("fetch", vi.fn((url, opts) => {
+      const method = (opts && opts.method) || "GET";
+      if (method === "PUT") {
+        return Promise.resolve({
+          ok: false, status: 400, headers: { get: () => "application/json" },
+          json: () => Promise.resolve({ error: { message: "oauth_account_key_readonly" } })
+        });
+      }
+      const payload = String(url).indexOf("/discover") !== -1
+        ? { ok: true, models: [] }
+        : (String(url).indexOf("/api/accounts?") === 0
+          ? { object: "list", data: ACCOUNTS } : PROVIDER);
+      return Promise.resolve({
+        ok: true, headers: { get: () => "application/json" }, json: () => Promise.resolve(payload)
+      });
+    }));
+    window.aigate.openDetail("p1");
+    await flush();
+    cards()[0].querySelector(".acc-edit").click();
+    document.getElementById("accLabel").value = "Keep me";
+    document.getElementById("accForm").dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    await flush();
+    await flush();
+    expect(document.getElementById("accModal").hidden).toBe(false); // NOT closed
+    const msg = document.getElementById("accModalMsg");
+    expect(msg.textContent).toContain("Failed to save changes");
+    expect(msg.textContent).toContain("oauth_account_key_readonly");
+    expect(msg.className).toContain("settings-msg-error");
+    // and the typed value survived the failed save
+    expect(document.getElementById("accLabel").value).toBe("Keep me");
+    vi.unstubAllGlobals();
+  });
+
+  it("closing then adding is a clean add mode with no leftover edit values", async () => {
+    stubApi({ provider: PROVIDER, accounts: ACCOUNTS, discover: { ok: true, models: [] } });
+    window.aigate.openDetail("p1");
+    await flush();
+    cards()[0].querySelector(".acc-edit").click();
+    document.getElementById("accLabel").value = "Leaky";
+    document.getElementById("accEnabled").checked = false;
+    // Cancel returns the modal to add mode (no value stuck)
+    document.getElementById("accCancelBtn").click();
+    expect(document.getElementById("accModal").hidden).toBe(true);
+    document.getElementById("pdAccAddBtn").click();
+    const m = window.aigate.getAccountModalMode();
+    expect(m.mode).toBe("add");
+    expect(m.id).toBe(null);
+    expect(document.getElementById("accModalTitle").textContent).toBe("New account for this provider");
+    expect(document.getElementById("accAddBtn").textContent).toBe("Add Account");
+    expect(document.getElementById("accLabel").value).toBe("");
+    expect(document.getElementById("accAuthType").disabled).toBe(false);
+    expect(document.getElementById("accPriorityRow").hidden).toBe(false);
+    expect(document.getElementById("accEnabledRow").hidden).toBe(true);
+    // Leave the module-global provider selection null (the baseline invariant of
+    // this file): with isolate:false a leaked "p1" would poison the next file's
+    // "refuses to invent a provider" test.
+    document.getElementById("provDetailBackBtn").click();
+    await flush();
     vi.unstubAllGlobals();
   });
 });

@@ -482,6 +482,7 @@
   // Provider-detail page (stage-3, Opsi A): only what a test or another module
   // actually calls is exported — the rest stays private to this IIFE.
   window.aigate.openDetail = openDetail;
+  window.aigate.backToProviders = backToProviders;
   window.aigate.saveStrategy = saveStrategy;
 
   /* Shared helpers — exposed so the Combos / Proxy Pools / Endpoints modules
@@ -808,8 +809,8 @@
     }).join("");
 
     // Consistent with the other tables: actions live in the kebab menu only.
-    // The detail page is one of them ("Akun alternatif/sekunder", stage-4), so
-    // the name cell carries no click behavior at all.
+    // The detail page is one of them ("Kelola akun" = providers.accounts_menu,
+    // stage-4), so the name cell carries no click behavior at all.
     wireRowMenu(body, function (tr) {
       var id = tr ? tr.getAttribute("data-id") : null;
       return [
@@ -1309,6 +1310,11 @@
             '<i class="fa fa-arrow-down" aria-hidden="true"></i></button>' +
         "</span>" +
         '<span class="acc-last">' + lastUsed + "</span>" +
+        '<button type="button" class="btn acc-edit" ' +
+          'aria-label="' + escapeHtml(getStr("provider_detail.edit_account")) + '" ' +
+          'title="' + escapeHtml(getStr("provider_detail.edit_account")) + '">' +
+          '<i class="fa fa-pen" aria-hidden="true"></i> ' +
+          escapeHtml(getStr("provider_detail.edit_account")) + "</button>" +
         '<button type="button" class="btn btn-danger acc-del">' +
           '<i class="fa fa-trash" aria-hidden="true"></i> ' +
           escapeHtml(getStr("accounts.delete")) + "</button>" +
@@ -1345,6 +1351,10 @@
         if (isNaN(idx)) return;
         if (e.target.closest(".acc-del")) {
           deleteAccount(card.getAttribute("data-id"));
+          return;
+        }
+        if (e.target.closest(".acc-edit")) {
+          openAccountEditModal(card.getAttribute("data-id"));
           return;
         }
         var up = e.target.closest(".acc-up");
@@ -1421,42 +1431,186 @@
       });
   }
 
-  /* ---- Account add modal (stage-3, Opsi A) ----
-     One surface, one job: the provider id is already known here (the detail
-     page owns it), so there is nothing to "save first" and no inline 5-row form
-     living inside the provider modal any more. */
+  /* ---- Account modal (stage-3 add, stage-5 add + edit): ONE surface ----
+      The provider id is already known here (the detail page owns it). The same
+      modal now serves two modes, chosen by accModalMode:
+        "add"  -> POST /api/accounts   (label, auth_type, api_key?, priority)
+        "edit" -> PUT  /api/accounts/{id}  (label, enabled, api_key?)  — only
+                  the fields the mode actually shows, never auth_type, priority
+                  or last_used_at.
+      Which rows show, what the title/submit say, and whether auth_type is
+      interactive all live in setAccountModalChrome(), so the two modes can never
+      drift out of sync with the request bodies they produce. */
+  var accModalMode = "add";
+  var accEditingId = null;
+
   function openAccountModal() {
+    accModalMode = "add";
+    accEditingId = null;
     var f = provEl("accForm");
     if (f) f.reset();
+    // Seed the add defaults EXPLICITLY (not only via form.reset, which needs a
+    // <form> wrapper): an edit that filled these fields must never leave a value
+    // behind when the next open is an add. auth_type returns to the default.
+    setFieldOrEmpty("accLabel", "");
+    setFieldOrEmpty("accApiKey", "");
+    var sel = provEl("accAuthType");
+    if (sel) sel.value = "api_key";
     // A fresh account joins at the END of the queue (priority = current count);
     // the note under the field explains that a smaller number is tried first.
     var pr = provEl("accPriority");
     if (pr) pr.value = String(accountRows.length);
+    // add mode never shows/POSTs `enabled` (a new account is created live), so
+    // its default is irrelevant to the body — set it for a clean, honest control.
+    var en = provEl("accEnabled");
+    if (en) en.checked = true;
+    setAccountModalChrome();
     syncAccountKeyRow();
     setAccModalMsg("", "");
     var m = provEl("accModal");
     if (m) m.hidden = false;
   }
 
+  // Edit mode is seeded from `accountRows` (the last server read), NOT a refetch:
+  // the card the user just tapped is already in memory with the same DTO.
+  function openAccountEditModal(id) {
+    var a = null;
+    for (var i = 0; i < accountRows.length; i++) {
+      if (String(accountRows[i].id) === String(id)) { a = accountRows[i]; break; }
+    }
+    if (!a) {
+      // The row vanished between render and tap (a reload landed): never open an
+      // edit modal on nothing. Re-read FIRST, then put the reason on the list —
+      // loadAccounts clears the status line, so the message must come AFTER it
+      // (same ordering rule moveAccount follows), or it would be wiped.
+      return loadAccounts(selectedProviderId).then(function () {
+        setAccountsMsg(getStr("provider_detail.edit_missing"), "error");
+      });
+    }
+    accModalMode = "edit";
+    accEditingId = a.id;
+    var f = provEl("accForm");
+    if (f) f.reset(); // clear stale add-typing BEFORE filling from the row
+    setFieldOrEmpty("accLabel", a.label);
+    setFieldOrEmpty("accApiKey", a.api_key);
+    var sel = provEl("accAuthType");
+    if (sel) sel.value = (a.auth_type === "oauth") ? "oauth" : "api_key";
+    var en = provEl("accEnabled");
+    if (en) en.checked = a.enabled !== false; // DTO owns truth
+    setAccountModalChrome();
+    syncAccountKeyRow();
+    setAccModalMsg("", "");
+    var m = provEl("accModal");
+    if (m) m.hidden = false;
+  }
+
+  // Small input helper: null/undefined becomes "", so a blank never prints
+  // "undefined" (an empty label/api_key are legitimate, distinct values).
+  function setFieldOrEmpty(id, val) {
+    var el = provEl(id);
+    if (el) el.value = val != null ? val : "";
+  }
+
+  // Everything that differs between the two modes, in ONE place.
+  function setAccountModalChrome() {
+    var edit = accModalMode === "edit";
+    var title = provEl("accModalTitle");
+    if (title) title.textContent =
+      getStr(edit ? "provider_detail.edit_title" : "provider_detail.account_modal_title");
+    var submit = provEl("accAddBtn");
+    if (submit) submit.textContent =
+      getStr(edit ? "provider_detail.save_changes" : "accounts.add");
+    // Priority belongs to adding; an existing account is ordered by ▲▼ only.
+    var pr = provEl("accPriorityRow");
+    if (pr) pr.hidden = edit;
+    var pn = provEl("accPriorityNote");
+    if (pn) pn.hidden = edit;
+    // Enabled belongs to editing (a new account is always created live).
+    var er = provEl("accEnabledRow");
+    if (er) er.hidden = !edit;
+    // auth_type is fixed once an account exists (a change is ignored anyway).
+    var sel = provEl("accAuthType");
+    if (sel) sel.disabled = edit;
+  }
+
+  // Close and hand the modal back in ADD mode: every value filled from a row is
+  // reset and the chrome is restored, so no half-typed edit leaks into the next
+  // "Add account" open.
   function closeAccountModal() {
     var m = provEl("accModal");
     if (m) m.hidden = true;
+    accModalMode = "add";
+    accEditingId = null;
+    var f = provEl("accForm");
+    if (f) f.reset();
+    setAccountModalChrome();
   }
 
-  // Auth type drives the API-key row: an OAuth account has no key to type.
+  // Auth type drives the API-key row: an OAuth account has no key to type, so we
+  // hide the input and explain instead — the PUT/POST of a key to an oauth
+  // account is a 400 oauth_account_key_readonly, and a form must not walk the
+  // user into a rejection the backend has to hand back.
   function syncAccountKeyRow() {
     var sel = provEl("accAuthType");
+    var isOauth = !!sel && sel.value !== "api_key";
     var row = provEl("accApiKeyRow");
-    if (row) row.hidden = !!sel && sel.value !== "api_key";
+    if (row) row.hidden = isOauth;
+    var note = provEl("accOauthNote");
+    if (note) note.hidden = !isOauth;
   }
 
-  // Modal submit -> addAccount() reading the modal fields; the modal closes
-  // only when the POST landed, so a 400 keeps the user's typing on screen.
+  // Modal submit routes by mode. The modal closes ONLY when the write landed, so
+  // a 400/404 keeps the user's typing on screen.
   function submitAccountForm(e) {
     if (e) e.preventDefault();
-    return addAccount().then(function (res) {
+    var run = accModalMode === "edit" ? saveAccountEdit() : addAccount();
+    return Promise.resolve(run).then(function (res) {
       if (res && res.ok) closeAccountModal();
       return res;
+    });
+  }
+
+  // PUT /api/accounts/{id} — the stage-5 partial update. Body carries ONLY what
+  // this mode shows: label + enabled, plus api_key for an api_key account. Never
+  // auth_type (backend ignores it), never priority (▲▼ own it), never
+  // last_used_at (machine-owned). A "" for label/api_key is a deliberate clear.
+  function saveAccountEdit() {
+    var id = accEditingId;
+    if (id == null) {
+      setAccModalMsg(getStr("provider_detail.edit_missing"), "error");
+      return Promise.resolve({ ok: false });
+    }
+    var sel = provEl("accAuthType");
+    var isOauth = !!sel && sel.value === "oauth";
+    var body = {
+      label: provEl("accLabel") ? provEl("accLabel").value : "",
+      enabled: provEl("accEnabled") ? !!provEl("accEnabled").checked : true
+    };
+    if (!isOauth) {
+      body.api_key = provEl("accApiKey") ? provEl("accApiKey").value : "";
+    }
+    setAccModalMsg("");
+    return fetchJson(ACC_API + "/" + encodeURIComponent(id), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify(body)
+    }).then(function () {
+      // Success: re-read from the server (moveAccount's pattern) so the card
+      // shows the stored truth in the server's order — then submitAccountForm
+      // closes the modal.
+      return loadAccounts(selectedProviderId).then(function () { return { ok: true }; });
+    }).catch(function (err) {
+      if (err && err.status === 404) {
+        // The row is gone server-side (another tab deleted it). Keep the modal
+        // open on the message AND re-read the list so the stale card behind it
+        // disappears — the id no longer exists to retry against.
+        setAccModalMsg(getStr("provider_detail.edit_missing"), "error");
+        return loadAccounts(selectedProviderId).then(function () { return { ok: false }; });
+      }
+      // Any other failure (e.g. a 400) leaves the modal open with the reason,
+      // so the typing is not lost.
+      setAccModalMsg(getStr("provider_detail.edit_error") + " (" + err.message + ")", "error");
+      return { ok: false };
     });
   }
 
@@ -1655,6 +1809,14 @@
   // (The ▲▼ buttons, the open/close taps and the auth-type toggle are wired by
   // wireProviderUi / the delegated card listener, so they stay private.)
   window.aigate.submitAccountForm = submitAccountForm;
+  // Edit mode is driven through the card's .acc-edit button in the shipped page;
+  // these are exposed so tests can enter edit mode and read the PUT body.
+  window.aigate.openAccountEditModal = openAccountEditModal;
+  window.aigate.openAccountModal = openAccountModal;
+  window.aigate.saveAccountEdit = saveAccountEdit;
+  window.aigate.getAccountModalMode = function () {
+    return { mode: accModalMode, id: accEditingId };
+  };
   window.aigate.getAccountRows = function () { return accountRows.slice(); };
 
   /* ===== Terminal view + Log Window (B3.1) ===== */

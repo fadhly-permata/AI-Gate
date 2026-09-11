@@ -17,7 +17,7 @@
        below; it is also read by i18n.js for the on-demand URLs. -->
   <script>
     (function () {
-      var V = "20260917";
+      var V = "20260919";
       window.I18N_VER = V;
       var loc = "en";
       try {
@@ -37,17 +37,17 @@
     })();
   </script>
   <title>aigate</title>
-  <!-- Font Awesome via CDN (no build step, ADR-001) -->
-  <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
-        crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <!-- Font Awesome 6.5.1 vendored LOCALLY (offline-safe; OPERATING_RULES G3 — no
+       CDN). Files live in vendor/font-awesome/ (css + webfonts woff2, + LICENSE).
+       No network request: icons render with the phone offline. -->
+  <link rel="stylesheet" href="vendor/font-awesome/css/all.min.css?v=20260919" />
   <!-- xterm.js 5.x + FitAddon vendored LOCALLY (offline-safe; ADR-001 no build,
        ADR-009 native run). No CDN dependency — terminal works with no internet. -->
   <link rel="stylesheet" href="vendor/xterm/xterm.css" />
   <script defer src="vendor/xterm/xterm.js"></script>
   <script defer src="vendor/xterm/xterm-addon-fit.js"></script>
 
-  <link rel="stylesheet" href="styles.css?v=20260917" />
+  <link rel="stylesheet" href="styles.css?v=20260919" />
 </head>
 <body>
   <div class="layout">
@@ -975,11 +975,19 @@
         </div>
       </div>
 
-      <!-- Add-account modal (stage-3, Opsi A): the ONE surface for creating an
-           account on the provider currently open in the detail page. Its id is
-           already known here, so the stage-2 "save the provider first" hint and
-           the 5-row inline form inside the provider modal are both gone.
-           Submit -> POST /api/accounts (contract: accepts priority, default 0). -->
+      <!-- Add / edit-account modal (stage-5, ONE surface two modes): #accModal
+           serves BOTH creating an account (POST /api/accounts) and editing one
+           (PUT /api/accounts/{id}). Which rows and which submit label are shown
+           is set by app.js (openAccountModal / openAccountEditModal), so the
+           field set per mode stays honest:
+             add  : label, auth_type, api_key?, priority   (enabled omitted —
+                    the POST body is unchanged, a new account is always live)
+             edit : label, auth_type (read-only), api_key?, enabled  (no priority
+                    — reordering already lives in the ▲▼ buttons, two doors for
+                    one job = the confusion the arrows were built to remove)
+           The api_key row is hidden for an oauth account in EITHER mode, because
+           PUT/POST of a key to an oauth account is rejected 400
+           oauth_account_key_readonly. -->
       <div class="modal-overlay" id="accModal" hidden>
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="accModalTitle">
           <h3 class="modal-title" id="accModalTitle" data-i18n="provider_detail.account_modal_title">New account for this provider</h3>
@@ -990,6 +998,8 @@
             </div>
             <div class="form-row">
               <label class="form-label" for="accAuthType" data-i18n="accounts.auth_type">Auth Type</label>
+              <!-- Read-only in edit mode (auth_type cannot be changed) — app.js
+                   sets `disabled`. It is never put in the request body. -->
               <select class="form-input" id="accAuthType" name="auth_type">
                 <option value="api_key" data-i18n="accounts.auth_api_key">API Key</option>
                 <option value="oauth" data-i18n="accounts.auth_oauth">OAuth</option>
@@ -1000,12 +1010,28 @@
               <!-- ADR-007 / J3: plaintext on purpose -->
               <input class="form-input" type="text" id="accApiKey" name="api_key" />
             </div>
-            <div class="form-row">
+            <!-- Shown instead of the key row for an oauth account: its credential
+                 is the token the OAuth callback refreshes automatically, so there
+                 is nothing to type here. -->
+            <p class="pd-note" id="accOauthNote" hidden data-i18n="provider_detail.oauth_key_note">
+              OAuth accounts refresh their own token; there is no API key to set here.
+            </p>
+            <!-- Enabled: EDIT-only row (app.js hides it on add). Lets someone
+                 take one account out of rotation without deleting it. -->
+            <div class="form-row" id="accEnabledRow" hidden>
+              <label class="form-label" for="accEnabled" data-i18n="provider_detail.enabled">Enabled</label>
+              <label class="switch">
+                <input type="checkbox" id="accEnabled" name="enabled" />
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+            <!-- Priority: ADD-only block (app.js hides it on edit; reorder via ▲▼). -->
+            <div class="form-row" id="accPriorityRow">
               <label class="form-label" for="accPriority" data-i18n="provider_detail.priority">Priority</label>
               <input class="form-input" type="number" id="accPriority" name="priority"
                      min="0" step="1" value="0" />
             </div>
-            <p class="pd-note" data-i18n="provider_detail.priority_note">
+            <p class="pd-note" id="accPriorityNote" data-i18n="provider_detail.priority_note">
               Smaller number is tried first. Reorder later with the arrows.
             </p>
             <p class="settings-msg" id="accModalMsg" role="status" aria-live="polite"></p>
@@ -1352,7 +1378,7 @@
        Translation strings live in i18n/<code>.js, loaded by the inline
        preloader in <head> (active language) and on demand by this file.
        ?v= cache-buster: bump whenever i18n.js changes (stale cache = missing labels). -->
-  <script src="i18n.js?v=20260917" defer></script>
+  <script src="i18n.js?v=20260919" defer></script>
   <!-- Device simulation helper (B4.2) — must load before app.js uses it -->
   <script src="device.js" defer></script>
   <!-- Searchable combobox widget (model pickers) — must load before app.js /
@@ -1361,7 +1387,7 @@
   <script src="combobox.js?v=20260911" defer></script>
   <!-- App bootstrap (defer preserves order).
        ?v= cache-buster: bump whenever app.js changes. -->
-  <script src="app.js?v=20260917" defer></script>
+  <script src="app.js?v=20260919" defer></script>
   <!-- Combos / Proxy Pools / Endpoints management (B2.4 / B2.3 / B2.5) -->
   <script src="combos.js" defer></script>
   <script src="proxies.js" defer></script>

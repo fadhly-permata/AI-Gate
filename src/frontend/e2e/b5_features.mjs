@@ -11,14 +11,23 @@
 // usage.js / analytics.js — bukan asumsi):
 //   seed   : POST /api/providers + POST /api/accounts (via page.evaluate fetch)
 //   B5.1   : nav providers -> baris #provTableBody -> menu ⋮ -> item
-//            [data-action="accounts"] ("Akun alternatif/sekunder", stage-4) ->
+//            [data-action="accounts"] ("Kelola akun" = providers.accounts_menu,
+//            stage-4) ->
 //            HALAMAN RINCI (view [data-view="provider-detail"] aktif, menu
 //            "Penyedia" tetap sorot): kepala #provDetailTitle + badge,
 //            Kartu A #pdApiKey (teks polos), Kartu B #pdStrategy +
 //            #pdStrategySaveBtn, Kartu C #accList berisi .acc-card "e2e-acc"
-//            dengan tombol ▲▼, Kartu D #provUsageTotals; modal akun #accModal
-//            (#accLabel/#accAuthType/#accApiKey/#accPriority) lalu #accModal
-//            ditutup lewat Kembali.
+//            dengan tombol ▲▼ + "Ubah" (.acc-edit) + "Hapus" (.acc-del),
+//            Kartu D #provUsageTotals; modal akun #accModal DUA MODE (satu
+//            permukaan): mode TAMBAH (#accLabel/#accAuthType/#accApiKey/
+//            #accPriority tampil, #accEnabledRow tersembunyi) lalu di-click
+//            "Ubah" masuk mode UBAH (judul/tombol berubah, #accPriorityRow
+//            tersembunyi, #accEnabledRow tampil, auth_type read-only); setiap
+//            kali ditutup balik bersih ke mode tambah.
+//            CATATAN stage-5: PUT /api/accounts/{id} kini menerima label/
+//            api_key/enabled (parsial), auth_type read-only; akun oauth TIDAK
+//            menampilkan kolom api_key (kalau dikirim -> 400 readonly), jadi
+//            form tidak pernah menabrak penolakan itu.
 //            CATATAN stage-3: tab modal + tabel 6 kolom HILANG — akun jadi
 //            kartu di halaman rinci, prioritas jadi tombol ▲▼ (PUT + renumber),
 //            discovery tetap di belakang layar dengan satu baris status teks.
@@ -195,10 +204,23 @@ async function testProvidersAccounts(pg, providerId) {
   const move = await pg.$$eval("#accList .acc-card:first-child .acc-move button",
     (bs) => bs.map((b) => b.getAttribute("aria-label")));
   assert(move.length === 2, "tombol ▲/▼ tidak dua: " + JSON.stringify(move));
+  // stage-5: tiap kartu punya tombol "Ubah" (acc-edit) SAME LEVEL dengan "Hapus".
+  const cardBtns = await pg.$$eval("#accList .acc-card:first-child", (card) => {
+    const edit = card.querySelector(".acc-edit");
+    return {
+      edit: !!edit,
+      editAria: edit ? edit.getAttribute("aria-label") : null,
+      del: !!card.querySelector(".acc-del")
+    };
+  });
+  assert(cardBtns.edit, "tombol Ubah (acc-edit) hilang dari kartu akun");
+  assert(cardBtns.del, "tombol Hapus hilang dari kartu akun");
+  assert(cardBtns.editAria && cardBtns.editAria.length > 0, "aria-label tombol Ubah kosong");
   assert(await pg.$("#provConnectOAuthBtn"), "tombol OAuth hilang dari Kartu C");
   assert(await pg.$("#pdAccReloadBtn"), "tombol muat ulang hilang dari Kartu C");
 
-  // 5) Modal akun: satu permukaan khusus akun (label/jenis/kunci/prioritas).
+  // 5a) Modal TAMBAH: satu permukaan khusus akun (label/jenis/kunci/prioritas);
+  //     baris enabled memang ADA tapi disembunyikan pada mode tambah.
   await pg.click("#pdAccAddBtn");
   await pg.waitForFunction(() => {
     const m = document.getElementById("accModal");
@@ -207,6 +229,48 @@ async function testProvidersAccounts(pg, providerId) {
   for (const sel of ["#accLabel", "#accAuthType", "#accApiKey", "#accPriority", "#accAddBtn"]) {
     assert(await pg.$(sel), "kontrol modal akun hilang: " + sel);
   }
+  const addChrome = await pg.evaluate(() => ({
+    title: document.getElementById("accModalTitle").textContent,
+    submit: document.getElementById("accAddBtn").textContent,
+    priorityHidden: document.getElementById("accPriorityRow").hidden,
+    enabledHidden: document.getElementById("accEnabledRow").hidden
+  }));
+  assert(addChrome.priorityHidden === false, "mode tambah: baris prioritas harus tampil");
+  assert(addChrome.enabledHidden === true, "mode tambah: baris enabled harus tersembunyi");
+  await pg.click("#accCancelBtn");
+  await pg.waitForFunction(() => {
+    const m = document.getElementById("accModal");
+    return !!m && m.hidden;
+  }, { timeout: WAIT });
+
+  // 5b) Modal UBAH (stage-5): klik Ubah pada kartu pertama -> judul/tombol jadi
+  //     mode ubah, terisi dari baris akun, prioritas tersembunyi, enabled tampil,
+  //     dan baris api_key tampil untuk akun api_key seed (e2e-acc / sk-acc).
+  await pg.click("#accList .acc-card:first-child .acc-edit");
+  await pg.waitForFunction(() => {
+    const m = document.getElementById("accModal");
+    return !!m && !m.hidden && document.getElementById("accLabel").value.length > 0;
+  }, { timeout: WAIT });
+  const editChrome = await pg.evaluate(() => ({
+    mode: window.aigate.getAccountModalMode().mode,
+    title: document.getElementById("accModalTitle").textContent,
+    submit: document.getElementById("accAddBtn").textContent,
+    priorityHidden: document.getElementById("accPriorityRow").hidden,
+    enabledHidden: document.getElementById("accEnabledRow").hidden,
+    keyHidden: document.getElementById("accApiKeyRow").hidden,
+    authDisabled: document.getElementById("accAuthType").disabled,
+    label: document.getElementById("accLabel").value
+  }));
+  assert(editChrome.mode === "edit", "klik Ubah tidak masuk mode ubah: " + editChrome.mode);
+  assert(editChrome.priorityHidden === true, "mode ubah: baris prioritas harus tersembunyi");
+  assert(editChrome.enabledHidden === false, "mode ubah: baris enabled harus tampil");
+  assert(editChrome.keyHidden === false, "mode ubah akun api_key: kolom kunci harus tampil");
+  assert(editChrome.authDisabled === true, "mode ubah: auth_type harus read-only");
+  assert(editChrome.label.indexOf("e2e-acc") !== -1,
+    "mode ubah tidak terisi label akun: " + JSON.stringify(editChrome.label));
+  assert(editChrome.title !== addChrome.title, "judul modal tidak berubah ke mode ubah");
+  assert(editChrome.submit !== addChrome.submit, "label tombol submit tidak berubah ke mode ubah");
+  // tutup -> kembali bersih mode tambah
   await pg.click("#accCancelBtn");
   await pg.waitForFunction(() => {
     const m = document.getElementById("accModal");

@@ -1198,7 +1198,10 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
 }
 body[data-device="phone"] .acc-move .icon-btn-small { width: 44px; height: 36px; }
 .acc-last { flex: 1 1 120px; min-width: 0; color: var(--muted); font-size: 12px; }
-.acc-del { flex: 0 0 auto; font-size: 12px; padding: 6px 12px; }
+/* Edit + Delete are the two footer actions on ONE level: Ubah is a neutral
+   secondary (.btn), Hapus stays danger (.btn-danger). Same footprint so the
+   footer never jumps between an account with 1 action and one with 2. */
+.acc-edit, .acc-del { flex: 0 0 auto; font-size: 12px; padding: 6px 12px; }
 /* aria-disabled is the honest state: visible, announced, and a no-op tap. */
 .acc-move .icon-btn-small[aria-disabled="true"] {
   color: var(--muted);
