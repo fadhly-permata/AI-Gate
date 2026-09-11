@@ -1579,3 +1579,47 @@ antrean; `accounts.none` ikut dicabut; PUT berurutan (bukan serentak) agar uruta
 Belum di-exercise di aplikasi nyata (G3) — user wajib muat ulang server (J6) + uji mata kartu/▲▼ di HP dan
 mode gelap; Playwright belum jalan; terjemahan 6 bahasa belum ditinjau penutur; halaman rinci tanpa rute
 URL (tidak bisa di-bookmark, back peramban tak berlaku — diterima di lembar desain); ahead 8, PR #17 open.
+
+## 2026-09-11 — TAHAP 4: masuk halaman rinci lewat menu ⋮ "Akun alternatif/sekunder" (fe-dev; commit BELUM push)
+
+**Asal:** user mencoba hasil tahap-3 → "aneh kalo tap/klik di namanya gitu, bikin menu baru aja dengan nama
+alternatif/sekunder akun ... digabung dengan menu dari tombol tiga titik di ujung kanan aja". Bentuk, nama,
+dan letak ditentukan USER → rule D6 terpenuhi oleh user sendiri (PM hanya kunci 4 default kecil).
+Laporan: `.opencode/reports/20260911/implementation/1222_menu-kebab-akun-alternatif-tahap4.md`.
+
+### Perubahan (13 berkas `src/frontend/**`, +63/−55)
+- `static/app.js:793-798`: sel Nama kembali TEKS POLOS — `button.prov-name-btn.js-prov-detail` DIHAPUS;
+  listener delegasi `data-detail-wired` (:809-822) ikut dihapus (tak terpakai); `openDetail(id)` tetap ada,
+  kini dipanggil dari item menu.
+- `static/app.js:812-822`: menu ⋮ penyedia = TIGA item berurutan `accounts` → `edit` → `delete`; item akun =
+  label `providers.accounts_menu`, ikon `fa-users`, bukan bahaya. Infrastruktur menu (`rowMenuCellHtml` :732-738,
+  `wireRowMenu` :740-749) TIDAK diubah → tetap satu tombol ⋮ per baris.
+- `static/styles.css`: rule `.prov-name-btn` (+`hover`/`focus-visible`) DIHAPUS (dicek 0 pemakaian tersisa);
+  0 rule baru; 0 warna hex baru; sel Nama kini konsisten dengan tabel kombo/pool/endpoint.
+- `static/i18n/{en,id,ru,nl,ja,zh,zh-tw}.js`: +1 kunci `providers.accounts_menu` (ID "Akun alternatif/sekunder",
+  EN "Alternative/secondary accounts") → 429 kunci/kamus.
+- `static/index.html`: cache-buster `V` + `styles.css?v=` + `i18n.js?v=` + `app.js?v=` naik serentak → `20260917`
+  (penjaga `tests/i18n.test.js:307-316` minta ketiganya sama).
+- `tests/row-actions.test.js:26-57` (urutan 3 item + label + ikon + non-danger + Nama bukan tombol);
+  `tests/provider_detail.test.js:175-190,800-806` (masuk via ⋮ + penjaga negatif "klik nama tidak navigasi" +
+  alur penuh 6 langkah); `e2e/b5_features.mjs:13-14,145-153` (⋮ dulu → `[data-action="accounts"]`, menu menempel
+  di `<body>`). `views.test.js`/`providers.test.js` tidak berubah (0 rujukan tombol nama, dicek grep).
+
+### Gate PM (mandiri)
+`node node_modules/.bin/vitest run` = **24 berkas / 586 tes LOLOS** (identik baseline → nol pengurangan cakupan);
+parity 429 kunci hilang 0 thừa 0 kosong 0 (en/id/zh-tw dicek langsung); `git status` = 13 berkas semua `src/frontend/**`;
+grep `prov-name-btn` = 0 di seluruh `src/frontend`; 0 hex baru; `git diff --check` bersih; `node --check` e2e exit 0.
+Glif `fa-users` dibuktikan ada di Font Awesome Free 6.5.1 yang di-load (`.fa-users:before{content:"\f0c0"}`).
+
+### Temuan di luar cakupan (TIDAK disentuh)
+Font Awesome dimuat dari **CDN cloudflare** (`index.html:42`) = utang lama WL.5 (ikon mati offline + permintaan
+keluar) — butuh keputusan user, bukan bagian tugas ini.
+
+### Default PM yang dikunci (user boleh veto)
+(1) item akun membuka HALAMAN RINCI (bukan lompat ke kartu akun saja — halaman itu juga memuat strategi);
+(2) label persis "Akun alternatif/sekunder"; (3) urutan akun → ubah → hapus; (4) ⋮ baris kombo/pool/endpoint tak disentuh.
+
+### BELUM diverifikasi
+Belum dilihat di peramban nyata (G3) — bagian tampilan dibaca ulang dari berkas tiap permintaan, jadi cukup
+muat ulang halaman, tidak perlu memuat ulang server; jalur ⋮ → item belum dieksekusi sungguhan (nol browser);
+terjemahan 6 bahasa belum ditinjau penutur.

@@ -2,6 +2,32 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260911-1225 — TAHAP 4: akses halaman rinci DIPINDAH dari klik nama → item menu ⋮ "Akun alternatif/sekunder" (fe-dev) — gate HIJAU (ProjectManager)
+- User menguji mata hasil tahap-3 → menolak pola "nama bisa diklik" ("aneh kalo tap/klik di namanya gitu") dan MENENTUKAN sendiri
+  bentuk+nama+letak: item menu baru "Akun alternatif/sekunder" DIGABUNG ke menu tiga titik yang sudah ada → rule D6 terpenuhi oleh user,
+  PM tidak menerbitkan lembar desain baru (hanya mengunci 4 default: item akun membuka HALAMAN RINCI; label persis kata user;
+  urutan akun→ubah→hapus; ⋮ baris kombo/pool/endpoint tak disentuh).
+- PM cek dulu bahwa infrastruktur menu baris sudah generik (`rowMenuCellHtml` `app.js:732-738`, `wireRowMenu` :740-749) →
+  permintaan bisa dipenuhi tanpa tombol ⋮ kedua. Handover pendek (E2/E3) → `fe-dev` 1 putaran (sesi `ses_f7120e2ccffem9h33yJ4YyLUwl`).
+- Realisasi 13 berkas `src/frontend/**` (+63/−55): `app.js:793-798` sel Nama kembali TEKS POLOS (`button.prov-name-btn.js-prov-detail`
+  + listener delegasi `data-detail-wired` DIHAPUS; `openDetail` tetap ada, kini dari item menu `:813-821`); ⋮ = `accounts|edit|delete`
+  (ikon `fa-users`, label `providers.accounts_menu`, non-bahaya); `styles.css` rule `.prov-name-btn` dihapus (0 rule/hex baru, nama kini
+  konsisten dengan tabel kombo/pool/endpoint); i18n +1 kunci ×7 (428→429); `index.html` cache-buster serentak `20260917`
+  (V/styles/i18n/app — dijaga `tests/i18n.test.js:307-316`); tes disesuaikan (`row-actions` urutan+ikon+label+Nama-bukan-tombol,
+  `provider_detail:175-190,800-806` jalur ⋮ + PENJAGA NEGATIF "klik nama tidak navigasi", alur penuh 6 langkah) + `e2e/b5_features.mjs`
+  (⋮ dulu → `[data-action="accounts"]`, menu menempel di `<body>`); `views.test.js`/`providers.test.js` tak berubah (0 rujukan, dicek grep).
+- BUKTI GLIF: `fa-users` ada di Font Awesome Free 6.5.1 yang benar-benar di-load (`.fa-users:before{content:"\f0c0"}`), bukan asumsi.
+- GATE PM MANDIRI: vitest **24 berkas / 586 tes LOLOS = identik baseline** (nol merah, nol penurunan cakupan); parity 429 kunci
+  hilang 0 thừa 0 kosong 0 (en/id/zh-tw dicek langsung); `git status` 13 berkas semua `src/frontend/**` (nol backend/combos/usage);
+  grep `prov-name-btn` = 0; 0 hex baru; `git diff --check` bersih; `node --check` e2e exit 0.
+- TEMUAN LUAR CAKUPAN (tidak disentuh, dilaporkan ke user): Font Awesome masih dari **CDN cloudflare** (`index.html:42`) = utang WL.5
+  (ikon mati offline + permintaan keluar) → keputusan user tersendiri.
+- PELAJARAN (dicatat, belum jadi rule): 586 tes hijau tidak menangkap "akses tersembunyi di teks" — mata user menolaknya.
+  Kandidat amandemen D6: lembar desain wajib menyebut **jalur masuk fitur = pola yang sudah dikenal user** (menunggu momen yang tepat).
+- BELUM / NEXT: user muat ulang HALAMAN di peramban (statis dibaca ulang dari berkas → server TIDAK perlu restart, J6 tak terlibat)
+  lalu uji mata; jalur ⋮ → item belum dieksekusi di browser nyata; ahead 10 BELUM push; PR #17 masih terbuka.
+- Laporan: `.opencode/reports/20260911/implementation/1222_menu-kebab-akun-alternatif-tahap4.md`.
+
 ## 20260911-1105 — TAHAP 3 Opsi A dibangun setelah ACC desain (fe-dev, 1 putaran) — gate PM HIJAU (ProjectManager)
 - Perintah user: "coba dulu yang a kita kerjain" = ACC lembar desain → baru spawn. **Rule D6 dipatuhi penuh** (nol kode sebelum ACC; 07:05→10:5x hanya handover + kerja agen).
 - Spawn `fe-dev` (sesi `ses_f721dd91bffeZOiRtn33N0XqnF`), reuse agen+skill. Handover = lembar desain + kontrak tahap-1

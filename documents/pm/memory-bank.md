@@ -4,6 +4,23 @@
 (empty — diisi PM saat task pertama)
 
 ## Decisions
+- 2026-09-11 (TAHAP 4 — akses lewat menu ⋮, bukan klik nama): user mencoba hasil tahap-3 di layar betulan dan
+  menolak pola "nama bisa diklik" ("aneh kalo tap/klik di namanya gitu") → perintahkan item MENU BARU bernama
+  "Akun alternatif/sekunder" yang DIGABUNG ke menu tiga titik yang sudah ada. Bentuk+nama+letak ditentukan USER
+  → rule D6 terpenuhi oleh user sendiri, PM tidak menerbitkan lembar desain baru (PM hanya kunci 4 default:
+  item akun membuka HALAMAN RINCI bukan lompat ke kartu; label persis seperti kata user; urutan akun→ubah→hapus;
+  ⋮ baris lain tak disentuh). PM verifikasi lebih dulu bahwa infrastruktur menu baris sudah generik
+  (`rowMenuCellHtml` app.js:732-738 + `wireRowMenu` :740-749) → permintaan dipenuhi TANPA tombol ⋮ kedua.
+  Hasil 1 putaran fe-dev (13 berkas, +63/−55): sel Nama kembali teks polos (`.prov-name-btn` + listener
+  `data-detail-wired` DIHAPUS, 0 rujukan tersisa), ⋮ = `accounts|edit|delete`, CSS rule tombol nama dihapus
+  (0 rule/hex baru), +1 kunci i18n ×7 (428→429), cache-buster serentak `20260917`, tes + e2e disesuaikan
+  (penjaga NEGATIF ditambahkan: klik nama tidak boleh navigasi). Gate PM MANDIRI: vitest **24 berkas/586 tes
+  LOLOS = identik baseline** (nol penurunan cakupan), paritas 429 hilang 0 thừa 0 kosong 0, 13 berkas semua
+  `src/frontend/**`, diff-check bersih. Glif `fa-users` dibuktikan ada di FA Free 6.5.1 yang di-load.
+  TEMUAN LUAR CAKUPAN (tidak disentuh, laporkan ke user): Font Awesome masih dari CDN cloudflare
+  (`index.html:42`) = utang WL.5. PELAJARAN: "akses tersembunyi di teks" gagal di uji mata user walau 586 tes
+  hijau — konsistensi pola tabel lain (nama polos) lebih penting daripada pintasan; aturan D6 soal desain
+  perlu menyinggung "jalur masuk fitur = pola yang sudah dikenal user".
 - 2026-09-11 (TAHAP 3 Opsi A — halaman rinci penyedia, DESAIN DULU BARU KODE): user marah "desain multi akun
   berantakan amat" → PM berhenti, audit realisasi `d1ff215` (6 titik lemah berbukti `file:line`), TULIS RULE
   **D6** (fitur UI wajib 1 lembar desain + ACC user sebelum spawn fe-dev; kontrak data ≠ persetujuan interaksi;
@@ -153,6 +170,13 @@
 
 ## Progress
 [entri lama dipindah ke `documents/pm/archive/memory-bank-progress-lama.md` — tidak dihapus]
+- 2026-09-11: **TAHAP 4 TERPASANG — akses halaman rinci lewat menu ⋮ "Akun alternatif/sekunder", klik nama DIMATIKAN.**
+  User menentukan sendiri bentuk+nama+letak (D6 terpenuhi oleh user). 13 berkas `src/frontend/**` (+63/−55): nama kembali
+  teks polos (0 sisa `.prov-name-btn` + listener delegasi dihapus), ⋮ = akun|ubah|hapus pakai infrastruktur menu yang sudah ada
+  (tetap satu tombol ⋮), ikon `fa-users` dibuktikan ada di FA Free 6.5.1 ter-load, +1 kunci i18n ×7 (429), cache-buster
+  `20260917`, tes + e2e disesuaikan plus penjaga negatif. Gate PM mandiri: vitest **24/586 LOLOS identik baseline**, paritas
+  429 hilang 0 thừa 0, 0 hex baru, diff-check bersih. Menunggu: uji mata user (cukup muat ulang halaman, tanpa restart server),
+  push (ahead 10), PR #17. Temuan luar cakupan: Font Awesome masih CDN (WL.5).
 - 2026-09-11: **TAHAP 3 Opsi A TERPASANG — gate HIJAU (24 berkas / 586 tes).** Proses: koreksi user → rule D6 →
   lembar desain ACC dulu → baru fe-dev 1 putaran tanpa blocker. View `provider-detail` (tanpa entri nav) + 4 kartu
   satu kolom + modal akun + prioritas ▲▼ (PUT hanya yang berubah, selalu baca ulang) + discovery dengan baris status;
