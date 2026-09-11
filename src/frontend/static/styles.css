@@ -508,6 +508,12 @@ body.sidebar-collapsed .nav-item {
   margin-bottom: 16px;
 }
 
+/* `display:flex` here beats the UA `[hidden]` rule (author > UA), so a hidden
+   form row would still show. Every other [hidden] control in this file needs
+   the same explicit undo; these are the rows JS toggles: the sticky limit of
+   Kartu B and the API-key row of the account modal. */
+.form-row[hidden] { display: none; }
+
 .form-label {
   font-weight: 600;
   color: var(--fg);
@@ -752,9 +758,7 @@ body[data-device="phone"] .modal { width: 100%; }
   font-size: 20px;
 }
 
-.providers-detail { margin-bottom: 18px; }
-
-.detail-actions { display: flex; align-items: center; gap: 8px; }
+.detail-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 /* Data table */
 .data-table {
@@ -1076,37 +1080,66 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
   font-size: 20px;
 }
 
-/* ===== Provider modal tabs (stage-2: Provider | Accounts) =====
-   Token-only colors so the dark theme follows automatically. Roving-tablist
-   pattern: .is-active marks the selected tab; JS keeps aria in sync. */
-.modal-tabs {
+/* ===== Provider detail page (stage-3, Opsi A) =====
+   ONE vertical column of cards; no grid, no wide table, so a phone never has
+   to pan sideways. Token-only colors: the dark theme follows automatically. */
+.provider-detail .card { margin-bottom: 18px; }
+.provider-detail .card:last-child { margin-bottom: 0; }
+
+.pd-head {
   display: flex;
-  gap: 4px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.pd-back { flex: 0 0 auto; }
+.pd-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.pd-name { word-break: break-word; }
+.pd-badge { flex: 0 0 auto; }
+
+.pd-card-title {
+  margin: 0 0 12px;
+  color: var(--accent);
+  font-size: 16px;
+}
+
+/* Read-only profile: label + value rows, stacked on narrow screens so a long
+   base URL or key can never force the card wider than the viewport. */
+.pd-profile { margin: 0; }
+.pd-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 6px 0;
   border-bottom: 1px solid var(--panel-border);
-  margin-bottom: 16px;
+}
+.pd-row:last-child { border-bottom: none; }
+.pd-row dt { flex: 0 0 34%; color: var(--muted); font-weight: 600; }
+.pd-row dd { flex: 1 1 auto; margin: 0; min-width: 0; }
+.pd-mono { font-family: "Menlo", "Consolas", monospace; }
+/* Cut long values visually; the full text stays reachable via `title`. */
+.pd-clip {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.modal-tab {
-  padding: 8px 14px;
-  border: none;
-  border-bottom: 2px solid transparent;
-  border-radius: var(--radius) var(--radius) 0 0;
-  background: none;
-  color: var(--muted);
-  font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
-  transition: color var(--transition), border-color var(--transition);
-}
-.modal-tab:hover { color: var(--fg); }
-.modal-tab.is-active { color: var(--accent); border-bottom-color: var(--accent); }
-.modal-tab[aria-disabled="true"] { color: var(--muted); opacity: 0.5; cursor: not-allowed; }
-.modal-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pd-note { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+.pd-status { margin: 8px 0 0; min-height: 18px; font-size: 12px; color: var(--muted); }
 
-.prov-tabpanel { display: block; }
-.prov-tabpanel[hidden] { display: none; }
+/* The Models cell is a machine count, so keep the digits aligned. Its title +
+   aria-label (app.js renderProviders) explain where the number comes from. */
+.prov-models { font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-/* Provider-table name cell doubles as the detail-card entry button. */
+/* Provider-table name cell doubles as the detail-page entry button. */
 .prov-name-btn {
   background: none;
   border: none;
@@ -1122,10 +1155,87 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
 .prov-name-btn:hover { color: var(--accent); text-decoration: underline; }
 .prov-name-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* Accounts tab: per-row priority stepper stays table-compact (base
-   .form-input is sized for form rows, not cells). */
-.acc-priority { width: 72px; min-width: 0; max-width: none; padding: 4px 6px; }
-.acc-never { color: var(--muted); }
+/* ===== Account cards (Kartu C) — replaced the 6-column table ===== */
+.acc-list { display: flex; flex-direction: column; gap: 12px; }
+.acc-empty { margin: 0; color: var(--muted); font-size: 13px; }
+
+.acc-card {
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  padding: 12px 14px;
+}
+.acc-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.acc-pos {
+  flex: 0 0 auto;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.acc-label { font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.acc-type { flex: 0 0 auto; color: var(--muted); font-size: 12px; }
+.acc-cred { margin: 8px 0 0; min-width: 0; }
+.acc-cred-label { color: var(--muted); font-size: 12px; }
+.acc-key {
+  display: block;
+  font-family: "Menlo", "Consolas", monospace;
+  font-size: 13px;
+  color: var(--fg);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.acc-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.acc-move { display: inline-flex; gap: 4px; }
+/* The arrows are the ONLY reorder affordance, so they get a slightly bigger
+   target than a table icon button — and a phone-sized one on the phone shell. */
+.acc-up, .acc-down { width: 34px; height: 34px; }
+@media (max-width: 600px) {
+  .acc-move .icon-btn-small { width: 44px; height: 36px; }
+}
+body[data-device="phone"] .acc-move .icon-btn-small { width: 44px; height: 36px; }
+.acc-last { flex: 1 1 120px; min-width: 0; color: var(--muted); font-size: 12px; }
+.acc-del { flex: 0 0 auto; font-size: 12px; padding: 6px 12px; }
+/* aria-disabled is the honest state: visible, announced, and a no-op tap. */
+.acc-move .icon-btn-small[aria-disabled="true"] {
+  color: var(--muted);
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.acc-move .icon-btn-small[aria-disabled="true"]:hover {
+  background: transparent;
+  color: var(--muted);
+}
+
+/* Narrow: the profile rows stack (label above value) and the account-card
+   footer keeps its buttons on one line. The body[data-device="phone"] mirror is
+   the device-simulation shell (a wide window pretending to be a phone), so both
+   narrow contexts behave the same — same pattern as the .bottom-nav rules. */
+@media (max-width: 600px) {
+  .pd-row { flex-direction: column; gap: 2px; }
+  .pd-row dt { flex: 0 0 auto; }
+}
+body[data-device="phone"] .pd-row { flex-direction: column; gap: 2px; }
+body[data-device="phone"] .pd-row dt { flex: 0 0 auto; }
 
 /* ===== Terminal view (B3.1) — ONE COHESIVE PANEL =====
    The tab strip and the terminal surface are two rows of a single framed panel

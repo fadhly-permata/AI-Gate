@@ -342,10 +342,15 @@ describe("index.html wiring (B5.5 structure)", () => {
       .forEach((id) => expect(view.querySelector("#" + id)).not.toBeNull());
   });
 
-  it("provider detail has the Usage subsection", () => {
-    const detail = doc.getElementById("provDetail");
-    expect(detail.querySelector("#provUsageTotals")).not.toBeNull();
-    expect(detail.querySelector("#provUsageModelBody")).not.toBeNull();
+  // stage-3 (Opsi A): the B5.5 subsection moved out of the old #provDetail card
+  // into KARTU D of the provider-detail page. The ids usage.js renders into are
+  // unchanged on purpose — usage.js was not touched by that move.
+  it("Kartu D of the provider-detail page holds the usage containers", () => {
+    const view = doc.querySelector('section.view[data-view="provider-detail"]');
+    expect(view.querySelector("#provUsageTotals")).not.toBeNull();
+    expect(view.querySelector("#provUsageModelBody")).not.toBeNull();
+    expect(view.querySelector("#provUsageMsg")).not.toBeNull();
+    expect(doc.getElementById("provDetail"), "old detail card is gone").toBeNull();
   });
 
   it("loads usage.js after app.js", () => {

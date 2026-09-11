@@ -17,7 +17,7 @@
        below; it is also read by i18n.js for the on-demand URLs. -->
   <script>
     (function () {
-      var V = "20260915";
+      var V = "20260916";
       window.I18N_VER = V;
       var loc = "en";
       try {
@@ -47,7 +47,7 @@
   <script defer src="vendor/xterm/xterm.js"></script>
   <script defer src="vendor/xterm/xterm-addon-fit.js"></script>
 
-  <link rel="stylesheet" href="styles.css?v=20260915" />
+  <link rel="stylesheet" href="styles.css?v=20260916" />
 </head>
 <body>
   <div class="layout">
@@ -308,47 +308,160 @@
           </table>
         </div>
 
-        <!-- Detail card (stage-2 tidy): title + Edit/Delete + usage. The model
-             table and the Discover button are gone — /discover now runs
-             silently when a provider is opened (app.js openDetail/openEditModal).
-             Accounts moved into the edit modal's Accounts tab. -->
-        <div class="card providers-detail" id="provDetail" hidden>
+        <!-- The old detail card is gone (stage-3, Opsi A): usage moved into
+             Kartu D of the provider-detail view, Edit/Delete into its head, and
+             the account CRUD into its own page + modal. -->
+      </section>
+
+      <!-- ===== Provider detail view (stage-3, Opsi A: "satu permukaan per
+           pekerjaan") =====
+           Everything about ONE provider lives here, as ONE vertical column of
+           cards (no grid: a phone must never break it apart):
+             head      = back + name + enabled badge + Edit / Delete
+             KARTU A   = profile, read-only (edit through the head's Edit button)
+             KARTU B   = account rotation strategy (its own save button)
+             KARTU C   = the accounts, one card each, ordered by priority
+             KARTU D   = today's usage (B5.5, moved out of the old detail card)
+           NO nav / bottom-nav entry: it is opened from a provider name in the
+           list, and app.js keeps the "Penyedia" menu item highlighted while it
+           is shown, so the nav <-> view parity check stays untouched. -->
+      <section class="view provider-detail" data-view="provider-detail"
+               role="region" aria-label="Provider details"
+               data-i18n-aria="provider_detail.title">
+        <div class="card providers-card pd-head">
+          <button class="btn pd-back" id="provDetailBackBtn" type="button">
+            <i class="fa fa-arrow-left" aria-hidden="true"></i>
+            <span data-i18n="provider_detail.back">Back to Providers</span>
+          </button>
+          <div class="pd-title-wrap">
+            <h2 class="providers-title pd-name" id="provDetailTitle"></h2>
+            <span class="badge pd-badge" id="provDetailBadge" hidden></span>
+          </div>
+          <div class="detail-actions">
+            <button class="btn" id="provEditBtn" type="button" data-i18n-aria="common.edit" title="Edit">
+              <i class="fa fa-pen" aria-hidden="true"></i>
+              <span data-i18n="common.edit">Edit</span>
+            </button>
+            <button class="btn btn-danger" id="provDeleteBtn" type="button" data-i18n-aria="common.delete" title="Delete">
+              <i class="fa fa-trash" aria-hidden="true"></i>
+              <span data-i18n="common.delete">Delete</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- KARTU A — profile, read-only. Labels stay in the markup so a locale
+             switch re-translates them; JS only ever writes the <dd> text. -->
+        <div class="card">
+          <h3 class="pd-card-title" data-i18n="provider_detail.profile">Profile</h3>
+          <dl class="pd-profile">
+            <div class="pd-row">
+              <dt data-i18n="providers.type">Type</dt>
+              <dd id="pdType"></dd>
+            </div>
+            <div class="pd-row">
+              <dt data-i18n="providers.base_url">Base URL</dt>
+              <dd class="pd-mono pd-clip" id="pdBaseUrl"></dd>
+            </div>
+            <div class="pd-row">
+              <dt data-i18n="providers.model">Model</dt>
+              <dd class="pd-clip" id="pdDefaultModel"></dd>
+            </div>
+            <div class="pd-row">
+              <dt data-i18n="providers.api_key">API Key</dt>
+              <!-- ADR-007 / J3: plaintext on purpose, never masked. Long keys are
+                   cut by CSS (ellipsis) and the full value rides in title. -->
+              <dd class="pd-mono pd-clip" id="pdApiKey"></dd>
+            </div>
+            <div class="pd-row">
+              <dt data-i18n="providers.custom_headers">Custom Headers</dt>
+              <dd id="pdHeaders"></dd>
+            </div>
+            <div class="pd-row">
+              <dt data-i18n="providers.models">Models</dt>
+              <dd id="pdModels"></dd>
+            </div>
+          </dl>
+          <p class="pd-note" data-i18n="provider_detail.profile_note">
+            Read only — use Edit above to change these.
+          </p>
+          <!-- Silent /discover speaks up here (stage-3, gap no.5): one small text
+               line, never a table, and a failure never blocks anything. -->
+          <p class="pd-status" id="pdModelStatus" role="status" aria-live="polite"></p>
+        </div>
+
+        <!-- KARTU B — rotation strategy. The ONLY place fallback_strategy /
+             sticky_round_robin_limit are ever sent (the profile modal no longer
+             carries them), so the two surfaces can never overwrite each other. -->
+        <div class="card">
+          <h3 class="pd-card-title" data-i18n="provider_detail.strategy_card">Account rotation</h3>
+          <p class="pd-note" data-i18n="provider_detail.strategy_help">
+            How the gateway picks one of this provider's accounts for each request.
+          </p>
+          <div class="form-row">
+            <label class="form-label" for="pdStrategy" data-i18n="provider_detail.strategy">Strategy</label>
+            <select class="form-input" id="pdStrategy">
+              <option value="fill-first" data-i18n="providers.strategy_fill_first">Fill first</option>
+              <option value="round-robin" data-i18n="providers.strategy_round_robin">Round-robin</option>
+            </select>
+          </div>
+          <!-- Only meaningful for round-robin: app.js hides AND disables this row
+               for fill-first, so nothing dead ever travels to the server. -->
+          <div class="form-row" id="pdStickyRow" hidden>
+            <label class="form-label" for="pdStickyLimit" data-i18n="provider_detail.sticky_limit">Uses per account before rotating</label>
+            <input class="form-input" type="number" id="pdStickyLimit" min="1" step="1" value="3" />
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" id="pdStrategySaveBtn" type="button"
+                    data-i18n="provider_detail.save_strategy">Save strategy</button>
+          </div>
+          <p class="settings-msg" id="pdStrategyMsg" role="status" aria-live="polite"></p>
+        </div>
+
+        <!-- KARTU C — accounts. One CARD per account (no wide table: it survived
+             on a desktop only). Order = the server's priority order
+             (GET /api/accounts sorts priority asc, id asc — render as-is). -->
+        <div class="card">
           <div class="providers-head">
-            <h3 class="modal-title" id="provDetailTitle"></h3>
+            <h3 class="pd-card-title" data-i18n="accounts.title">Accounts</h3>
             <div class="detail-actions">
-              <button class="btn" id="provEditBtn" type="button" title="Edit" data-i18n-aria="common.edit">
-                <i class="fa fa-pen"></i>
+              <button class="btn btn-primary" id="pdAccAddBtn" type="button">
+                <i class="fa fa-plus" aria-hidden="true"></i>
+                <span data-i18n="provider_detail.add_account">Add account</span>
               </button>
-              <button class="btn btn-danger" id="provDeleteBtn" type="button" title="Delete" data-i18n-aria="common.delete">
-                <i class="fa fa-trash"></i>
+              <button class="btn" id="provConnectOAuthBtn" type="button">
+                <i class="fa fa-link" aria-hidden="true"></i>
+                <span data-i18n="accounts.connect_oauth">Connect OAuth</span>
+              </button>
+              <button class="btn" id="pdAccReloadBtn" type="button">
+                <i class="fa fa-rotate" aria-hidden="true"></i>
+                <span data-i18n="provider_detail.reload">Reload</span>
               </button>
             </div>
           </div>
 
-          <!-- Usage subsection (B5.5): this provider's day summary -->
-          <div class="accounts-section usage-section">
-            <div class="providers-head">
-              <h4 class="accounts-title" data-i18n="usage.summary">Usage summary</h4>
-            </div>
+          <p class="settings-msg" id="accountsMsg" role="status" aria-live="polite"></p>
+          <div class="acc-list" id="accList"></div>
+        </div>
 
-            <p class="settings-msg" id="provUsageMsg" role="status" aria-live="polite"></p>
-
-            <div class="usage-stats" id="provUsageTotals"></div>
-
-            <h3 class="usage-subtitle" data-i18n="usage.top_models">Top models</h3>
-            <table class="data-table" id="provUsageModelTable">
-              <thead>
-                <tr>
-                  <th data-i18n="usage.model">Model</th>
-                  <th data-i18n="usage.requests">Requests</th>
-                  <th data-i18n="usage.tokens_in">Tokens in</th>
-                  <th data-i18n="usage.tokens_out">Tokens out</th>
-                  <th data-i18n="usage.cost">Cost (est.)</th>
-                </tr>
-              </thead>
-              <tbody id="provUsageModelBody"></tbody>
-            </table>
-          </div>
+        <!-- KARTU D — B5.5 usage (moved verbatim out of the old detail card;
+             usage.js still renders into these ids, unchanged). -->
+        <div class="card usage-section">
+          <h3 class="pd-card-title" data-i18n="usage.summary">Usage summary</h3>
+          <p class="settings-msg" id="provUsageMsg" role="status" aria-live="polite"></p>
+          <div class="usage-stats" id="provUsageTotals"></div>
+          <h4 class="usage-subtitle" data-i18n="usage.top_models">Top models</h4>
+          <table class="data-table" id="provUsageModelTable">
+            <thead>
+              <tr>
+                <th data-i18n="usage.model">Model</th>
+                <th data-i18n="usage.requests">Requests</th>
+                <th data-i18n="usage.tokens_in">Tokens in</th>
+                <th data-i18n="usage.tokens_out">Tokens out</th>
+                <th data-i18n="usage.cost">Cost (est.)</th>
+              </tr>
+            </thead>
+            <tbody id="provUsageModelBody"></tbody>
+          </table>
         </div>
       </section>
 
@@ -785,162 +898,122 @@
         </div>
       </section>
 
-      <!-- Provider add/edit modal (B2.2) — stage-2: two tabs. [Provider] holds
-           the form (plus the account-rotation strategy); [Accounts] holds the
-           whole multi-account subsection that used to live in the detail card.
-           ARIA tablist with roving tabindex (app.js wireProvTabs). The Accounts
-           tab is aria-disabled in ADD mode — an id is needed before accounts
-           can attach, explained by #provTabHint instead of silent dead controls. -->
+      <!-- Provider add/edit modal (B2.2) — stage-3: PROFILE ONLY. The stage-2
+           tablist + Accounts panel are gone (one surface per job): accounts and
+           the rotation strategy live on the provider-detail page. The strategy
+           fields deliberately do NOT exist here any more, so saving the profile
+           can never overwrite what Kartu B just stored. -->
       <div class="modal-overlay" id="provModal" hidden>
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="provModalTitle">
           <h3 class="modal-title" id="provModalTitle" data-i18n="providers.add">Add Provider</h3>
-          <div class="modal-tabs" id="provTabList" role="tablist"
-               aria-label="Provider sections" data-i18n-aria="providers.tabs_label">
-            <button type="button" class="modal-tab is-active" id="provTabProvider" role="tab"
-                    aria-selected="true" aria-controls="provPanelProvider"
-                    data-i18n="providers.tab_provider">Provider</button>
-            <button type="button" class="modal-tab" id="provTabAccounts" role="tab"
-                    aria-selected="false" aria-controls="provPanelAccounts" tabindex="-1"
-                    data-i18n="providers.tab_accounts">Accounts</button>
-          </div>
-          <p class="settings-msg" id="provTabHint" data-i18n="accounts.save_first" hidden></p>
           <form id="provForm" class="settings-form" autocomplete="off">
-            <div class="prov-tabpanel" id="provPanelProvider" role="tabpanel"
-                 aria-labelledby="provTabProvider" tabindex="0">
-              <input type="hidden" id="provId" />
-              <div class="form-row">
-                <label class="form-label" for="provName" data-i18n="providers.name">Name</label>
-                <input class="form-input" type="text" id="provName" name="name" required />
+            <input type="hidden" id="provId" />
+            <div class="form-row">
+              <label class="form-label" for="provName" data-i18n="providers.name">Name</label>
+              <input class="form-input" type="text" id="provName" name="name" required />
+            </div>
+            <div class="form-row">
+              <label class="form-label" for="provType" data-i18n="providers.type">Type</label>
+              <select class="form-input" id="provType" name="type">
+                <option value="openai-compatible">openai-compatible</option>
+                <option value="anthropic">anthropic</option>
+                <option value="ollama">ollama</option>
+                <option value="openrouter">openrouter</option>
+                <option value="litellm">litellm</option>
+                <option value="other">other</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label class="form-label" for="provBaseUrl" data-i18n="providers.base_url">Base URL</label>
+              <input class="form-input" type="text" id="provBaseUrl" name="base_url" />
+            </div>
+            <div class="form-row">
+              <label class="form-label" for="provApiKey" data-i18n="providers.api_key">API Key</label>
+              <!-- ADR-007: plaintext, no masking -->
+              <input class="form-input" type="text" id="provApiKey" name="api_key" />
+            </div>
+            <div class="form-row">
+              <label class="form-label" for="provModel" data-i18n="providers.model">Model</label>
+              <!-- Searchable combobox (combobox.js): text input + custom <ul>
+                   panel that filters as you type. Replaces <input list> +
+                   <datalist>, which never pops a dropdown on Android. The
+                   input value IS the model string, so free text (custom
+                   models) still works. -->
+              <div class="aigate-combo">
+                <input class="form-input" type="text" id="provModel" name="default_model"
+                       autocomplete="off" placeholder="Search or type a model…"
+                       role="combobox" aria-expanded="false" aria-controls="provModelList"
+                       aria-autocomplete="list" />
+                <ul class="aigate-combo-list" id="provModelList" role="listbox" hidden></ul>
               </div>
-              <div class="form-row">
-                <label class="form-label" for="provType" data-i18n="providers.type">Type</label>
-                <select class="form-input" id="provType" name="type">
-                  <option value="openai-compatible">openai-compatible</option>
-                  <option value="anthropic">anthropic</option>
-                  <option value="ollama">ollama</option>
-                  <option value="openrouter">openrouter</option>
-                  <option value="litellm">litellm</option>
-                  <option value="other">other</option>
-                </select>
-              </div>
-              <div class="form-row">
-                <label class="form-label" for="provBaseUrl" data-i18n="providers.base_url">Base URL</label>
-                <input class="form-input" type="text" id="provBaseUrl" name="base_url" />
-              </div>
-              <div class="form-row">
-                <label class="form-label" for="provApiKey" data-i18n="providers.api_key">API Key</label>
-                <!-- ADR-007: plaintext, no masking -->
-                <input class="form-input" type="text" id="provApiKey" name="api_key" />
-              </div>
-              <div class="form-row">
-                <label class="form-label" for="provModel" data-i18n="providers.model">Model</label>
-                <!-- Searchable combobox (combobox.js): text input + custom <ul>
-                     panel that filters as you type. Replaces <input list> +
-                     <datalist>, which never pops a dropdown on Android. The
-                     input value IS the model string, so free text (custom
-                     models) still works. -->
-                <div class="aigate-combo">
-                  <input class="form-input" type="text" id="provModel" name="default_model"
-                         autocomplete="off" placeholder="Search or type a model…"
-                         role="combobox" aria-expanded="false" aria-controls="provModelList"
-                         aria-autocomplete="list" />
-                  <ul class="aigate-combo-list" id="provModelList" role="listbox" hidden></ul>
-                </div>
-              </div>
-              <div class="form-row">
-                <label class="form-label" for="provEnabled" data-i18n="providers.enabled">Enabled</label>
-                <label class="switch" title="Enabled">
-                  <input type="checkbox" id="provEnabled" name="enabled" />
-                  <span class="switch-slider"></span>
-                </label>
-              </div>
-              <!-- Multi-account rotation strategy (stage-2, contract stage-1):
-                   enum is exactly fill-first | round-robin; anything else the
-                   backend rejects with 400 invalid_fallback_strategy. -->
-              <div class="form-row">
-                <label class="form-label" for="provStrategy" data-i18n="providers.strategy">Account strategy</label>
-                <select class="form-input" id="provStrategy" name="fallback_strategy">
-                  <option value="fill-first" data-i18n="providers.strategy_fill_first">Fill first</option>
-                  <option value="round-robin" data-i18n="providers.strategy_round_robin">Round-robin</option>
-                </select>
-              </div>
-              <!-- Only meaningful for round-robin: app.js hides + disables this
-                   row for fill-first so it never pretends to send a value. -->
-              <div class="form-row" id="provStickyRow" hidden>
-                <label class="form-label" for="provStickyLimit" data-i18n="providers.sticky_limit">Uses per account</label>
-                <input class="form-input" type="number" id="provStickyLimit"
-                       name="sticky_round_robin_limit" min="1" step="1" value="3" />
-              </div>
-              <div class="form-row form-row-stack">
-                <label class="form-label" data-i18n="providers.custom_headers">Custom Headers</label>
-                <div class="headers-editor" id="provHeaders"></div>
-                <button type="button" class="btn hdr-add" id="provAddHeaderBtn">
-                  <i class="fa fa-plus"></i> <span data-i18n="providers.add_header">Add Header</span>
-                </button>
-              </div>
-              <p class="settings-msg" id="provModalMsg" role="status" aria-live="polite"></p>
-              <div class="form-actions">
-                <button type="button" class="btn" id="provTestBtn" data-i18n="providers.test">Test Connection</button>
-                <button type="submit" class="btn btn-primary" id="provSaveBtn" data-i18n="providers.save">Save</button>
-              </div>
+            </div>
+            <!-- Model discovery status (stage-3): one small text line under the
+                 combobox. /discover stays a silent background POST, but the user
+                 now sees WHY the list is empty instead of wondering. -->
+            <p class="pd-status" id="provModalModelStatus" role="status" aria-live="polite"></p>
+            <div class="form-row">
+              <label class="form-label" for="provEnabled" data-i18n="providers.enabled">Enabled</label>
+              <label class="switch" title="Enabled">
+                <input type="checkbox" id="provEnabled" name="enabled" />
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+            <div class="form-row form-row-stack">
+              <label class="form-label" data-i18n="providers.custom_headers">Custom Headers</label>
+              <div class="headers-editor" id="provHeaders"></div>
+              <button type="button" class="btn hdr-add" id="provAddHeaderBtn">
+                <i class="fa fa-plus"></i> <span data-i18n="providers.add_header">Add Header</span>
+              </button>
+            </div>
+            <p class="settings-msg" id="provModalMsg" role="status" aria-live="polite"></p>
+            <div class="form-actions">
+              <button type="button" class="btn" id="provTestBtn" data-i18n="providers.test">Test Connection</button>
+              <button type="submit" class="btn btn-primary" id="provSaveBtn" data-i18n="providers.save">Save</button>
+              <button type="button" class="btn" id="provCancel" data-i18n="providers.cancel">Cancel</button>
             </div>
           </form>
-          <div class="prov-tabpanel accounts-section" id="provPanelAccounts" role="tabpanel"
-               aria-labelledby="provTabAccounts" tabindex="0" hidden>
-            <div class="providers-head">
-              <h4 class="accounts-title" data-i18n="accounts.title">Accounts</h4>
-              <button class="btn" id="provConnectOAuthBtn" type="button">
-                <i class="fa fa-link"></i>
-                <span data-i18n="accounts.connect_oauth">Connect OAuth</span>
-              </button>
+        </div>
+      </div>
+
+      <!-- Add-account modal (stage-3, Opsi A): the ONE surface for creating an
+           account on the provider currently open in the detail page. Its id is
+           already known here, so the stage-2 "save the provider first" hint and
+           the 5-row inline form inside the provider modal are both gone.
+           Submit -> POST /api/accounts (contract: accepts priority, default 0). -->
+      <div class="modal-overlay" id="accModal" hidden>
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="accModalTitle">
+          <h3 class="modal-title" id="accModalTitle" data-i18n="provider_detail.account_modal_title">New account for this provider</h3>
+          <form id="accForm" class="settings-form" autocomplete="off">
+            <div class="form-row">
+              <label class="form-label" for="accLabel" data-i18n="accounts.label">Label</label>
+              <input class="form-input" type="text" id="accLabel" name="label" />
             </div>
-
-            <p class="settings-msg" id="accountsMsg" role="status" aria-live="polite"></p>
-
-            <div class="accounts-add">
-              <div class="form-row-inline">
-                <label class="form-label" for="accLabel" data-i18n="accounts.label">Label</label>
-                <input class="form-input" type="text" id="accLabel" />
-              </div>
-              <div class="form-row-inline">
-                <label class="form-label" for="accAuthType" data-i18n="accounts.auth_type">Auth Type</label>
-                <select class="form-input" id="accAuthType">
-                  <option value="api_key" data-i18n="accounts.auth_api_key">API Key</option>
-                  <option value="oauth" data-i18n="accounts.auth_oauth">OAuth</option>
-                </select>
-              </div>
-              <div class="form-row-inline" id="accApiKeyRow">
-                <label class="form-label" for="accApiKey" data-i18n="accounts.api_key">API Key</label>
-                <input class="form-input" type="text" id="accApiKey" />
-              </div>
-              <!-- provider.priority: small number tried first (stage-1 contract) -->
-              <div class="form-row-inline">
-                <label class="form-label" for="accPriority" data-i18n="accounts.priority">Priority</label>
-                <input class="form-input acc-priority" type="number" id="accPriority" min="0" step="1" value="0" />
-              </div>
-              <button class="btn btn-primary" id="accAddBtn" type="button">
-                <i class="fa fa-plus"></i>
-                <span data-i18n="accounts.add">Add Account</span>
-              </button>
+            <div class="form-row">
+              <label class="form-label" for="accAuthType" data-i18n="accounts.auth_type">Auth Type</label>
+              <select class="form-input" id="accAuthType" name="auth_type">
+                <option value="api_key" data-i18n="accounts.auth_api_key">API Key</option>
+                <option value="oauth" data-i18n="accounts.auth_oauth">OAuth</option>
+              </select>
             </div>
-
-            <table class="data-table" id="accountsTable">
-              <thead>
-                <tr>
-                  <th data-i18n="accounts.label">Label</th>
-                  <th data-i18n="accounts.auth_type">Auth Type</th>
-                  <th data-i18n="accounts.credential">Credential</th>
-                  <th data-i18n="accounts.priority">Priority</th>
-                  <th data-i18n="accounts.last_used">Last used</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody id="accountsBody"></tbody>
-            </table>
-          </div>
-          <div class="form-actions">
-            <button type="button" class="btn" id="provCancel" data-i18n="providers.cancel">Cancel</button>
-          </div>
+            <div class="form-row" id="accApiKeyRow">
+              <label class="form-label" for="accApiKey" data-i18n="accounts.api_key">API Key</label>
+              <!-- ADR-007 / J3: plaintext on purpose -->
+              <input class="form-input" type="text" id="accApiKey" name="api_key" />
+            </div>
+            <div class="form-row">
+              <label class="form-label" for="accPriority" data-i18n="provider_detail.priority">Priority</label>
+              <input class="form-input" type="number" id="accPriority" name="priority"
+                     min="0" step="1" value="0" />
+            </div>
+            <p class="pd-note" data-i18n="provider_detail.priority_note">
+              Smaller number is tried first. Reorder later with the arrows.
+            </p>
+            <p class="settings-msg" id="accModalMsg" role="status" aria-live="polite"></p>
+            <div class="form-actions">
+              <button type="button" class="btn" id="accCancelBtn" data-i18n="providers.cancel">Cancel</button>
+              <button type="submit" class="btn btn-primary" id="accAddBtn" data-i18n="accounts.add">Add Account</button>
+            </div>
+          </form>
         </div>
       </div>
 
@@ -1279,7 +1352,7 @@
        Translation strings live in i18n/<code>.js, loaded by the inline
        preloader in <head> (active language) and on demand by this file.
        ?v= cache-buster: bump whenever i18n.js changes (stale cache = missing labels). -->
-  <script src="i18n.js?v=20260915" defer></script>
+  <script src="i18n.js?v=20260916" defer></script>
   <!-- Device simulation helper (B4.2) — must load before app.js uses it -->
   <script src="device.js" defer></script>
   <!-- Searchable combobox widget (model pickers) — must load before app.js /
@@ -1288,7 +1361,7 @@
   <script src="combobox.js?v=20260911" defer></script>
   <!-- App bootstrap (defer preserves order).
        ?v= cache-buster: bump whenever app.js changes. -->
-  <script src="app.js?v=20260915" defer></script>
+  <script src="app.js?v=20260916" defer></script>
   <!-- Combos / Proxy Pools / Endpoints management (B2.4 / B2.3 / B2.5) -->
   <script src="combos.js" defer></script>
   <script src="proxies.js" defer></script>

@@ -71,9 +71,18 @@
     syncBottomNav(view);
   }
 
+  // Which nav item lights up for a given view. Normally 1:1 — except the
+  // provider-detail page (stage-3), which has NO entry of its own and belongs
+  // to "providers". Kept in one place so setActiveNav and the device-simulation
+  // re-sync can never disagree about it.
+  function navViewFor(view) {
+    return view === "provider-detail" ? "providers" : view;
+  }
+
   function syncBottomNav(view) {
+    var target = navViewFor(view);
     document.querySelectorAll(".bn-item").forEach(function (n) {
-      n.classList.toggle("active", !!view && n.getAttribute("data-view") === view);
+      n.classList.toggle("active", !!target && n.getAttribute("data-view") === target);
     });
   }
 
@@ -155,8 +164,10 @@
       n.classList.remove("active");
     });
     if (item) item.classList.add("active");
-    // Mirror the active state onto the mobile bottom-nav (same data-view).
-    var view = item ? item.getAttribute("data-view") : null;
+    // Mirror the active state onto the mobile bottom-nav (same data-view,
+    // mapped through navViewFor so a sub-page like provider-detail still
+    // highlights its parent).
+    var view = item ? navViewFor(item.getAttribute("data-view")) : null;
     document.querySelectorAll(".bn-item").forEach(function (n) {
       n.classList.toggle("active", !!view && n.getAttribute("data-view") === view);
     });
@@ -460,6 +471,7 @@
 
   window.aigate.mapProviderToRow = mapProviderToRow;
   window.aigate.renderProviders = renderProviders;
+  window.aigate.loadProviders = loadProviders;
   window.aigate.buildHeadersDict = buildHeadersDict;
   window.aigate.headersToRows = headersToRows;
   window.aigate.saveProvider = saveProvider;
@@ -467,10 +479,10 @@
   window.aigate.openEditModal = openEditModal;
   window.aigate.discoverModels = discoverModels;
   window.aigate.populateModelCombobox = populateModelCombobox;
-  // Modal tab wiring — exposed so tests can exercise the exact init() wiring.
-  window.aigate.wireProvTabs = wireProvTabs;
-  window.aigate.selectProvTab = selectProvTab;
-  window.aigate.syncStickyLimitRow = syncStickyLimitRow;
+  // Provider-detail page (stage-3, Opsi A): only what a test or another module
+  // actually calls is exported — the rest stays private to this IIFE.
+  window.aigate.openDetail = openDetail;
+  window.aigate.saveStrategy = saveStrategy;
 
   /* Shared helpers — exposed so the Combos / Proxy Pools / Endpoints modules
      (and tests) reuse the exact same fetch/escape/i18n behavior. */
@@ -560,25 +572,24 @@
   /* ---- DOM helpers ---- */
   function provEl(id) { return document.getElementById(id); }
 
-  function setProvMsg(text, kind) {
-    var m = provEl("provMsg");
+  /* ---- Shared status-line writer (DRY: every message slot behaves the same) ---- */
+  function setMsgIn(id, text, kind, base) {
+    var m = provEl(id);
     if (!m) return;
     m.textContent = text || "";
-    m.className = "settings-msg" + (kind ? " settings-msg-" + kind : "");
+    m.className = (base || "settings-msg") + (kind ? " settings-msg-" + kind : "");
   }
 
-  function setProvModalMsg(text, kind) {
-    var m = provEl("provModalMsg");
-    if (!m) return;
-    m.textContent = text || "";
-    m.className = "settings-msg" + (kind ? " settings-msg-" + kind : "");
-  }
+  function setProvMsg(text, kind) { setMsgIn("provMsg", text, kind); }
+  function setProvModalMsg(text, kind) { setMsgIn("provModalMsg", text, kind); }
 
+  // Discovery speaks through ONE small text line, shown in BOTH places it is
+  // relevant: under the model combobox in the profile modal and inside Kartu A
+  // of the detail page. (stage-3: the old #provModelMsg + model table are gone;
+  // a status line never needs a table and never blocks the form.)
   function setModelMsg(text, kind) {
-    var m = provEl("provModelMsg");
-    if (!m) return;
-    m.textContent = text || "";
-    m.className = "settings-msg" + (kind ? " settings-msg-" + kind : "");
+    setMsgIn("provModalModelStatus", text, kind, "pd-status");
+    setMsgIn("pdModelStatus", text, kind, "pd-status");
   }
 
   /* ---- Provider default-model: searchable combobox (combobox.js) ----
@@ -779,23 +790,27 @@
       var badge = row.enabled
         ? '<span class="badge badge-ok">' + escapeHtml(getStr("providers.enabled")) + "</span>"
         : '<span class="badge badge-off">' + escapeHtml(getStr("providers.disabled")) + "</span>";
-      // The name is the entry point to the detail card (usage + Edit/Delete):
-      // the old way in was the kebab "Discover Models" action, but discovery
-      // now runs silently and that action became redundant (stage-2).
+      // The name opens the provider-detail page (stage-3, Opsi A): that single
+      // page owns profile + strategy + accounts + usage. The kebab stays
+      // edit/delete only.
+      var modelsHint = escapeHtml(getStr("providers.models_hint"));
       return '<tr class="prov-row" data-id="' + escapeHtml(row.id) + '">' +
         '<td class="prov-name"><button type="button" class="prov-name-btn js-prov-detail" data-id="' +
           escapeHtml(row.id) + '">' + escapeHtml(row.name) + "</button></td>" +
         "<td>" + escapeHtml(row.type) + "</td>" +
         "<td>" + escapeHtml(row.base_url) + "</td>" +
         "<td>" + badge + "</td>" +
-        "<td>" + row.modelCount + "</td>" +
+        // The count is a machine result (silent /discover), so say where it
+        // comes from instead of letting the number look authoritative.
+        '<td class="prov-models" title="' + modelsHint + '" aria-label="' + modelsHint + '">' +
+          escapeHtml(row.modelCount) + "</td>" +
         rowMenuCellHtml() +
       "</tr>";
     }).join("");
 
-    // Name button -> openDetail. One delegated listener on the tbody (the node
-    // survives innerHTML re-renders; the flag stops per-call listener buildup
-    // when a test rebuilds the tbody it re-attaches on the fresh node).
+    // Name button -> the detail page. One delegated listener on the tbody (the
+    // node survives innerHTML re-renders; the flag stops per-call listener
+    // buildup when a test rebuilds the tbody it re-attaches on the fresh node).
     if (body.getAttribute("data-detail-wired") !== "1") {
       body.setAttribute("data-detail-wired", "1");
       body.addEventListener("click", function (e) {
@@ -860,102 +875,21 @@
     return buildHeadersDict(rows);
   }
 
-  /* ---- Modal tabs: [Provider] | [Accounts] (stage-2) ----
-     One WAI-ARIA tablist with a roving tabindex; panels toggle `hidden`.
-     In ADD mode the Accounts tab is aria-disabled (no provider id to attach
-     accounts to) and #provTabHint explains — never silently dead controls. */
-  function provTabButtons() {
-    return [provEl("provTabProvider"), provEl("provTabAccounts")];
-  }
-
-  function provPanels() {
-    return [provEl("provPanelProvider"), provEl("provPanelAccounts")];
-  }
-
-  function accountsTabEnabled() {
-    var t = provEl("provTabAccounts");
-    return !!t && t.getAttribute("aria-disabled") !== "true";
-  }
-
-  function setAccountsTabEnabled(on) {
-    var t = provEl("provTabAccounts");
-    var hint = provEl("provTabHint");
-    if (hint) hint.hidden = !!on;
-    if (!t) return;
-    if (on) {
-      t.removeAttribute("aria-disabled");
-    } else {
-      t.setAttribute("aria-disabled", "true");
-      t.tabIndex = -1;
-      if (t.getAttribute("aria-selected") === "true") selectProvTab(0);
-    }
-  }
-
-  // Activate panel `idx` (0 Provider, 1 Accounts). A disabled Accounts tab
-  // falls back to Provider. moveFocus = keyboard interaction (arrow keys).
-  function selectProvTab(idx, moveFocus) {
-    var tabs = provTabButtons();
-    var panels = provPanels();
-    if (!tabs[idx]) return;
-    if (idx === 1 && !accountsTabEnabled()) idx = 0;
-    tabs.forEach(function (t, i) {
-      if (!t) return;
-      var on = i === idx;
-      t.setAttribute("aria-selected", on ? "true" : "false");
-      t.tabIndex = on ? 0 : -1;
-      t.classList.toggle("is-active", on);
-    });
-    panels.forEach(function (p, i) {
-      if (p) p.hidden = i !== idx;
-    });
-    if (moveFocus && tabs[idx] && typeof tabs[idx].focus === "function") {
-      tabs[idx].focus();
-    }
-  }
-
-  // Left/Right move (wrapping), Home/End jump — across ENABLED tabs only.
-  function provTabKeydown(e) {
-    var tabs = provTabButtons();
-    var current = tabs.indexOf(document.activeElement);
-    if (current === -1) return;
-    var enabled = [0, 1].filter(function (i) {
-      return i === 0 || accountsTabEnabled();
-    });
-    var pos = enabled.indexOf(current);
-    if (pos === -1) return;
-    var next = null;
-    if (e.key === "ArrowRight") next = enabled[(pos + 1) % enabled.length];
-    else if (e.key === "ArrowLeft") next = enabled[(pos - 1 + enabled.length) % enabled.length];
-    else if (e.key === "Home") next = enabled[0];
-    else if (e.key === "End") next = enabled[enabled.length - 1];
-    if (next === null) return;
-    e.preventDefault();
-    selectProvTab(next, true);
-  }
-
-  function wireProvTabs() {
-    var tabs = provTabButtons();
-    tabs.forEach(function (t, i) {
-      if (!t) return;
-      t.addEventListener("click", function () { selectProvTab(i); });
-    });
-    var list = provEl("provTabList");
-    if (list) list.addEventListener("keydown", provTabKeydown);
-  }
-
-  /* ---- Strategy controls (stage-2, adopsi 9router) ----
-     sticky_round_robin_limit is only meaningful while strategy=round-robin:
-     for fill-first the row is hidden AND the input disabled, so saveProvider
-     can skip the field instead of pretending a dead value was sent. */
+  /* ---- Rotation strategy (Kartu B of the provider-detail page) ----
+     sticky_round_robin_limit is only meaningful while strategy=round-robin: for
+     fill-first the row is hidden AND the input disabled, so saveStrategy can skip
+     the field instead of pretending a dead value was sent. The strategy select
+     lives ONLY here — the profile modal no longer carries it, so the two
+     surfaces cannot overwrite each other (stage-3, Opsi A). */
   function strategyIsRoundRobin() {
-    var sel = provEl("provStrategy");
+    var sel = provEl("pdStrategy");
     return !!sel && sel.value === "round-robin";
   }
 
   function syncStickyLimitRow() {
     var rr = strategyIsRoundRobin();
-    var row = provEl("provStickyRow");
-    var inp = provEl("provStickyLimit");
+    var row = provEl("pdStickyRow");
+    var inp = provEl("pdStickyLimit");
     if (row) row.hidden = !rr;
     if (inp) inp.disabled = !rr;
   }
@@ -971,53 +905,36 @@
     // edit (free text still works with an empty option list).
     var c = provModelCtl();
     if (c) { c.setOptions([]); c.setValue(""); c.close(); }
-    // Strategy defaults: fill-first + limit 3 (the HTML form defaults).
-    syncStickyLimitRow();
-    // No id yet -> the Accounts tab cannot attach anything; hint explains.
-    setAccountsTabEnabled(false);
-    selectProvTab(0);
+    setModelMsg("", "");
     provEl("provModal").hidden = false;
   }
 
+  // EDIT mode: the profile fields come from the DTO, then the modal opens. The
+  // rotation strategy is deliberately NOT loaded here — it belongs to Kartu B
+  // (renderStrategyCard), and the profile PUT must not carry it back.
   function openEditModal(id) {
     fetchJson(PROV_API + "/" + id).then(function (p) {
       selectedProviderId = id;
-      provEl("provId").value = p.id;
+      provEl("provId").value = p.id != null ? p.id : "";
       provEl("provName").value = p.name != null ? p.name : "";
       provEl("provType").value = p.type || "openai-compatible";
       provEl("provBaseUrl").value = p.base_url != null ? p.base_url : "";
       // ADR-007: show api_key as plaintext (no redaction).
       provEl("provApiKey").value = p.api_key != null ? p.api_key : "";
       provEl("provEnabled").checked = !!p.enabled;
-      // Rotation strategy (stage-1 contract): enum is exactly fill-first |
-      // round-robin; anything unexpected falls back to the default instead of
-      // echoing a value the backend would reject with 400 later.
-      var sel = provEl("provStrategy");
-      if (sel) {
-        sel.value = p.fallback_strategy === "round-robin" ? "round-robin" : "fill-first";
-      }
-      var lim = provEl("provStickyLimit");
-      if (lim) {
-        var n = parseInt(p.sticky_round_robin_limit, 10);
-        lim.value = isNaN(n) ? 3 : n;
-      }
-      syncStickyLimitRow();
       // Default model: seed the combobox with this provider's known models
       // (sorted) and set the stored value. A custom (undiscovered) value is
       // still shown because the input holds any string.
       var mc = provModelCtl();
       if (mc) { mc.setOptions(modelOptions(p.models)); mc.setValue(p.default_model); }
-      else provEl("provModel").value = p.default_model != null ? p.default_model : "";
+      else if (provEl("provModel")) provEl("provModel").value = p.default_model != null ? p.default_model : "";
       provEl("provModalTitle").textContent = getStr("providers.edit");
       renderHeadersEditor(headersToRows(p.custom_headers));
-      // Accounts live in this modal now (tab 2): enable the tab + load list.
-      setAccountsTabEnabled(true);
-      selectProvTab(0);
-      loadAccounts(id);
-      // Silent model refresh: no status message, no table — feeds only the
-      // combobox options + list counts once it lands (stage-2 decision).
-      discoverModels(id, { quiet: true });
+      setModelMsg("", "");
       provEl("provModal").hidden = false;
+      // Background model refresh (stage-2 decision kept): the POST still runs
+      // quietly; stage-3 adds ONE status line so the wait is not mute.
+      discoverModels(id, { quiet: true });
     }).catch(function (err) {
       setProvMsg(err.message, "error");
     });
@@ -1068,6 +985,10 @@
   function saveProvider(e) {
     if (e) e.preventDefault();
     var id = provEl("provId").value;
+    // Stage-3 (Opsi A): PROFILE fields only. fallback_strategy /
+    // sticky_round_robin_limit deliberately are NOT sent — they belong to
+    // Kartu B (saveStrategy), so saving the profile can never silently
+    // overwrite the rotation the user just stored there.
     var body = {
       name: provEl("provName").value,
       type: provEl("provType").value,
@@ -1075,17 +996,8 @@
       api_key: provEl("provApiKey").value,
       default_model: provModelValue(),
       enabled: provEl("provEnabled").checked,
-      custom_headers: collectHeaders(),
-      // Stage-1 contract: strategy is always sent (enum select cannot emit
-      // anything else); the sticky limit goes along ONLY when round-robin —
-      // hidden+disabled-for-fill-first must not masquerade as a live value.
-      fallback_strategy: provEl("provStrategy") ? provEl("provStrategy").value : "fill-first"
+      custom_headers: collectHeaders()
     };
-    if (strategyIsRoundRobin()) {
-      var limEl = provEl("provStickyLimit");
-      var lim = limEl ? parseInt(limEl.value, 10) : NaN;
-      body.sticky_round_robin_limit = isNaN(lim) ? 3 : Math.max(1, lim);
-    }
     setProvMsg("");
     var req = id
       ? fetchJson(PROV_API + "/" + id, {
@@ -1094,19 +1006,33 @@
       : fetchJson(PROV_API, {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
         });
-    req.then(function () {
+    req.then(function (saved) {
       hideModal();
       loadProviders();
+      // Editing from the detail page: refresh what the user is looking at, with
+      // the id the SERVER answered (a POST has no id yet).
+      var savedId = (saved && saved.id != null) ? saved.id : id;
+      if (savedId != null && savedId !== "" && selectedProviderId === savedId &&
+          isProviderDetailActive()) {
+        loadProviderDetail(savedId);
+      }
     }).catch(function (err) {
       setProvMsg(err.message, "error");
     });
   }
 
-  /* ---- Detail card (stage-2 tidy) ----
-     The discovered-models TABLE is gone (it cluttered the card); /discover
-     now runs quietly from openDetail/openEditModal and feeds only the
-     #provModel combobox + the "Models" count column. renderModels() died with
-     its table. */
+  /* ===== Provider-detail page (stage-3, Opsi A) =====
+     One page owns everything about ONE provider: head (back / name / badge /
+     Ubah / Hapus), Kartu A profile (read-only), Kartu B rotation strategy,
+     Kartu C accounts, Kartu D usage (B5.5, moved from the old detail card).
+     It has NO nav entry of its own: the "providers" item stays highlighted so
+     the nav <-> view parity contract keeps holding. */
+
+  // Is the detail page the one currently on screen?
+  function isProviderDetailActive() {
+    var v = document.querySelector('.view[data-view="provider-detail"]');
+    return !!v && v.classList.contains("is-active");
+  }
 
   // Load discovered models into the #provModel combobox panel (sorted by name).
   // Replaces the old populateModelDatalist(): a <datalist> never pops on
@@ -1116,28 +1042,149 @@
     if (c) c.setOptions(modelOptions(models));
   }
 
-  // skipDiscover: the legacy non-quiet discoverModels() opens the detail card
-  // itself and then runs its OWN (visible) discovery — no duplicate POST.
+  /* skipDiscover: the legacy non-quiet discoverModels() opens the page itself
+     and then runs its OWN visible discovery — no duplicate POST. */
   function openDetail(id, skipDiscover) {
     selectedProviderId = id;
-    fetchJson(PROV_API + "/" + id).then(function (p) {
-      provEl("provDetail").hidden = false;
-      provEl("provDetailTitle").textContent = p.name || id;
-      // B5.5: refresh the per-provider Usage subsection (day summary).
+    showView("provider-detail");
+    // Same item as the list: the sidebar/bottom-nav keep pointing at "Penyedia".
+    setActiveNav(document.querySelector('.nav-item[data-view="providers"]'));
+    stopOAuthPoll();
+    loadProviderDetail(id);
+    if (!skipDiscover) discoverModels(id, { quiet: true });
+  }
+
+  // GET everything the page shows for ONE provider (profile + accounts + usage).
+  function loadProviderDetail(id) {
+    if (id == null) id = selectedProviderId;
+    if (id == null) return Promise.resolve();
+    setProvMsg("");
+    return fetchJson(PROV_API + "/" + id).then(function (p) {
+      renderProfileCard(p);
+      renderStrategyCard(p);
+      loadAccounts(id);
+      // B5.5 usage (Kartu D) — usage.js owns the rendering, we only point it.
       if (window.aigate && window.aigate.usage &&
           typeof window.aigate.usage.loadProviderUsage === "function") {
         window.aigate.usage.loadProviderUsage(id);
       }
-      if (!skipDiscover) discoverModels(id, { quiet: true });
     }).catch(function (err) {
+      // Nothing can be rendered without the provider: go back to the list and
+      // put the reason where the user can actually see it (#provMsg is there).
+      if (isProviderDetailActive()) {
+        showView("providers");
+        setActiveNav(document.querySelector('.nav-item[data-view="providers"]'));
+      }
       setProvMsg(err.message, "error");
     });
   }
 
-  // Discovery runs quietly (stage-2): modal/detail opens trigger it without
-  // any status chatter; the only UI effect is fresh combobox options.
-  // discoverSeq: if the user moved on to another provider while a response
-  // was in flight, the stale list must never overwrite the current one.
+  // "← Kembali ke Penyedia": back to the list, and the list is re-read so the
+  // model counts / badges are fresh after anything changed on the detail page.
+  function backToProviders() {
+    stopOAuthPoll();
+    selectedProviderId = null;
+    showView("providers");
+    setActiveNav(document.querySelector('.nav-item[data-view="providers"]'));
+    loadProviders();
+  }
+
+  // Kartu A — read-only profile. Values go in as text (never HTML), long ones
+  // are cut by CSS and ride along in `title` so nothing is lost.
+  function renderProfileCard(p) {
+    p = p || {};
+    var title = provEl("provDetailTitle");
+    if (title) title.textContent = p.name != null ? p.name : "";
+    var badge = provEl("provDetailBadge");
+    if (badge) {
+      badge.hidden = false;
+      badge.textContent = getStr(p.enabled ? "providers.enabled" : "providers.disabled");
+      badge.className = "pd-badge badge " + (p.enabled ? "badge-ok" : "badge-off");
+    }
+    setProfileText("pdType", p.type || "");
+    setProfileText("pdBaseUrl", p.base_url || "");
+    setProfileText("pdDefaultModel", p.default_model || "");
+    // ADR-007 / J3: the key is plaintext on screen by design, never masked.
+    setProfileText("pdApiKey", p.api_key || "");
+    var headers = headersToRows(p.custom_headers);
+    setProfileText("pdHeaders", headers.length
+      ? headers.map(function (h) { return h.key + ": " + h.value; }).join("  ·  ")
+      : getStr("provider_detail.none"));
+    var models = Array.isArray(p.models) ? p.models : [];
+    setModelCount(models.length);
+  }
+
+  // One <dd>: text only + a title carrying the full value (ellipsised by CSS).
+  function setProfileText(id, value) {
+    var el = provEl(id);
+    if (!el) return;
+    el.textContent = value;
+    el.setAttribute("title", value);
+  }
+
+  // The known-model count in Kartu A (DTO count on load, discovery count when a
+  // background /discover lands).
+  function setModelCount(n) {
+    var el = provEl("pdModels");
+    if (!el) return;
+    var text = String(n);
+    el.textContent = text;
+    el.setAttribute("title", text);
+  }
+
+  // Kartu B — strategy + sticky limit. Enum guard from the stage-1 contract:
+  // anything unexpected shows the default instead of echoing a value the
+  // backend would later reject with 400.
+  function renderStrategyCard(p) {
+    p = p || {};
+    var sel = provEl("pdStrategy");
+    if (sel) sel.value = p.fallback_strategy === "round-robin" ? "round-robin" : "fill-first";
+    var lim = provEl("pdStickyLimit");
+    if (lim) {
+      var n = parseInt(p.sticky_round_robin_limit, 10);
+      lim.value = isNaN(n) ? 3 : n;
+    }
+    syncStickyLimitRow();
+    setStrategyMsg("", "");
+  }
+
+  function setStrategyMsg(text, kind) { setMsgIn("pdStrategyMsg", text, kind); }
+
+  // PUT ONLY the two routing fields (stage-1 contract). A rejected strategy
+  // (400 invalid_fallback_strategy) shows inline; nothing else is touched.
+  function saveStrategy() {
+    var id = selectedProviderId;
+    if (id == null) {
+      setStrategyMsg(getStr("provider_detail.save_blocked"), "error");
+      return Promise.resolve();
+    }
+    var body = {
+      fallback_strategy: strategyIsRoundRobin() ? "round-robin" : "fill-first"
+    };
+    if (strategyIsRoundRobin()) {
+      var limEl = provEl("pdStickyLimit");
+      var lim = limEl ? parseInt(limEl.value, 10) : NaN;
+      body.sticky_round_robin_limit = isNaN(lim) ? 3 : Math.max(1, lim);
+    }
+    setStrategyMsg("");
+    return fetchJson(PROV_API + "/" + id, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify(body)
+    }).then(function (saved) {
+      if (saved && saved.id != null) renderStrategyCard(saved);
+      else syncStickyLimitRow();
+      setStrategyMsg(getStr("provider_detail.strategy_saved"), "ok");
+    }).catch(function (err) {
+      // The 400 (invalid_fallback_strategy) belongs to THIS card, not the list.
+      setStrategyMsg(err.message, "error");
+    });
+  }
+
+  /* ---- Model discovery: silent POST, but not mute (stage-3, gap no.5) ----
+     discoverSeq: if the user moved on to another provider while a response was
+     in flight, the stale answer must never overwrite the current one — and it
+     must never rewrite the status line either. */
   var discoverSeq = 0;
 
   function discoverModels(id, opts) {
@@ -1147,11 +1194,13 @@
     var quiet = !!opts.quiet;
     var seq = ++discoverSeq;
     var mc = provModelCtl();
+    // The line is shown on BOTH paths: a silent background POST may be quiet
+    // about blocking, it must not be mute about what it is doing (stage-3).
+    setModelMsg(getStr("providers.discovering"), "");
     if (!quiet) {
-      // Legacy visible path (window.aigate.discoverModels — kept for tests
-      // and any internal caller): status text + loading state on the field.
+      // Legacy visible path (window.aigate.discoverModels — kept for tests and
+      // any internal caller): opens the page and locks the field while loading.
       openDetail(id, true);
-      setModelMsg(getStr("providers.discovering"), "");
       if (mc) mc.setLoading(true); // disable field + "Loading models…" row
     }
     fetchJson(PROV_API + "/" + id + "/discover", {
@@ -1161,140 +1210,204 @@
       if (!quiet && mc) mc.setLoading(false);
       // Contract: {"ok":true,"models":[...]} OR {"ok":false,"error":"<msg>"}
       if (res && res.ok === false) {
-        if (!quiet) setModelMsg(res.error || getStr("providers.error"), "error");
+        reportDiscoveryFailure(res.error || getStr("providers.error"), quiet);
         return;
       }
       var models = (res && res.models) ? res.models : [];
       populateModelCombobox(models);
-      if (!quiet) {
-        setModelMsg(getStr("providers.discovered") + " (" + models.length + ")", "ok");
-      }
+      setModelMsg(getStr("providers.discovered") + " (" + models.length + ")", "ok");
+      // Kartu A shows the same number the list is about to show, so the page
+      // never displays a count older than the discovery that just landed.
+      setModelCount(models.length);
       loadProviders(); // refresh model counts in the list
     }).catch(function (err) {
       if (seq !== discoverSeq) return;
-      if (!quiet) {
-        if (mc) mc.setLoading(false);
-        setModelMsg(err.message, "error");
-        return;
-      }
-      // Quiet mode never blocks the form with an error, but the failure is
-      // not swallowed either — leave it in the console (R12).
-      if (typeof console !== "undefined" && console.warn) {
-        console.warn("aigate: silent model discovery failed:", err.message);
-      }
+      if (!quiet && mc) mc.setLoading(false);
+      reportDiscoveryFailure(err.message, quiet);
     });
+  }
+
+  // One text line + console.warn. A dead model list NEVER blocks a form: the
+  // model combobox stays free-text (R12: the reason goes to the console).
+  function reportDiscoveryFailure(message, quiet) {
+    setModelMsg(getStr("providers.models_failed"), "error");
+    if (typeof console !== "undefined" && console.warn) {
+      console.warn("aigate: model discovery failed" + (quiet ? " (silent)" : "") + ":", message);
+    }
   }
 
   function deleteProvider(id) {
     if (!window.confirm(getStr("providers.confirm_delete"))) return;
     fetchJson(PROV_API + "/" + id, { method: "DELETE" }).then(function () {
-      if (selectedProviderId === id) provEl("provDetail").hidden = true;
+      // Deleting the provider whose detail page is open: fall back to the list.
+      if (selectedProviderId === id && isProviderDetailActive()) {
+        selectedProviderId = null;
+        showView("providers");
+        setActiveNav(document.querySelector('.nav-item[data-view="providers"]'));
+      }
       loadProviders();
     }).catch(function (err) {
       setProvMsg(err.message, "error");
     });
   }
 
-  /* ===== Provider Accounts (B5.1): multi-account per provider + OAuth ===== */
+  /* ===== Provider Accounts (B5.1): multi-account per provider + OAuth =====
+     stage-3 (Opsi A): the accounts of ONE provider are rendered as a vertical
+     list of CARDS on the provider-detail page (Kartu C) — the old 6-column
+     table is gone, so nothing has to scroll sideways on a phone. Creating an
+     account goes through its own small modal (#accModal). */
   var ACC_API = "/api/accounts";
   var oauthPollTimer = null;
   var OAUTH_POLL_MS = 2000;
   var OAUTH_POLL_MAX = 15;
+  // The list exactly as the server last returned it (already sorted
+  // priority asc, id asc) — the ▲▼ buttons operate on THIS order.
+  var accountRows = [];
 
-  function setAccountsMsg(text, kind) {
-    var m = provEl("accountsMsg");
-    if (!m) return;
-    m.textContent = text || "";
-    m.className = "settings-msg" + (kind ? " settings-msg-" + kind : "");
+  function setAccountsMsg(text, kind) { setMsgIn("accountsMsg", text, kind); }
+  function setAccModalMsg(text, kind) { setMsgIn("accModalMsg", text, kind); }
+
+  // One account = one card. Position is 1..n (a human rank), never the raw DB
+  // integer; the credential is PLAINTEXT (J3 / ADR-007: this product stores and
+  // shows its own local secrets on purpose) and is cut by CSS with the full
+  // value kept in `title`.
+  function accountCardHtml(a, i, total) {
+    var position = i + 1;
+    var posTitle = escapeHtml(getStr("provider_detail.position") + " " + position + " / " + total);
+    var credential;
+    if (a.auth_type === "oauth") {
+      credential = '<span class="badge badge-ok">' +
+        escapeHtml(getStr("accounts.oauth_badge")) + " ✓</span>";
+      if (a.expires_at) {
+        credential += ' <span class="acc-expires">' +
+          escapeHtml(getStr("accounts.expires")) + ": " +
+          escapeHtml(a.expires_at) + "</span>";
+      }
+    } else {
+      // ADR-007: show api_key plaintext, no masking. An account without a key
+      // says so instead of leaving a blank that looks like data.
+      var key = a.api_key != null ? String(a.api_key) : "";
+      credential = '<span class="acc-key" title="' + escapeHtml(key) + '">' +
+        escapeHtml(key || getStr("provider_detail.none")) + "</span>";
+    }
+    // Last used: machine-owned ISO timestamp, or the i18n "never" marker —
+    // never a blank cell pretending to be data.
+    var lastUsed = escapeHtml(getStr("provider_detail.last_used")) + ": " +
+      (a.last_used_at ? escapeHtml(a.last_used_at)
+        : escapeHtml(getStr("provider_detail.never_used")));
+    // Boundary buttons: aria-disabled + a title that says WHY (never a dead
+    // tap that pretends nothing happened).
+    var upOff = i === 0;
+    var downOff = i === total - 1;
+    var upAttrs = 'aria-label="' + escapeHtml(getStr("provider_detail.move_up")) + '"' +
+      (upOff ? ' aria-disabled="true" title="' + escapeHtml(getStr("provider_detail.already_first")) + '"' : "");
+    var downAttrs = 'aria-label="' + escapeHtml(getStr("provider_detail.move_down")) + '"' +
+      (downOff ? ' aria-disabled="true" title="' + escapeHtml(getStr("provider_detail.already_last")) + '"' : "");
+    return '<article class="acc-card" data-id="' + escapeHtml(a.id) + '" data-index="' + i + '">' +
+      '<div class="acc-card-top">' +
+        '<span class="acc-pos" title="' + posTitle + '">' + position + "</span>" +
+        '<span class="acc-label">' + escapeHtml(a.label) + "</span>" +
+        '<span class="acc-type">' + escapeHtml(a.auth_type) + "</span>" +
+      "</div>" +
+      '<div class="acc-cred"><span class="acc-cred-label">' +
+        escapeHtml(getStr("accounts.credential")) + ":</span> " + credential + "</div>" +
+      '<div class="acc-card-foot">' +
+        '<span class="acc-move">' +
+          '<button type="button" class="icon-btn-small acc-up"' + upAttrs + ">" +
+            '<i class="fa fa-arrow-up" aria-hidden="true"></i></button>' +
+          '<button type="button" class="icon-btn-small acc-down"' + downAttrs + ">" +
+            '<i class="fa fa-arrow-down" aria-hidden="true"></i></button>' +
+        "</span>" +
+        '<span class="acc-last">' + lastUsed + "</span>" +
+        '<button type="button" class="btn btn-danger acc-del">' +
+          '<i class="fa fa-trash" aria-hidden="true"></i> ' +
+          escapeHtml(getStr("accounts.delete")) + "</button>" +
+      "</div>" +
+    "</article>";
   }
 
-  // Render a GET /api/accounts payload into #accountsBody (modal Accounts tab).
-  // Column order mirrors the stage-1 contract: list arrives sorted by
-  // priority asc, id asc; last_used_at belongs to the ENGINE (read-only —
-  // never sent back, PUT only accepts {priority}).
+  // Render a GET /api/accounts payload into the account card list (Kartu C).
+  // The stage-1 contract order is trusted as-is: the server sorts
+  // priority asc, id asc, so card position == routing position.
   function renderAccounts(list) {
-    var body = provEl("accountsBody");
-    if (!body) return;
+    var box = provEl("accList");
+    if (!box) return;
     list = list || [];
+    accountRows = list.slice();
     if (!list.length) {
-      body.innerHTML = '<tr><td colspan="6" class="empty-cell">' +
-        escapeHtml(getStr("accounts.none")) + "</td></tr>";
+      box.innerHTML = '<p class="acc-empty" data-i18n="provider_detail.no_accounts">' +
+        escapeHtml(getStr("provider_detail.no_accounts")) + "</p>";
       return;
     }
-    body.innerHTML = list.map(function (a) {
-      var credential;
-      if (a.auth_type === "oauth") {
-        credential = '<span class="badge badge-ok">' +
-          escapeHtml(getStr("accounts.oauth_badge")) + " ✓</span>";
-        if (a.expires_at) {
-          credential += ' <span class="acc-expires">' +
-            escapeHtml(getStr("accounts.expires")) + ": " +
-            escapeHtml(a.expires_at) + "</span>";
-        }
-      } else {
-        // ADR-007: show api_key plaintext, no masking.
-        credential = a.api_key != null ? escapeHtml(a.api_key) : "";
-      }
-      // Priority: small number tried first; malformed/missing -> 0 (default).
-      var pr = parseInt(a.priority, 10);
-      pr = isNaN(pr) ? 0 : pr;
-      // Last used: machine-owned ISO timestamp, or the i18n "never" marker —
-      // never a blank cell pretending to be data.
-      var lastUsed = a.last_used_at
-        ? escapeHtml(a.last_used_at)
-        : '<span class="acc-never">' + escapeHtml(getStr("accounts.never_used")) + "</span>";
-      return '<tr class="acc-row" data-id="' + escapeHtml(a.id) + '">' +
-        "<td>" + escapeHtml(a.label) + "</td>" +
-        "<td>" + escapeHtml(a.auth_type) + "</td>" +
-        "<td>" + credential + "</td>" +
-        '<td><input type="number" class="form-input acc-priority" min="0" step="1" ' +
-          'value="' + escapeHtml(pr) + '" data-priority="' + escapeHtml(pr) + '" ' +
-          'aria-label="' + escapeHtml(getStr("accounts.priority")) + '" /></td>' +
-        '<td class="acc-last-used">' + lastUsed + "</td>" +
-        '<td class="row-actions">' +
-          '<button type="button" class="icon-btn-small js-acc-del" title="' +
-            escapeHtml(getStr("accounts.delete")) + '">' +
-            '<i class="fa fa-trash"></i></button>' +
-        "</td>" +
-      "</tr>";
+    var total = list.length;
+    box.innerHTML = list.map(function (a, i) {
+      return accountCardHtml(a, i, total);
     }).join("");
 
-    Array.prototype.forEach.call(body.querySelectorAll(".js-acc-del"), function (btn) {
-      btn.addEventListener("click", function () {
-        var tr = btn.closest(".acc-row");
-        var id = tr ? tr.getAttribute("data-id") : null;
-        if (id != null) deleteAccount(id);
+    // One delegated listener survives innerHTML re-renders (the guard mirrors
+    // the provider tbody wiring: a test that rebuilds the node re-attaches).
+    if (box.getAttribute("data-acc-wired") !== "1") {
+      box.setAttribute("data-acc-wired", "1");
+      box.addEventListener("click", function (e) {
+        var card = e.target.closest ? e.target.closest(".acc-card") : null;
+        if (!card) return;
+        var idx = parseInt(card.getAttribute("data-index"), 10);
+        if (isNaN(idx)) return;
+        if (e.target.closest(".acc-del")) {
+          deleteAccount(card.getAttribute("data-id"));
+          return;
+        }
+        var up = e.target.closest(".acc-up");
+        var down = e.target.closest(".acc-down");
+        // aria-disabled buttons explain themselves and never hit the network.
+        if (up && up.getAttribute("aria-disabled") !== "true") moveAccount(idx, -1);
+        else if (down && down.getAttribute("aria-disabled") !== "true") moveAccount(idx, 1);
       });
-    });
-
-    // Priority is committed on `change` (not per keystroke): blur/Enter sends
-    // one PUT {priority} and reloads the list in the new order.
-    Array.prototype.forEach.call(body.querySelectorAll(".acc-priority"), function (inp) {
-      inp.addEventListener("change", function () {
-        var tr = inp.closest(".acc-row");
-        var id = tr ? tr.getAttribute("data-id") : null;
-        if (id == null) return;
-        var next = parseInt(inp.value, 10);
-        if (isNaN(next) || next < 0) next = 0;
-        inp.value = String(next);
-        if (String(next) === inp.getAttribute("data-priority")) return; // no-op edit
-        updateAccountPriority(id, next);
-      });
-    });
+    }
   }
 
-  // PUT /api/accounts/<id> with ONLY {priority} (contract: no other field is
-  // accepted — last_used_at stays machine-owned).
-  function updateAccountPriority(id, priority) {
+  /* ---- Priority = swap + renumber (stage-3, replaces the bare number input) ----
+     ▲/▼ exchange position i with i+1, the list is then normalised to
+     priority = 0..n-1, and ONLY the rows whose stored value actually changes are
+     PUT. With the all-zero default that is 2 requests, not n. */
+  function moveAccount(index, dir) {
+    var target = index + dir;
+    if (index < 0 || target < 0 || target >= accountRows.length) {
+      return Promise.resolve();
+    }
+    var order = accountRows.slice();
+    var swap = order[index];
+    order[index] = order[target];
+    order[target] = swap;
+    var changed = [];
+    order.forEach(function (a, i) {
+      var cur = parseInt(a.priority, 10);
+      if (isNaN(cur)) cur = 0;
+      if (cur !== i) changed.push({ id: a.id, priority: i });
+    });
+    if (!changed.length) return loadAccounts(selectedProviderId);
     setAccountsMsg("");
-    return fetchJson(ACC_API + "/" + encodeURIComponent(id), {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", "Accept": "application/json" },
-      body: JSON.stringify({ priority: priority })
-    }).then(function () {
+    // Sequential PUTs: a deterministic order on the server beats firing n
+    // requests that may land in any order (risk 2 of the design sheet).
+    var chain = Promise.resolve();
+    changed.forEach(function (c) {
+      chain = chain.then(function () {
+        return fetchJson(ACC_API + "/" + encodeURIComponent(c.id), {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", "Accept": "application/json" },
+          body: JSON.stringify({ priority: c.priority })
+        });
+      });
+    });
+    // Always re-read from the server — after a partial failure the view must
+    // show the truth, not the order the user tried to create. The message is
+    // set AFTER the reload: loadAccounts() clears the status line first.
+    return chain.then(function () {
       return loadAccounts(selectedProviderId);
     }).catch(function (err) {
-      setAccountsMsg(err.message, "error");
+      return loadAccounts(selectedProviderId).then(function () {
+        setAccountsMsg(err.message, "error");
+      });
     });
   }
 
@@ -1318,8 +1431,47 @@
       });
   }
 
+  /* ---- Account add modal (stage-3, Opsi A) ----
+     One surface, one job: the provider id is already known here (the detail
+     page owns it), so there is nothing to "save first" and no inline 5-row form
+     living inside the provider modal any more. */
+  function openAccountModal() {
+    var f = provEl("accForm");
+    if (f) f.reset();
+    // A fresh account joins at the END of the queue (priority = current count);
+    // the note under the field explains that a smaller number is tried first.
+    var pr = provEl("accPriority");
+    if (pr) pr.value = String(accountRows.length);
+    syncAccountKeyRow();
+    setAccModalMsg("", "");
+    var m = provEl("accModal");
+    if (m) m.hidden = false;
+  }
+
+  function closeAccountModal() {
+    var m = provEl("accModal");
+    if (m) m.hidden = true;
+  }
+
+  // Auth type drives the API-key row: an OAuth account has no key to type.
+  function syncAccountKeyRow() {
+    var sel = provEl("accAuthType");
+    var row = provEl("accApiKeyRow");
+    if (row) row.hidden = !!sel && sel.value !== "api_key";
+  }
+
+  // Modal submit -> addAccount() reading the modal fields; the modal closes
+  // only when the POST landed, so a 400 keeps the user's typing on screen.
+  function submitAccountForm(e) {
+    if (e) e.preventDefault();
+    return addAccount().then(function (res) {
+      if (res && res.ok) closeAccountModal();
+      return res;
+    });
+  }
+
   // POST /api/accounts. opts may carry {provider_id,label,auth_type,api_key,
-  // priority} to bypass the form (used by tests); otherwise reads the form
+  // priority} to bypass the form (used by tests); otherwise reads the modal
   // fields. priority defaults to 0 (contract: small number tried first).
   function addAccount(opts) {
     opts = opts || {};
@@ -1335,8 +1487,8 @@
       : (provEl("accPriority") ? parseInt(provEl("accPriority").value, 10) : 0);
     if (isNaN(priority) || priority < 0) priority = 0;
     if (providerId == null) {
-      setAccountsMsg(getStr("accounts.provider_required"), "error");
-      return Promise.resolve();
+      setAccModalMsg(getStr("accounts.provider_required"), "error");
+      return Promise.resolve({ ok: false });
     }
     var body = {
       provider_id: providerId, label: label,
@@ -1344,17 +1496,16 @@
     };
     if (auth_type === "api_key") body.api_key = api_key;
     setAccountsMsg("");
+    setAccModalMsg("");
     return fetchJson(ACC_API, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Accept": "application/json" },
       body: JSON.stringify(body)
     }).then(function () {
-      if (provEl("accLabel")) provEl("accLabel").value = "";
-      if (provEl("accApiKey")) provEl("accApiKey").value = "";
-      if (provEl("accPriority")) provEl("accPriority").value = "0";
-      return loadAccounts(providerId);
+      return loadAccounts(providerId).then(function () { return { ok: true }; });
     }).catch(function (err) {
-      setAccountsMsg(getStr("accounts.add_error") + " (" + err.message + ")", "error");
+      setAccModalMsg(getStr("accounts.add_error") + " (" + err.message + ")", "error");
+      return { ok: false };
     });
   }
 
@@ -1449,11 +1600,72 @@
     });
   }
 
+  /* ---- Wiring for the whole provider surface (list + detail + modals) ----
+     Kept as ONE named function: init() calls it once, and a test that mounts
+     the shipped page into its own jsdom calls the SAME code, so the wiring
+     under test can never drift from the wiring that ships. */
+  function wireProviderUi() {
+    var provAdd = document.getElementById("provAddBtn");
+    if (provAdd) provAdd.addEventListener("click", openAddModal);
+    var provForm = document.getElementById("provForm");
+    if (provForm) provForm.addEventListener("submit", saveProvider);
+    var provTest = document.getElementById("provTestBtn");
+    if (provTest) provTest.addEventListener("click", testProviderConnection);
+    var provCancel = document.getElementById("provCancel");
+    if (provCancel) provCancel.addEventListener("click", hideModal);
+    var provAddHdr = document.getElementById("provAddHeaderBtn");
+    if (provAddHdr) provAddHdr.addEventListener("click", function () { addHeaderRow("", ""); });
+    // The Discover button is gone (stage-2): /discover runs in the background
+    // from openDetail / openEditModal and only speaks through one text line.
+    // What is wired here instead: the strategy row of Kartu B + its own save.
+    var pdStrategy = document.getElementById("pdStrategy");
+    if (pdStrategy) pdStrategy.addEventListener("change", syncStickyLimitRow);
+    var pdStrategySave = document.getElementById("pdStrategySaveBtn");
+    if (pdStrategySave) pdStrategySave.addEventListener("click", saveStrategy);
+    var pdBack = document.getElementById("provDetailBackBtn");
+    if (pdBack) pdBack.addEventListener("click", backToProviders);
+    var provEdit = document.getElementById("provEditBtn");
+    if (provEdit) provEdit.addEventListener("click", function () { openEditModal(selectedProviderId); });
+    var provDel = document.getElementById("provDeleteBtn");
+    if (provDel) provDel.addEventListener("click", function () { deleteProvider(selectedProviderId); });
+    // --- Accounts (Kartu C + its own modal) ---
+    var pdAccAdd = document.getElementById("pdAccAddBtn");
+    if (pdAccAdd) pdAccAdd.addEventListener("click", openAccountModal);
+    var pdAccReload = document.getElementById("pdAccReloadBtn");
+    if (pdAccReload) pdAccReload.addEventListener("click", function () {
+      loadAccounts(selectedProviderId);
+    });
+    var accOAuth = document.getElementById("provConnectOAuthBtn");
+    if (accOAuth) accOAuth.addEventListener("click", function () {
+      connectOAuth(selectedProviderId);
+    });
+    var accForm = document.getElementById("accForm");
+    if (accForm) accForm.addEventListener("submit", submitAccountForm);
+    var accCancel = document.getElementById("accCancelBtn");
+    if (accCancel) accCancel.addEventListener("click", closeAccountModal);
+    var accAuthType = document.getElementById("accAuthType");
+    if (accAuthType) accAuthType.addEventListener("change", syncAccountKeyRow);
+    var provModal = document.getElementById("provModal");
+    if (provModal) provModal.addEventListener("click", function (e) {
+      if (e.target === provModal) hideModal(); // click backdrop closes
+    });
+    var accModal = document.getElementById("accModal");
+    if (accModal) accModal.addEventListener("click", function (e) {
+      if (e.target === accModal) closeAccountModal(); // click backdrop closes
+    });
+  }
+
+  window.aigate.wireProviderUi = wireProviderUi;
   window.aigate.renderAccounts = renderAccounts;
   window.aigate.loadAccounts = loadAccounts;
   window.aigate.addAccount = addAccount;
   window.aigate.deleteAccount = deleteAccount;
   window.aigate.connectOAuth = connectOAuth;
+  // Account modal submit + the last-read order: what the tests drive directly.
+  // (The ▲▼ buttons, the open/close taps and the auth-type toggle are wired by
+  // wireProviderUi / the delegated card listener, so they stay private.)
+  window.aigate.submitAccountForm = submitAccountForm;
+  window.aigate.getAccountRows = function () { return accountRows.slice(); };
 
   /* ===== Terminal view + Log Window (B3.1) ===== */
   var LOGS_API = "/api/logs";
@@ -1971,40 +2183,11 @@
       });
     }
 
-    // --- Providers (B2.2) ---
-    var provAdd = document.getElementById("provAddBtn");
-    if (provAdd) provAdd.addEventListener("click", openAddModal);
-    var provForm = document.getElementById("provForm");
-    if (provForm) provForm.addEventListener("submit", saveProvider);
-    var provTest = document.getElementById("provTestBtn");
-    if (provTest) provTest.addEventListener("click", testProviderConnection);
-    var provCancel = document.getElementById("provCancel");
-    if (provCancel) provCancel.addEventListener("click", hideModal);
-    var provAddHdr = document.getElementById("provAddHeaderBtn");
-    if (provAddHdr) provAddHdr.addEventListener("click", function () { addHeaderRow("", ""); });
-    // The Discover button is gone (stage-2): discovery runs silently from
-    // openEditModal/openDetail. What is wired here instead: the strategy
-    // select drives the sticky-limit row, and the modal tablist behaves.
-    var provStrategy = document.getElementById("provStrategy");
-    if (provStrategy) provStrategy.addEventListener("change", syncStickyLimitRow);
-    wireProvTabs();
-    var provEdit = document.getElementById("provEditBtn");
-    if (provEdit) provEdit.addEventListener("click", function () { openEditModal(selectedProviderId); });
-    var provDel = document.getElementById("provDeleteBtn");
-    if (provDel) provDel.addEventListener("click", function () { deleteProvider(selectedProviderId); });
-    var accAdd = document.getElementById("accAddBtn");
-    if (accAdd) accAdd.addEventListener("click", function () { addAccount(); });
-    var accOAuth = document.getElementById("provConnectOAuthBtn");
-    if (accOAuth) accOAuth.addEventListener("click", function () { connectOAuth(selectedProviderId); });
-    var accAuthType = document.getElementById("accAuthType");
-    if (accAuthType) accAuthType.addEventListener("change", function () {
-      var row = document.getElementById("accApiKeyRow");
-      if (row) row.hidden = accAuthType.value !== "api_key";
-    });
-    var provModal = document.getElementById("provModal");
-    if (provModal) provModal.addEventListener("click", function (e) {
-      if (e.target === provModal) hideModal(); // click backdrop closes
-    });
+    // --- Providers (B2.2) + provider-detail page (stage-3, Opsi A) ---
+    // One named wiring function (window.aigate.wireProviderUi) instead of inline
+    // code here: the shipped page has to be re-mounted by tests, and duplicating
+    // the wiring there would drift from production the first time it changed.
+    wireProviderUi();
 
     // --- Log Window (B3.1) — GLOBAL, shown on every view, toggled from topbar ---
     var logRefreshBtn = document.getElementById("logRefreshBtn");

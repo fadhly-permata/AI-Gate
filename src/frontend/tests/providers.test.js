@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { indexDocument, indexHtml } from "./helpers/dom.js";
+import { indexDocument, indexHtml, staticSource } from "./helpers/dom.js";
 
 // i18n.js attaches window.I18N + window.applyLocale (jsdom provides DOM).
 import "../static/i18n.js";
@@ -14,66 +14,72 @@ import "../static/app.js";
 // Let async .then chains (fetchJson / testProviderConnection) resolve.
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-// The modal DOM as stage-2 ships it: an ARIA tablist ([Provider] | [Accounts])
-// + a hint, the form wrapped in its tabpanel, the (empty) Accounts panel, and
-// the strategy controls inside the form. #provModel is a searchable COMBOBOX:
-// a text input + a custom <ul> panel (NOT <datalist>).
+// The provider modal as stage-3 ships it: PROFILE ONLY (no tablist, no accounts
+// panel, no strategy controls) + the discovery status line under the model
+// combobox. #provModel is a searchable COMBOBOX: a text input + a custom <ul>
+// panel (NOT <datalist>).
 function withProviderModalDom() {
   document.body.innerHTML =
     '<div id="provModal">' +
       '<h3 id="provModalTitle"></h3>' +
-      '<div id="provTabList" role="tablist">' +
-        '<button type="button" class="modal-tab is-active" id="provTabProvider" role="tab" ' +
-          'aria-selected="true" aria-controls="provPanelProvider" tabindex="0">Provider</button>' +
-        '<button type="button" class="modal-tab" id="provTabAccounts" role="tab" ' +
-          'aria-selected="false" aria-controls="provPanelAccounts" tabindex="-1">Accounts</button>' +
-      '</div>' +
-      '<p id="provTabHint" hidden></p>' +
       '<form id="provForm">' +
-        '<div id="provPanelProvider" role="tabpanel" aria-labelledby="provTabProvider">' +
-          '<input type="hidden" id="provId" />' +
-          '<input id="provName" />' +
-          '<select id="provType">' +
-            '<option value="openai-compatible">openai-compatible</option>' +
-          '</select>' +
-          '<input id="provBaseUrl" />' +
-          '<input id="provApiKey" />' +
-          '<div class="aigate-combo">' +
-            '<input type="text" id="provModel" />' +
-            '<ul id="provModelList" role="listbox" hidden></ul>' +
-          '</div>' +
-          '<input type="checkbox" id="provEnabled" />' +
-          '<select id="provStrategy">' +
-            '<option value="fill-first">Fill first</option>' +
-            '<option value="round-robin">Round-robin</option>' +
-          '</select>' +
-          '<div id="provStickyRow" hidden>' +
-            '<input type="number" id="provStickyLimit" min="1" step="1" value="3" />' +
-          '</div>' +
-          '<div id="provHeaders"></div>' +
+        '<input type="hidden" id="provId" />' +
+        '<input id="provName" />' +
+        '<select id="provType">' +
+          '<option value="openai-compatible">openai-compatible</option>' +
+        '</select>' +
+        '<input id="provBaseUrl" />' +
+        '<input id="provApiKey" />' +
+        '<div class="aigate-combo">' +
+          '<input type="text" id="provModel" />' +
+          '<ul id="provModelList" role="listbox" hidden></ul>' +
         '</div>' +
+        '<p class="pd-status" id="provModalModelStatus" role="status" aria-live="polite"></p>' +
+        '<input type="checkbox" id="provEnabled" />' +
+        '<div class="form-row form-row-stack">' +
+          '<div id="provHeaders"></div>' +
+          '<button type="button" id="provAddHeaderBtn"></button>' +
+        '</div>' +
+        '<p id="provModalMsg"></p>' +
+        '<button type="button" id="provTestBtn">Test Connection</button>' +
+        '<button type="submit" id="provSaveBtn"></button>' +
+        '<button type="button" id="provCancel"></button>' +
       '</form>' +
-      '<div id="provPanelAccounts" role="tabpanel" aria-labelledby="provTabAccounts" hidden></div>' +
-      '<button type="button" id="provTestBtn">Test Connection</button>' +
-      '<p id="provModalMsg"></p>' +
       '<p id="provMsg"></p>' +
     '</div>';
+  window.applyLocale("en");
 }
 
-// The legacy DETAIL card DOM (kept reachable through the provider-name button
-// and the legacy window.aigate.discoverModels export). The discovered-models
-// TABLE is gone from the shipped page (stage-2): discovery is silent now.
+// The DETAIL PAGE DOM (stage-3): one column of cards. Kept minimal but real:
+// the head, Kartu A/B/C containers.
 function withDetailDom() {
   document.body.innerHTML =
-    '<div id="provDetail">' +
-      '<h3 id="provDetailTitle"></h3>' +
-      '<p id="provModelMsg"></p>' +
+    '<nav><a class="nav-item" data-view="providers" href="#"></a></nav>' +
+    '<section class="view is-active" data-view="providers">' +
+      '<table><tbody id="provTableBody"></tbody></table>' +
       '<p id="provMsg"></p>' +
-    '</div>' +
+    '</section>' +
+    '<section class="view" data-view="provider-detail">' +
+      '<h2 id="provDetailTitle"></h2><span id="provDetailBadge" hidden></span>' +
+      '<button id="provDetailBackBtn"></button>' +
+      '<dl><dd id="pdType"></dd><dd id="pdBaseUrl" class="pd-clip"></dd>' +
+        '<dd id="pdDefaultModel"></dd><dd id="pdApiKey" class="pd-clip"></dd>' +
+        '<dd id="pdHeaders"></dd><dd id="pdModels"></dd></dl>' +
+      '<p class="pd-status" id="pdModelStatus"></p>' +
+      '<select id="pdStrategy">' +
+        '<option value="fill-first">Fill first</option>' +
+        '<option value="round-robin">Round-robin</option>' +
+      '</select>' +
+      '<div id="pdStickyRow" hidden><input type="number" id="pdStickyLimit" min="1" value="3" /></div>' +
+      '<p id="pdStrategyMsg"></p>' +
+      '<p id="accountsMsg"></p><div id="accList"></div>' +
+    '</section>' +
     '<div class="aigate-combo">' +
-      '<input type="text" id="provModel" />' +
+      '<input type="text" id="provModel" role="combobox" />' +
       '<ul id="provModelList" role="listbox" hidden></ul>' +
     '</div>';
+  window.applyLocale("en");
+  window.aigate.wireProviderUi();
 }
 
 // The combobox panel's rendered option values (model ids), in DOM order.
@@ -82,16 +88,16 @@ const provModelOptionValues = () => Array.from(
 ).map((li) => li.getAttribute("data-value"));
 
 // Minimal fetch router for the openEditModal flow: answers the provider GET,
-// the silent POST /discover, the accounts GET and the list refresh.
-function stubEditModalApi({ provider, discover, accounts }) {
+// the background POST /discover and the list refresh.
+function stubEditModalApi({ provider, discover }) {
   const calls = [];
   vi.stubGlobal("fetch", vi.fn((url, opts) => {
     const method = (opts && opts.method) || "GET";
     calls.push({ url: String(url), method, body: opts && opts.body });
     let payload = { data: [] };
     if (method === "POST" && String(url).indexOf("/discover") !== -1) payload = discover;
-    else if (String(url).indexOf("/accounts") !== -1) payload = accounts;
     else if (String(url) === "/api/providers/p1") payload = provider;
+    else if (String(url) === "/api/providers/p2") payload = { ...provider, id: "p2", name: "TWO" };
     return Promise.resolve({
       ok: true,
       headers: { get: () => "application/json" },
@@ -208,8 +214,7 @@ describe("Test Connection button (B2.2)", () => {
     document.getElementById("provModel").value = "gpt-4";
 
     // Wire the button exactly as init() does, then click it (true wiring test).
-    document.getElementById("provTestBtn")
-      .addEventListener("click", window.aigate.testProviderConnection);
+    window.aigate.wireProviderUi();
     document.getElementById("provTestBtn").click();
 
     await flush();
@@ -269,10 +274,10 @@ describe("Test Connection button (B2.2)", () => {
   });
 });
 
-describe("saveProvider persists default_model + strategy (B2.2 / stage-2)", () => {
+describe("saveProvider sends PROFILE fields only (B2.2 / stage-3)", () => {
   beforeEach(() => { withProviderModalDom(); });
 
-  it("includes default_model + fallback_strategy in the POST body (add, fill-first)", async () => {
+  it("includes default_model in the POST body (add mode)", async () => {
     const calls = [];
     vi.stubGlobal("fetch", vi.fn((url, opts) => {
       calls.push({ url, body: opts && opts.body });
@@ -298,44 +303,15 @@ describe("saveProvider persists default_model + strategy (B2.2 / stage-2)", () =
     expect(saved).toBeTruthy();
     const body = JSON.parse(saved.body);
     expect(body.default_model).toBe("claude-3");
-    // Strategy always travels; the sticky limit only when round-robin (the
-    // hidden+disabled row must not masquerade as a live value).
-    expect(body.fallback_strategy).toBe("fill-first");
-    expect(body).not.toHaveProperty("sticky_round_robin_limit");
     // sanity: other fields still present
     expect(body.name).toBe("ACME");
     expect(body.api_key).toBe("sk-acme");
     vi.unstubAllGlobals();
   });
 
-  it("sends both strategy fields when round-robin (PUT on edit)", async () => {
-    const calls = [];
-    vi.stubGlobal("fetch", vi.fn((url, opts) => {
-      calls.push({ url, opts });
-      return Promise.resolve({
-        ok: true,
-        headers: { get: () => "application/json" },
-        json: () => Promise.resolve({ data: [] })
-      });
-    }));
-
-    document.getElementById("provId").value = "p1"; // edit -> PUT
-    document.getElementById("provStrategy").value = "round-robin";
-    window.aigate.syncStickyLimitRow(); // init() wires this to the change event
-    document.getElementById("provStickyLimit").value = "4";
-
-    window.aigate.saveProvider();
-    await flush();
-
-    const put = calls.find((c) => c.url === "/api/providers/p1" && c.opts.method === "PUT");
-    expect(put).toBeTruthy();
-    const body = JSON.parse(put.opts.body);
-    expect(body.fallback_strategy).toBe("round-robin");
-    expect(body.sticky_round_robin_limit).toBe(4);
-    vi.unstubAllGlobals();
-  });
-
-  it("clamps a zero/blank sticky limit to >=1 / default 3", async () => {
+  // The point of stage-3: the profile save must NOT carry the routing fields,
+  // or it would silently overwrite whatever Kartu B just stored.
+  it("never sends fallback_strategy / sticky_round_robin_limit (PUT on edit)", async () => {
     const calls = [];
     vi.stubGlobal("fetch", vi.fn((url, opts) => {
       calls.push({ url, opts });
@@ -345,191 +321,107 @@ describe("saveProvider persists default_model + strategy (B2.2 / stage-2)", () =
       });
     }));
 
-    document.getElementById("provStrategy").value = "round-robin";
-    document.getElementById("provStickyLimit").value = "0";
+    document.getElementById("provId").value = "p1"; // edit -> PUT
+    document.getElementById("provName").value = "ACME";
     window.aigate.saveProvider();
     await flush();
-    const post1 = calls.find((c) => c.opts && c.opts.body);
-    expect(JSON.parse(post1.opts.body).sticky_round_robin_limit).toBe(1); // Math.max(1, 0)
 
-    calls.length = 0;
-    document.getElementById("provStickyLimit").value = "";
+    const put = calls.find((c) => c.url === "/api/providers/p1" && c.opts.method === "PUT");
+    expect(put).toBeTruthy();
+    const body = JSON.parse(put.opts.body);
+    expect(body).not.toHaveProperty("fallback_strategy");
+    expect(body).not.toHaveProperty("sticky_round_robin_limit");
+    vi.unstubAllGlobals();
+  });
+
+  it("closes the modal and refreshes the list on success", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve({
+      ok: true, headers: { get: () => "application/json" },
+      json: () => Promise.resolve({ data: [] })
+    })));
+    document.getElementById("provId").value = "";
+    document.getElementById("provModal").hidden = false;
     window.aigate.saveProvider();
     await flush();
-    const post2 = calls.find((c) => c.opts && c.opts.body);
-    expect(JSON.parse(post2.opts.body).sticky_round_robin_limit).toBe(3); // blank -> default
+    await flush();
+    expect(document.getElementById("provModal").hidden).toBe(true);
     vi.unstubAllGlobals();
   });
 });
 
-describe("sticky limit row sync (stage-2)", () => {
-  beforeEach(() => { withProviderModalDom(); });
-
-  it("fill-first hides + disables the row; round-robin shows + enables it", () => {
-    // Wire the select exactly as init() does.
-    document.getElementById("provStrategy")
-      .addEventListener("change", window.aigate.syncStickyLimitRow);
-    const row = document.getElementById("provStickyRow");
-    const inp = document.getElementById("provStickyLimit");
-
-    const sel = document.getElementById("provStrategy");
-    sel.value = "fill-first";
-    sel.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(row.hidden).toBe(true);
-    expect(inp.disabled).toBe(true);
-
-    sel.value = "round-robin";
-    sel.dispatchEvent(new Event("change", { bubbles: true }));
-    expect(row.hidden).toBe(false);
-    expect(inp.disabled).toBe(false);
-  });
-});
-
-describe("provider modal tabs — index.html structure (stage-2)", () => {
+describe("provider modal — index.html structure (stage-3, profile only)", () => {
   const doc = indexDocument();
   const html = indexHtml();
 
-  it("provTabList is an ARIA tablist with two tabs bound to their panels", () => {
-    const list = doc.getElementById("provTabList");
-    expect(list).not.toBeNull();
-    expect(list.getAttribute("role")).toBe("tablist");
-    expect(list.getAttribute("data-i18n-aria")).toBe("providers.tabs_label");
-    const tabs = list.querySelectorAll('[role="tab"]');
-    expect(tabs).toHaveLength(2);
-    tabs.forEach((t) => {
-      const panel = doc.getElementById(t.getAttribute("aria-controls"));
-      expect(panel, t.id + " controls a real panel").not.toBeNull();
-      expect(panel.getAttribute("role")).toBe("tabpanel");
-      expect(panel.getAttribute("aria-labelledby")).toBe(t.id);
+  it("has no tablist, no hint and no accounts panel any more", () => {
+    const modal = doc.getElementById("provModal");
+    expect(modal.querySelector('[role="tablist"]')).toBeNull();
+    expect(modal.querySelector('[role="tab"]')).toBeNull();
+    expect(modal.querySelector('[role="tabpanel"]')).toBeNull();
+    ["provTabList", "provTabProvider", "provTabAccounts", "provTabHint",
+      "provPanelAccounts", "provPanelProvider"].forEach((id) => {
+      expect(doc.getElementById(id), id).toBeNull();
     });
-    // Exactly one panel active; the other hidden.
-    const provider = doc.getElementById("provTabProvider");
-    const accounts = doc.getElementById("provTabAccounts");
-    expect(provider.getAttribute("aria-selected")).toBe("true");
-    expect(accounts.getAttribute("aria-selected")).toBe("false");
-    expect(doc.getElementById("provPanelProvider").hasAttribute("hidden")).toBe(false);
-    expect(doc.getElementById("provPanelAccounts").hasAttribute("hidden")).toBe(true);
-    // Roving tabindex: only the selected tab is in the tab order.
-    expect(accounts.getAttribute("tabindex")).toBe("-1");
+    // No accounts UI inside the provider modal: it has its own modal + page.
+    expect(modal.querySelector("#accLabel")).toBeNull();
+    expect(modal.querySelector("#accountsTable")).toBeNull();
+    expect(modal.querySelector("#provConnectOAuthBtn")).toBeNull();
+    expect(doc.getElementById("accModal")).not.toBeNull();
   });
 
-  it("the Accounts subsection lives in the modal Accounts panel now", () => {
-    const panel = doc.getElementById("provPanelAccounts");
-    ["accountsTable", "accountsBody", "accountsMsg", "accLabel", "accAuthType",
-      "accApiKey", "accPriority", "accAddBtn", "provConnectOAuthBtn"]
-      .forEach((id) => expect(panel.querySelector("#" + id), id).not.toBeNull());
-    // And it is NOT in the detail card anymore.
-    expect(doc.getElementById("provDetail").querySelector("#accountsBody")).toBeNull();
+  it("carries no strategy fields (they belong to Kartu B of the detail page)", () => {
+    expect(doc.getElementById("provStrategy")).toBeNull();
+    expect(doc.getElementById("provStickyRow")).toBeNull();
+    expect(doc.getElementById("provStickyLimit")).toBeNull();
+    expect(html).not.toMatch(/name="fallback_strategy"/);
+    expect(html).not.toMatch(/name="sticky_round_robin_limit"/);
+    // The detail page owns them instead, with the exact contract enum.
+    const sel = doc.getElementById("pdStrategy");
+    expect(Array.from(sel.querySelectorAll("option")).map((o) => o.getAttribute("value")))
+      .toEqual(["fill-first", "round-robin"]);
+    const lim = doc.getElementById("pdStickyLimit");
+    expect(lim.getAttribute("type")).toBe("number");
+    expect(lim.getAttribute("min")).toBe("1");
+    expect(doc.getElementById("pdStickyRow").hasAttribute("hidden")).toBe(true);
   });
 
-  it("the discovery UI is gone from the shipped page (silent /discover instead)", () => {
+  it("the discovery UI is still not a table, but it is no longer mute", () => {
     expect(doc.getElementById("provModelsTable")).toBeNull();
     expect(doc.getElementById("provModelsBody")).toBeNull();
     expect(doc.getElementById("provDiscoverBtn")).toBeNull();
     expect(doc.getElementById("provModelMsg")).toBeNull();
-    expect(html).not.toContain("providers.discover\""); // no binding left in markup
-    // The accounts add form exposes a priority input (contract default 0).
+    expect(html).not.toContain('providers.discover"'); // no binding left in markup
+    // stage-3: one status paragraph under the combobox + one in Kartu A.
+    const status = doc.getElementById("provModalModelStatus");
+    expect(status.tagName).toBe("P");
+    expect(status.getAttribute("role")).toBe("status");
+    expect(doc.getElementById("pdModelStatus")).not.toBeNull();
+  });
+
+  it("the add-account form is a modal with the contract's priority input", () => {
     const pr = doc.getElementById("accPriority");
     expect(pr.getAttribute("type")).toBe("number");
     expect(pr.getAttribute("min")).toBe("0");
+    expect(doc.getElementById("accAuthType")).not.toBeNull();
+    expect(doc.getElementById("accApiKey")).not.toBeNull();
+    // One surface per job: the modal has no table, the page has no inline form.
+    expect(doc.getElementById("accModal").querySelector("table")).toBeNull();
   });
 
-  it("strategy controls carry the exact contract enum + sane sticky input", () => {
-    const sel = doc.getElementById("provStrategy");
-    expect(sel.tagName).toBe("SELECT");
-    const opts = Array.from(sel.querySelectorAll("option"));
-    expect(opts.map((o) => o.getAttribute("value")))
-      .toEqual(["fill-first", "round-robin"]);
-    // Human labels via i18n, never the raw enum as visible text.
-    opts.forEach((o) => expect(o.getAttribute("data-i18n")).toBeTruthy());
-    expect(opts.map((o) => o.getAttribute("data-i18n"))).toEqual([
-      "providers.strategy_fill_first", "providers.strategy_round_robin"
-    ]);
-    const lim = doc.getElementById("provStickyLimit");
-    expect(lim.getAttribute("type")).toBe("number");
-    expect(lim.getAttribute("min")).toBe("1");
-    expect(lim.getAttribute("step")).toBe("1");
-    expect(lim.getAttribute("name")).toBe("sticky_round_robin_limit");
-    // Default strategy is fill-first, so the sticky row starts hidden.
-    expect(doc.getElementById("provStickyRow").hasAttribute("hidden")).toBe(true);
-    // The add-mode hint is hidden by default and bound to the i18n key.
-    const hint = doc.getElementById("provTabHint");
-    expect(hint.hasAttribute("hidden")).toBe(true);
-    expect(hint.getAttribute("data-i18n")).toBe("accounts.save_first");
-  });
-
-  it("detail card is tidy: title + Edit/Delete + usage, no dead controls", () => {
-    const detail = doc.getElementById("provDetail");
-    expect(detail.querySelector("#provDetailTitle")).not.toBeNull();
-    expect(detail.querySelector("#provEditBtn")).not.toBeNull();
-    expect(detail.querySelector("#provDeleteBtn")).not.toBeNull();
-    // B5.5 usage subsection survives (usage.js renders into it).
-    expect(detail.querySelector("#provUsageTotals")).not.toBeNull();
-    expect(detail.querySelector("#provUsageModelBody")).not.toBeNull();
-    expect(detail.querySelector("button")).not.toBeNull(); // Edit/Delete wired
+  it("the Models column explains where its number comes from", async () => {
+    // The cell is rendered by app.js (the rows are built in JS), so the tooltip
+    // contract lives there + in the dictionary.
+    const appSrc = staticSource("app.js");
+    // The Models cell carries BOTH a title and an aria-label built from the key.
+    expect(appSrc).toMatch(/class="prov-models"[^\n]*title[^\n]*aria-label/);
+    expect(appSrc).toContain('var modelsHint = escapeHtml(getStr("providers.models_hint"))');
+    expect(window.I18N.en["providers.models_hint"]).toBeTruthy();
   });
 });
 
-describe("modal tab behavior (roving tabindex + keyboard)", () => {
-  const press = (key) => {
-    document.activeElement.dispatchEvent(
-      new KeyboardEvent("keydown", { key, bubbles: true })
-    );
-  };
-
+describe("openEditModal: profile load + background discovery (stage-3)", () => {
   beforeEach(() => {
     withProviderModalDom();
-    // Wire exactly as init() does.
-    window.aigate.wireProvTabs();
-  });
-
-  it("clicking a tab activates it: one panel visible, aria + tabindex synced", () => {
-    document.getElementById("provTabAccounts").click();
-    expect(document.getElementById("provTabAccounts").getAttribute("aria-selected")).toBe("true");
-    expect(document.getElementById("provTabProvider").getAttribute("aria-selected")).toBe("false");
-    expect(document.getElementById("provPanelAccounts").hidden).toBe(false);
-    expect(document.getElementById("provPanelProvider").hidden).toBe(true);
-    expect(document.getElementById("provTabAccounts").tabIndex).toBe(0);
-    expect(document.getElementById("provTabProvider").tabIndex).toBe(-1);
-  });
-
-  it("ArrowRight/ArrowLeft wrap, Home/End jump between the two tabs", () => {
-    document.getElementById("provTabProvider").focus();
-    press("ArrowRight");
-    expect(document.getElementById("provTabAccounts").getAttribute("aria-selected")).toBe("true");
-    expect(document.activeElement.id).toBe("provTabAccounts");
-    press("ArrowRight"); // wraps back (only two enabled tabs)
-    expect(document.getElementById("provTabProvider").getAttribute("aria-selected")).toBe("true");
-    press("ArrowLeft");
-    expect(document.activeElement.id).toBe("provTabAccounts");
-    press("Home");
-    expect(document.activeElement.id).toBe("provTabProvider");
-    press("End");
-    expect(document.activeElement.id).toBe("provTabAccounts");
-  });
-
-  it("ADD mode: Accounts tab is aria-disabled, the hint explains, arrows never land on it", () => {
-    window.aigate.openAddModal();
-    const acc = document.getElementById("provTabAccounts");
-    const hint = document.getElementById("provTabHint");
-    expect(acc.getAttribute("aria-disabled")).toBe("true");
-    expect(hint.hidden).toBe(false); // "save the provider first", not a dead tab
-    expect(document.getElementById("provTabProvider").getAttribute("aria-selected")).toBe("true");
-    acc.click(); // clicking a disabled tab must not activate it
-    expect(acc.getAttribute("aria-selected")).toBe("false");
-    expect(document.getElementById("provPanelAccounts").hidden).toBe(true);
-    document.getElementById("provTabProvider").focus();
-    press("ArrowRight");
-    expect(document.activeElement.id).toBe("provTabProvider");
-    press("End");
-    expect(document.activeElement.id).toBe("provTabProvider");
-  });
-});
-
-describe("openEditModal: strategy load + silent discovery (stage-2)", () => {
-  beforeEach(() => {
-    withProviderModalDom();
-    window.aigate.wireProvTabs();
   });
 
   // default_model stays empty on purpose: the combobox filters its panel by
@@ -541,64 +433,70 @@ describe("openEditModal: strategy load + silent discovery (stage-2)", () => {
     fallback_strategy: "round-robin", sticky_round_robin_limit: 5
   };
 
-  it("fills the strategy fields, enables the Accounts tab, loads accounts", async () => {
-    const calls = stubEditModalApi({
-      provider: baseProvider,
-      discover: { ok: true, models: [] },
-      accounts: { object: "list", data: [] }
-    });
-
+  it("fills the profile fields and opens the modal", async () => {
+    stubEditModalApi({ provider: baseProvider, discover: { ok: true, models: [] } });
     window.aigate.openEditModal("p1");
     await flush();
 
-    expect(document.getElementById("provStrategy").value).toBe("round-robin");
-    expect(document.getElementById("provStickyLimit").value).toBe("5");
-    expect(document.getElementById("provStickyRow").hidden).toBe(false);
-    expect(document.getElementById("provStickyLimit").disabled).toBe(false);
-    expect(document.getElementById("provTabAccounts").hasAttribute("aria-disabled")).toBe(false);
-    expect(document.getElementById("provTabHint").hidden).toBe(true);
-    // Accounts moved into the modal -> editing a provider fetches its list.
-    expect(calls.some((c) => c.url.indexOf("/api/accounts?provider_id=p1") === 0)).toBe(true);
+    expect(document.getElementById("provName").value).toBe("ACME");
+    expect(document.getElementById("provModal").hidden).toBe(false);
+    expect(document.getElementById("provModalTitle").textContent).toBe("Edit Provider");
     vi.unstubAllGlobals();
   });
 
-  it("POSTs /discover silently: combobox fed, NO status text, no model table", async () => {
-    const calls = stubEditModalApi({
-      provider: baseProvider,
-      discover: { ok: true, models: [{ model_id: "gpt-4", model_name: "GPT-4" }] },
-      accounts: { object: "list", data: [] }
+  it("POSTs /discover in the background: combobox fed + a status line, no table", async () => {
+    let resolveDisc;
+    const gate = new Promise((r) => { resolveDisc = r; });
+    const calls = [];
+    const answer = (payload) => Promise.resolve({
+      ok: true, headers: { get: () => "application/json" }, json: () => Promise.resolve(payload)
     });
+    vi.stubGlobal("fetch", vi.fn((url, opts) => {
+      const method = (opts && opts.method) || "GET";
+      calls.push({ url: String(url), method, body: opts && opts.body });
+      if (method === "POST" && String(url).indexOf("/discover") !== -1) return gate;
+      if (String(url) === "/api/providers/p1") return answer(baseProvider);
+      return answer({ data: [] });
+    }));
 
     window.aigate.openEditModal("p1");
-    await flush();
-    await flush(); // let the silent discovery + list refresh land
+    await flush(); // the GET landed; the discovery POST is now in flight
+    const status = document.getElementById("provModalModelStatus");
+    expect(status.textContent).toBe("Discovering models…"); // not mute while waiting
+    expect(document.getElementById("provModel").disabled).toBe(false); // never blocks
+    resolveDisc({
+      ok: true, headers: { get: () => "application/json" },
+      json: () => Promise.resolve({ ok: true, models: [{ model_id: "gpt-4", model_name: "GPT-4" }] })
+    });
+    await flush(); // let the discovery + list refresh land
 
     const disc = calls.find((c) => c.method === "POST" && c.url === "/api/providers/p1/discover");
-    expect(disc, "discovery still runs — just without the button").toBeTruthy();
+    expect(disc, "discovery still runs — just without a button").toBeTruthy();
     // The fresh list replaced the DTO-seeded options in the combobox panel.
     expect(provModelOptionValues()).toEqual(["gpt-4"]);
-    // Silent: no status chatter anywhere, and the shipped page has no table.
+    expect(status.textContent).toContain("Models discovered");
+    expect(status.textContent).toContain("(1)");
+    // Nothing anywhere pretends to be a model table.
+    expect(status.querySelector("table")).toBeNull();
+    expect(document.getElementById("provModelsBody")).toBeNull();
+    // The provider list message stays clean: discovery is not a form error.
     expect(document.getElementById("provMsg").textContent).toBe("");
     expect(document.getElementById("provModalMsg").textContent).toBe("");
-    expect(document.getElementById("provModelsBody")).toBeNull();
-    expect(document.getElementById("provModelsTable")).toBeNull();
     vi.unstubAllGlobals();
   });
 
-  it("a FAILED silent discovery stays invisible and never blocks the form", async () => {
+  it("a FAILED discovery shows a text hint, keeps the form open and warns", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.stubGlobal("fetch", vi.fn((url, opts) => {
       const method = (opts && opts.method) || "GET";
-      // Only the silent discovery fails; the form's own GET stays healthy.
+      // Only the background discovery fails; the form's own GET stays healthy.
       if (method === "POST" && String(url).indexOf("/discover") !== -1) {
         return Promise.reject(new Error("network down"));
       }
       return Promise.resolve({
         ok: true, headers: { get: () => "application/json" },
         json: () => Promise.resolve(
-          String(url) === "/api/providers/p1"
-            ? { ...baseProvider, fallback_strategy: "fill-first" }
-            : { data: [] }
+          String(url) === "/api/providers/p1" ? baseProvider : { data: [] }
         )
       });
     }));
@@ -607,38 +505,23 @@ describe("openEditModal: strategy load + silent discovery (stage-2)", () => {
     await flush();
     await flush();
 
-    expect(document.getElementById("provMsg").textContent).toBe(""); // silent
+    const status = document.getElementById("provModalModelStatus");
+    expect(status.textContent).toContain("Model list could not be fetched");
+    expect(status.textContent).not.toMatch(/<table/);
     expect(document.getElementById("provModal").hidden).toBe(false); // form open
     expect(document.getElementById("provName").value).toBe("ACME"); // fields intact
+    expect(document.getElementById("provModalMsg").textContent).toBe(""); // not blocked
     // Not swallowed though (R12): the console keeps the reason.
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
     vi.unstubAllGlobals();
   });
 
-  it("fill-first from the DTO hides + disables the sticky row even with a stored limit", async () => {
-    stubEditModalApi({
-      provider: { ...baseProvider, fallback_strategy: "fill-first", sticky_round_robin_limit: 9 },
-      discover: { ok: true, models: [] },
-      accounts: { object: "list", data: [] }
-    });
-
-    window.aigate.openEditModal("p1");
-    await flush();
-
-    expect(document.getElementById("provStrategy").value).toBe("fill-first");
-    expect(document.getElementById("provStickyRow").hidden).toBe(true);
-    expect(document.getElementById("provStickyLimit").disabled).toBe(true);
-    vi.unstubAllGlobals();
-  });
-
-  it("a stale silent discovery cannot overwrite a newer provider's options", async () => {
+  it("a stale discovery cannot overwrite a newer provider's options", async () => {
     // p1's discover resolves late; meanwhile p2's modal load + discover land.
     let resolveP1;
-    const calls = [];
     vi.stubGlobal("fetch", vi.fn((url, opts) => {
       const method = (opts && opts.method) || "GET";
-      calls.push({ url: String(url), method });
       if (String(url) === "/api/providers/p1") {
         return Promise.resolve({ ok: true, headers: { get: () => "application/json" },
           json: () => Promise.resolve({ ...baseProvider, id: "p1", name: "ONE" }) });
@@ -672,11 +555,14 @@ describe("openEditModal: strategy load + silent discovery (stage-2)", () => {
     await flush();
     expect(provModelOptionValues()).toEqual(["p2-model"]);
     expect(document.getElementById("provName").value).toBe("TWO");
+    // ...and the discarded answer never rewrote the status line either.
+    expect(document.getElementById("provModalModelStatus").textContent)
+      .toContain("Models discovered (1)");
     vi.unstubAllGlobals();
   });
 });
 
-describe("discoverModels — legacy visible path (export kept, stage-2)", () => {
+describe("discoverModels — legacy visible path (export kept)", () => {
   beforeEach(() => { withDetailDom(); });
 
   it("fills the #provModel combobox panel with discovered model_ids (sorted)", async () => {
@@ -694,6 +580,7 @@ describe("discoverModels — legacy visible path (export kept, stage-2)", () => 
     })));
 
     window.aigate.discoverModels("p1");
+    await flush();
     await flush();
 
     // The combobox panel offers the discovered ids, sorted by name:
@@ -729,6 +616,7 @@ describe("discoverModels — legacy visible path (export kept, stage-2)", () => 
       ok: true, headers: { get: () => "application/json" },
       json: () => Promise.resolve({ ok: true, models: [{ model_id: "m1", model_name: "M1" }] })
     });
+    await flush();
     await flush();
     expect(document.getElementById("provModel").disabled).toBe(false);
     expect(document.getElementById("provModelList").textContent)

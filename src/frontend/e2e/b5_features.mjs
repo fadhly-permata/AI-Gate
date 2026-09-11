@@ -11,12 +11,16 @@
 // usage.js / analytics.js — bukan asumsi):
 //   seed   : POST /api/providers + POST /api/accounts (via page.evaluate fetch)
 //   B5.1   : nav providers -> baris #provTableBody -> tombol .prov-name-btn ->
-//            #provDetail (kartu detail bersih: judul + Edit/Delete + usage);
-//            lalu kebab (.js-row-menu) -> item "edit" -> #provModal -> tab
-//            #provTabAccounts -> panel #provPanelAccounts berisi #accountsBody
-//            dengan baris "e2e-acc" + form add (termasuk kolom #accPriority).
-//            CATATAN stage-2: item kebab "discover" + tabel model hilang —
-//            discovery kini berjalan diam-diam dan akun pindah ke tab modal.
+//            HALAMAN RINCI (view [data-view="provider-detail"] aktif, menu
+//            "Penyedia" tetap sorot): kepala #provDetailTitle + badge,
+//            Kartu A #pdApiKey (teks polos), Kartu B #pdStrategy +
+//            #pdStrategySaveBtn, Kartu C #accList berisi .acc-card "e2e-acc"
+//            dengan tombol ▲▼, Kartu D #provUsageTotals; modal akun #accModal
+//            (#accLabel/#accAuthType/#accApiKey/#accPriority) lalu #accModal
+//            ditutup lewat Kembali.
+//            CATATAN stage-3: tab modal + tabel 6 kolom HILANG — akun jadi
+//            kartu di halaman rinci, prioritas jadi tombol ▲▼ (PUT + renumber),
+//            discovery tetap di belakang layar dengan satu baris status teks.
 //   B5.5   : nav usage -> #quotaTableBody tr.quota-row (provider seed muncul,
 //            kemungkinan "unlimited") + #usageTotals .usage-stat
 //   B5.6   : nav analytics -> #analyticsChart .trend-col >= 1 +
@@ -127,7 +131,7 @@ async function gotoView(pg, view) {
   await pg.click('.nav-item[data-view="' + view + '"]');
 }
 
-/* ---- B5.1: Providers -> detail card -> edit modal -> tab Accounts ---- */
+/* ---- B5.1: Providers -> halaman rinci -> kartu akun -> modal akun ---- */
 async function testProvidersAccounts(pg, providerId) {
   await gotoView(pg, "providers");
   const rowSel = '#provTableBody tr.prov-row[data-id="' + providerId + '"]';
@@ -135,58 +139,82 @@ async function testProvidersAccounts(pg, providerId) {
   const name = await pg.$eval(rowSel + " .prov-name", (el) => el.textContent);
   assert((name || "").indexOf("e2e-anth") !== -1,
     "sel nama provider seed salah: " + JSON.stringify(name));
+  // stage-3: kolom Model menjelaskan asal angkanya (hasil pencarian otomatis).
+  const modelsTitle = await pg.$eval(rowSel + " .prov-models", (el) => el.getAttribute("title"));
+  assert(modelsTitle && modelsTitle.length > 0, "tooltip kolom Model hilang");
 
-  // 1) Kartu detail: satu-satunya jalur masuk sekarang = tombol nama di baris
+  // 1) Satu-satunya jalur masuk halaman rinci = tombol nama di baris
   //    (app.js renderProviders -> .prov-name-btn.js-prov-detail -> openDetail).
   await pg.click(rowSel + " .prov-name-btn.js-prov-detail");
   await pg.waitForFunction(() => {
-    const d = document.getElementById("provDetail");
-    return !!d && !d.hidden;
+    const v = document.querySelector('.view[data-view="provider-detail"]');
+    return !!v && v.classList.contains("is-active");
   }, { timeout: WAIT });
 
-  // 2) Accounts pindah ke tab modal (stage-2): buka modal EDIT lewat kebab
-  //    (item "discover" sudah dihapus; kebab = edit + delete saja).
-  await pg.click(rowSel + " .js-row-menu");
-  await pg.waitForSelector('.row-menu .row-menu-item[data-action="edit"]', { visible: true, timeout: WAIT });
-  await pg.click('.row-menu .row-menu-item[data-action="edit"]');
-  await pg.waitForSelector("#provModal", { visible: true, timeout: WAIT });
-  // openEditModal mengaktifkan tab Akun (mode tambah = aria-disabled + hint);
-  // tunggu sampai modal tampil DAN tab benar-benar enabled sebelum klik.
+  // Paritas nav tidak berubah: halaman rinci TANPA entri menu sendiri, jadi
+  // "Penyedia" yang sorot.
   await pg.waitForFunction(() => {
-    const t = document.getElementById("provTabAccounts");
-    return !!t && !t.hasAttribute("aria-disabled");
+    const n = document.querySelector('.nav-item[data-view="providers"]');
+    return !!n && n.classList.contains("active");
+  }, { timeout: WAIT });
+
+  // 2) Kepala + Kartu A (baca-saja): nama + badge + kunci API teks polos.
+  await pg.waitForFunction(() => {
+    const t = document.getElementById("provDetailTitle");
+    return !!t && (t.textContent || "").indexOf("e2e-anth") !== -1;
   }, { timeout: WAIT, polling: 300 });
+  for (const sel of ["#provDetailBadge", "#provEditBtn", "#provDeleteBtn",
+                     "#provDetailBackBtn", "#pdType", "#pdBaseUrl", "#pdApiKey"]) {
+    assert(await pg.$(sel), "kontrol kepala/Kartu A hilang: " + sel);
+  }
+  const keyPlain = await pg.$eval("#pdApiKey", (el) => el.getAttribute("title") || el.textContent);
+  assert(keyPlain === "sk-e2e", "Kartu A tidak menampilkan kunci apa adanya: " + keyPlain);
 
-  // Klik tab Akun -> panel #provPanelAccounts tampil (hidden dilepas).
-  await pg.click("#provTabAccounts");
-  await pg.waitForFunction(() => {
-    const t = document.getElementById("provTabAccounts");
-    const p = document.getElementById("provPanelAccounts");
-    return !!t && !!p && t.getAttribute("aria-selected") === "true" && !p.hidden;
-  }, { timeout: WAIT });
+  // 3) Kartu B: strategi + simpan sendiri (satu permukaan untuk strategi).
+  const strategy = await pg.$eval("#pdStrategy", (el) => el.value);
+  assert(strategy === "fill-first" || strategy === "round-robin",
+    "select strategi bukan enum kontrak: " + strategy);
+  assert(await pg.$("#pdStrategySaveBtn"), "tombol simpan strategi hilang");
 
-  // Accounts section merender account seed (label + auth_type di baris sama).
+  // 4) Kartu C: akun dirender KARTU (bukan tabel), dengan posisi + ▲▼.
   await pg.waitForFunction(() => {
     return Array.prototype.some.call(
-      document.querySelectorAll("#accountsBody tr.acc-row"),
-      (tr) => {
-        const t = tr.textContent || "";
-        return t.indexOf("e2e-acc") !== -1 && t.indexOf("api_key") !== -1;
-      }
+      document.querySelectorAll("#accList .acc-card"),
+      (c) => (c.textContent || "").indexOf("e2e-acc") !== -1
     );
   }, { timeout: WAIT, polling: 300 });
+  const noTable = await pg.$eval("#accList", (el) => !el.querySelector("table"));
+  assert(noTable, "Kartu C masih berisi tabel");
+  const move = await pg.$$eval("#accList .acc-card:first-child .acc-move button",
+    (bs) => bs.map((b) => b.getAttribute("aria-label")));
+  assert(move.length === 2, "tombol ▲/▼ tidak dua: " + JSON.stringify(move));
+  assert(await pg.$("#provConnectOAuthBtn"), "tombol OAuth hilang dari Kartu C");
+  assert(await pg.$("#pdAccReloadBtn"), "tombol muat ulang hilang dari Kartu C");
 
-  // Kontrol OAuth + form add-account ada di dalam panel Accounts modal.
-  await pg.waitForSelector("#provConnectOAuthBtn", { visible: true, timeout: WAIT });
-  for (const sel of ["#accountsTable", "#accLabel", "#accAuthType", "#accApiKey", "#accPriority", "#accAddBtn"]) {
-    assert(await pg.$(sel), "kontrol accounts hilang: " + sel);
+  // 5) Modal akun: satu permukaan khusus akun (label/jenis/kunci/prioritas).
+  await pg.click("#pdAccAddBtn");
+  await pg.waitForFunction(() => {
+    const m = document.getElementById("accModal");
+    return !!m && !m.hidden;
+  }, { timeout: WAIT });
+  for (const sel of ["#accLabel", "#accAuthType", "#accApiKey", "#accPriority", "#accAddBtn"]) {
+    assert(await pg.$(sel), "kontrol modal akun hilang: " + sel);
   }
-  // Kolom Priority per baris (stage-2): baris seed punya stepper number min=0.
-  const hasPriorityCol = await pg.$eval(
-    '#accountsBody tr.acc-row .acc-priority',
-    (el) => el.type === "number" && el.getAttribute("min") === "0"
-  ).catch(() => false);
-  assert(hasPriorityCol, "kolom Priority (input number min=0) tidak ada di baris akun");
+  await pg.click("#accCancelBtn");
+  await pg.waitForFunction(() => {
+    const m = document.getElementById("accModal");
+    return !!m && m.hidden;
+  }, { timeout: WAIT });
+
+  // 6) Kartu D (B5.5) ikut pindah ke halaman rinci.
+  assert(await pg.$("#provUsageTotals"), "Kartu D pemakaian hilang");
+
+  // 7) "Kembali" -> daftar, dan daftar dibaca ulang.
+  await pg.click("#provDetailBackBtn");
+  await pg.waitForFunction(() => {
+    const v = document.querySelector('.view[data-view="providers"]');
+    return !!v && v.classList.contains("is-active");
+  }, { timeout: WAIT });
 }
 
 /* ---- B5.5: Usage & Quota ---- */
