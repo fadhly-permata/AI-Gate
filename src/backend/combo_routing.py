@@ -322,7 +322,9 @@ async def execute_combo(
         # enabled ProviderAccount of each candidate's provider so a limit/quota
         # error can retry on the NEXT account within the same request. Credentials
         # are resolved up-front (OAuth auto-refresh applied) so the async retry
-        # loop needs no live session.
+        # loop needs no live session. Ordered by the SAME account order the
+        # selection engine uses (priority asc, id asc) so the retry sequence
+        # matches the configured routing priority.
         account_creds: dict[int, list] = {}
         for target in candidates:
             if not target.provider_id:
@@ -330,7 +332,9 @@ async def execute_combo(
             accounts = (
                 session.query(ProviderAccount)
                 .filter_by(provider_id=target.provider_id, enabled=True)
-                .order_by(ProviderAccount.id.asc())
+                .order_by(
+                    ProviderAccount.priority.asc(), ProviderAccount.id.asc()
+                )
                 .all()
             )
             creds = []

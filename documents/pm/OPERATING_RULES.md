@@ -11,6 +11,13 @@ A2 PM tidak menulis kode/test. Butuh keahlian → spawn spesialis + handover (go
 A3 Tiap agen hanya tulis di scope-nya; lintas scope = receipt ditolak. Detail roster: `.opencode/rules/agent-boundaries.md`. [R3]
 A4 Handover = ≤25 baris untuk task ≤5 file; peta `file:line` wajib; jangan minta file laporan `.md` untuk task kecil; jangan bikin FILE baru untuk mencatat (append baris boleh). [R38]
 A5 Sub-agent + skill dibuat berbarengan saat dibutuhkan, tidak pernah dihapus. Setelah generate: WAJIB minta user restart opencode; dilarang diam-diam fallback ke agen `general`. [R1,R2,R4] → `.opencode/rules/agent-generation.md`.
+A11 `documents/pm/**` = memo kerja PM (rekaman titik-waktu, append-only): blok/entri lama jangan ditulis-ulang, jangan dihapus,
+   jangan "dirapikan" isinya; koreksi = entri/blok BARIS yang menyebut yang lama. Boleh diedit hanya baris `mode:` `state.md`
+   + typo; isi catatan/status/keputusan lama haram. Detail: `.opencode/skills/pm-orchestration/SKILL.md` §6 + `task-report.md`
+   (laporan diisi maju, tidak dirombak).
+A12 Fakta dunia luar (status PR/branch/isu/merge) = rekaman titik-waktu: boleh dikutip sebagai "per tanggal X", TAPI sebelum
+   jadi dasar kerja WAJIB dicek ulang ke sumbernya (API / `git fetch`) pada sesi itu; kedaluwarsa → tulis koreksi + perbarui
+   baris `updated:` `state.md`, jangan diulang diam-diam sebagai kebenaran aktif. → `.opencode/rules/no-hallucination.md`.
 
 ## B — Penempatan & higienitas berkas
 B1 Semua dokumen proyek di `documents/**`, bukan `docs/**`. [R5]
@@ -34,6 +41,9 @@ D2 Setelah ada perintah: jalan tanpa konfirmasi; ambiguitas → ambil default + 
 D3 Istilah yang bisa dua level ("terminal" = fitur aigate, bukan terminal OS) → cek repo dulu atau klarifikasi 1 kalimat; jangan jawab di level salah. [R30]
 D4 Niat "pemisahan" default = branch, bukan repo. Resource eksternal (repo/registry/domain/akun/webhook) wajib disebut bentuknya + tunggu jawaban. Terlanjur salah bikin → lapor, jangan hapus sendiri. [R39]
 D5 Typo user wajib dikoreksi ke bentuk benar; jangan diikuti; ragu → tanya 1 kalimat. [R46]
+D6 Fitur UI baru: PM WAJIB tayangkan 1 lembar desain (denah blok + alternatif + alasan) dan dapat ACC user
+   SEBELUM spawn fe-dev. Kontrak data/API bukan pengganti persetujuan interaksi; tes hijau bukan ACC desain.
+   Desain ditolak user → desain ulang + ACC lagi, jangan tambal-sulam di kode.
 
 ## E — Mode eksekusi & kecepatan proses
 E1 Sebelum kerja multi-agen/panjang: tawarkan paralel vs sekuensial; pilihan berlaku satu sesi, sesi baru tanya lagi; scope overlap → paksa sekuensial. Detail: `.opencode/rules/parallel-sequential.md`; state = `documents/pm/state.md` key `multiagent_mode`. [R16]

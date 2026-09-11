@@ -71,7 +71,14 @@ dan WL.2a baru boleh dikerjakan.
       Catat: salinan MIT yang sudah tersebar tidak bisa ditarik balik.
 - [ ] **WL.4** Pin versi xterm.js yang di-vendor (sekarang TIDAK tercatat di repo — provenance gap)
       dan simpan salinan teks lisensi upstream di folder vendor.
-- [ ] **WL.5** ⚠️ Font Awesome dimuat dari CDN Cloudflare (`index.html:42`) padahal xterm sengaja
+      PERLUAS 2026-09-11: berlaku juga untuk Font Awesome 6.5.1 — nomor versi HANYA dari string header CSS internal,
+      belum diverifikasi terhadap artefak rilis upstream (diakui jujur di `THIRD_PARTY_NOTICES.md` §2, commit `15862bf`).
+- [x] **WL.5** ⚠️ Font Awesome dimuat dari CDN Cloudflare (`index.html:42`) padahal xterm sengaja
       di-vendor biar offline-safe → icons mati tanpa internet + ada request keluar ke pihak ketiga,
       bertentangan dengan klaim privasi di README/wiki. BUTUH KEPUTUSAN user: vendor lokal / ganti
       ikon / tetap CDN + koreksi kalimat privasi.
+      **SELESAI 2026-09-11 (keputusan user: "localin aja semua aset font atau icon")** — vendor lokal di
+      `src/frontend/static/vendor/font-awesome/` (5 berkas, 409.388 B, blob identik branch `docs/wiki`),
+      `index.html:43` path relatif, grep CDN di `static/**` = 0, penjaga otomatis `tests/vendor_assets.test.js` (7 tes),
+      legal §2 ditulis ulang + ADR-015 di TSD + FSD 321 dikoreksi. commit `19df593` `15862bf` `b256064` `bb759e4`.
+      SISA: uji mata offline nyata (matikan jaringan → ikon tetap muncul) belum dilakukan — butuh user/QA.

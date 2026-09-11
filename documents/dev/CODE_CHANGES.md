@@ -1395,3 +1395,308 @@ Bukti "kode lama masih aktif" tidak berlaku: tidak ada proses produk yang disent
 - Jalan yang tersisa (butuh keputusan user): (i) generate `graph.json` di mesin Linux/x86 lalu query
   lokal di HP (`graphify path/explain --graph <file>` jalan tanpa LLM/tanpa grammar),
   (ii) tetap tanpa graf (C4 berkondisi), (iii) coba build binding grammar lebih dalam (tidak dijamin).
+
+## 2026-09-10 — Banner tujuan halaman (fitur `banner-halaman`, fe-dev, commit ini)
+- `src/frontend/static/index.html` (+40): 8 blok `.page-banner` jadi anak pertama 8 view —
+  settings :175, providers :280, combos :417, proxies :449, endpoints :481, usage :514,
+  analytics :611, cli :792. welcome+terminal BERSIH (verifikasi per-section, bukan asumsi).
+  fallback inline = teks EN (konvensi berkas). Ikon `fa-circle-info` — ada di FA 6.5.1 yang
+  sudah dimuat (index.html:42; bukti: unduh + grep `fa-circle-info:before`).
+- `src/frontend/static/styles.css` (+43, di :458–490): satu set `.page-banner` — flex, ikon
+  `--accent`, kartu token (`--panel/--panel-border/--radius/--shadow/--fg`), none-fixed,
+  @media 600px stack. Cahah/gelap otomatis (cuma variabel).
+- `src/frontend/static/i18n/{en,id,ru,nl,ja,zh,zh-tw}.js` (+9/−1 per berkas): 8 kunci baru
+  `page_desc.{settings,providers,combos,proxies,endpoints,usage,analytics,cli}` SERENTAK di 7
+  kamus → 56 entri, tiap kamus 400 kunci, parity guard i18n.test.js lolos (35 tes).
+  id = draf user-ACC verbatim; 6 bahasa lain = draf terjemahan (BELUM ditinjau penutur asli).
+- Nol perubahan JS app (app.js dkk). Gate PM: vitest penuh 23 berkas/523 tes HIJAU (10,21 s,
+  = baseline, 0 regresi) + render-check jsdom (applyLocale asli + kamus asli): 7/7 locale,
+  8/8 banner terisi, welcome+terminal nihil → LULUS. Browser nyata TIDAK tersedia di Termux
+  (playwright crash, tanpa biner) → visual masih butuh mata user sendiri. Laporan:
+  `.opencode/reports/20260910/implementation/0405_banner-halaman-implementasi.md`.
+
+## 2026-09-10 — Gerbang backend multi-akun 9router: review a237414 + tes (fitur `multiakun-9router`, peran be-dev in-session, commit 03d9b6e)
+- `src/backend/oauth.py` (+20/−7): SKIP kredensial kosong — defect review: kontrak "skip yang
+  unavailable" belum menangkap `api_key=""` (diteruskan mentah upstream). Jalur pin: kredensial
+  kosong → log + fallback strategi (bukan return ""); jalur strategi: kandidat kosong → lanjut.
+  Sekalian hapus variabel `account_id` ganda di pin (return langsung `pinned.id`). Docstring
+  langkah-5 diperbarui. Bukti: oauth.py:404-419 (pin), :442-456 (strategi).
+- `tests/backend/test_account_routing.py` BARUS (28 tes): mesin fill-first (prioritas asc, id asc
+  tie-break, skip raise/kosong, fallback legacy, enum tak dikenal=fail-safe), round-robin STICKY
+  (default 3; limit DARI KOLOM: 1/2; clamp 0→1; matriks clamp_sticky_limit; last_used_at persist;
+  urutan bertahan restart; kandidat gagal tidak makan streak), pin x-connection-id (menang atas
+  2 strategi; unknown/disabled/asing/token-gagal → fallback tanpa error; wrapper meneruskan pin;
+  resolve_target → ResolvedTarget.account_id), parsing header (absen/kosong/non-int/valid), DTO
+  rute provider/account (+validasi 400 invalid_fallback_strategy, clamp di PUT, PUT priority,
+  404 account_not_found, urutan list), migrasi self-heal idempoten 2× pada DB skema-lama dengan
+  default mendarat di baris lama.
+- Gate: suite penuh `python3 -m pytest tests/backend -q` = 526 passed, 1 skipped, 0 failed (40,63 s).
+  Laporan: `.opencode/reports/20260910/qa/1351_backend-gate-multiakun-9router.md` (+kontrak tahap-1).
+
+## 2026-09-10 — Pembersihan 4 merah PRE-EXISTING suite cli-tools (fitur terpisah `cli-tools-preexisting-red`, commit f986d51)
+- Bukti pre-existing: 4 gagal terulang IDENTIK di baseline c3a2241 (a237414~1, worktree terpisah)
+  → bukan regresi WIP; milik pekerjaan anthropic-inbound/cli-compat yang lalu.
+- `src/backend/cli_compat.py` (+9/−2): `except Exception: pass` di current_platform melanggar R12
+  (ketahuan guard AST test_logging) → debug-log stdlib `logging` + `import logging` (modul tetap
+  framework-free by design, TIDAK import backend.log).
+- `src/backend/cli_tools_router.py` (+30): `_claude_builder` BARUS + registrasi `"claude"` —
+  resolve in-app hanya inject OPENAI_* yang DIABAIKAN claude-code (gap nyata, ketahuan guard
+  test_every_verified_preset). Form = meniru scripts/cli-tools/claude.sh:64-83 (terbukti jalan):
+  ANTHROPIC_BASE_URL=root gateway (strip trailing slash + suffix /v1; CLI menambah /v1/messages
+  sendiri) + ANTHROPIC_API_KEY + ANTHROPIC_MODEL/--model opsional; prefix env per-perintah (pola
+  _openhands_builder), tidak persist config. Masking key di log tetap (replace ctx.key).
+- `tests/backend/test_cli_tools.py` (+32/−2): ToolDTO += kunci `compat` (ditambah katalog 36b71ad);
+  claude `("verified","")` (bukan unsupported/anthropic_only — flip sengaja pekerjaan inbound);
+  hapus kasus param claude basi (refusal tetap dicakup codex/antigravity/gpt-researcher/crewai);
+  + unit test `_claude_builder` (root-strip /v1, model-absen).
+- Diverifikasi: test_cli_tools+test_logging hijau; suite penuh hijau (di atas). BELUM di-exercise:
+  spawn claude-code sungguhan via terminal in-app (butuh biner + PTY live) — jujur di laporan.
+
+## 2026-09-11 — UI strategi multi-akun TAHAP 2 (fe-dev; branch refactor/ui, BELUM push)
+
+**Asal:** ACC user ("1") atas tahap-2 fitur adopsi 9router. Kontrak =
+`.opencode/reports/20260910/qa/1351_backend-gate-multiakun-9router.md` §KONTRAK.
+Eksekutor: `fe-dev` (Task tool, 2 putaran). Laporan:
+`.opencode/reports/20260911/implementation/0633_ui-multiakun-tahap2-implementasi.md`.
+Batas lingkup dijaga: **nol `src/backend/**`, nol `combos.js`** (keputusan user terkunci).
+
+### Perubahan (14 berkas `src/frontend/**`)
+- `static/index.html` (+155/−125): kartu detail provider dibersihkan (:311-328) — `#provDiscoverBtn`,
+  `#provModelMsg`, `#provModelsTable`/`#provModelsBody`, dan subseksi akun DIHAPUS dari kartu;
+  `#provModal` jadi ber-tab (tablist `#provTabList` :797, panel Provider + panel Akun :888-927,
+  kontrol baru `#provStrategy`/`#provStickyRow`/`#provStickyLimit`, `#accPriority` :918-919,
+  hint `#provTabHint`); Cancel keluar dari `<form>`; cache-buster `styles.css?v=20260914→20260915`.
+- `static/app.js` (+266/−39): tab ARIA + roving tabindex + panah/Home/End (:858-960); `openAddModal` menonaktifkan
+  tab Akun + hint (:962-981); `openEditModal` mengisi 2 field strategi, mengaktifkan tab Akun,
+  memanggil discovery DIAM-DIAM (:983-1026); `saveProvider` mengirim `fallback_strategy` selalu dan
+  `sticky_round_robin_limit` hanya saat `round-robin`, clamp ≥1/default 3 (:1073-1090);
+  `openDetail(id, skipDiscover)` + `discoverModels(id,{quiet})` dengan penjaga balapan `discoverSeq`
+  dan gagal senyap → `console.warn` (BUKAN `except: pass` — R12) (:1123-1198); `renderAccounts`
+  += kolom Prioritas (input number, commit-on-change) + Terakhir dipakai (`never_used` bila null)
+  (:1240-1323); `updateAccountPriority` = `PUT /api/accounts/{id}` body `{priority}` SAJA
+  (:1327-1338); `addAccount` kirim `priority` default 0 (:1341-1383); sel Nama jadi tombol masuk
+  detail `.prov-name-btn` (:786-808, pengganti aksi kebab `discover` yang dihapus); kebab = edit+delete.
+- `static/styles.css` (+51): `.modal-tabs`, `.modal-tab`(+`is-active`/`aria-disabled`/`focus-visible`),
+  `.prov-tabpanel[hidden]`, `.prov-name-btn`, `.acc-priority`, `.acc-never` (:1079-1131).
+  **Nol warna hex baru** — semua token existing → mode gelap otomatis (dibuktikan `git diff | grep -c '#hex'` = 0).
+- `static/i18n/{en,id,ru,nl,ja,zh,zh-tw}.js` (+11 @ 7): kunci baru `providers.tabs_label`,
+  `providers.tab_provider`, `providers.tab_accounts`, `providers.strategy`,
+  `providers.strategy_fill_first`, `providers.strategy_round_robin`, `providers.sticky_limit`,
+  `accounts.priority`, `accounts.last_used`, `accounts.never_used`, `accounts.save_first`.
+  Paritas 7/7: `i18n-parity-check.mjs zh` = 411 kunci, hilang 0, thừa 0.
+- `tests/providers.test.js` (15→32 tes): muatan tablist, akun di panel modal, UI discovery hilang,
+  enum select, kartu detail bersih, perilaku tab (klik + panah/Home/End + wrap), `saveProvider`
+  (+2 field, omit saat fill-first, clamp), `openEditModal` memanggil `/discover` senyap tanpa
+  pesan/tabel + gagal senyap tak mem-block, limit sticky tersembunyi saat fill-first, balapan
+  respons basi, `discoverModels` legacy tetap dipertahankan.
+- `tests/accounts.test.js` (8→17 tes): DTO += priority/last_used_at; kolom baru + colspan 6;
+  PUT `{priority}` saja (tanpa `last_used_at`) + muat ulang; no-op tidak mengirim PUT; 404 inline;
+  POST menyertakan `priority`.
+- `tests/row-actions.test.js`: kebab kini `["edit","delete"]` + assert tombol nama.
+- `e2e/b5_features.mjs` (tindak lanjut, DIDELEGASIKAN ULANG karena `fe-dev` melaporkan sendiri
+  terpengaruh): jalur B5.1 ditulis ulang ke UI baru — detail via `.prov-name-btn.js-prov-detail`,
+  akun via kebab `edit` → `#provModal` → `#provTabAccounts` → `#provPanelAccounts`, plus assert
+  `#accPriority` (number, min 0) + `.acc-priority` per baris; komentar alur :13-19 diperbarui.
+  `node --check` exit 0. `android.mjs`/`smoke.spec.js` terverifikasi tidak terpengaruh (level API).
+
+### Gate PM (mandiri, bukan klaim sub-agent)
+`node node_modules/.bin/vitest run` = **23 berkas / 547 tes LOLOS** (baseline 523 → +24);
+`git diff --check` bersih; `git status --short` = 14 berkas semuanya `src/frontend/**`;
+rujukan `provModelsTable|provDiscoverBtn|provModelsBody` di `static/**` = 0; banner
+`page_desc.providers` utuh; `node --check` app.js + b5_features.mjs exit 0.
+
+### Insiden lingkup (dilaporkan jujur oleh fe-dev, diverifikasi PM)
+Satu suntingan sempat menyentuh komentar `static/app.js` (3 baris non-fungsional) di luar batas
+"HANYA e2e" → dibatalkan ke teks persis tergates; PM memverifikasi ulang `node --check` + vitest
+547 hijau. Nol dampak fungsional.
+
+### Yang TIDAK diubah (keputusan PM, dicatat di laporan)
+4 kunci i18n lama jadi tak terpakai (`providers.discover`, `providers.no_models`,
+`providers.model_id`, `providers.model_name`) → DITAHAN, tidak di-purge (endpoint `/discover` masih
+dipanggil diam-diam; purging = riuh 7 berkas tanpa nilai tes). Boleh dicabut user.
+
+### BELUM diverifikasi
+Aplikasi nyata (butuh muat ulang server oleh user — J6, keputusan user) + uji mata papan ketik/tab
+di HP (G3); Playwright belum dijalankan; terjemahan 6 bahasa belum ditinjau penutur;
+commit belum di-push; PR #17 masih terbuka.
+
+## 2026-09-11 — OPSI A halaman rinci penyedia (tahap-3 UI multiakun; commit `6ede872`, BELUM push)
+
+**Asal:** user menilai tahap-2 berantakan → PM audit (6 titik, bukti di blok 20260911-0645) → rule **D6**
+(lembar desain + ACC sebelum fe-dev) → user pilih "coba dulu opsi a" → ACC ditekan pada lembar desain →
+`fe-dev` spawned (sesi `ses_f721dd91bffeZOiRtn33N0XqnF`, 1 putaran, tanpa blocker).
+Lembar desain: `documents/pm/handovers/handover-20260911-opsi-a-halaman-rinci-penyedia.md`.
+Laporan: `.opencode/reports/20260911/implementation/1100_ui-halaman-rinci-penyedia-tahap3.md`.
+Batas lingkup dijaga: **nol `src/backend/**`, nol `combos.js`, nol `usage.js`** (Kartu D pakai id lama).
+
+### Perubahan (17 berkas `src/frontend/**`, +1527/−1149)
+- `static/index.html` (+256/−183): `#provDetail` lama DIHAPUS (:311); view BARU `.view.provider-detail
+  [data-view="provider-detail"]` (:316-465) = kepala (`#provDetailBackBtn` :332, judul+badge, Ubah/Hapus
+  :341-347) + Kartu A profil baca-saja `<dl>` (:352-389, status `#pdModelStatus` :388) + Kartu B strategi
+  (`#pdStrategy` :400-404, `#pdStickyRow`/`#pdStickyLimit` :407-410, `#pdStrategySaveBtn` :412,
+  `#pdStrategyMsg` :415) + Kartu C akun (`#pdAccAddBtn`/`#provConnectOAuthBtn`/`#pdAccReloadBtn`,
+  `#accList` DIV :443 — tabel 6 kolom hilang) + Kartu D pemakaian (:446-465); `#provModal` jadi profil-only
+  (:901-976); modal BARU `#accModal` (:978-1018); cache-buster `20260915→20260916`.
+- `static/app.js` (+497/−314): `navViewFor` + sorot nav Penyedia TANPA entri nav baru (:78-88,162-174);
+  `openDetail`/`loadProviderDetail`/`backToProviders` (:1032-1136); `saveProvider` TIDAK lagi mengirim
+  field strategi (:985-1030); `saveStrategy` PUT HANYA 2 field routing + clamp ≥1 + 400 inline di kartunya
+  (:1138-1186); discovery senyap + baris status + `discoverSeq` + gagal `console.warn` (R12) (:1190-1237);
+  akun dirender KARTU (posisi 1..n, kunci polos ber-`title`, ▲▼ `aria-disabled` beralasan) (:1259-1364);
+  `moveAccount` tukar → normalisasi `0..n-1` → PUT hanya yang berubah → selalu baca ulang server, PUT
+  berurutan (:1366-1412); modal akun (:1438-1528); `wireProviderUi()` terpadu (:1607-1668); ekspor
+  `window.aigate` dipangkas.
+- `static/styles.css` (+142/−32): hapus `.modal-tabs/.modal-tab/.prov-tabpanel/.acc-priority/.acc-never/
+  .providers-detail` (0 rujukan tersisa); halaman rinci :1083-1156; kartu akun :1158-1238 (sentuh ▲▼
+  44px di ponsel); **tambalan bug lama** :511-515 `.form-row[hidden]{display:none}` (`display:flex` penulis
+  mengalahkan `[hidden]` peramban → baris "hidden" sebelumnya masih tampil). NOL warna hex baru.
+- `static/i18n/{en,id,ru,nl,ja,zh,zh-tw}.js`: 10 kunci mati dicabut (`providers.tab_*`,
+  `providers.tabs_label`, `providers.strategy`, `providers.sticky_limit`, `accounts.priority`,
+  `accounts.last_used`, `accounts.never_used`, `accounts.save_first`, `accounts.none`), 27 kunci baru
+  (`providers.models_hint|models_failed` + `provider_detail.*`) → **428 kunci/kamus**, paritas 7/7 lolos.
+- `tests/provider_detail.test.js` BARU (40 tes): 4 kartu, Kembali, ▲▼ (2 PUT pada daftar 0..n-1; semua-0;
+  batas aria-disabled; gagal → pesan inline + baca ulang), Kartu B satu-satunya pemilik strategi,
+  modal akun POST `priority`, kosong-state, Kartu D menunjuk `loadProviderUsage`, 10 kunci dicabut tak
+  menggantung, "app.js tidak punya logika tab tersisa".
+- `tests/providers.test.js` 32→27 (tab→"profil-only"), `tests/accounts.test.js` 17→18 (kartu, bukan tabel),
+  `tests/views.test.js` 25→27 (view baru TANPA entri nav), `tests/row-actions.test.js` 4→5 (tooltip Model),
+  `tests/usage.test.js` (1 tes retarget id). Tabel pemindahan tes lama→baru lengkap di laporan §6.
+- `e2e/b5_features.mjs` (+71/−43): alur B5.1 = `.prov-name-btn` → halaman rinci → kepala → `#pdApiKey`
+  polos → `#pdStrategy`+simpan → `#accList .acc-card` (assert tanpa tabel) → `#accModal` → Kembali.
+  `node --check` OK; BELUM dijalankan (nol browser di Termux).
+
+### Gate PM (mandiri)
+`node node_modules/.bin/vitest run` = **24 berkas / 586 tes LOLOS** (sebelum 23/547);
+`i18n-parity-check.mjs` 7/7 kode = 428 kunci, hilang 0 thừa 0 kosong 0; grep sisa tab di `static/**` = 0;
+grep 4 kunci dicabut di 7 kamus = 0; `git status --short` = 17 berkas semua `src/frontend/**`;
+0 hex baru; `git diff --check` bersih; `node --check` app.js + e2e OK; `rules-index.py` LOLOS.
+
+### Keputusan fe-dev di luar acuan (semua diterima PM)
+Prioritas akun baru = jumlah akun (append) — **koreksi defect nyata**: default 0 bikin akun baru melompati
+antrean; `accounts.none` ikut dicabut; PUT berurutan (bukan serentak) agar urutan server pasti;
+`stopOAuthPoll()` saat berpindah penyedia; permukaan `window.aigate` dipangkas.
+
+### BELUM diverifikasi
+Belum di-exercise di aplikasi nyata (G3) — user wajib muat ulang server (J6) + uji mata kartu/▲▼ di HP dan
+mode gelap; Playwright belum jalan; terjemahan 6 bahasa belum ditinjau penutur; halaman rinci tanpa rute
+URL (tidak bisa di-bookmark, back peramban tak berlaku — diterima di lembar desain); ahead 8, PR #17 open.
+
+## 2026-09-11 — TAHAP 4: masuk halaman rinci lewat menu ⋮ "Akun alternatif/sekunder" (fe-dev; commit BELUM push)
+
+**Asal:** user mencoba hasil tahap-3 → "aneh kalo tap/klik di namanya gitu, bikin menu baru aja dengan nama
+alternatif/sekunder akun ... digabung dengan menu dari tombol tiga titik di ujung kanan aja". Bentuk, nama,
+dan letak ditentukan USER → rule D6 terpenuhi oleh user sendiri (PM hanya kunci 4 default kecil).
+Laporan: `.opencode/reports/20260911/implementation/1222_menu-kebab-akun-alternatif-tahap4.md`.
+
+### Perubahan (13 berkas `src/frontend/**`, +63/−55)
+- `static/app.js:793-798`: sel Nama kembali TEKS POLOS — `button.prov-name-btn.js-prov-detail` DIHAPUS;
+  listener delegasi `data-detail-wired` (:809-822) ikut dihapus (tak terpakai); `openDetail(id)` tetap ada,
+  kini dipanggil dari item menu.
+- `static/app.js:812-822`: menu ⋮ penyedia = TIGA item berurutan `accounts` → `edit` → `delete`; item akun =
+  label `providers.accounts_menu`, ikon `fa-users`, bukan bahaya. Infrastruktur menu (`rowMenuCellHtml` :732-738,
+  `wireRowMenu` :740-749) TIDAK diubah → tetap satu tombol ⋮ per baris.
+- `static/styles.css`: rule `.prov-name-btn` (+`hover`/`focus-visible`) DIHAPUS (dicek 0 pemakaian tersisa);
+  0 rule baru; 0 warna hex baru; sel Nama kini konsisten dengan tabel kombo/pool/endpoint.
+- `static/i18n/{en,id,ru,nl,ja,zh,zh-tw}.js`: +1 kunci `providers.accounts_menu` (ID "Akun alternatif/sekunder",
+  EN "Alternative/secondary accounts") → 429 kunci/kamus.
+- `static/index.html`: cache-buster `V` + `styles.css?v=` + `i18n.js?v=` + `app.js?v=` naik serentak → `20260917`
+  (penjaga `tests/i18n.test.js:307-316` minta ketiganya sama).
+- `tests/row-actions.test.js:26-57` (urutan 3 item + label + ikon + non-danger + Nama bukan tombol);
+  `tests/provider_detail.test.js:175-190,800-806` (masuk via ⋮ + penjaga negatif "klik nama tidak navigasi" +
+  alur penuh 6 langkah); `e2e/b5_features.mjs:13-14,145-153` (⋮ dulu → `[data-action="accounts"]`, menu menempel
+  di `<body>`). `views.test.js`/`providers.test.js` tidak berubah (0 rujukan tombol nama, dicek grep).
+
+### Gate PM (mandiri)
+`node node_modules/.bin/vitest run` = **24 berkas / 586 tes LOLOS** (identik baseline → nol pengurangan cakupan);
+parity 429 kunci hilang 0 thừa 0 kosong 0 (en/id/zh-tw dicek langsung); `git status` = 13 berkas semua `src/frontend/**`;
+grep `prov-name-btn` = 0 di seluruh `src/frontend`; 0 hex baru; `git diff --check` bersih; `node --check` e2e exit 0.
+Glif `fa-users` dibuktikan ada di Font Awesome Free 6.5.1 yang di-load (`.fa-users:before{content:"\f0c0"}`).
+
+### Temuan di luar cakupan (TIDAK disentuh)
+Font Awesome dimuat dari **CDN cloudflare** (`index.html:42`) = utang lama WL.5 (ikon mati offline + permintaan
+keluar) — butuh keputusan user, bukan bagian tugas ini.
+
+### Default PM yang dikunci (user boleh veto)
+(1) item akun membuka HALAMAN RINCI (bukan lompat ke kartu akun saja — halaman itu juga memuat strategi);
+(2) label persis "Akun alternatif/sekunder"; (3) urutan akun → ubah → hapus; (4) ⋮ baris kombo/pool/endpoint tak disentuh.
+
+### BELUM diverifikasi
+Belum dilihat di peramban nyata (G3) — bagian tampilan dibaca ulang dari berkas tiap permintaan, jadi cukup
+muat ulang halaman, tidak perlu memuat ulang server; jalur ⋮ → item belum dieksekusi sungguhan (nol browser);
+terjemahan 6 bahasa belum ditinjau penutur.
+
+## 2026-09-11 — TAHAP 5+6: ubah akun (backend+layar) + Font Awesome dilokalkan + label menu (commit `eea7504` `19df593` `15862bf` `b256064` `bb759e4`, BELUM push)
+
+**Asal:** satu pesan user memuat tiga permintaan: "localin aja semua aset font atau icon" · "kenapa teks menunya
+'Alternative/secondary accounts' itu kan cuma contoh. ganti jadi yang lebih representatif dong" · "kok gak ada tombol
+edit ya di daftar secondary account? cuma ada tombol delete doang nih". Lanjutan: "lanjut dong tadi provider AI-nya error"
+(spawn tahap-6 mati "upstream authentication failed" → handover sama diulang).
+Laporan: `.opencode/reports/20260911/implementation/1850_ubah-ikon-lokal-label-tahap5-6.md`.
+**Sebab-akibat:** tombol edit mustahil karena API lama hanya menerima `priority` (`1351:81`) → backend dulu, baru layar.
+
+### Backend — `eea7504` (be-dev `ses_f70913524ffezKmxQV4LdzciV4`)
+- `src/backend/accounts_router.py:7` docstring modul; `:67-89` `AccountUpdate` diperluas (`label`, `api_key`, `enabled`,
+  `priority`); `:263-321` `update_account` ditulis ulang. Parsial pakai `req.dict(exclude_unset=True)` → **"absen" ≠
+  "kosong"**: `label=""`/`api_key=""` sah ditulis sadar, `null` = no-op (kolom NOT NULL `models.py:110,113`).
+  `auth_type` + `last_used_at` tidak bisa ditulis (diabaikan senyap, DTO kembalikan nilai asli; alasan oauth token lahir
+  di callback ditulis di `:75-79`). SATU penolakan `:291-298`: `api_key` (termasuk `""`) ke akun oauth → 400
+  `oauth_account_key_readonly`, dievaluasi SEBELUM menulis. Log `:317-320` hanya NAMA field.
+- `tests/backend/test_account_routing.py:565-799` +11 tes: label-only, api_key-only, 404 untuk semua field,
+  `api_key=""` → akun di-skip mesin (end-to-end ke `_select`), toggle `enabled` + mesin hanya lihat yang enabled,
+  semua field sekaligus, **regression guard field absen tidak menimpa**, body kosong = no-op 200, `auth_type` diabaikan,
+  oauth+api_key → 400, dan **log `LogEntry` tidak memuat nilai rahasia** (baca tabel log, assert `sk-super-secret` absen).
+- `_seed` (:85-118) dibuat aditif (`auth_type`/`oauth_token`) → 28 tes lama tidak berubah.
+- Gate PM sendiri: `python3 -m pytest tests/backend -q` = **537 passed, 1 skipped, 0 failed** (baseline 526 + 11).
+- `GET /api/accounts` + `_account_to_dto` TIDAK disentuh → kontrak tahap-1 tetap sah kecuali `1351:81` yang kini usang (supersede di laporan).
+
+### Frontend — `19df593` (fe-dev tahap-5 `ses_f7060031dffeFpTJlMt5NVXMTT`; tahap-6 sesi `ses_f6fd547b4ffee4lli1lcr0VIEO` setelah sesi pertama mati)
+- `static/app.js:1313-1319` tombol `.acc-edit` (`fa-pen`, `aria-label`+`title`) sebelum `.acc-del`; `:1356-1359` cabang handler
+  di listener delegasi `#accList` yang SUDAH ada (nol listener per kartu); `:1444-1571` `#accModal` dua mode
+  (`accModalMode`/`accEditingId`, seed eksplisit mode tambah, `openAccountEditModal` baca `accountRows` tanpa fetch ulang,
+  `setAccountModalChrome` satu tempat untuk semua beda mode, `closeAccountModal` reset ke mode tambah);
+  `:1553-1560` `syncAccountKeyRow` memperluas → baris kunci TERSEMBUNYI + catatan oauth; `:1577-1615` `saveAccountEdit` →
+  `PUT /api/accounts/{id}` HANYA `{label, api_key, enabled}` (akun kunci) / `{label, enabled}` (akun oauth) — ditegaskan tes
+  `toEqual` + `not.toHaveProperty("auth_type"|"priority"|"last_used_at"|"provider_id")`.
+- `static/index.html:991-1044` (`#accOauthNote`, `#accEnabledRow`+switch, id baris prioritas) — `enabled` hanya mode UBAH,
+  `priority` hanya mode TAMBAH (satu pintu untuk satu urusan; mengurut sudah ▲▼).
+- `static/styles.css:1204` ukuran tombol aksi kartu (0 warna hex baru).
+- i18n +7 kunci × 7 kamus (`provider_detail.edit_account|edit_title|save_changes|enabled|oauth_key_note|edit_error|edit_missing`).
+- **Vendoring (aturan G3 — CDN selama ini dipakai PRODUK):** `static/vendor/font-awesome/` 5 berkas **409.388 B**
+  (`LICENSE.txt` 7.427 · `css/all.min.css` 102.641 · woff2 brands 117.372 / regular 25.452 / solid 156.496) diambil dari
+  branch `docs/wiki` dengan `git restore --source=docs/wiki` (nol unduhan, TIDAK ikut ter-staging); PM mencocokkan
+  **hash blob 5/5**. `index.html:43` = `href="vendor/font-awesome/css/all.min.css?v=20260919"`; tag cdnjs DIHAPUS;
+  grep `cdnjs|cdn.jsdelivr|unpkg|@import url("http` pada `static/**` = **0**. `.ttf` (4 rujukan) + `fa-v4compatibility.woff2`
+  sengaja tidak di-vendor (woff2 menang di rantai `src`; family legacy `"FontAwesome"` 0 pemakaian di luar `@font-face`).
+- **Guard BARU** `tests/vendor_assets.test.js` (7 tes, 160 baris): scan STRUKTUR `static/**` (link/script/img/source/iframe/
+  embed/object/video/audio/track + `@import`/`url()` CSS + `<style>` inline) menuntut nol aset eksternal + setiap `woff2`
+  yang dirujuk `@font-face` wajib ada di disk; tautan "Repo" ke github = navigasi, dikecualikan dengan alasan tertulis.
+  Ketajaman dibuktikan dengan sabotase sementara (sisip CDN → 3/7 gagal; singkirkan woff2 → 2/7 gagal; dipulihkan + hash dicocokkan).
+- **Label menu:** `providers.accounts_menu` (kunci TETAP) EN "Alternative/secondary accounts" → **"Manage accounts"**,
+  ID → **"Kelola akun"** (+ ru/nl/ja/zh/zh-tw setingkat). Perilaku item tidak berubah (`accounts|edit|delete`, `fa-users`, `openDetail`).
+  Catatan: teks yang dikira user "contoh" itu nilai kamus EN — bahasa aplikasi sedang di-set Inggris.
+- Cache-buster serentak `20260919` (V/styles/i18n/app — dijaga `tests/i18n.test.js:307-316`).
+- Tes: `accounts.test.js` 18→27, `provider_detail.test.js` 40→47, +`vendor_assets.test.js` 7 → **25 berkas / 609 tes LOLOS**
+  (gate PM sendiri; nol tes dihapus). Paritas 436 kunci × 7 kamus, hilang 0 thừa 0 kosong 0.
+- `e2e/b5_features.mjs` diperluas (assert `.acc-edit`, chrome tambah vs ubah, auth_type read-only) — `node --check` OK, TIDAK dijalankan.
+
+### Dokumen yang ikut diselaraskan (akibat vendoring — supaya sesi berikutnya tidak menulis fakta lama)
+- `documents/architecture/TSD.md` §3.4 bullet Ikon + **ADR-015 "Aset front-end: vendor lokal, tanpa CDN"** (`b256064`,
+  tech-architect; sensus `documents/architecture/**` = 1 klaim usang, `anthropic-inbound-endpoint.md` bersih).
+- `documents/analysis/FSD.md:321` (rujuk ADR-015, tanpa duplikasi byte/path) + `:454` kebutuhan "dapat dipakai offline"
+  tercatat TERBUKTI + versi spec 1.0→1.1 (`bb759e4`, system-analyst; sensus analisis = 1 klaim usang).
+- `THIRD_PARTY_NOTICES.md` §2 ditulis ulang 118+/18− (`15862bf`, fullstack-dev — berkas root, di luar akar agen lain):
+  tabel berkas + lapisan lisensi, kutipan `LICENSE.txt` per baris (CC BY :13-17 / OFL :21-31 / MIT :121-126 / atribusi :147-156 /
+  syarat redistribusi :80-85), atribusi ditulis nyata, **provenance diakui jujur** ("6.5.1" hanya dari string header CSS,
+  belum diverifikasi terhadap artefak rilis upstream), fallback tak di-vendor + penjaga tes disebut.
+- `documents/plan/wiki-backlog.md`: **WL.5 dicentang SELESAI** (keputusan user = vendor lokal), **WL.4 diperluas** ke provenance FA.
+
+### Keputusan agen di luar perintah (semua DITERIMA PM)
+`enabled` hanya di mode ubah (POST tambah tetap byte-identik) · `auth_type` ditampilkan read-only, bukan disembunyikan ·
+penolakan oauth+`api_key` berlaku termasuk string kosong (UI menyembunyikan kolomnya) · tanpa `log_warning` untuk 4xx
+(meniru gaya modul; kalau mau semua 4xx dicatat = perubahan lintas modul, tugas terpisah) · `window.aigate.backToProviders`
+diekspos + satu tes dibuat deterministik (bukan melemahkan assertion) · `?v=` ikut dipasang di berkas vendor baru.
+
+### BELUM diverifikasi
+Belum di-exercise di peramban nyata (G3) — cukup muat ulang HALAMAN (statis dibaca dari berkas), TIDAK perlu restart server;
+**uji mata mode pesawat** (ikon harus tetap muncul) belum dilakukan; e2e/Playwright belum dijalankan; terjemahan non-EN belum
+ditinjau penutur; provenance FA belum diverifikasi ke hulu (WL.4); `documents/analysis/FSD.md:7,19` masih merujuk path
+`docs/business/BRD.md` yang tidak ada (temuan system-analyst, belum ditugaskan); ahead 19 BELUM push; PR #17 masih terbuka.

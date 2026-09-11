@@ -10,10 +10,27 @@
 // Yang di-drive (semua selector diverifikasi dari app.js / index.html /
 // usage.js / analytics.js — bukan asumsi):
 //   seed   : POST /api/providers + POST /api/accounts (via page.evaluate fetch)
-//   B5.1   : nav providers -> baris #provTableBody -> menu aksi (kebab) ->
-//            item "discover" -> #provDetail -> #accountsBody "e2e-acc".
-//            CATATAN: semua aksi baris kini lewat menu kebab (.js-row-menu),
-//            konsisten dgn Combos/Proxy Pools/Endpoints.
+//   B5.1   : nav providers -> baris #provTableBody -> menu ⋮ -> item
+//            [data-action="accounts"] ("Kelola akun" = providers.accounts_menu,
+//            stage-4) ->
+//            HALAMAN RINCI (view [data-view="provider-detail"] aktif, menu
+//            "Penyedia" tetap sorot): kepala #provDetailTitle + badge,
+//            Kartu A #pdApiKey (teks polos), Kartu B #pdStrategy +
+//            #pdStrategySaveBtn, Kartu C #accList berisi .acc-card "e2e-acc"
+//            dengan tombol ▲▼ + "Ubah" (.acc-edit) + "Hapus" (.acc-del),
+//            Kartu D #provUsageTotals; modal akun #accModal DUA MODE (satu
+//            permukaan): mode TAMBAH (#accLabel/#accAuthType/#accApiKey/
+//            #accPriority tampil, #accEnabledRow tersembunyi) lalu di-click
+//            "Ubah" masuk mode UBAH (judul/tombol berubah, #accPriorityRow
+//            tersembunyi, #accEnabledRow tampil, auth_type read-only); setiap
+//            kali ditutup balik bersih ke mode tambah.
+//            CATATAN stage-5: PUT /api/accounts/{id} kini menerima label/
+//            api_key/enabled (parsial), auth_type read-only; akun oauth TIDAK
+//            menampilkan kolom api_key (kalau dikirim -> 400 readonly), jadi
+//            form tidak pernah menabrak penolakan itu.
+//            CATATAN stage-3: tab modal + tabel 6 kolom HILANG — akun jadi
+//            kartu di halaman rinci, prioritas jadi tombol ▲▼ (PUT + renumber),
+//            discovery tetap di belakang layar dengan satu baris status teks.
 //   B5.5   : nav usage -> #quotaTableBody tr.quota-row (provider seed muncul,
 //            kemungkinan "unlimited") + #usageTotals .usage-stat
 //   B5.6   : nav analytics -> #analyticsChart .trend-col >= 1 +
@@ -124,7 +141,7 @@ async function gotoView(pg, view) {
   await pg.click('.nav-item[data-view="' + view + '"]');
 }
 
-/* ---- B5.1: Providers -> detail -> Accounts ---- */
+/* ---- B5.1: Providers -> halaman rinci -> kartu akun -> modal akun ---- */
 async function testProvidersAccounts(pg, providerId) {
   await gotoView(pg, "providers");
   const rowSel = '#provTableBody tr.prov-row[data-id="' + providerId + '"]';
@@ -132,32 +149,143 @@ async function testProvidersAccounts(pg, providerId) {
   const name = await pg.$eval(rowSel + " .prov-name", (el) => el.textContent);
   assert((name || "").indexOf("e2e-anth") !== -1,
     "sel nama provider seed salah: " + JSON.stringify(name));
+  // stage-3: kolom Model menjelaskan asal angkanya (hasil pencarian otomatis).
+  const modelsTitle = await pg.$eval(rowSel + " .prov-models", (el) => el.getAttribute("title"));
+  assert(modelsTitle && modelsTitle.length > 0, "tooltip kolom Model hilang");
 
-  // Buka DETAIL via menu aksi (kebab) -> item "discover" (openDetail -> loadAccounts).
+  // Nama baris = teks biasa (stage-4): tidak ada tombol di dalam .prov-name.
+  assert((await pg.$(rowSel + " .prov-name button")) === null,
+    "sel nama masih berisi tombol (harusnya teks biasa)");
+  // 1) Satu-satunya jalur masuk halaman rinci (stage-4) = menu ⋮ baris ->
+  //    item "accounts" (app.js renderProviders -> data-action="accounts" ->
+  //    openDetail). Menu singleton menempel di <body>, bukan di dalam baris.
   await pg.click(rowSel + " .js-row-menu");
-  await pg.waitForSelector('.row-menu .row-menu-item[data-action="discover"]', { visible: true, timeout: WAIT });
-  await pg.click('.row-menu .row-menu-item[data-action="discover"]');
+  await pg.waitForSelector('.row-menu [data-action="accounts"]', { visible: true, timeout: WAIT });
+  await pg.click('.row-menu [data-action="accounts"]');
   await pg.waitForFunction(() => {
-    const d = document.getElementById("provDetail");
-    return !!d && !d.hidden;
+    const v = document.querySelector('.view[data-view="provider-detail"]');
+    return !!v && v.classList.contains("is-active");
   }, { timeout: WAIT });
 
-  // Accounts section merender account seed (label + auth_type di baris sama).
+  // Paritas nav tidak berubah: halaman rinci TANPA entri menu sendiri, jadi
+  // "Penyedia" yang sorot.
+  await pg.waitForFunction(() => {
+    const n = document.querySelector('.nav-item[data-view="providers"]');
+    return !!n && n.classList.contains("active");
+  }, { timeout: WAIT });
+
+  // 2) Kepala + Kartu A (baca-saja): nama + badge + kunci API teks polos.
+  await pg.waitForFunction(() => {
+    const t = document.getElementById("provDetailTitle");
+    return !!t && (t.textContent || "").indexOf("e2e-anth") !== -1;
+  }, { timeout: WAIT, polling: 300 });
+  for (const sel of ["#provDetailBadge", "#provEditBtn", "#provDeleteBtn",
+                     "#provDetailBackBtn", "#pdType", "#pdBaseUrl", "#pdApiKey"]) {
+    assert(await pg.$(sel), "kontrol kepala/Kartu A hilang: " + sel);
+  }
+  const keyPlain = await pg.$eval("#pdApiKey", (el) => el.getAttribute("title") || el.textContent);
+  assert(keyPlain === "sk-e2e", "Kartu A tidak menampilkan kunci apa adanya: " + keyPlain);
+
+  // 3) Kartu B: strategi + simpan sendiri (satu permukaan untuk strategi).
+  const strategy = await pg.$eval("#pdStrategy", (el) => el.value);
+  assert(strategy === "fill-first" || strategy === "round-robin",
+    "select strategi bukan enum kontrak: " + strategy);
+  assert(await pg.$("#pdStrategySaveBtn"), "tombol simpan strategi hilang");
+
+  // 4) Kartu C: akun dirender KARTU (bukan tabel), dengan posisi + ▲▼.
   await pg.waitForFunction(() => {
     return Array.prototype.some.call(
-      document.querySelectorAll("#accountsBody tr.acc-row"),
-      (tr) => {
-        const t = tr.textContent || "";
-        return t.indexOf("e2e-acc") !== -1 && t.indexOf("api_key") !== -1;
-      }
+      document.querySelectorAll("#accList .acc-card"),
+      (c) => (c.textContent || "").indexOf("e2e-acc") !== -1
     );
   }, { timeout: WAIT, polling: 300 });
+  const noTable = await pg.$eval("#accList", (el) => !el.querySelector("table"));
+  assert(noTable, "Kartu C masih berisi tabel");
+  const move = await pg.$$eval("#accList .acc-card:first-child .acc-move button",
+    (bs) => bs.map((b) => b.getAttribute("aria-label")));
+  assert(move.length === 2, "tombol ▲/▼ tidak dua: " + JSON.stringify(move));
+  // stage-5: tiap kartu punya tombol "Ubah" (acc-edit) SAME LEVEL dengan "Hapus".
+  const cardBtns = await pg.$$eval("#accList .acc-card:first-child", (card) => {
+    const edit = card.querySelector(".acc-edit");
+    return {
+      edit: !!edit,
+      editAria: edit ? edit.getAttribute("aria-label") : null,
+      del: !!card.querySelector(".acc-del")
+    };
+  });
+  assert(cardBtns.edit, "tombol Ubah (acc-edit) hilang dari kartu akun");
+  assert(cardBtns.del, "tombol Hapus hilang dari kartu akun");
+  assert(cardBtns.editAria && cardBtns.editAria.length > 0, "aria-label tombol Ubah kosong");
+  assert(await pg.$("#provConnectOAuthBtn"), "tombol OAuth hilang dari Kartu C");
+  assert(await pg.$("#pdAccReloadBtn"), "tombol muat ulang hilang dari Kartu C");
 
-  // Kontrol OAuth + form add-account ada di dalam detail.
-  await pg.waitForSelector("#provConnectOAuthBtn", { visible: true, timeout: WAIT });
-  for (const sel of ["#accountsTable", "#accLabel", "#accAuthType", "#accApiKey", "#accAddBtn"]) {
-    assert(await pg.$(sel), "kontrol accounts hilang: " + sel);
+  // 5a) Modal TAMBAH: satu permukaan khusus akun (label/jenis/kunci/prioritas);
+  //     baris enabled memang ADA tapi disembunyikan pada mode tambah.
+  await pg.click("#pdAccAddBtn");
+  await pg.waitForFunction(() => {
+    const m = document.getElementById("accModal");
+    return !!m && !m.hidden;
+  }, { timeout: WAIT });
+  for (const sel of ["#accLabel", "#accAuthType", "#accApiKey", "#accPriority", "#accAddBtn"]) {
+    assert(await pg.$(sel), "kontrol modal akun hilang: " + sel);
   }
+  const addChrome = await pg.evaluate(() => ({
+    title: document.getElementById("accModalTitle").textContent,
+    submit: document.getElementById("accAddBtn").textContent,
+    priorityHidden: document.getElementById("accPriorityRow").hidden,
+    enabledHidden: document.getElementById("accEnabledRow").hidden
+  }));
+  assert(addChrome.priorityHidden === false, "mode tambah: baris prioritas harus tampil");
+  assert(addChrome.enabledHidden === true, "mode tambah: baris enabled harus tersembunyi");
+  await pg.click("#accCancelBtn");
+  await pg.waitForFunction(() => {
+    const m = document.getElementById("accModal");
+    return !!m && m.hidden;
+  }, { timeout: WAIT });
+
+  // 5b) Modal UBAH (stage-5): klik Ubah pada kartu pertama -> judul/tombol jadi
+  //     mode ubah, terisi dari baris akun, prioritas tersembunyi, enabled tampil,
+  //     dan baris api_key tampil untuk akun api_key seed (e2e-acc / sk-acc).
+  await pg.click("#accList .acc-card:first-child .acc-edit");
+  await pg.waitForFunction(() => {
+    const m = document.getElementById("accModal");
+    return !!m && !m.hidden && document.getElementById("accLabel").value.length > 0;
+  }, { timeout: WAIT });
+  const editChrome = await pg.evaluate(() => ({
+    mode: window.aigate.getAccountModalMode().mode,
+    title: document.getElementById("accModalTitle").textContent,
+    submit: document.getElementById("accAddBtn").textContent,
+    priorityHidden: document.getElementById("accPriorityRow").hidden,
+    enabledHidden: document.getElementById("accEnabledRow").hidden,
+    keyHidden: document.getElementById("accApiKeyRow").hidden,
+    authDisabled: document.getElementById("accAuthType").disabled,
+    label: document.getElementById("accLabel").value
+  }));
+  assert(editChrome.mode === "edit", "klik Ubah tidak masuk mode ubah: " + editChrome.mode);
+  assert(editChrome.priorityHidden === true, "mode ubah: baris prioritas harus tersembunyi");
+  assert(editChrome.enabledHidden === false, "mode ubah: baris enabled harus tampil");
+  assert(editChrome.keyHidden === false, "mode ubah akun api_key: kolom kunci harus tampil");
+  assert(editChrome.authDisabled === true, "mode ubah: auth_type harus read-only");
+  assert(editChrome.label.indexOf("e2e-acc") !== -1,
+    "mode ubah tidak terisi label akun: " + JSON.stringify(editChrome.label));
+  assert(editChrome.title !== addChrome.title, "judul modal tidak berubah ke mode ubah");
+  assert(editChrome.submit !== addChrome.submit, "label tombol submit tidak berubah ke mode ubah");
+  // tutup -> kembali bersih mode tambah
+  await pg.click("#accCancelBtn");
+  await pg.waitForFunction(() => {
+    const m = document.getElementById("accModal");
+    return !!m && m.hidden;
+  }, { timeout: WAIT });
+
+  // 6) Kartu D (B5.5) ikut pindah ke halaman rinci.
+  assert(await pg.$("#provUsageTotals"), "Kartu D pemakaian hilang");
+
+  // 7) "Kembali" -> daftar, dan daftar dibaca ulang.
+  await pg.click("#provDetailBackBtn");
+  await pg.waitForFunction(() => {
+    const v = document.querySelector('.view[data-view="providers"]');
+    return !!v && v.classList.contains("is-active");
+  }, { timeout: WAIT });
 }
 
 /* ---- B5.5: Usage & Quota ---- */

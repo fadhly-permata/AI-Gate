@@ -83,7 +83,10 @@ from backend.models import (
 from backend.gateway import token_saver as _token_saver
 from backend import proxy_selector
 from backend import usage as _usage
-from backend.oauth import select_provider_credential_with_account
+from backend.oauth import (
+    CONNECTION_ID_HEADER,
+    select_provider_credential_with_account,
+)
 
 
 class ChatCompletionRequest(BaseModel):
@@ -201,6 +204,28 @@ async def _parse_object_body(request: Request) -> dict:
     return payload
 
 
+def _preferred_account_id(request: Request) -> Optional[int]:
+    """Read the optional ``x-connection-id`` account-pin header (9router parity).
+
+    Returns the account id, or ``None`` when the header is absent / blank / not
+    an integer — an unusable pin must NEVER error the request; the provider's
+    routing strategy simply applies. Whether the id belongs to the resolved
+    provider is enforced by the selection engine (also fail-safe).
+    """
+    raw = request.headers.get(CONNECTION_ID_HEADER)
+    if raw is None or not raw.strip():
+        return None
+    try:
+        return int(raw.strip())
+    except ValueError:
+        log_warning(
+            f"ignoring non-integer '{CONNECTION_ID_HEADER}' header",
+            source="backend.gateway.router",
+            context={"header": CONNECTION_ID_HEADER, "value": raw[:32]},
+        )
+        return None
+
+
 async def _handle_chat_completion(request: Request, ctx: dict) -> Union[dict, Response]:
     """Validate + route + forward one chat completion (raises GatewayError).
 
@@ -266,7 +291,9 @@ async def _handle_chat_completion(request: Request, ctx: dict) -> Union[dict, Re
         return result
 
     try:
-        target = resolve_target(model)
+        target = resolve_target(
+            model, preferred_account_id=_preferred_account_id(request)
+        )
     except TargetNotFound as exc:
         log_warning(
             f"model reference not found: {model}",
@@ -451,7 +478,9 @@ async def _handle_responses(request: Request, ctx: dict) -> dict:
         return _responses.chat_response_to_responses(chat_result, model)
 
     try:
-        target = resolve_target(model)
+        target = resolve_target(
+            model, preferred_account_id=_preferred_account_id(request)
+        )
     except TargetNotFound as exc:
         log_warning(
             f"model reference not found: {model}",
@@ -610,7 +639,9 @@ async def _handle_anthropic_messages(request: Request, ctx: dict) -> dict:
         return openai_chat_response_to_anthropic_messages(chat_result, model)
 
     try:
-        target = resolve_target(model)
+        target = resolve_target(
+            model, preferred_account_id=_preferred_account_id(request)
+        )
     except TargetNotFound as exc:
         log_warning(
             f"model reference not found: {model}",
@@ -1254,7 +1285,7 @@ async def _route_via_endpoint(
                     "provider_not_found",
                 )
             api_key, account_id = select_provider_credential_with_account(
-                provider, session
+                provider, session, preferred_account_id=_preferred_account_id(request)
             )
             target = ResolvedTarget(
                 base_url=provider.base_url,

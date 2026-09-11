@@ -23,7 +23,7 @@ describe("kebab action menu + lang dropdown", () => {
     expect(html).not.toContain('class="lang-btn"');
   });
 
-  it("providers row kebab opens menu with edit/discover/delete", () => {
+  it("providers row kebab opens menu: accounts -> edit -> delete (stage-4)", () => {
     document.body.innerHTML = '<table><tbody id="provTableBody"></tbody></table>';
     window.aigate.renderProviders([
       { id: "p1", name: "OpenAI", type: "openai-compatible", base_url: "u", enabled: true, models: [] }
@@ -33,12 +33,43 @@ describe("kebab action menu + lang dropdown", () => {
     kebab.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     const menu = document.querySelector(".row-menu");
     expect(menu).toBeTruthy();
-    const actions = Array.from(menu.querySelectorAll("[data-action]"))
-      .map((b) => b.getAttribute("data-action"));
-    expect(actions).toEqual(["edit", "discover", "delete"]);
+    const items = Array.from(menu.querySelectorAll("[data-action]"));
+    const actions = items.map((b) => b.getAttribute("data-action"));
+    expect(actions).toEqual(["accounts", "edit", "delete"]);
+    // Stage-4: the detail page moved from the name cell into this menu, and
+    // the accounts item is the FIRST entry (user's chosen order).
+    expect(items[0].getAttribute("data-action")).toBe("accounts");
+    expect(items[0].textContent).toContain(window.I18N.en["providers.accounts_menu"]);
+    expect(items[0].classList.contains("is-danger")).toBe(false);
+    expect(items[0].querySelector("i.fa-users")).not.toBeNull();
     expect(menu.textContent).toContain("Edit");
-    expect(menu.textContent).toContain("Discover Models");
     expect(menu.textContent).toContain("Delete");
+    // The old "Discover Models" action is gone: discovery runs in the background
+    // from openEditModal/openDetail now.
+    expect(menu.querySelector('[data-action="discover"]')).toBeNull();
+    // The name cell is plain text again: no button, no detail wiring.
+    const name = document.querySelector("#provTableBody .prov-name");
+    expect(name).toBeTruthy();
+    expect(name.tagName).toBe("TD");
+    expect(name.querySelector("button")).toBeNull();
+    expect(name.textContent).toBe("OpenAI");
+    expect(document.querySelector("#provTableBody .js-prov-detail")).toBeNull();
+  });
+
+  // stage-3 (Opsi A): the number in that column is a machine result, so the
+  // cell says where it came from instead of letting it look authoritative.
+  it("the Models cell carries a title + aria-label explaining the count", () => {
+    document.body.innerHTML = '<table><tbody id="provTableBody"></tbody></table>';
+    window.aigate.renderProviders([
+      { id: "p1", name: "OpenAI", type: "openai-compatible", base_url: "u", enabled: true,
+        models: [{ model_id: "a" }, { model_id: "b" }] }
+    ]);
+    const cell = document.querySelector("#provTableBody .prov-models");
+    expect(cell.textContent).toBe("2");
+    const hint = window.I18N.en["providers.models_hint"];
+    expect(hint).toBeTruthy();
+    expect(cell.getAttribute("title")).toBe(hint);
+    expect(cell.getAttribute("aria-label")).toBe(hint);
   });
 
   it("updateLangUI renders flag + localized name in trigger and menu", () => {

@@ -50,6 +50,32 @@ describe("index.html structure — missing views + global Log Window", () => {
     expect(doc.querySelector('[data-view="endpoints"]')).not.toBeNull();
   });
 
+  /* ===== The provider-detail page is the ONE exception to "view = menu" =====
+     stage-3 (Opsi A): it is a sub-page of Providers, opened from a row name, so
+     it must NOT grow a sidebar or bottom-nav entry — otherwise the mirror list
+     below (and the phone shell's reachability contract) changes shape. app.js
+     keeps .nav-item[data-view="providers"] highlighted while it is shown. */
+  it("provider-detail view exists but has NO nav or bottom-nav entry", () => {
+    const view = doc.querySelector('section.view[data-view="provider-detail"]');
+    expect(view, "detail view section present").not.toBeNull();
+    expect(view.classList.contains("view")).toBe(true);
+    expect(doc.querySelector('.nav-item[data-view="provider-detail"]')).toBeNull();
+    expect(doc.querySelector('.bn-item[data-view="provider-detail"]')).toBeNull();
+    // It is still reachable by keyboard/mouse: the entry point is a real button.
+    expect(doc.querySelector('.nav-item[data-view="providers"]')).not.toBeNull();
+  });
+
+  it("provider-detail is one vertical column of cards (no grid, no wide table)", () => {
+    const view = doc.querySelector('section.view[data-view="provider-detail"]');
+    const cards = view.querySelectorAll(":scope > .card");
+    expect(cards.length, "head + 4 cards").toBeGreaterThanOrEqual(5);
+    // The only table left inside it is the B5.5 top-models one that usage.js
+    // owns; the 6-column accounts table must not come back.
+    expect(view.querySelector("#accList").tagName).toBe("DIV");
+    expect(view.querySelector("#accList table")).toBeNull();
+    expect(doc.getElementById("accountsTable")).toBeNull();
+  });
+
   it("sidebar + bottom-nav link to the three new views", () => {
     ["combos", "proxies", "endpoints"].forEach(function (v) {
       expect(doc.querySelector('.nav-item[data-view="' + v + '"]')).not.toBeNull();

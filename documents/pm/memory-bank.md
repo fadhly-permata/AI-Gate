@@ -4,6 +4,133 @@
 (empty — diisi PM saat task pertama)
 
 ## Decisions
+- 2026-09-11 (PUSH + **PR #18**, dan koreksi catatan PM sendiri): user "rapikan, commit, push, & pr".
+  RAPIKAN = 3 agen per akar tulisnya (system-analyst/tech-architect/business-analyst) membersihkan rujukan path mati
+  `docs/...` → `documents/...` (6 rujukan aktif diperbaiki + 8 nama usulan di arsip dipasangkan lewat blok catatan,
+  bukan ditulis-ulang; folder hantu `docs/` di root yang terbukti kosong di-`rmdir`). commit `6e3cf3f`.
+  PUSH pakai `$GITHUB_TOKEN` dari `.env` lewat helper inline sekali-pakai (nol pencetakan nilai, nol penulisan ke disk) →
+  sinkron `0 0`. **PR #18** `refactor/ui -> main`: 23 commit / 57 berkas / +7.251 −467, `mergeable_state: clean`,
+  label `documentation`+`enhancement` → https://github.com/fadhly-permata/AI-Gate/pull/18.
+  DUA PELAJARAN PROSES yang dicatat permanen: (1) **catatan PM sendiri bisa basi dan menyesatkan sesi berikutnya** —
+  `"PR #17 masih terbuka"` ditulis berulang di state/memory-bank padahal #17 SUDAH DI-MERGE (`main = 000663b`; #12 juga
+  merged); diverifikasi API + `git fetch`. Kebiasaan baru: **status PR/dunia luar dicek ulang lewat API sebelum dikutip**,
+  jangan mengutip memori sesi. (2) **Gerbang buta oleh lingkupnya sendiri**: `rules-index.py:120-124` hanya memindai
+  `OPERATING_RULES.md` + `.opencode/rules/*.md`, jadi `documents/analysis|architecture|business/**` TIDAK pernah diperiksa —
+  itu sebab rujukan hantu bertahan bertahun padahal gerbang selalu "LOLOS". Usulan (belum ditugaskan): perluas gerbang ke
+  `documents/**`, supaya kelas kesalahan ini tidak bisa kembali.
+  Gotcha API: field `labels` pada payload create PR TIDAK menempel → pasang via `POST /issues/N/labels` lalu verifikasi.
+- 2026-09-11 (TAHAP 5+6 — ubah akun, ikon dilokalkan, label menu): satu pesan user memuat tiga permintaan:
+  "localin aja semua aset font atau icon" + "kenapa teks menunya 'Alternative/secondary accounts' itu kan cuma contoh,
+  ganti jadi yang lebih representatif" + "kok gak ada tombol edit ya di daftar secondary account? cuma ada delete doang".
+  RANTAI SEBAB-AKIBAT yang penting dicatat: tombol edit TIDAK ADA karena API-nya memang hanya menerima `priority`
+  (kontrak tahap-1) → jadi backend dulu (`be-dev`), baru layar (`fe-dev`). Bukan kelalaian fe-dev.
+  JAWABAN soal label: teks itu BUKAN contoh/komentar — itu nilai kamus **EN**, dan bahasa aplikasi sedang di-set Inggris
+  (nilai ID-nya "Akun alternatif/sekunder"). Tetap diganti karena kaku di bahasa mana pun → kini "Kelola akun"/"Manage accounts"
+  (+ ru/nl/ja/zh/zh-tw), kunci TETAP `providers.accounts_menu`, perilaku item tak berubah.
+  Backend (`eea7504`): `AccountUpdate` partial pakai `exclude_unset` (absen ≠ kosong → `label=""`/`api_key=""` sah ditulis sadar;
+  `null` = no-op karena kolom NOT NULL); `auth_type`/`last_used_at` tetap tak bisa ditulis (diabaikan senyap); SATU penolakan
+  `api_key` (termasuk `""`) ke akun oauth → 400 `oauth_account_key_readonly`; log hanya NAMA field (ada tes yang membaca
+  `LogEntry` memastikan nilai kunci tak masuk log). Gate PM sendiri: **537 passed, 1 skipped, 0 failed**.
+  Frontend (`19df593`): `.acc-edit` per kartu lewat listener delegasi yang sudah ada; `#accModal` DUA MODE (tambah|ubah) tanpa
+  modal ketiga, chrome disatukan di satu fungsi, reset saat ditutup; PUT hanya `{label,api_key,enabled}` / `{label,enabled}`
+  (oauth: kolom kunci DISEMBUNYIKAN supaya UI tidak pernah menabrak 400); `enabled` hanya di mode ubah, `priority` hanya di
+  mode tambah (▲▼ satu-satunya pintu mengurut). Tes 18→27 dan 40→47, nol tes dihapus.
+  VENDOR (aturan G3 selama ini DILANGGAR produk, bukan oleh kita): FA Free 6.5.1 diambil dari branch `docs/wiki` lewat
+  `git restore --source=docs/wiki` (nol unduhan, nol staging), 5 berkas 409.388 B, **hash blob 5/5 PM cocokkan sendiri**;
+  `index.html:43` path relatif; grep `cdnjs|jsdelivr|unpkg|@import url("http` = 0. Guard BARU `tests/vendor_assets.test.js`
+  (7 tes, scan STRUKTUR bukan daftar hitam host) + ketajamannya dibuktikan dengan sabotase sementara (sisip CDN → 3/7 gagal;
+  hilangkan woff2 → 2/7 gagal; dipulihkan). `.ttf` + `fa-v4compatibility.woff2` sengaja tidak di-vendor (woff2 menang di rantai
+  `src`; family legacy tak dipakai selector) — komentar guard yang tadinya SALAH fakta dikoreksi sesi kedua.
+  INSIDIEN: spawn tahap-6 MATI di tengah ("upstream authentication failed") → PM ulangi handover yang sama; sesi kedua
+  menemukan working tree sudah terisi sebagian lalu MENGAUDIT ULANG total (hash+grep+tes) dan menemukan 1 komentar salah fakta.
+  Pelajaran: spawn yang gagal di tengah = state tak tentu → wajib audit ulang, bukan dipercaya.
+  DOKUMEN YANG MENIPU IKUT DISELARASKAN (biar sesi berikutnya tidak lagi menulis "via CDN"): `TSD.md` §3.4 + **ADR-015
+  "Aset front-end: vendor lokal, tanpa CDN"** (`b256064`, tech-architect), `FSD.md:321` + kebutuhan "dapat dipakai offline"
+  kini tercatat TERBUKTI + spec naik ke 1.1 (`bb759e4`, system-analyst), `THIRD_PARTY_NOTICES.md` §2 ditulis ulang dengan
+  kutipan `LICENSE.txt` per baris + provenance diakui jujur (`15862bf`, fullstack-dev — berkas root, di luar akar agen lain).
+  Gate PM akhir MANDIRI: vitest **25 berkas / 609 tes LOLOS**, paritas 436 × 7 kamus (hilang 0 thừa 0 kosong 0), hash vendor 5/5.
+  KOREKSI UNTUK ENTRI DI ATAS/SEBELUMNYA di berkas ini: pernyataan "Font Awesome masih dari CDN cloudflare (index.html:42)"
+  dan "temuan luar cakupan WL.5" **SUDAH TERTUTUP** hari ini; baris kini `:43`. `documents/plan/wiki-backlog.md` WL.5 dicentang,
+  WL.4 DIPERLUAS mencakup provenance Font Awesome. Supersede kontrak tahap-1: laporan `1351` baris 81 ("PUT accounts HANYA
+  priority") sudah digantikan laporan `1850` (berkas laporan lama tidak diedit = arsip titik-waktu).
+  BELUM: exercise nyata + uji mata offline (G3); e2e belum dijalankan; terjemahan belum ditinjau penutur; ahead 19 BELUM push; PR #17 open.
+- 2026-09-11 (TAHAP 4 — akses lewat menu ⋮, bukan klik nama): user mencoba hasil tahap-3 di layar betulan dan
+  menolak pola "nama bisa diklik" ("aneh kalo tap/klik di namanya gitu") → perintahkan item MENU BARU bernama
+  "Akun alternatif/sekunder" yang DIGABUNG ke menu tiga titik yang sudah ada. Bentuk+nama+letak ditentukan USER
+  → rule D6 terpenuhi oleh user sendiri, PM tidak menerbitkan lembar desain baru (PM hanya kunci 4 default:
+  item akun membuka HALAMAN RINCI bukan lompat ke kartu; label persis seperti kata user; urutan akun→ubah→hapus;
+  ⋮ baris lain tak disentuh). PM verifikasi lebih dulu bahwa infrastruktur menu baris sudah generik
+  (`rowMenuCellHtml` app.js:732-738 + `wireRowMenu` :740-749) → permintaan dipenuhi TANPA tombol ⋮ kedua.
+  Hasil 1 putaran fe-dev (13 berkas, +63/−55): sel Nama kembali teks polos (`.prov-name-btn` + listener
+  `data-detail-wired` DIHAPUS, 0 rujukan tersisa), ⋮ = `accounts|edit|delete`, CSS rule tombol nama dihapus
+  (0 rule/hex baru), +1 kunci i18n ×7 (428→429), cache-buster serentak `20260917`, tes + e2e disesuaikan
+  (penjaga NEGATIF ditambahkan: klik nama tidak boleh navigasi). Gate PM MANDIRI: vitest **24 berkas/586 tes
+  LOLOS = identik baseline** (nol penurunan cakupan), paritas 429 hilang 0 thừa 0 kosong 0, 13 berkas semua
+  `src/frontend/**`, diff-check bersih. Glif `fa-users` dibuktikan ada di FA Free 6.5.1 yang di-load.
+  TEMUAN LUAR CAKUPAN (tidak disentuh, laporkan ke user): Font Awesome masih dari CDN cloudflare
+  (`index.html:42`) = utang WL.5 — **TERTUTUP hari ini oleh entri TAHAP 5+6 di atas** (keputusan user: vendor lokal). PELAJARAN: "akses tersembunyi di teks" gagal di uji mata user walau 586 tes
+  hijau — konsistensi pola tabel lain (nama polos) lebih penting daripada pintasan; aturan D6 soal desain
+  perlu menyinggung "jalur masuk fitur = pola yang sudah dikenal user".
+- 2026-09-11 (TAHAP 3 Opsi A — halaman rinci penyedia, DESAIN DULU BARU KODE): user marah "desain multi akun
+  berantakan amat" → PM berhenti, audit realisasi `d1ff215` (6 titik lemah berbukti `file:line`), TULIS RULE
+  **D6** (fitur UI wajib 1 lembar desain + ACC user sebelum spawn fe-dev; kontrak data ≠ persetujuan interaksi;
+  tes hijau ≠ ACC desain), terbitkan lembar desain `documents/pm/handovers/handover-20260911-opsi-a-halaman-
+  rinci-penyedia.md`, DAN TAHAN eksekusi (nol kode disentuh) sampai user menegaskan "coba dulu yang a kita
+  kerjain". Barulah spawn `fe-dev`. D6 TERBUKTI BERGUNA: user mengoreksi arah sebelum ada 1500 baris lagi.
+  Hasil satu putaran (17 berkas `src/frontend/**`, +1527/−1149): view baru `provider-detail` TANPA entri nav
+  (menu sorot Penyedia), 4 kartu satu kolom (profil baca-saja | strategi | akun sebagai kartu | pemakaian),
+  modal akun terpisah, **prioritas ▲▼ = tukar + normalisasi 0..n-1, PUT hanya yang berubah, selalu baca ulang
+  server, PUT berurutan**, `saveProvider` tidak lagi mengirim field strategi (satu pemilik per field — henti
+  timpa-menimpa), discovery senyap + baris status (bukan bisu), tab tahap-2 + 10 kunci i18n mati DICABUT bersih
+  (0 sisa markup), 27 kunci baru → 428/kamus 7/7. Bonus tambalan bug lama: `.form-row[hidden]` masih tampil
+  karena `display:flex` penulis > aturan peramban (`styles.css:511-515`). KOREKSI DEFECT oleh fe-dev yang PM
+  terima: prioritas akun baru = jumlah akun (append), bukan 0 — default 0 bikin akun baru melompati antrean.
+  `usage.js`/`combos.js`/`src/backend/**` NOL sentuh (Kartu D hanya pindah rumah, id lama tetap).
+  Gate PM MANDIRI: vitest **24 berkas / 586 tes LOLOS** (23/547 sebelumnya), parity 7/7 428 hilang 0 thừa 0,
+  `git diff --check` bersih, 0 hex baru, grep sisa tab = 0. Commit `6ede872` (kode) + dokumen PM, BELUM push.
+  BELUM: exercise nyata (G3) — user wajib muat ulang server (J6) + uji mata kartu/▲▼ di HP + mode gelap;
+  Playwright belum jalan; terjemahan 6 bahasa belum ditinjau; ahead 8; PR #17 masih terbuka.
+  BATASAN yang diterima user lewat lembar desain: tanpa rute URL → tidak bisa di-bookmark, back peramban tak berlaku.
+- 2026-09-11 (TAHAP 2 UI multiakun 9router — SELESAI tingkat tes, lalu DITOLAK desainnya): ACC user ("1") → spawn `fe-dev` (agen+skill sudah
+  ada → reuse, nol generasi; Task tool TERSEDIA di sesi ini, beda dari sesi backend kemarin). Handover memuat kontrak
+  tahap-1 + peta `file:line` yang diverifikasi ULANG PM sebelum tulis (anchor checkpoint lama masih valid). Hasil: modal
+  provider ber-tab ARIA `[Provider|Akun]` (keyboard panah/Home/End, roving tabindex), pemilih strategi
+  (`fill-first`|`round-robin`) + limit sticky yang hanya tampil saat round-robin, akun pindah ke tab dengan kolom
+  Prioritas (commit-on-change → `PUT /api/accounts/{id}` berisi `{priority}` SAJA, `last_used_at` tidak dikirim) dan
+  kolom "Terakhir dipakai" baca-saja, **UI discovery dihapus** (`#provModelsTable`/`#provDiscoverBtn`/`#provModelMsg` +
+  aksi kebab `discover`) TAPI `/discover` tetap dipanggil DIAM-DIAM dengan penjaga balapan dan kegagalan senyap
+  (`console.warn`, bukan menelan error — R12). KORBAN YANG DISELAMATKAN: aksi kebab `discover` tadinya satu-satunya jalur
+  masuk kartu detail → subsection pemakaian B5.5 (`usage.js`) jadi tak terjangkau; fe-dev memindahkannya ke tombol nama
+  provider (`.prov-name-btn`) — diterima PM (nol sentuh modul lain, keyboard-reachable). Combo TIDAK disentuh
+  (`combos.js:353` utuh) sesuai keputusan terkunci user. **GATE PM MANDIRI**: vitest **23 berkas / 547 tes LOLOS**
+  (baseline 523 → +24), paritas i18n 411 kunci × 7 kamus (hilang 0), `git diff --check` bersih, 14 berkas semua
+  `src/frontend/**`, 0 warna hex baru, rujukan UI discovery lama di `static/**` = 0. Default ambigu PM kunci (diterima):
+  (1) aksi kebab discover ikut dihapus, fungsi `discoverModels` + ekspor `window.aigate.discoverModels` tetap ada;
+  (2) `last_used_at===null` → teks "belum pernah"; (3) priority dikirim pada event `change`, bukan tiap ketikan;
+  (4) TIDAK ada kontrol pin `x-connection-id` di UI tahap ini; (5) CSS tab pakai token existing + cache-buster
+  `styles.css?v=20260915`. UTANG DITAHAN: 4 kunci i18n lama jadi tak terpakai (`providers.discover|no_models|model_id|
+  model_name`) → tidak di-purge (endpoint `/discover` masih dipakai diam-diam; purging = riuh 7 berkas tanpa nilai tes) —
+  user boleh cabut. TEMUAN RULE TABELING: `task-report.md` minta PELAKSANA menulis laporannya sendiri, tapi akar tulis
+  `fe-dev` dibatasi `src/frontend/**` oleh `agent-boundaries.md` → laporan ditulis PM dari receipt; dua rule bertabrakan,
+  butuh putusan user.   Insiden lingkup kecil dilaporkan jujur oleh fe-dev (sempat menyentuh komentar `app.js` lalu dibatalkan)
+  → diverifikasi PM, nol dampak, TIDAK dibuatkan rule baru (bukan pola berulang; gate receipt+vitest sudah menangkap).
+  BELUM: exercise aplikasi nyata (G3) + muat ulang server (J6 = keputusan user) + uji mata tab di HP + push + PR #17.
+  Laporan: `.opencode/reports/20260911/implementation/0633_ui-multiakun-tahap2-implementasi.md`.
+- 2026-09-10 (GERBANG BACKEND multiakun 9router — HIJAU): user perintah eksplisit "review a237414 lalu
+  jalankan suite, jangan ke fe-dev sebelum hijau" → izin edit backend tersirat. Review per-file: kontrak
+  PM-kunci COCOK semua (kolom/migrasi/urutan/sticky/limit-dari-kolom/last_used_at/legacy fallback; nol
+  sentuh Combo+discovery+FE; nol SQL-format). 1 defect nyata ketahuan: kredensial KOSONG (`api_key=""`)
+  lolos sebagai "usable" → engine kini skip (03d9b6e). 28 tes mesin routing ditulis (belum ada sama sekali).
+  Suite awal 4 failed/494 passed → 4 merah TERBUKTI pre-existing (reproduksi identik di baseline c3a2241
+  via worktree; milik pekerjaan anthropic-inbound/cli-compat: R12 except-kosong cli_compat + claude
+  VERIFIED tanpa builder in-app = gap NYATA) → dibersihkan TERPISAH f986d51 (builder claude sungguhan,
+  form claude.sh:64-83; spawn live belum di-exercise). Final: **526 passed, 1 skipped, 0 failed**.
+  Default ambigu yang PM ambil (dicatat, user boleh veto): (1) pre-existing merah IKUT dibetihin karena
+  gerbang user minta "hijau" dan scope-nya be-dev; (2) strategi tak dikenal di DB lama = fail-safe
+  fill-first (bukan error); (3) `PUT /api/accounts/{id}` (hanya `priority`) diakui sebagai tambahan
+  kontrak — perlu biar priority bisa ditulis; (4) header pin diabaikan untuk combo (sesuai teks kontrak).
+  Kontrak tahap-1 RESMI: `.opencode/reports/20260910/qa/1351_backend-gate-multiakun-9router.md`.
+  Commit lokal `refactor/ui`: 03d9b6e + f986d51, TIDAK push. **STATUS: TUNGGU ACC user → tahap2 fe-dev.**
 - 2026-09-10 (MERGE main + PR #17): user "ok" -> `origin/main` digabung ke `refactor/ui`. Bentrok 4 berkas
   (`OPERATING_RULES.md`, `memory-bank.md`, `state.md`, `status.md`) diselesaiin dengan kebijakan:
   **v2 + arsip aktif menang, salinan versi main diarsipin** — diverifikasi **0 baris konten ilang**
@@ -93,6 +220,89 @@
 
 ## Progress
 [entri lama dipindah ke `documents/pm/archive/memory-bank-progress-lama.md` — tidak dihapus]
+- 2026-09-11: **PUSH SELESAI + PR #18 TERBUKA (refactor/ui -> main).** "rapikan, commit, push, & pr": 6 rujukan path mati
+  `docs/...`→`documents/...` dibersihkan 3 agen (analisis/arsitektur/bisnis) + folder hantu `docs/` di root dihapus →
+  commit `6e3cf3f` → push dengan token dari `.env` (nol nilai dicetak) → **PR #18** 23 commit / 57 berkas / +7.251 −467,
+  `mergeable_state: clean`, label `documentation`+`enhancement`: https://github.com/fadhly-permata/AI-Gate/pull/18.
+  KOREKSI: catatan lama "PR #17 masih terbuka" sudah tidak benar — **#17 sudah di-MERGE** (`main = 000663b`); PR #18
+  sekarang menaungi seluruh fitur akun ganda (backend + layar), ikon yang dilokalkan, ADR-015, dan perapian dokumen.
+  UTANG BARU yang ketahuan: gerbang `rules-index.py` tidak memeriksa `documents/analysis|architecture|business/**`
+  (sebab rujukan hantu bertahan) — usulan perluasan belum ditugaskan. Menunggu user: review + merge PR #18, uji mata
+  (tombol Ubah, modal dua mode, mode pesawat → ikon tetap muncul).
+  Laporan: `.opencode/reports/20260911/docs/1935_rapikan-path-push-pr18.md`.
+- 2026-09-11: **TAHAP 5+6 SELESAI — akun bisa DIUBAH, ikon Font Awesome jadi LOKAL, label menu jadi "Kelola akun".**
+  Rantai: user tanya kenapa tidak ada tombol edit → ternyata API hanya menerima `priority` → be-dev perluas `PUT /api/accounts/{id}`
+  (parsial `label|api_key|enabled|priority`, `auth_type`/`last_used_at` tetap milik mesin, 400 `oauth_account_key_readonly`,
+  log tanpa nilai rahasia) → gate PM **537/1skip/0fail** → fe-dev pasang `.acc-edit` + `#accModal` dua mode (oauth: kolom kunci
+  disembunyikan) → 602 tes. Lalu user minta semua aset font/ikon dilokal­kan → FA 6.5.1 di-vendor dari branch `docs/wiki`
+  (`git restore --source`, 5 berkas 409.388 B, hash PM cocokkan 5/5), `index.html:43` relatif, grep CDN = 0, guard baru
+  `tests/vendor_assets.test.js` (7 tes, ketajaman dibuktikan dengan sabotase sementara). Label EN "Alternative/secondary
+  accounts" yang dikira user itu contoh = nilai kamus EN (aplikasi sedang berbahasa Inggris) → diganti "Kelola akun"/"Manage
+  accounts" di 7 kamus, kunci tetap. Dokumen yang masih menulis "via CDN" ikut dibetulkan: TSD + **ADR-015** (`b256064`),
+  FSD 321 + kebutuhan offline terbukti (`bb759e4`), THIRD_PARTY_NOTICES §2 + provenance jujur (`15862bf`).
+  Gate akhir PM: vitest **25 berkas / 609 tes LOLOS**, paritas 436 × 7, `git diff --check` bersih. Commit `eea7504` `19df593`
+  `15862bf` `b256064` `bb759e4` — ahead 19, BELUM push. WL.5 dicentang; WL.4 diperluas ke provenance FA.
+  MENUNGGU USER: muat ulang halaman + uji mata (termasuk mode pesawat → ikon harus tetap muncul), push, PR #17.
+  Laporan: `.opencode/reports/20260911/implementation/1850_ubah-ikon-lokal-label-tahap5-6.md`.
+- 2026-09-11: **TAHAP 4 TERPASANG — akses halaman rinci lewat menu ⋮ "Akun alternatif/sekunder", klik nama DIMATIKAN.**
+  User menentukan sendiri bentuk+nama+letak (D6 terpenuhi oleh user). 13 berkas `src/frontend/**` (+63/−55): nama kembali
+  teks polos (0 sisa `.prov-name-btn` + listener delegasi dihapus), ⋮ = akun|ubah|hapus pakai infrastruktur menu yang sudah ada
+  (tetap satu tombol ⋮), ikon `fa-users` dibuktikan ada di FA Free 6.5.1 ter-load, +1 kunci i18n ×7 (429), cache-buster
+  `20260917`, tes + e2e disesuaikan plus penjaga negatif. Gate PM mandiri: vitest **24/586 LOLOS identik baseline**, paritas
+  429 hilang 0 thừa 0, 0 hex baru, diff-check bersih. Menunggu: uji mata user (cukup muat ulang halaman, tanpa restart server),
+  push (ahead 10), PR #17. Temuan luar cakupan: Font Awesome masih CDN (WL.5) — **ditutup di TAHAP 5+6 (lihat atas)**.
+- 2026-09-11: **TAHAP 3 Opsi A TERPASANG — gate HIJAU (24 berkas / 586 tes).** Proses: koreksi user → rule D6 →
+  lembar desain ACC dulu → baru fe-dev 1 putaran tanpa blocker. View `provider-detail` (tanpa entri nav) + 4 kartu
+  satu kolom + modal akun + prioritas ▲▼ (PUT hanya yang berubah, selalu baca ulang) + discovery dengan baris status;
+  tab tahap-2 & 10 kunci i18n mati dibongkar bersih (0 sisa), 27 kunci baru (428 × 7 kamus), bonus tambalan
+  `.form-row[hidden]`. `usage.js`/`combos.js`/`src/backend/**` nol sentuh. Commit `6ede872` + dokumen, ahead 8 BELUM push.
+  MENUNGGU USER: muat ulang server + uji mata di HP (G3), push, PR #17.
+  Laporan: `.opencode/reports/20260911/implementation/1100_ui-halaman-rinci-penyedia-tahap3.md`.
+- 2026-09-11: **TAHAP 2 UI multiakun 9router SELESAI — HIJAU di tingkat tes.** fe-dev spawned (reuse agen+skill), 2 putaran.
+  Modal provider ber-tab ARIA (Provider|Akun) + pemilih strategi + limit sticky kondisional + kolom Prioritas/Last-used di
+  tab akun; UI discovery dihapus, `/discover` jalan diam-diam; jalur masuk kartu detail pindah ke tombol nama. Combo &
+  backend nol sentuh. Gate PM: vitest 23 berkas/**547 tes** LOLOS (+24 dari baseline 523), paritas i18n 411×7, diff-check
+  bersih, 14 berkas semua `src/frontend/**`. e2e `b5_features.mjs` disesuaikan (belum dijalankan — nol browser).
+  MENUNGGU USER: muat ulang server + uji mata di HP (G3), keputusan push, review PR #17.
+  Laporan: `.opencode/reports/20260911/implementation/0633_ui-multiakun-tahap2-implementasi.md`.
+- 2026-09-10: **GERBANG BACKEND multiakun 9router SELESAI — HIJAU.** Review a237414 beres (kontrak cocok;
+  defect "skip kredensial kosong" diperbaiki), 28 tes mesin routing BARUS, 4 merah pre-existing dibersihkan
+  terpisah (termasuk builder claude in-app yang sebelumnya cuma klaim verified). Suite penuh
+  `python3 -m pytest tests/backend -q` = 526 passed / 1 skipped / 0 failed. Commit lokal 03d9b6e + f986d51
+  (belum push). Kontrak tahap-1 + tabel temuan: laporan `1351_backend-gate-multiakun-9router.md`.
+  MENUNGGU ACC user untuk tahap2 fe-dev (modal ber-tab + discovery diam-diam). BELUM: exercise nyata
+  (gateway live/DB nyata/spawn claude).
+- 2026-09-10: **BANNER TUJUAN HALAMAN — Fase 0+1 SELESAI, TUNGGU USER.** User minta banner "tujuan halaman"
+  di semua halaman KECUALI home + terminal; teks bakal dikasih user per halaman (belum dikasih → dilarang
+  karang). PM inventarisasi read-only (nol sub-agent, nol perubahan src): SPA 1 berkas
+  `src/frontend/static/index.html`, 10 view = `<section data-view>` di-switch `showView()` (app.js:144),
+  tanpa route URL. Home=`welcome` (:164, bukti is-active awal + fallback app.js:146 + init :1833),
+  terminal (:676, flex penuh styles.css:1048) → dikecualikan. Target 8: settings :174, providers :274,
+  combos :406, proxies :433, endpoints :460, usage :488, analytics :580, cli :756. **Usulan Opsi B** (rekom):
+  blok `.page-banner` anak pertama tiap section + kunci i18n `page_desc.<view>` di 7 kamus (parity guard
+  i18n.test.js:81 maksa lengkap), nol JS, nol sentuh app.js. Opsi A (banner tunggal + hook showView)
+  ditolak: sentuh sentral + risiko layout terminal + teks tetep harus ke i18n. Default ambigu: teks user
+  disalin ke 7 locale s/d diterjemah (fallback cuma ke en — i18n.js:57-62), 1 banner per view walau
+  multi-kartu (cli+heal, usage, analytics), judul lama tetap. LAPORAN:
+  `.opencode/reports/20260910/research/0324_banner-halaman-inventarisasi-proposal.md`. NEXT: user isi
+  teks 1–8 + ACC opsi → baru turun fe-dev (scope `src/frontend/**`).
+- 2026-09-10 (BANNER, FASE 2): user CABUT asumsi "teks dari user" → "ya justru itu, buatin dong teksnya"
+  = tim yang draf. PM baca penuh 8 section + JS + model backend → 8 draf banner ID (satu kalimat,
+  ≤140 char, tiap klaim berbukti `file:line`; angka preset CLI 24 sengaja tidak disebut biar tidak basi).
+  TEMUAN: `.opencode/skills/aigatedoc-copywriting-skill/` TIDAK ADA (ls skills = 8 direktori lain; grep
+  `aigatedoc` dokumen+config+README = 0) → gaya suara dari `language.md` + mikrocopy `i18n/id.js`
+  (istilah baku: Penyedia, Kombo, Pool Proxy, Endpoint, Pengaturan, Pemakaian & Kuota, Analitik, Alat CLI).
+  Rencana: 8 kunci `page_desc.<view>` masuk SERENTAK ke 7 kamus (parity guard i18n.test.js:81 aman).
+  Rekom urutan: opsi A — ACC Indonesia dulu → translate 6 bahasa → fe-dev sekali jalan.
+  Laporan: `.opencode/reports/20260910/research/0338_banner-copy-draft.md`. TUNGGU ACC draf + opsi A.
+- 2026-09-10 (BANNER, FASE 3 — SELESAI + DI-COMMIT): user "oke kerjain" → fe-dev (reuse) spawned via
+  `opencode run --agent fe-dev`, 1 putaran, receipt diterima. Hasil: 8 blok `.page-banner` anak pertama
+  (index.html :175/:280/:417/:449/:481/:514/:611/:792), welcome+terminal bersih, CSS :458-490 (token
+  existing), 56 entri `page_desc.*` di 7 kamus (400 kunci/kamus). Gate PM: vitest 23/523 HIJAU (= baseline),
+  render-check jsdom pakai applyLocale ASLI 7/7 locale LULUS, glyph fa-circle-info terbukti di FA 6.5.1
+  ter-load. **COMMIT `a9c7f3b`** (refactor/ui, TIDAK push — nunggu perintah user; PR #17 masih open).
+  Browser nyata mustahil di Termux → user wajib tes mata (visual + HP scroll). Sisa: review penutur utk
+  6 terjemahan; opsi banner settings 540px. Laporan: 0405_banner-halaman-implementasi.md.
 - 2026-09-09: **Bottom-nav ponsel dirapikan (hamburger-ilang + scroll + mirror 9 view + Repo + separator grup) — SELESAI (fe-dev, 3 iterasi; DI-COMMIT 6fb210b + docs 26b087d, pushed, PR #14 open).** User lapor beruntun: (1) hamburger hide/show nge-bug di potret → ilangin; (2) menu bawah gak bisa diakses banyak → "masih gak bisa digeser / ada item di-hidden?"; (3) "tambahin link Repo + separator tiap grup". Temuan kunci: `.bottom-nav` dulu cuma 7 dari 9 view menu samping (usage+analytics gak pernah ke-render), BUKAN masalah scroll doang. Fix final (`src/frontend/**`): `#sidebarToggle{display:none}` dua shell phone; `.bottom-nav` `overflow-x:auto`+`justify-content:flex-start`+momentum; `.bn-item` `min-width:60px`; bottom-nav sekarang 9 app-view (urut spt sidebar) + 1 link Repo (no data-view → link eksternal asli) = 10 item + 4 `<span class="bn-sep">` di batas grup (Gateway|Operasi|Wawasan|Sistem|Repo); rule `.bn-sep` token `--panel-border`; cache-buster `styles.css?v=20260914`. Tablet/desktop gak kena (bottom-nav `display:none` di >600px; hamburger utuh). app.js/i18n.js GAK diubah (wiring generik + key udah ada). Verifikasi PM: `views.test.js` **25 pass** (paritas 9-view + repo-hadir + sep=4 + scroll=10 + hamburger-hidden), `git diff --check` bersih. ⚠️ **Scroll browser-asli UNVERIFIED** (no browser; jsdom gak ngukur layout) → user WAJIB tes manual di HP (R20). **TASK SUSULAN (terbuka):** suite FE penuh merah 22 fail `localStorage`/`sessionStorage` (logwindow+terminal_discard) = PRE-EXISTING/LINGKUNGAN (dibuktikan via git stash; npm ci vitest2.1.9+jsdom25.0.1), BUKAN efek perubahan → perlu qa/fe-dev benerin env tes. Detail per-file: `documents/dev/CODE_CHANGES.md` 2026-09-09 (+lanjutan).
 - 2026-09-09: **CLI Compat catalog + `cli tools` view — DONE (branch `setup/cli-tools`).** Katalog kompatibilitas per-tool × per-platform (24 tool) di `src/backend/cli_compat.py` (`CLI_COMPAT`); endpoint `GET /api/cli-tools` kini balik `current_platform` + `compat` per tool; frontend `clitools.js` render 4 badge platform (sorot platform saat ini) + warning merah bila status ∈ {broken, no_install, not_a_cli, not_wired}. Mirror `documents/pm/cli-tools-compatibility.md`. Verifikasi: py_compile + `list_cli_tools()` end-to-end (`current_platform=termux`, claude termux=`broken`) + i18n parity 7 locale hijau. Stretch print-di-script di-skip. Belum di-push (user test Windows/Linux).
 - 2026-09-09: **Anthropic `/v1/messages` inbound — DONE + DI-COMMIT + DI-MERGE KE `setup/cli-tools` (5 commit `253aae5`/`bb3b6c9`/`7f330a1`/`4986adc`/`41d24f8`, branch `feat/anthropic-inbound`).** aigate serve Anthropic-compatible `POST /v1/messages` **native** (tanpa litellm) supaya `claude-code` pakai `ANTHROPIC_BASE_URL=<aigate>/v1/messages`. Keputusan (dari `documents/architecture/anthropic-inbound-endpoint.md`): bare model id → `resolve_target` (reuse `_resolve_bare_model`, no static map); Stage 1 **non-streaming** (`stream:true`→400 `anthropic_streaming_unsupported`); **tools passthrough** (Anthropic↔OpenAI, bukan 400; extended-thinking/`cache_control` = future phase); auth terima **`Bearer` ATAU `x-api-key`** (terbuka spt chat/responses, client `x-api-key` tak diteruskan upstream). Translator baru: `anthropic_messages_request_to_openai_chat` (translator.py:630) + `openai_chat_response_to_anthropic_messages` (translator.py:718) + `AnthropicMessagesRequest` (translator.py:828) + helper inbound + extend `_translate_request_anthropic` (translator.py:183) forward tools. Router: `messages_completions` (router.py:500) + `_handle_anthropic_messages` (router.py:549) + sibling `/v1/messages/count_tokens` (router.py:658) + `/api/event_logging/batch` stub (router.py:696). `cli_presets` claude flip `LAUNCH_UNSUPPORTED`→`LAUNCH_VERIFIED` (cli_presets.py:171). `claude.sh` SUDAH di-rewire ke aigate (tanpa litellm). **QA LULUS** (`.opencode/reports/qa_anthropic_inbound_verification.md`): py_compile bersih, 11/11 pure test passed, 0 regression translator (17/17), R25 LULUS, R12 LULUS (0 `except:pass`). 9 route-level test gagal eksekusi murni env mismatch `httpx 0.28.1` vs `starlette 0.27.0` (pre-existing, BUKAN regression). Open: selaraskan `httpx<0.28` di `pyproject.toml` lalu jalanin `pytest tests/backend/test_anthropic_messages.py` di env user (R20) — belum dikerjakan.
