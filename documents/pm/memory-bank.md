@@ -4,6 +4,21 @@
 (empty — diisi PM saat task pertama)
 
 ## Decisions
+- 2026-09-11 (PUSH + **PR #18**, dan koreksi catatan PM sendiri): user "rapikan, commit, push, & pr".
+  RAPIKAN = 3 agen per akar tulisnya (system-analyst/tech-architect/business-analyst) membersihkan rujukan path mati
+  `docs/...` → `documents/...` (6 rujukan aktif diperbaiki + 8 nama usulan di arsip dipasangkan lewat blok catatan,
+  bukan ditulis-ulang; folder hantu `docs/` di root yang terbukti kosong di-`rmdir`). commit `6e3cf3f`.
+  PUSH pakai `$GITHUB_TOKEN` dari `.env` lewat helper inline sekali-pakai (nol pencetakan nilai, nol penulisan ke disk) →
+  sinkron `0 0`. **PR #18** `refactor/ui -> main`: 23 commit / 57 berkas / +7.251 −467, `mergeable_state: clean`,
+  label `documentation`+`enhancement` → https://github.com/fadhly-permata/AI-Gate/pull/18.
+  DUA PELAJARAN PROSES yang dicatat permanen: (1) **catatan PM sendiri bisa basi dan menyesatkan sesi berikutnya** —
+  `"PR #17 masih terbuka"` ditulis berulang di state/memory-bank padahal #17 SUDAH DI-MERGE (`main = 000663b`; #12 juga
+  merged); diverifikasi API + `git fetch`. Kebiasaan baru: **status PR/dunia luar dicek ulang lewat API sebelum dikutip**,
+  jangan mengutip memori sesi. (2) **Gerbang buta oleh lingkupnya sendiri**: `rules-index.py:120-124` hanya memindai
+  `OPERATING_RULES.md` + `.opencode/rules/*.md`, jadi `documents/analysis|architecture|business/**` TIDAK pernah diperiksa —
+  itu sebab rujukan hantu bertahan bertahun padahal gerbang selalu "LOLOS". Usulan (belum ditugaskan): perluas gerbang ke
+  `documents/**`, supaya kelas kesalahan ini tidak bisa kembali.
+  Gotcha API: field `labels` pada payload create PR TIDAK menempel → pasang via `POST /issues/N/labels` lalu verifikasi.
 - 2026-09-11 (TAHAP 5+6 — ubah akun, ikon dilokalkan, label menu): satu pesan user memuat tiga permintaan:
   "localin aja semua aset font atau icon" + "kenapa teks menunya 'Alternative/secondary accounts' itu kan cuma contoh,
   ganti jadi yang lebih representatif" + "kok gak ada tombol edit ya di daftar secondary account? cuma ada delete doang".
@@ -35,7 +50,7 @@
   kutipan `LICENSE.txt` per baris + provenance diakui jujur (`15862bf`, fullstack-dev — berkas root, di luar akar agen lain).
   Gate PM akhir MANDIRI: vitest **25 berkas / 609 tes LOLOS**, paritas 436 × 7 kamus (hilang 0 thừa 0 kosong 0), hash vendor 5/5.
   KOREKSI UNTUK ENTRI DI ATAS/SEBELUMNYA di berkas ini: pernyataan "Font Awesome masih dari CDN cloudflare (index.html:42)"
-  dan "temuan luar cakupan WL.5" **SUDANG TERTUTUP** hari ini; baris kini `:43`. `documents/plan/wiki-backlog.md` WL.5 dicentang,
+  dan "temuan luar cakupan WL.5" **SUDAH TERTUTUP** hari ini; baris kini `:43`. `documents/plan/wiki-backlog.md` WL.5 dicentang,
   WL.4 DIPERLUAS mencakup provenance Font Awesome. Supersede kontrak tahap-1: laporan `1351` baris 81 ("PUT accounts HANYA
   priority") sudah digantikan laporan `1850` (berkas laporan lama tidak diedit = arsip titik-waktu).
   BELUM: exercise nyata + uji mata offline (G3); e2e belum dijalankan; terjemahan belum ditinjau penutur; ahead 19 BELUM push; PR #17 open.
@@ -205,6 +220,16 @@
 
 ## Progress
 [entri lama dipindah ke `documents/pm/archive/memory-bank-progress-lama.md` — tidak dihapus]
+- 2026-09-11: **PUSH SELESAI + PR #18 TERBUKA (refactor/ui -> main).** "rapikan, commit, push, & pr": 6 rujukan path mati
+  `docs/...`→`documents/...` dibersihkan 3 agen (analisis/arsitektur/bisnis) + folder hantu `docs/` di root dihapus →
+  commit `6e3cf3f` → push dengan token dari `.env` (nol nilai dicetak) → **PR #18** 23 commit / 57 berkas / +7.251 −467,
+  `mergeable_state: clean`, label `documentation`+`enhancement`: https://github.com/fadhly-permata/AI-Gate/pull/18.
+  KOREKSI: catatan lama "PR #17 masih terbuka" sudah tidak benar — **#17 sudah di-MERGE** (`main = 000663b`); PR #18
+  sekarang menaungi seluruh fitur akun ganda (backend + layar), ikon yang dilokalkan, ADR-015, dan perapian dokumen.
+  UTANG BARU yang ketahuan: gerbang `rules-index.py` tidak memeriksa `documents/analysis|architecture|business/**`
+  (sebab rujukan hantu bertahan) — usulan perluasan belum ditugaskan. Menunggu user: review + merge PR #18, uji mata
+  (tombol Ubah, modal dua mode, mode pesawat → ikon tetap muncul).
+  Laporan: `.opencode/reports/20260911/docs/1935_rapikan-path-push-pr18.md`.
 - 2026-09-11: **TAHAP 5+6 SELESAI — akun bisa DIUBAH, ikon Font Awesome jadi LOKAL, label menu jadi "Kelola akun".**
   Rantai: user tanya kenapa tidak ada tombol edit → ternyata API hanya menerima `priority` → be-dev perluas `PUT /api/accounts/{id}`
   (parsial `label|api_key|enabled|priority`, `auth_type`/`last_used_at` tetap milik mesin, 400 `oauth_account_key_readonly`,

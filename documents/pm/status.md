@@ -2,6 +2,38 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260911-1935 — "rapikan, commit, push, & pr": 3 agen rapikan rujukan path → `6e3cf3f` → PUSH → **PR #18 TERBUKA** (ProjectManager)
+- Perintah user 4 aksi. Mode sekuensial (tercatat) → tiga agen docs dijalankan berurutan per akar tulis, PM tidak menulis berkas agen lain.
+- RAPIKAN (rujukan path mati `docs/...` → `documents/...`; folder `docs/` memang tidak ada):
+  `system-analyst` (`ses_f6f916c59ffe...`) → `documents/analysis/**`: 6 rujukan MATI diperbaiki (`FSD.md:7,19,473`, `ERD.md:6×2,405`),
+  nomor bagian `FSD.md:279` → `PRD §6` (isi terbukti cocok), `FSD.md:21` dieksplisitkan; 8 nama path usulan di
+  `2026-09-10-rules-consolidation.md` TIDAK ditulis-ulang (arsip = rekaman sensus) → dipasangkan ke lokasi nyata lewat blok
+  "Catatan status & lokasi nyata"; traceability 44 ID `US-2.x.y` FSD↔BRD dicek cocok. ·
+  `tech-architect` (`ses_f6f7f1800ffe...`) → `TSD.md:6,7,412,416`; sensus sisanya NIHIL (semua path lain diverifikasi ADA;
+  URL vendor eksternal + nama branch `docs/wiki` sengaja tak disentuh). ·
+  `business-analyst` (`ses_f6f7ce13dffe...`) → `BRD.md:278`; sensus `documents/business/**` = 1 berkas, temuan lain NIHIL
+  (`/models`, `http://localhost:8080/v1`, `aigate/self-heal-*` = endpoint/URL/nama branch).
+- PM: folder hantu `docs/` di root terbukti kosong (0 berkas, untracked) → `rmdir`. Verifikasi silang: grep
+  `docs/business|docs/analysis|docs/architecture` pada berkas HIDUP = 0; `rules-index.py` exit 0 (`live_paths: tidak ada`).
+- **TEMUAN GERBANG (utang baru, belum ditugaskan):** `rules-index.py:120-124` hanya memindai `OPERATING_RULES.md` +
+  `.opencode/rules/*.md` → `documents/analysis|architecture|business/**` TIDAK diperiksa. INILAH sebab rujukan hantu
+  bisa lolos bertahun. Usulan: perluas gerbang (pekerjaan tersendiri).
+- COMMIT `6e3cf3f` (5 berkas dokumen, satu concern). Lalu **PUSH** `94df101..6e3cf3f refactor/ui -> refactor/ui`
+  dengan `$GITHUB_TOKEN` dari `.env` lewat `git -c credential.helper='!f(){...}'` — nilai tidak dicetak, tidak ditulis ke disk;
+  sinkron diverifikasi `origin/refactor/ui...refactor/ui = 0 0`.
+- **PR #18 TERBUKA** https://github.com/fadhly-permata/AI-Gate/pull/18 · `refactor/ui -> main` · 23 commit / 57 berkas /
+  **+7.251 −467** · `mergeable: True`, `mergeable_state: clean` · label `documentation` + `enhancement`
+  (CATATAN: field `labels` pada payload create PR TIDAK menempel → dipasang via `POST /issues/18/labels`, lalu diverifikasi).
+  Tubuh PR memuat tabel gerbang nyata (pytest 537/1skip, vitest 25/609, paritas 436×7, rules-index LOLOS) + daftar jujur
+  "belum diverifikasi" (exercise nyata, e2e, penutur terjemahan, provenance Font Awesome).
+- **KOREKSI FAKTA PENTING (melawan catatan PM sendiri):** `"PR #17 masih terbuka"` yang ditulis berulang di state/memory-bank
+  SUDAH TIDAK AKURAT — **#17 DI-MERGE** (`main = 000663b "Merge pull request #17"`, dan `195a1fa` PR #12), dibuktikan
+  `GET /pulls/17` (`state: closed, merged: True`) + `git fetch`. Blok lama dibiarkan utuh (arsip titik-waktu); kebenaran
+  tercatat di blok ini + state.md.
+- BELUM / NEXT: review + merge PR #18 oleh user; uji mata (tombol Ubah, modal dua mode, **mode pesawat → ikon tetap muncul**) = G3;
+  usulan perluasan gerbang `rules-index.py`; `WL.4` (provenance xterm.js + Font Awesome) masih terbuka.
+- Laporan: `.opencode/reports/20260911/docs/1935_rapikan-path-push-pr18.md`.
+
 ## 20260911-1855 — TAHAP 5+6: ubah akun + ikon dilokalkan + label menu (be-dev, fe-dev ×2, fullstack-dev, tech-architect, system-analyst) — gate HIJAU (ProjectManager)
 - Satu pesan user memuat 3 permintaan: "localin aja semua aset font atau icon" · "kenapa teks menunya 'Alternative/secondary
   accounts' itu kan cuma contoh. ganti jadi yang lebih representatif dong" · "kok gak ada tombol edit ya di daftar secondary
