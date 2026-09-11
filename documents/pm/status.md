@@ -2,6 +2,30 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260911-2155 — Ruling user: laporan = HANYA PM · provenance aset terverifikasi · PROSES HIDUP masih kode LAMA (ProjectManager)
+- Ruling user (pertanyaan tabrakan rule): **"Tetap, cuma PM yang boleh nulis report."** → ditulis nyata:
+  `.opencode/rules/task-report.md` (ownership dibalik: spesialis mengembalikan receipt di sesi; PM yang menyusun laporan
+  dari receipt + verifikasi sendiri; dilarang melebarkan akar tulis agen "demi laporan") + `OPERATING_RULES.md` B3 diperjelas.
+  commit `dd2f51d`. Gate `rules-index.py` LOLOS (53 rule/10 tema). Tabrakan rule task-report vs agent-boundaries = SELESAI.
+- Provenance (user: "boleh"): PM mengunduh tarball RESMI lalu membuang file sementara; pencocokan sha256 per berkas:
+  `@fortawesome/fontawesome-free@6.5.1` = 5/5 identik (tarball 4.951.025 B, sha512+sha1 cocok metadata registry);
+  `xterm@5.3.0` (`lib/xterm.js` 283.404 B + `css/xterm.css` 5.383 B) dan `xterm-addon-fit@0.8.0` (1.503 B) = 3/3 identik
+  → xterm yang selama ini TANPA catatan versi kini teridentifikasi pasti (buktinya hash, bukan string `version="6"` di dalam file).
+  Dicatat + diberi tanggal oleh fullstack-dev (`ses_f6f0013b8ffe...`) di `THIRD_PARTY_NOTICES.md` §1–§2, commit `8a85435`.
+  SISA JELAS: teks lisensi MIT xterm belum disimpan sebagai berkas di folder vendor + belum di-diff per-baris; usulan manifest
+  `PROVENANCE.txt` per folder vendor (wilayah fe-dev) — `WL.4` dijadikan `[~]` (sebagian), bukan ditutup.
+- **TEMUAN PALING PENTING untuk user ("apa masih perlu restart?"): YA — tapi bukan untuk tampilan, untuk APInya.**
+  Bukti terukur dari proses yang SEDANG jalan (`python run.py`, PID 15400):
+  · `GET /` (statis dibaca dari berkas per permintaan) = SUDAH baru: `data-view="provider-detail"` 1×, `accModal` 5×,
+    `vendor/font-awesome/css/all.min.css` 1×, `v=20260919` 4× — sama persis dengan isi berkas di disk.
+  · `GET /openapi.json` (skema dibuat dari modul Python yang TERPASANG di memori) = `AccountUpdate: ['priority']`,
+    padahal `src/backend/accounts_router.py` di disk punya 4 field (`priority/label/api_key/enabled`, baris 17-21 potonganku).
+  → artinya tombol "Ubah akun" di layar yang sudah terlihat **belum tentu tersimpan** selama server lama belum dimuat ulang:
+  field ekstra diabaikan Pydantic v1 (bukan error) → suntingan bisa tampak "sukses" lalu nilainya balik lagi.
+  PM TIDAK menyentuh proses (aturan restart = hak user). Catatan: `ps -o lstart` di Termux mengembalikan waktu acak
+  (1970) jadi tidak bisa dipakai untuk adu waktu-ubah-berkas; bukti yang sah = selisih skema `/openapi.json` vs kode di disk.
+- Peta sisa pekerjaan user-side ditulis di balasan PM (restart → tes ubah akun + mode pesawat → review/merge PR #18 → putuskan 4 item terbuka).
+
 ## 20260911-1950 — KOREKSI DIRI: klaim "aturan A11/A12 sudah dicatat" ternyata belum tertulis (ProjectManager)
 - Fakta: blok 19:35 di berkas ini + laporan `1935_rapikan-path-push-pr18.md` menulis A11/A12 "sudah dicatat" dan gerbang
   "52 rule". Verifikasi setelahnya: `grep "^A1[12]" documents/pm/OPERATING_RULES.md` = KOSONG, `AGENTS.md` tanpa butir 13,

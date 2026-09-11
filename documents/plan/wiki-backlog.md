@@ -69,10 +69,19 @@ dan WL.2a baru boleh dikerjakan.
 - [ ] **WL.3** REVIEW LISensi — "dulu/sementara" dari user. Pemicu review: (a) sebelum rilis publik
       pertama, (b) sebelum kontribusi orang lain masuk, (c) kalau ada yang mulai ngomersialkan klon.
       Catat: salinan MIT yang sudah tersebar tidak bisa ditarik balik.
-- [ ] **WL.4** Pin versi xterm.js yang di-vendor (sekarang TIDAK tercatat di repo — provenance gap)
+- [~] **WL.4** Pin versi xterm.js yang di-vendor (sekarang TIDAK tercatat di repo — provenance gap)
       dan simpan salinan teks lisensi upstream di folder vendor.
       PERLUAS 2026-09-11: berlaku juga untuk Font Awesome 6.5.1 — nomor versi HANYA dari string header CSS internal,
       belum diverifikasi terhadap artefak rilis upstream (diakui jujur di `THIRD_PARTY_NOTICES.md` §2, commit `15862bf`).
+      **SEBAGIAN BESAR SELESAI 2026-09-11 (keputusan user: "boleh" untuk telusuri sumber resmi):**
+      versi xterm.js + Font Awesome kini **terverifikasi terhadap artefak rilis** — pencocokan sha256 per berkas
+      ke tarball resmi npm, bukan lagi tebakan dari string internal:
+      `xterm@5.3.0` (`lib/xterm.js` 283.404 B, `css/xterm.css` 5.383 B), `xterm-addon-fit@0.8.0` (1.503 B),
+      `@fortawesome/fontawesome-free@6.5.1` (5/5 berkas identik; tarball 4.951.025 B, sha512+sha1 registry cocok).
+      Semua tercatat + bertanggal di `THIRD_PARTY_NOTICES.md` §1–§2.
+      SISA (tetap terbuka, makanya `[~]`): (a) teks lisensi upstream xterm BELUM disimpan sebagai berkas di
+      `static/vendor/xterm/` (baru Font Awesome yang punya `LICENSE.txt`) dan belum di-diff per-baris vs isi tarball;
+      (b) usulan manifest `PROVENANCE.txt` per folder vendor supaya bukti nempel ke artefaknya, bukan cuma ke dokumen root.
 - [x] **WL.5** ⚠️ Font Awesome dimuat dari CDN Cloudflare (`index.html:42`) padahal xterm sengaja
       di-vendor biar offline-safe → icons mati tanpa internet + ada request keluar ke pihak ketiga,
       bertentangan dengan klaim privasi di README/wiki. BUTUH KEPUTUSAN user: vendor lokal / ganti

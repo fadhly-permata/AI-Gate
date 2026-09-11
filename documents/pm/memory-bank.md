@@ -4,6 +4,17 @@
 (empty — diisi PM saat task pertama)
 
 ## Decisions
+- 2026-09-11 (RULING user soal tabrakan rule + provenance + fakta proses lama): (1) **"Tetap, cuma PM yang boleh nulis
+  report."** → aturan lama "siapa yang mengerjakan menulis laporannya sendiri" DICABUT dari `.opencode/rules/task-report.md`
+  + B3 dipertegas; spesialis = receipt di sesi, PM = laporan. Tabrakan task-report vs agent-boundaries beres, permanen.
+  (2) Provenance aset dicek ke artefak resmi (user "boleh"): FA 6.5.1 5/5 identik + xterm teridentifikasi **5.3.0**
+  (+ addon-fit 0.8.0) lewat sha256 vs tarball npm — bukan lagi tebakan dari string internal; dicatat bertanggal di
+  `THIRD_PARTY_NOTICES.md`. Sisa: teks MIT xterm belum di-vendor/di-diff; usulan `PROVENANCE.txt` per folder vendor;
+  WL.4 jadi `[~]`. (3) **Bukti proses hidup masih kode lama**: `/openapi.json` dari port 8080 = `AccountUpdate ['priority']`
+  sedangkan disk punya 4 field → fitur "Ubah akun" baru benar-benar berfungsi setelah user memuat ulang server; tampilan
+  tidak butuh restart (statis dibaca per permintaan). Kebiasaan baru PM: klaim "sudah terpasang" wajib disertai pembedaan
+  **terpasang di disk vs terpasang di proses**.
+
 - 2026-09-11 (PUSH + **PR #18**, dan koreksi catatan PM sendiri): user "rapikan, commit, push, & pr".
   RAPIKAN = 3 agen per akar tulisnya (system-analyst/tech-architect/business-analyst) membersihkan rujukan path mati
   `docs/...` → `documents/...` (6 rujukan aktif diperbaiki + 8 nama usulan di arsip dipasangkan lewat blok catatan,
