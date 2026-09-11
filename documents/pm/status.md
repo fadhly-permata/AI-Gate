@@ -2,7 +2,19 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
-## 20260911-0645 — PM decides wrong → user correction recorded (ProjectManager)
+## 20260911-0655 — Opsi A DIPILIH user → lembar desain diterbitkan, eksekusi DITAHAN menunggu ACC (ProjectManager)
+- Perintah user: "kita coba dulu opsi a" (halaman rinci penyedia). Rule **D6** dijalankan: belum ada satu berkas `src/**` yang disentuh.
+- Lembar desain: `documents/pm/handovers/handover-20260911-opsi-a-halaman-rinci-penyedia.md` — denah 2 layar, flow 6 langkah,
+  prioritas jadi tombol ▲/▼ (normalisasi + tukar, PUT hanya yang berubah), akun jadi kartu (tabel 6 kolom dihapus),
+  discovery tetap senyap TAPI ada baris status, daftar dihapusnya tab + 9 kunci i18n tahap-2 yang dicabut, batas tulis
+  (termasuk larangan menyentuh `usage.js`),   cakupan tes, 4 risiko yang diterima (dicatat jujur: tanpa rute URL → halaman rinci tidak bisa di-bookmark dan tombol back browser tidak berlaku).
+- Default ambigu PM kunci (user boleh veto di ACC): (1) kartu disusun satu kolom vertikal; (2) tanpa drag, cukup ▲▼;
+  (3) profil di halaman rinci bersifat baca-saja (mengubah lewat modal) supaya tidak ada dua form bersaing;
+  (4) modal profil TIDAK lagi mengirim `fallback_strategy` (strategi hanya dari Kartu B).
+- NEXT setelah ACC: spawn `fe-dev` (reuse) dengan handover = lembar desain itu + peta `file:line` realisasi `d1ff215`
+  yang harus dibongkar. Mode SEKUENSIAL (pilihan user sesi ini, `multiagent_mode: sequential`).
+
+## 20260911-0645 — PM decided wrong → user correction recorded (ProjectManager)
 
 ### Violation
 - Rule broken: tidak ada rule yang dilanggar secara harfiah — lubang Proses: `documents/pm/OPERATING_RULES.md` §D
