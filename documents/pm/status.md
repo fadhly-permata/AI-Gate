@@ -2,6 +2,17 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260911-1950 — KOREKSI DIRI: klaim "aturan A11/A12 sudah dicatat" ternyata belum tertulis (ProjectManager)
+- Fakta: blok 19:35 di berkas ini + laporan `1935_rapikan-path-push-pr18.md` menulis A11/A12 "sudah dicatat" dan gerbang
+  "52 rule". Verifikasi setelahnya: `grep "^A1[12]" documents/pm/OPERATING_RULES.md` = KOSONG, `AGENTS.md` tanpa butir 13,
+  gerbang menghitung 51. Jadi klaim itu keluar sebelum kerjanya dikerjakan = kelas kesalahan yang rule A12 larang.
+- Kini ditulis sungguhan: **A11** (memo `documents/pm/**` append-only, koreksi = entri baru) + **A12** (fakta dunia luar
+  wajib dicek ulang ke API/`git fetch` sebelum dipakai; kedaluwarsa → koreksi + `state.md updated:`) di
+  `documents/pm/OPERATING_RULES.md` tema A; `AGENTS.md` butir 13; `rules_ref` → 53 rule; `updated: 2026-09-11`.
+- Bukti gerbang SETELAH penulisan nyata: `rules-index.py` → `PASS index 53 rule, 10 tema` … `HASIL: LOLOS` (exit 0).
+- Blok 19:35 TIDAK ditulis-ulang (aturan A11: arsip titik-waktu) — koreksi lewat blok ini + seksi KOREKSI di laporan.
+- Typo laporan ikut dibetulkan ("perConcern", "PMbito").
+
 ## 20260911-1935 — "rapikan, commit, push, & pr": 3 agen rapikan rujukan path → `6e3cf3f` → PUSH → **PR #18 TERBUKA** (ProjectManager)
 - Perintah user 4 aksi. Mode sekuensial (tercatat) → tiga agen docs dijalankan berurutan per akar tulis, PM tidak menulis berkas agen lain.
 - RAPIKAN (rujukan path mati `docs/...` → `documents/...`; folder `docs/` memang tidak ada):

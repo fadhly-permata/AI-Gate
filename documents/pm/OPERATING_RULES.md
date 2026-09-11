@@ -11,6 +11,13 @@ A2 PM tidak menulis kode/test. Butuh keahlian → spawn spesialis + handover (go
 A3 Tiap agen hanya tulis di scope-nya; lintas scope = receipt ditolak. Detail roster: `.opencode/rules/agent-boundaries.md`. [R3]
 A4 Handover = ≤25 baris untuk task ≤5 file; peta `file:line` wajib; jangan minta file laporan `.md` untuk task kecil; jangan bikin FILE baru untuk mencatat (append baris boleh). [R38]
 A5 Sub-agent + skill dibuat berbarengan saat dibutuhkan, tidak pernah dihapus. Setelah generate: WAJIB minta user restart opencode; dilarang diam-diam fallback ke agen `general`. [R1,R2,R4] → `.opencode/rules/agent-generation.md`.
+A11 `documents/pm/**` = memo kerja PM (rekaman titik-waktu, append-only): blok/entri lama jangan ditulis-ulang, jangan dihapus,
+   jangan "dirapikan" isinya; koreksi = entri/blok BARIS yang menyebut yang lama. Boleh diedit hanya baris `mode:` `state.md`
+   + typo; isi catatan/status/keputusan lama haram. Detail: `.opencode/skills/pm-orchestration/SKILL.md` §6 + `task-report.md`
+   (laporan diisi maju, tidak dirombak).
+A12 Fakta dunia luar (status PR/branch/isu/merge) = rekaman titik-waktu: boleh dikutip sebagai "per tanggal X", TAPI sebelum
+   jadi dasar kerja WAJIB dicek ulang ke sumbernya (API / `git fetch`) pada sesi itu; kedaluwarsa → tulis koreksi + perbarui
+   baris `updated:` `state.md`, jangan diulang diam-diam sebagai kebenaran aktif. → `.opencode/rules/no-hallucination.md`.
 
 ## B — Penempatan & higienitas berkas
 B1 Semua dokumen proyek di `documents/**`, bukan `docs/**`. [R5]

@@ -45,6 +45,9 @@ must never be missed. `documents/pm/OPERATING_RULES.md` is injected via `opencod
     code changes per-file in `documents/dev/CODE_CHANGES.md`. [H1-H3]
 12. Done only after the feature is exercised for real. Green tests != usable app. Vendor assets
     local, no CDN. [G3]
+13. PM notes (`documents/pm/**`) are append-only point-in-time records — never rewrite/delete old blocks; corrections go
+    in a NEW entry. External facts (PR/branch/issue status) MUST be re-checked at the source (API / `git fetch`) in the
+    current session before being used; if stale, write the correction + update `state.md` `updated:`. [A11, A12]
 
 Not rules (canonical homes, referenced above): `.opencode/rules/` — language, secrets,
 task-report, commands, no-hallucination, agent-generation, agent-boundaries,

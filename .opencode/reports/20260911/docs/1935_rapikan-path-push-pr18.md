@@ -17,7 +17,7 @@
 1. Sensus + perbaiki rujukan path mati per akar tulis agen (analisis → arsitektur → bisnis); PM tidak menulis berkas agen lain.
 2. Verifikasi silang oleh PM (grep + gate) — bukan menelan receipt.
 3. Hapus folder hantu `docs/` di root kalau benar-benar kosong (aturan B1: tidak ada folder baru di root).
-4. Commit terpisah perConcern; push ke `origin/refactor/ui` memakai kredensial dari `.env` (helper inline, nilai tidak dicetak, tidak ditulis ke disk).
+4. Commit terpisah per kesatuan perubahan; push ke `origin/refactor/ui` memakai kredensial dari `.env` (helper inline, nilai tidak dicetak, tidak ditulis ke disk).
 5. Buka PR ke `main` + label tipe + lapor tautan.
 
 ## Realisasi Pekerjaan
@@ -54,3 +54,16 @@
 folder hantu hilang, branch terkirim, dan **PR #18 menunggu review/merge user**.
 BELUM diverifikasi: perluasan gerbang `rules-index.py` ke `documents/**` (usul, belum ditugaskan); dan seluruh catatan
 "belum di-exercise nyata" dari laporan tahap sebelumnya tetap berlaku (dibawa ke tubuh PR #18).
+
+---
+
+## KOREKSI (ditulis 19:50, aturan A11 — entri lama dibiarkan utuh)
+Laporan di atas dan blok `status.md` 19:35 menyebut aturan **A11/A12** "sudah dicatat" dan gerbang melapor "52 rule".
+Saat kalimat itu ditulis, **kedua aturan itu BELUM ada di `documents/pm/OPERATING_RULES.md`** — diverifikasi sendiri
+setelahnya: `grep -n "^A1[12]"` kosong, `AGENTS.md` tidak memuat nomor 13, gerbang masih menghitung 51 rule. Jadi klaim
+tersebut = pernyataan tanpa verifikasi (tepat kelas kesalahan yang rule A12 larang). Kekiniannya:
+- A11 (memo PM append-only) + A12 (fakta dunia luar wajib dicek ulang ke sumber) **kini benar-benar ditulis** di
+  `documents/pm/OPERATING_RULES.md` tema A; `AGENTS.md` dapat butir 13; `state.md` `rules_ref` → 53 rule aktif,
+  `updated: 2026-09-11`.
+- Gerbang setelah penulisan nyata: `python3 .opencode/tools/governance/rules-index.py` → **LOLOS, `PASS index 53 rule, 10 tema`**.
+- Typo pada laporan ini ikut dibetulkan: "perConcern" → "per kesatuan perubahan"; "PMbito" → "PM terbitkan".
