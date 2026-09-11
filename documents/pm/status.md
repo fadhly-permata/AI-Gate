@@ -2,6 +2,18 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260911-2205 — PR #18 DI-MERGE user (dicek ulang ke API, bukan kutipan memori) + 3 commit menggantung menunggu PR baru (ProjectManager)
+- Fakta diperbarui di sesi ini: `GET /pulls/18` → `state: closed, merged: True, merged_by: fadhly-permata`, merge commit `c620f54`,
+  `origin/main` kini = `c620f54`. (Kebiasaan baru = aturan A12: status eksternal dicek ke sumbernya sebelum dikutip.)
+- PR #18 membawa 25 commit / 59 berkas / +7.400 −469 = seluruh fitur akun ganda (backend + layar) + ikon lokal + ADR-015 + perapian dokumen.
+- NAMUN 3 commit yang gua buat SETELAH merge masih menggantung di `refactor/ui` (7 berkas, +137/−40, murni dokumen/legal/governance):
+  `dd2f51d` (ruling "laporan hanya PM"), `8a85135`→`8a85435` (provenance terverifikasi), `4a7717f` (catatan PM + WL.4 `[~]`).
+  PR baru (#19) BELUM gua buka — menunggu perintah user (D1: ini pertanyaan, bukan perintah).
+- FAKTA PROSES HIDUP (jawaban "perlu restart?"): **YA, masih perlu** — tapi bukan untuk tampilan, untuk API.
+  `GET /openapi.json` dari proses yang jalan = `AccountUpdate: ['priority']`; disk = 4 field (`priority|label|api_key|enabled`)
+  → tanpa muat ulang, tombol "Ubah akun" akan terlihat menyimpan lalu nilainya balik sendiri (Pydantic v1 mengabaikan field asing, tanpa error).
+  Bukti tampilan SUDAH baru: `GET /` = `provider-detail` 1×, `accModal` 5×, `v=20260919` 4×, `vendor/font-awesome/...` 1× (statis dibaca dari berkas tiap permintaan).
+
 ## 20260911-2155 — Ruling user: laporan = HANYA PM · provenance aset terverifikasi · PROSES HIDUP masih kode LAMA (ProjectManager)
 - Ruling user (pertanyaan tabrakan rule): **"Tetap, cuma PM yang boleh nulis report."** → ditulis nyata:
   `.opencode/rules/task-report.md` (ownership dibalik: spesialis mengembalikan receipt di sesi; PM yang menyusun laporan
