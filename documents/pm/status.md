@@ -2,6 +2,26 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260911-2215 — PR #19 DIBUKA (4 commit dokumen pasca-merge #18) + jawaban "perlu restart?" = YA, untuk API (ProjectManager)
+- `origin/refactor/ui` = `ab67fe1` (sinkron 0/0). **PR #19** `refactor/ui -> main`: https://github.com/fadhly-permata/AI-Gate/pull/19
+  — 4 commit / 7 berkas / +149 −40 (murni dokumen: ruling laporan-hanya-PM, provenance, catatan PM), `mergeable: True / clean`.
+  Label dipasang via endpoint `issues/19/labels` (field `labels` saat create PR terbukti TIDAK menempel — pelajaran berulang, #18 juga begitu).
+- Jawaban restart, dengan bukti terukur (bukan dugaan): **YA, masih perlu muat ulang — tapi hanya untuk API, bukan untuk tampilan.**
+  · `GET http://127.0.0.1:8080/` = tampilan SUDAH baru (penghitung: `provider-detail` 1, `accModal` 5, `v=20260919` 4, tautan
+    `vendor/font-awesome/css/all.min.css` 1) — berkas statis dibaca ulang tiap permintaan.
+  · `GET /openapi.json` (skema dibuat dari modul Python yang terpasang di memori proses) = `AccountUpdate: ['priority']`,
+    sedangkan `src/backend/accounts_router.py` di disk berisi 4 field → **proses lama masih jalan**.
+  · Konsekuensi nyata: selama belum dimuat ulang, tombol "Ubah akun" akan **kelihatannya berhasil tapi tidak menyimpan apa pun**
+    (Pydantic v1 membuang field asing tanpa error, lalu layar membaca ulang daftar dan nilai lama muncul lagi). Ini kelas kegagalan
+    yang tidak tertangkap tes apa pun — hanya tertangkap oleh cek proses hidup.
+  · PM tidak menyentuh proses (aturan restart = hak user). `ps -o lstart` di Termux mengembalikan waktu acak (1970) jadi tidak
+    bisa dipakai adu-mtime; bukti sah = selisih skema `/openapi.json` vs kode di disk.
+- Ruling user soal laporan sudah ditulis permanen (`dd2f51d`): berkas laporan hanya PM; agen mengembalikan receipt di sesi.
+  Tabrakan `task-report.md` vs `agent-boundaries.md` = BERES.
+- Provenance (user: "boleh") selesai diverifikasi: FA 6.5.1 5/5 identik artefak resmi; xterm TERNYATA `xterm@5.3.0` +
+  `xterm-addon-fit@0.8.0` (3/3 identik) padahal selama ini tidak ada catatan versi sama sekali. WL.4 → `[~]`, sisa = teks
+  lisensi MIT xterm belum ikut di-vendor/di-diff + usulan `PROVENANCE.txt` per folder vendor.
+
 ## 20260911-2205 — PR #18 DI-MERGE user (dicek ulang ke API, bukan kutipan memori) + 3 commit menggantung menunggu PR baru (ProjectManager)
 - Fakta diperbarui di sesi ini: `GET /pulls/18` → `state: closed, merged: True, merged_by: fadhly-permata`, merge commit `c620f54`,
   `origin/main` kini = `c620f54`. (Kebiasaan baru = aturan A12: status eksternal dicek ke sumbernya sebelum dikutip.)
