@@ -134,6 +134,16 @@ Arsitektur dibagi menjadi 7 modul berlapis. Komunikasi antar modul mengikuti kon
   - **OAuth Auto-Refresh:** `ProviderAccount.auth_type=oauth` menyimpan `oauth_token`+`refresh_token`+`expires_at`; sebelum request, sistem refresh otomatis bila hampir kedaluwarsa (tanpa login ulang).
 - **Trade-off:** token saver bisa mengubah isi request (tapi fail-open aman); OAuth butuh flow callback (lihat API contract `/api/oauth/*`).
 
+### ADR-015 — Aset front-end: vendor lokal, tanpa CDN
+- **Status:** Accepted (2026-09-11; mengikat untuk semua aset front-end baru).
+- **Konteks:** UI = SPA vanilla yang disajikan FastAPI lokal di `localhost` (ADR-001). Draft TSD awal masih membolehkan ikon Font Awesome "via CDN". aigate adalah aplikasi lokal dan mengklaim privasi (tidak ada request keluar tak perlu — lihat README/THIRD_PARTY_NOTICES), sehingga aset via CDN = UI ikon mati saat offline + kebocoran permintaan ke pihak ketiga + versi tak terkendali.
+- **Keputusan:** SELURUH aset front-end yang dipakai UI (JS/CSS/font/ikon) **di-vendor** di bawah `src/frontend/static/vendor/<lib>/` dan dirujuk dengan **path relatif**. Nol rujukan host eksternal di `src/frontend/static/**` (`<link>`, `<script>`, `url()`, `@import`). Versi aset terkunci oleh isi repo; catatan legal & provenance tercatat di `THIRD_PARTY_NOTICES.md`.
+- **Konsekuensi / trade-off:**
+  - *Pro:* UI identik online maupun offline; tidak ada mode gagal CDN/CORS/pemblokir; versi eksplisit dan bisa diaudit; konsisten dengan no-build (tetap `<link>`/`<script>` statis, bukan bundler).
+  - *Kontra:* repo bertambah beberapa ratus KB per aset (Font Awesome Free = 409.388 B); update aset = kerja manual unduh-ganti berkas, bukan otomatis.
+- **Ditolak:** (a) *CDN + fallback lokal* → dua jalur muat, tetap butuh internet pada muat pertama; (b) *unduh aset saat build/install* → melanggar no-build ADR-001 dan mengunci versi tak reproducible.
+- **Penegakan (kontrak, bukan niat):** tes `src/frontend/tests/vendor_assets.test.js` memindai `src/frontend/static/**` — menuntut **nol** rujukan aset eksternal dan setiap `woff2` yang dirujuk `@font-face` wajib ada di disk. Regresi = tes merah, bukan kode review.
+
 ---
 
 ## 3. Deep-Dive Arsitektur Terminal
@@ -225,7 +235,7 @@ Konsol manajemen + Terminal disajikan sebagai **SPA vanilla** (ADR-001): HTML/CS
 - **Collapsible Sidebar (ikon-only saat collapse):** Root `<html>`/`body` membawa class `sidebar-collapsed`. CSS: saat collapsed, `.nav-label` `display:none`, `.nav-icon` tetap tampil (lebar sidebar menyusut ke ukuran ikon). Toggle via JS → simpan state di `localStorage['aigate.sidebar']`.
 - **Theme (dark/light):** Tema diimplementasikan dengan **CSS custom properties** di `<html data-theme="dark|light">` (`--bg`, `--fg`, `--panel`, `--accent`, dst). Toggle men-set atribut + simpan `localStorage['aigate.theme']`. Berlaku global termasuk Terminal pane (xterm theme disesuaikan via `term.setOption('theme', …)` saat tema berubah).
 - **i18n (EN/ID):** Kamus terjemahan sisi klien `i18n = { en: {...}, id: {...} }` (ekstensible). Node dengan atribut `data-i18n="key"` diganti teksnya oleh `applyLocale(locale)`. Pengalih bahasa set `localStorage['aigate.locale']` + panggil `applyLocale`. Bahasa awal: `en`, `id`.
-- **Ikon:** Font Awesome via CDN (`<link>` tanpa build) atau SVG inline; collapsed sidebar menampilkan ikon saja (tanpa teks).
+- **Ikon:** Font Awesome Free (6.5.1) **di-vendor lokal** di `src/frontend/static/vendor/font-awesome/` — 5 berkas: `css/all.min.css`, `webfonts/fa-{brands-400,regular-400,solid-900}.woff2`, `LICENSE.txt` (total 409.388 B). Dimuat dari `src/frontend/static/index.html:43` sebagai `<link rel="stylesheet" href="vendor/font-awesome/css/all.min.css?v=…">` — path **relatif**, jadi tetap **tanpa framework, tanpa build step, tanpa CDN** (ADR-001 + ADR-015). Pola ini sama dengan `xterm.js`/addon-nya yang memang sudah lebih dulu di-vendor di `src/frontend/static/vendor/xterm/`. Aset yang sengaja **tidak** di-vendor: fallback `.ttf` (woff2 menang di rantai `src` `@font-face`) dan `fa-v4compatibility.woff2` (family legacy `"FontAwesome"` tidak dipakai selector mana pun, baik di CSS yang di-vendor maupun di kode app). Collapsed sidebar menampilkan ikon saja (tanpa teks).
 - **Persistensi:** Semua preferensi UI (sidebar, theme, locale) di `localStorage` — **tidak ada entitas DB baru** (ERD tidak berubah). Tidak ada round-trip ke backend untuk ganti tema/bahasa.
 
 > **Catatan desain:** AdminLTE *ditiru secara visual* dengan vanilla CSS (bukan mengimpor paket Bootstrap/AdminLTE) agar tetap memenuhi ADR-001 (no framework/build). Jika kelak butuh komponen kaya, dapat dipertimbangkan webview native tanpa mengubah kontrak (lihat §7).
@@ -390,6 +400,7 @@ Desain dibuat *contract-first* agar item roadmap (PRD §6) menempel tanpa refact
 | ADR-012 | Format Translation Engine (OpenAI↔Claude↔Gemini↔…, transparan) | Accepted (2026-09-03, adopsi 9router) |
 | ADR-013 | Token Saver hooks (RTK/Caveman/Ponytail, fail-open) + OAuth auto-refresh | Accepted (2026-09-03, adopsi 9router) |
 | ADR-014 | Chat Playground: reuse gateway `/v1/chat/completions` (SSE streaming) + riwayat `ChatSession`/`ChatMessage` di DB; tanpa mesin LLM baru | Accepted (2026-09-03, fitur baru PRD §2.9) |
+| ADR-015 | Semua aset front-end (JS/CSS/font/ikon) di-vendor lokal, tanpa CDN; dijaga tes `vendor_assets.test.js` | Accepted (2026-09-11) |
 
 ---
 
