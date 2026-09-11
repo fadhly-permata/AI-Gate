@@ -61,6 +61,7 @@ window.I18N.nl = {
     "providers.strategy_round_robin": "Round-robin — om de beurt tussen accounts",
     "providers.models_hint": "Aantal modellen gevonden door de automatische zoekopdracht",
     "providers.models_failed": "De modellenlijst kon niet worden opgehaald — je kunt nog steeds handmatig een model invullen.",
+    "providers.accounts_menu": "Alternatieve/secundaire accounts",
     "term.log_window": "Logvenster",
     "term.refresh": "Vernieuwen",
     "term.severity": "Ernst",

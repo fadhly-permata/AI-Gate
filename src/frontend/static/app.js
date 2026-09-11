@@ -790,13 +790,12 @@
       var badge = row.enabled
         ? '<span class="badge badge-ok">' + escapeHtml(getStr("providers.enabled")) + "</span>"
         : '<span class="badge badge-off">' + escapeHtml(getStr("providers.disabled")) + "</span>";
-      // The name opens the provider-detail page (stage-3, Opsi A): that single
-      // page owns profile + strategy + accounts + usage. The kebab stays
-      // edit/delete only.
+      // The name is plain text (stage-4): the detail page (Opsi A) is reached
+      // through the kebab's top item, like every other row action. The cell
+      // matches the plain name cells of the combos/pools/endpoints tables.
       var modelsHint = escapeHtml(getStr("providers.models_hint"));
       return '<tr class="prov-row" data-id="' + escapeHtml(row.id) + '">' +
-        '<td class="prov-name"><button type="button" class="prov-name-btn js-prov-detail" data-id="' +
-          escapeHtml(row.id) + '">' + escapeHtml(row.name) + "</button></td>" +
+        '<td class="prov-name">' + escapeHtml(row.name) + "</td>" +
         "<td>" + escapeHtml(row.type) + "</td>" +
         "<td>" + escapeHtml(row.base_url) + "</td>" +
         "<td>" + badge + "</td>" +
@@ -808,23 +807,14 @@
       "</tr>";
     }).join("");
 
-    // Name button -> the detail page. One delegated listener on the tbody (the
-    // node survives innerHTML re-renders; the flag stops per-call listener
-    // buildup when a test rebuilds the tbody it re-attaches on the fresh node).
-    if (body.getAttribute("data-detail-wired") !== "1") {
-      body.setAttribute("data-detail-wired", "1");
-      body.addEventListener("click", function (e) {
-        var btn = e.target.closest ? e.target.closest(".js-prov-detail") : null;
-        if (!btn) return;
-        var id = btn.getAttribute("data-id");
-        if (id != null) openDetail(id);
-      });
-    }
-
     // Consistent with the other tables: actions live in the kebab menu only.
+    // The detail page is one of them ("Akun alternatif/sekunder", stage-4), so
+    // the name cell carries no click behavior at all.
     wireRowMenu(body, function (tr) {
       var id = tr ? tr.getAttribute("data-id") : null;
       return [
+        { action: "accounts", label: getStr("providers.accounts_menu"), icon: "fa-users",
+          onClick: function () { openDetail(id); } },
         { action: "edit", label: getStr("common.edit"), icon: "fa-pen", onClick: function () { openEditModal(id); } },
         { action: "delete", label: getStr("common.delete"), icon: "fa-trash", danger: true, onClick: function () { deleteProvider(id); } }
       ];

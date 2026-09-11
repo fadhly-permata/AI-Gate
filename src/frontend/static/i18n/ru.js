@@ -66,6 +66,7 @@ window.I18N.ru = {
     "providers.strategy_round_robin": "Круговая — чередовать аккаунты",
     "providers.models_hint": "Число моделей, найденных автоматическим поиском",
     "providers.models_failed": "Список моделей не получен — модель можно ввести вручную.",
+    "providers.accounts_menu": "Альтернативные/вторичные аккаунты",
     "term.log_window": "Окно журнала",
     "term.refresh": "Обновить",
     "term.severity": "Важность",

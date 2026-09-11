@@ -172,10 +172,20 @@ describe("provider-detail view — markup contract", () => {
 describe("provider-detail page — behavior", () => {
   beforeEach(() => { withPage(); });
 
-  it("a provider name opens the page, shows it, and keeps 'Penyedia' highlighted", async () => {
+  it("the kebab's accounts item opens the page, keeps 'Penyedia' highlighted", async () => {
     const calls = stubApi({ provider: PROVIDER, accounts: ACCOUNTS, discover: { ok: true, models: [] } });
     window.aigate.renderProviders([PROVIDER]);
-    document.querySelector("#provTableBody .js-prov-detail").click();
+    // Stage-4 entry path: name cell is plain text; the detail page is reached
+    // through the row kebab -> "Akun alternatif/sekunder" (first item).
+    const name = document.querySelector("#provTableBody .prov-name");
+    expect(name.querySelector("button")).toBeNull();
+    name.click(); // plain text: clicking the name must NOT navigate
+    expect(document.querySelector('.view[data-view="provider-detail"]').classList.contains("is-active")).toBe(false);
+    document.querySelector('#provTableBody tr[data-id="p1"] .js-row-menu')
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const item = document.querySelector('.row-menu [data-action="accounts"]');
+    expect(item).toBeTruthy();
+    item.click();
     await flush();
 
     const view = document.querySelector('[data-view="provider-detail"]');
@@ -786,11 +796,13 @@ describe("full flow against a stateful fake backend", () => {
 
   it("list -> page -> Ubah (profile only) -> add account -> move -> back", async () => {
     const api = fakeBackend();
-    // 1. list, then click the name
+    // 1. list, then open the page via the row kebab's accounts item (stage-4)
     window.aigate.loadProviders();
     await flush();
     await flush();
-    document.querySelector("#provTableBody .js-prov-detail").click();
+    document.querySelector('#provTableBody tr[data-id="p1"] .js-row-menu')
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    document.querySelector('.row-menu [data-action="accounts"]').click();
     await flush();
     await flush();
     expect(document.querySelector('.view[data-view="provider-detail"]').classList.contains("is-active")).toBe(true);

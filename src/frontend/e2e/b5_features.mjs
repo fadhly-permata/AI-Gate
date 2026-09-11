@@ -10,7 +10,8 @@
 // Yang di-drive (semua selector diverifikasi dari app.js / index.html /
 // usage.js / analytics.js — bukan asumsi):
 //   seed   : POST /api/providers + POST /api/accounts (via page.evaluate fetch)
-//   B5.1   : nav providers -> baris #provTableBody -> tombol .prov-name-btn ->
+//   B5.1   : nav providers -> baris #provTableBody -> menu ⋮ -> item
+//            [data-action="accounts"] ("Akun alternatif/sekunder", stage-4) ->
 //            HALAMAN RINCI (view [data-view="provider-detail"] aktif, menu
 //            "Penyedia" tetap sorot): kepala #provDetailTitle + badge,
 //            Kartu A #pdApiKey (teks polos), Kartu B #pdStrategy +
@@ -143,9 +144,15 @@ async function testProvidersAccounts(pg, providerId) {
   const modelsTitle = await pg.$eval(rowSel + " .prov-models", (el) => el.getAttribute("title"));
   assert(modelsTitle && modelsTitle.length > 0, "tooltip kolom Model hilang");
 
-  // 1) Satu-satunya jalur masuk halaman rinci = tombol nama di baris
-  //    (app.js renderProviders -> .prov-name-btn.js-prov-detail -> openDetail).
-  await pg.click(rowSel + " .prov-name-btn.js-prov-detail");
+  // Nama baris = teks biasa (stage-4): tidak ada tombol di dalam .prov-name.
+  assert((await pg.$(rowSel + " .prov-name button")) === null,
+    "sel nama masih berisi tombol (harusnya teks biasa)");
+  // 1) Satu-satunya jalur masuk halaman rinci (stage-4) = menu ⋮ baris ->
+  //    item "accounts" (app.js renderProviders -> data-action="accounts" ->
+  //    openDetail). Menu singleton menempel di <body>, bukan di dalam baris.
+  await pg.click(rowSel + " .js-row-menu");
+  await pg.waitForSelector('.row-menu [data-action="accounts"]', { visible: true, timeout: WAIT });
+  await pg.click('.row-menu [data-action="accounts"]');
   await pg.waitForFunction(() => {
     const v = document.querySelector('.view[data-view="provider-detail"]');
     return !!v && v.classList.contains("is-active");

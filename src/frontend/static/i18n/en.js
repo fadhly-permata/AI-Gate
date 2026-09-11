@@ -67,6 +67,7 @@ window.I18N.en = {
     "providers.strategy_round_robin": "Round-robin — rotate between accounts",
     "providers.models_hint": "Number of models found by the automatic search",
     "providers.models_failed": "Model list could not be fetched — you can still type a model manually.",
+    "providers.accounts_menu": "Alternative/secondary accounts",
     "term.log_window": "Log Window",
     "term.refresh": "Refresh",
     "term.severity": "Severity",

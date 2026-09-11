@@ -68,6 +68,7 @@ window.I18N.ja = {
     "providers.strategy_round_robin": "ラウンドロビン — アカウントを交互に使う",
     "providers.models_hint": "自動検索で見つかったモデル数",
     "providers.models_failed": "モデル一覧を取得できませんでした — モデルは手動で入力できます。",
+    "providers.accounts_menu": "代替/セカンダリーアカウント",
     "term.log_window": "ログウィンドウ",
     "term.refresh": "更新",
     "term.severity": "重大度",

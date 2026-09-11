@@ -68,6 +68,7 @@ window.I18N.zh = {
     "providers.strategy_round_robin": "轮询模式 — 在账户之间轮换",
     "providers.models_hint": "自动搜索发现的模型数量",
     "providers.models_failed": "模型列表获取失败——仍可手动输入模型。",
+    "providers.accounts_menu": "替代/辅助账户",
     "term.log_window": "日志窗口",
     "term.refresh": "刷新",
     "term.severity": "级别",

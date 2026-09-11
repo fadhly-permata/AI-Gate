@@ -69,6 +69,7 @@ window.I18N.id = {
     "providers.strategy_round_robin": "Gilir — rotasi antar akun",
     "providers.models_hint": "Jumlah model hasil pencarian otomatis",
     "providers.models_failed": "Daftar model gagal diambil — model masih bisa diketik manual.",
+    "providers.accounts_menu": "Akun alternatif/sekunder",
     "term.log_window": "Jendela Log",
     "term.refresh": "Segarkan",
     "term.severity": "Tingkat",

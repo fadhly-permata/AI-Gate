@@ -70,6 +70,7 @@ window.I18N["zh-tw"] = {
     "providers.strategy_round_robin": "輪詢模式 — 在帳戶之間輪替",
     "providers.models_hint": "自動搜尋發現的模型數量",
     "providers.models_failed": "模型清單抓取失敗——仍可手動輸入模型。",
+    "providers.accounts_menu": "替代/輔助帳號",
     "term.log_window": "記錄視窗",
     "term.refresh": "重新整理",
     "term.severity": "嚴重程度",
