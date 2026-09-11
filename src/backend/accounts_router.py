@@ -4,7 +4,7 @@ Endpoints:
 
 * ``GET  /api/accounts?provider_id=`` — list a provider's accounts (priority asc).
 * ``POST /api/accounts``             — create an account (api_key | oauth).
-* ``PUT  /api/accounts/{id}``        — update routing ``priority``.
+* ``PUT  /api/accounts/{id}``        — update an account (label | api_key | enabled | priority).
 * ``DELETE /api/accounts/{id}``     — delete an account.
 * ``POST /api/oauth/<provider>/start``    — begin OAuth flow; return authorize URL.
 * ``GET  /api/oauth/<provider>/callback`` — exchange code -> store token.
@@ -65,13 +65,26 @@ class AccountCreate(BaseModel):
 
 
 class AccountUpdate(BaseModel):
-    """Updatable account fields (partial; None = leave unchanged).
+    """Updatable account fields (partial edit of an existing account).
 
-    ``priority`` is the routing knob this feature adds. ``label`` / ``enabled``
-    are NOT accepted here — out of scope, kept out per YAGNI.
+    A field is written ONLY when the client actually sent it: presence comes
+    from ``__fields_set__`` (what ``exclude_unset`` filters), never from
+    ``is not None`` — so ``label=""`` / ``api_key=""`` are honoured as a
+    *deliberate* clear while an absent field keeps its stored value. An explicit
+    ``null`` is a no-op (the columns are NOT NULL; clear them by sending ``""``).
+
+    ``auth_type`` is accepted-but-IGNORED, not rejected: an ``oauth`` account's
+    ``oauth_token`` / ``refresh_token`` / ``expires_at`` are produced by the
+    OAuth callback, never by a hand-written form, so flipping the type from here
+    would leave a half-populated credential. ``last_used_at`` stays engine-owned
+    (read-only, see :func:`_account_to_dto`).
     """
 
     priority: Optional[int] = None
+    label: Optional[str] = None
+    # ADR-007: plaintext, same as ``AccountCreate``/``AccountDTO``.
+    api_key: Optional[str] = None
+    enabled: Optional[bool] = None
 
     class Config:
         pass
@@ -249,19 +262,55 @@ def create_account(req: AccountCreate) -> Any:
 
 @router.put("/api/accounts/{account_id}")
 def update_account(account_id: int, req: AccountUpdate) -> Any:
-    """Update an account's routing ``priority`` (partial).
+    """Update an existing account (partial edit).
 
-    ``last_used_at`` is deliberately NOT writable here — the selection engine
-    owns it. 404 envelope when the account is missing.
+    Accepted: ``priority``, ``label``, ``api_key``, ``enabled``. Only fields the
+    client actually sent are written — ``exclude_unset`` keeps ``label=""`` /
+    ``api_key=""`` distinct from an absent field, so a blank value clears the
+    column on purpose while an absent one leaves it untouched. ``auth_type`` is
+    ignored (see :class:`AccountUpdate`); ``last_used_at`` is engine-owned.
+
+    Rejections: sending a non-null ``api_key`` to an ``auth_type='oauth'``
+    account -> 400 ``oauth_account_key_readonly`` — the selection engine reads
+    ``oauth_token`` for those accounts, so a key stored there is a dead column
+    that merely *looks* configured. Missing account -> 404 ``account_not_found``.
+
+    The log records the changed field NAMES only; no key/token value is ever
+    logged (R12 + ``.opencode/rules/secrets.md``).
     """
+    # Candidate writes = client-sent AND non-null (an explicit null on these
+    # NOT NULL columns is treated as "not sent", same as pre-feature behavior).
+    updates: Dict[str, Any] = {
+        k: v for k, v in req.dict(exclude_unset=True).items() if v is not None
+    }
+
     with SessionLocal() as session:
         account = session.get(ProviderAccount, account_id)
         if account is None:
             return _error(404, f"account {account_id} not found", "account_not_found")
+        if "api_key" in updates and account.auth_type == "oauth":
+            return _error(
+                400,
+                "api_key cannot be set on an oauth account; its credential is "
+                "the oauth token",
+                "oauth_account_key_readonly",
+                "invalid_request_error",
+            )
+
         changed: list = []
-        if req.priority is not None:
-            account.priority = int(req.priority)
+        if "label" in updates:
+            account.label = str(updates["label"])
+            changed.append("label")
+        if "api_key" in updates:
+            account.api_key = str(updates["api_key"])  # ADR-007: plaintext
+            changed.append("api_key")
+        if "enabled" in updates:
+            account.enabled = bool(updates["enabled"])
+            changed.append("enabled")
+        if "priority" in updates:
+            account.priority = int(updates["priority"])
             changed.append("priority")
+
         session.commit()
         session.refresh(account)
         dto = _account_to_dto(account).dict()

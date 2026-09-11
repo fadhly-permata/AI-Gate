@@ -9,7 +9,9 @@ Covers the WIP landed in ``a237414`` + the review follow-up:
 * pin ``x-connection-id`` — wins over both strategies; an unusable pin
   (unknown / disabled / foreign / raising / empty cred) falls back (fail-safe);
 * legacy fallback  — no accounts / all unavailable -> ``provider.api_key``;
-* DTO + validation on /api/providers + /api/accounts;
+* DTO + validation on /api/providers + /api/accounts — including the partial
+  ``PUT /api/accounts/{id}`` edit (label | api_key | enabled | priority; absent
+  fields never overwritten; ``auth_type`` ignored; oauth+key rejected);
 * the idempotent self-heal migration in ``backend.config.db``.
 
 Hermetic in-memory SQLite (StaticPool), mirroring ``test_accounts.py``. The
@@ -37,7 +39,7 @@ import backend.providers_router as providers_router
 from backend.config import db as db_module
 from backend.config.db import Base
 from backend.gateway.router import CONNECTION_ID_HEADER, _preferred_account_id
-from backend.models import Provider, ProviderAccount, ProviderModel
+from backend.models import LogEntry, Provider, ProviderAccount, ProviderModel
 from backend.server import app
 
 
@@ -80,7 +82,8 @@ def _seed(
     accounts: list[dict] | None = None,
 ) -> dict:
     """Seed one provider + its accounts. ``accounts`` items: label, priority,
-    api_key (default per-label), enabled. Returns ids + the provider id."""
+    api_key (default per-label), enabled, auth_type (default 'api_key'),
+    oauth_token (default ''). Returns ids + the provider id."""
     accounts = accounts or []
     with sf() as session:
         provider = Provider(
@@ -107,8 +110,9 @@ def _seed(
             acc = ProviderAccount(
                 provider_id=provider.id,
                 label=spec["label"],
-                auth_type="api_key",
+                auth_type=spec.get("auth_type", "api_key"),
                 api_key=spec.get("api_key", f"key-{spec['label']}"),
+                oauth_token=spec.get("oauth_token", ""),
                 enabled=spec.get("enabled", True),
                 priority=spec.get("priority", 0),
             )
@@ -556,6 +560,242 @@ def test_account_update_priority_and_404(monkeypatch) -> None:
     r = client.put("/api/accounts/99999", json={"priority": 1})
     assert r.status_code == 404
     assert r.json()["error"]["code"] == "account_not_found"
+
+
+# --------------------------------------------------------------------------- #
+# PUT /api/accounts/{id} — full partial EDIT (label | api_key | enabled | priority)
+# --------------------------------------------------------------------------- #
+def _account_row(sf: sessionmaker, account_id: int) -> ProviderAccount:
+    """Fresh-session reload of the stored row (asserts what really landed)."""
+    with sf() as session:
+        return session.get(ProviderAccount, account_id)
+
+
+def test_account_update_label_only(monkeypatch) -> None:
+    sf = _make_sessionmaker()
+    ids = _seed(sf, accounts=[{"label": "a", "priority": 4}])
+    _patch_db(monkeypatch, sf)
+    client = TestClient(app)
+    a = ids["account_ids"][0]
+    r = client.put(f"/api/accounts/{a}", json={"label": "renamed"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["label"] == "renamed"
+    assert body["priority"] == 4 and body["api_key"] == "key-a"
+    assert body["enabled"] is True and body["auth_type"] == "api_key"
+    # ``id`` is the DTO's own key; the response is the bare DTO, not {"data":..}.
+    assert "data" not in body
+    row = _account_row(sf, a)
+    assert (row.label, row.priority, row.api_key) == ("renamed", 4, "key-a")
+
+
+def test_account_update_api_key_only(monkeypatch) -> None:
+    sf = _make_sessionmaker()
+    ids = _seed(sf, accounts=[{"label": "a", "priority": 1}])
+    _patch_db(monkeypatch, sf)
+    client = TestClient(app)
+    a = ids["account_ids"][0]
+    r = client.put(f"/api/accounts/{a}", json={"api_key": "sk-rotated"})
+    assert r.status_code == 200, r.text
+    assert r.json()["api_key"] == "sk-rotated"  # ADR-007 plaintext out
+    assert r.json()["label"] == "a" and r.json()["priority"] == 1
+    row = _account_row(sf, a)
+    assert row.api_key == "sk-rotated" and row.label == "a"
+
+
+def test_account_update_404_for_any_field(monkeypatch) -> None:
+    sf = _make_sessionmaker()
+    _patch_db(monkeypatch, sf)
+    client = TestClient(app)
+    r = client.put("/api/accounts/99999", json={"label": "x", "enabled": False})
+    assert r.status_code == 404
+    assert r.json()["error"]["code"] == "account_not_found"
+
+
+def test_account_update_clear_api_key_makes_account_unusable(monkeypatch) -> None:
+    """``api_key: ""`` is a DELIBERATE write (absent ≠ empty): it lands in the DB
+    and the selection engine then skips the account (empty credential = unusable)
+    and falls back to ``provider.api_key`` — end-to-end proof."""
+    sf = _make_sessionmaker()
+    ids = _seed(sf, accounts=[{"label": "a"}])
+    _patch_db(monkeypatch, sf)
+    client = TestClient(app)
+    a = ids["account_ids"][0]
+    # Selected while it has a key.
+    assert _select(sf) == ("key-a", a)
+    r = client.put(f"/api/accounts/{a}", json={"api_key": ""})
+    assert r.status_code == 200, r.text
+    assert r.json()["api_key"] == ""
+    assert _account_row(sf, a).api_key == ""
+    # Now unusable -> skipped by the engine, legacy credential wins, no 500.
+    assert _select(sf) == ("sk-legacy", None)
+
+
+def test_account_update_toggle_enabled(monkeypatch) -> None:
+    sf = _make_sessionmaker()
+    ids = _seed(sf, accounts=[{"label": "a"}, {"label": "b"}])
+    _patch_db(monkeypatch, sf)
+    client = TestClient(app)
+    a = ids["account_ids"][0]
+    r = client.put(f"/api/accounts/{a}", json={"enabled": False})
+    assert r.status_code == 200, r.text
+    assert r.json()["enabled"] is False
+    assert _account_row(sf, a).enabled is False
+    # The engine only sees enabled rows -> account "b" is used now.
+    assert _select(sf) == ("key-b", ids["account_ids"][1])
+    assert client.put(f"/api/accounts/{a}", json={"enabled": True}).json()["enabled"]
+
+
+def test_account_update_all_fields_at_once(monkeypatch) -> None:
+    sf = _make_sessionmaker()
+    ids = _seed(sf, accounts=[{"label": "a", "priority": 9, "enabled": True}])
+    _patch_db(monkeypatch, sf)
+    client = TestClient(app)
+    a = ids["account_ids"][0]
+    r = client.put(
+        f"/api/accounts/{a}",
+        json={
+            "label": "all",
+            "api_key": "sk-all",
+            "enabled": False,
+            "priority": -3,
+        },
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["label"] == "all"
+    assert body["api_key"] == "sk-all"
+    assert body["enabled"] is False
+    assert body["priority"] == -3
+    row = _account_row(sf, a)
+    assert (row.label, row.api_key, row.enabled, row.priority) == (
+        "all",
+        "sk-all",
+        False,
+        -3,
+    )
+
+
+def test_account_update_absent_fields_keep_their_values(monkeypatch) -> None:
+    """REGRESSION GUARD: the DTO defaults of ``AccountUpdate`` (label '', key '',
+    enabled True, priority 0) must NEVER be written for fields the client omit.
+    """
+    sf = _make_sessionmaker()
+    ids = _seed(
+        sf,
+        accounts=[
+            {
+                "label": "keep-me",
+                "api_key": "sk-keep",
+                "enabled": False,
+                "priority": 7,
+            }
+        ],
+    )
+    _patch_db(monkeypatch, sf)
+    client = TestClient(app)
+    a = ids["account_ids"][0]
+    r = client.put(f"/api/accounts/{a}", json={"label": "only-label"})
+    assert r.status_code == 200, r.text
+    row = _account_row(sf, a)
+    assert row.label == "only-label"
+    assert row.api_key == "sk-keep"  # not blanked by the model default
+    assert row.enabled is False  # not flipped by the model default
+    assert row.priority == 7  # not zeroed by the model default
+    # An explicit null is also "no write" (the columns are NOT NULL).
+    r = client.put(f"/api/accounts/{a}", json={"api_key": None, "priority": None})
+    assert r.status_code == 200, r.text
+    row = _account_row(sf, a)
+    assert (row.api_key, row.priority) == ("sk-keep", 7)
+
+
+def test_account_update_empty_body_is_a_noop_200(monkeypatch) -> None:
+    """Old behavior preserved: no field sent -> 200 with the CURRENT DTO, nothing
+    rewritten (``last_used_at`` included)."""
+    sf = _make_sessionmaker()
+    ids = _seed(sf, accounts=[{"label": "a", "priority": 5}])
+    _patch_db(monkeypatch, sf)
+    client = TestClient(app)
+    a = ids["account_ids"][0]
+    before = client.get(f"/api/accounts?provider_id={ids['provider_id']}").json()
+    r = client.put(f"/api/accounts/{a}", json={})
+    assert r.status_code == 200, r.text
+    assert r.json() == before["data"][0]
+
+
+def test_account_update_auth_type_is_ignored_not_rejected(monkeypatch) -> None:
+    """``auth_type`` cannot be flipped from this endpoint (oauth credentials are
+    minted by the callback, not typed into a form): it is silently ignored and
+    the DTO keeps reporting the stored type."""
+    sf = _make_sessionmaker()
+    ids = _seed(
+        sf,
+        accounts=[
+            {"label": "k", "auth_type": "api_key", "api_key": "sk-k"},
+            {"label": "o", "auth_type": "oauth", "api_key": "", "oauth_token": "tok"},
+        ],
+    )
+    _patch_db(monkeypatch, sf)
+    client = TestClient(app)
+    k, o = ids["account_ids"]
+    r = client.put(f"/api/accounts/{k}", json={"auth_type": "oauth", "label": "k2"})
+    assert r.status_code == 200, r.text
+    assert r.json()["auth_type"] == "api_key" and r.json()["label"] == "k2"
+    assert _account_row(sf, k).auth_type == "api_key"
+    r = client.put(f"/api/accounts/{o}", json={"auth_type": "api_key", "priority": 2})
+    assert r.status_code == 200, r.text
+    assert r.json()["auth_type"] == "oauth"
+    assert r.json()["has_oauth_token"] is True
+    assert r.json()["priority"] == 2
+
+
+def test_account_update_api_key_on_oauth_account_is_rejected(monkeypatch) -> None:
+    """Storing a key in ``api_key`` for an oauth account would be a trap (the
+    engine reads ``oauth_token``), so it is refused with a 400 envelope."""
+    sf = _make_sessionmaker()
+    ids = _seed(
+        sf, accounts=[{"label": "o", "auth_type": "oauth", "api_key": "", "oauth_token": "tok"}]
+    )
+    _patch_db(monkeypatch, sf)
+    client = TestClient(app)
+    o = ids["account_ids"][0]
+    for payload in ({"api_key": "sk-no"}, {"api_key": ""}):
+        r = client.put(f"/api/accounts/{o}", json=payload)
+        assert r.status_code == 400, r.text
+        assert r.json()["error"]["code"] == "oauth_account_key_readonly"
+        assert r.json()["error"]["type"] == "invalid_request_error"
+    # Rejected writes land nothing; unrelated fields still edit fine.
+    assert _account_row(sf, o).api_key == ""
+    r = client.put(f"/api/accounts/{o}", json={"label": "renamed-oauth"})
+    assert r.status_code == 200 and r.json()["label"] == "renamed-oauth"
+
+
+def test_account_update_logs_field_names_never_values(monkeypatch) -> None:
+    """R12 + secrets rule: the LogEntry row names the changed fields and must
+    never carry the key value."""
+    sf = _make_sessionmaker()
+    ids = _seed(sf, accounts=[{"label": "a"}])
+    _patch_db(monkeypatch, sf)
+    client = TestClient(app)
+    a = ids["account_ids"][0]
+    r = client.put(
+        f"/api/accounts/{a}", json={"label": "lab", "api_key": "sk-super-secret"}
+    )
+    assert r.status_code == 200, r.text
+    with sf() as session:
+        rows = (
+            session.query(LogEntry)
+            .filter_by(source="backend.accounts.router")
+            .order_by(LogEntry.id.desc())
+            .all()
+        )
+        update_rows = [e.message for e in rows if "updated account" in e.message]
+    assert update_rows, "the update was not logged at all"
+    message = update_rows[0]
+    assert "label" in message and "api_key" in message
+    assert "sk-super-secret" not in message
+    assert "updated account" in message
+
 
 
 def test_accounts_list_ordered_by_priority_then_id(monkeypatch) -> None:
