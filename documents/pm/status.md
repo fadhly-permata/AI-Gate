@@ -2,6 +2,53 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260911-1855 — TAHAP 5+6: ubah akun + ikon dilokalkan + label menu (be-dev, fe-dev ×2, fullstack-dev, tech-architect, system-analyst) — gate HIJAU (ProjectManager)
+- Satu pesan user memuat 3 permintaan: "localin aja semua aset font atau icon" · "kenapa teks menunya 'Alternative/secondary
+  accounts' itu kan cuma contoh. ganti jadi yang lebih representatif dong" · "kok gak ada tombol edit ya di daftar secondary
+  account? cuma ada tombol delete doang nih".
+- **Sebab-akibat yang harus dicatat:** tombol edit tidak ada BUKAN kelalaian fe-dev — `PUT /api/accounts/{id}` memang hanya
+  menerima `priority` (kontrak tahap-1 `1351:81`). Urutan dipaksa: backend dulu → baru layar. Mode SEKUENSIAL (tercatat).
+- **Jawaban label:** teks itu bukan contoh/komentar, melainkan nilai kamus **EN** (bahasa aplikasi sedang di-set Inggris; nilai ID
+  = "Akun alternatif/sekunder"). Tetap diganti: kini "Kelola akun" / "Manage accounts" (+ ru/nl/ja/zh/zh-tw), kunci TETAP
+  `providers.accounts_menu`, perilaku item tidak berubah.
+- be-dev (`ses_f70913524ffezKmxQV4LdzciV4`) → commit `eea7504`: `accounts_router.py:7,67-89,263-321` — partial pakai
+  `exclude_unset` (absen ≠ kosong; `label=""`/`api_key=""` sah ditulis sadar; `null` = no-op karena kolom NOT NULL),
+  `auth_type`/`last_used_at` tidak bisa ditulis (diabaikan senyap), SATU penolakan `api_key` (termasuk `""`) ke akun oauth →
+  400 `oauth_account_key_readonly`, log hanya NAMA field. **Gate PM sendiri: 537 passed, 1 skipped, 0 failed** (baseline 526 +11 tes).
+- fe-dev tahap-5 (`ses_f7060031dffeFpTJlMt5NVXMTT`) → ikut `19df593`: `.acc-edit` per kartu lewat listener delegasi yang sudah ada
+  (`app.js:1313-1319,1356-1359`), `#accModal` DUA MODE tanpa modal ketiga (`:1444-1571`, chrome disatukan `setAccountModalChrome`,
+  reset saat ditutup), `saveAccountEdit` PUT hanya `{label,api_key,enabled}` / `{label,enabled}` (oauth: kolom kunci DISEMBUNYIKAN
+  → UI tidak pernah menabrak 400), `enabled` hanya mode ubah, `priority` hanya mode tambah. Tes 18→27 & 40→47, **nol tes dihapus**.
+- **INSIDIEN SPAWN:** tahap-6 pertama (`ses_f70051dc0ffegXmj0p7mlMI2He`) MATI di tengah — "upstream authentication failed".
+  PM mengulang handover yang sama (user: "lanjut dong tadi provider AI-nya error"). Sesi kedua (`ses_f6fd547b4ffee4lli1lcr0VIEO`)
+  menemukan working tree sudah terisi sebagian → **mengaudit ulang total** (hash, grep, jalankan tes) dan mengoreksi 1 komentar
+  guard yang SALAH FAKTA (klaim "0 aturan content menyentuh kodepoint v4compat" → sebenarnya 63/36; alasan benar = family legacy
+  tidak pernah dipakai selector). PELAJARAN: spawn gagal di tengah = state tak tentu → wajib audit ulang, jangan dipercaya.
+- Vendor (aturan G3 yang selama ini dilanggar PRODUK, bukan oleh kita): `src/frontend/static/vendor/font-awesome/` 5 berkas
+  **409.388 B** diambil dari branch `docs/wiki` via `git restore --source=docs/wiki` (nol unduhan, nol staging) — PM cocokkan
+  **hash blob 5/5 sendiri**; `index.html:43` path relatif `?v=20260919`; grep `cdnjs|cdn.jsdelivr|unpkg|@import url("http` = 0.
+  Guard BARU `tests/vendor_assets.test.js` (7 tes, scan STRUKTUR bukan daftar hitam host; tautan "Repo" ke github = navigasi, sah).
+  Ketajaman dibuktikan dengan sabotase sementara: sisip CDN → 3/7 gagal; singkirkan `fa-solid-900.woff2` → 2/7 gagal; dipulihkan.
+  `.ttf` (4 rujukan) + `fa-v4compatibility.woff2` sengaja TIDAK di-vendor + alasannya dicatat. Cache-buster serentak `20260919`.
+- Dokumen yang MENIPU sesi berikutnya ikut diselaraskan (bukan bagian permintaan user, tapi akibat vendoring):
+  `documents/architecture/TSD.md` §3.4 + **ADR-015 "Aset front-end: vendor lokal, tanpa CDN"** (`b256064`, tech-architect;
+  sensus arsitektur = 1 klaim usang, `anthropic-inbound-endpoint.md` bersih) · `documents/analysis/FSD.md:321` + kebutuhan
+  "dapat dipakai offline" tercatat TERBUKTI + spec 1.0→1.1 (`bb759e4`, system-analyst; sensus analisis = 1 klaim usang) ·
+  `THIRD_PARTY_NOTICES.md` §2 ditulis ulang dengan kutipan `LICENSE.txt` per baris + **provenance diakui jujur** (`15862bf`,
+  fullstack-dev — berkas root, di luar akar agen lain, sesuai roster).
+- GATE PM AKHIR (mandiri): vitest **25 berkas / 609 tes LOLOS** (acuan 24/602 → +7 guard); paritas i18n 7/7 = 436 kunci
+  hilang 0 thừa 0 kosong 0; hash vendor 5/5; `git diff --check` bersih; lingkup tiap agen cocok (nol lintas akar);
+  `rules-index.py` LOLOS.
+- BUKU: `documents/plan/wiki-backlog.md` **WL.5 dicentang SELESAI** (keputusan user = vendor lokal), **WL.4 DIPERLUAS**
+  ke provenance Font Awesome (versi hanya dari string header CSS, belum diverifikasi terhadap artefak rilis upstream).
+  Supersede: laporan `1351:81` ("PUT accounts HANYA priority") digantikan laporan `1850` — berkas laporan lama TIDAK diedit (arsip titik-waktu).
+- UTANG KECIL BARU (belum ditugaskan): `documents/analysis/FSD.md:7,19` merujuk path `docs/business/BRD.md` yang TIDAK ADA
+  (nyata `documents/business/BRD.md`) — temuan system-analyst, minta izin user sebelum disuruh betulkan.
+- BELUM / NEXT: muat ulang HALAMAN di peramban (statis dibaca dari berkas → server TIDAK perlu restart) + uji mata: tombol Ubah
+  per kartu, modal dua mode, dan **mode pesawat → ikon harus tetap muncul** (G3); e2e belum dijalankan; terjemahan belum ditinjau
+  penutur; ahead 19 BELUM push; PR #17 masih terbuka.
+- Laporan: `.opencode/reports/20260911/implementation/1850_ubah-ikon-lokal-label-tahap5-6.md`.
+
 ## 20260911-1225 — TAHAP 4: akses halaman rinci DIPINDAH dari klik nama → item menu ⋮ "Akun alternatif/sekunder" (fe-dev) — gate HIJAU (ProjectManager)
 - User menguji mata hasil tahap-3 → menolak pola "nama bisa diklik" ("aneh kalo tap/klik di namanya gitu") dan MENENTUKAN sendiri
   bentuk+nama+letak: item menu baru "Akun alternatif/sekunder" DIGABUNG ke menu tiga titik yang sudah ada → rule D6 terpenuhi oleh user,

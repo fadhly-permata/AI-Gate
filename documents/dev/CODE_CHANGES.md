@@ -1623,3 +1623,80 @@ keluar) — butuh keputusan user, bukan bagian tugas ini.
 Belum dilihat di peramban nyata (G3) — bagian tampilan dibaca ulang dari berkas tiap permintaan, jadi cukup
 muat ulang halaman, tidak perlu memuat ulang server; jalur ⋮ → item belum dieksekusi sungguhan (nol browser);
 terjemahan 6 bahasa belum ditinjau penutur.
+
+## 2026-09-11 — TAHAP 5+6: ubah akun (backend+layar) + Font Awesome dilokalkan + label menu (commit `eea7504` `19df593` `15862bf` `b256064` `bb759e4`, BELUM push)
+
+**Asal:** satu pesan user memuat tiga permintaan: "localin aja semua aset font atau icon" · "kenapa teks menunya
+'Alternative/secondary accounts' itu kan cuma contoh. ganti jadi yang lebih representatif dong" · "kok gak ada tombol
+edit ya di daftar secondary account? cuma ada tombol delete doang nih". Lanjutan: "lanjut dong tadi provider AI-nya error"
+(spawn tahap-6 mati "upstream authentication failed" → handover sama diulang).
+Laporan: `.opencode/reports/20260911/implementation/1850_ubah-ikon-lokal-label-tahap5-6.md`.
+**Sebab-akibat:** tombol edit mustahil karena API lama hanya menerima `priority` (`1351:81`) → backend dulu, baru layar.
+
+### Backend — `eea7504` (be-dev `ses_f70913524ffezKmxQV4LdzciV4`)
+- `src/backend/accounts_router.py:7` docstring modul; `:67-89` `AccountUpdate` diperluas (`label`, `api_key`, `enabled`,
+  `priority`); `:263-321` `update_account` ditulis ulang. Parsial pakai `req.dict(exclude_unset=True)` → **"absen" ≠
+  "kosong"**: `label=""`/`api_key=""` sah ditulis sadar, `null` = no-op (kolom NOT NULL `models.py:110,113`).
+  `auth_type` + `last_used_at` tidak bisa ditulis (diabaikan senyap, DTO kembalikan nilai asli; alasan oauth token lahir
+  di callback ditulis di `:75-79`). SATU penolakan `:291-298`: `api_key` (termasuk `""`) ke akun oauth → 400
+  `oauth_account_key_readonly`, dievaluasi SEBELUM menulis. Log `:317-320` hanya NAMA field.
+- `tests/backend/test_account_routing.py:565-799` +11 tes: label-only, api_key-only, 404 untuk semua field,
+  `api_key=""` → akun di-skip mesin (end-to-end ke `_select`), toggle `enabled` + mesin hanya lihat yang enabled,
+  semua field sekaligus, **regression guard field absen tidak menimpa**, body kosong = no-op 200, `auth_type` diabaikan,
+  oauth+api_key → 400, dan **log `LogEntry` tidak memuat nilai rahasia** (baca tabel log, assert `sk-super-secret` absen).
+- `_seed` (:85-118) dibuat aditif (`auth_type`/`oauth_token`) → 28 tes lama tidak berubah.
+- Gate PM sendiri: `python3 -m pytest tests/backend -q` = **537 passed, 1 skipped, 0 failed** (baseline 526 + 11).
+- `GET /api/accounts` + `_account_to_dto` TIDAK disentuh → kontrak tahap-1 tetap sah kecuali `1351:81` yang kini usang (supersede di laporan).
+
+### Frontend — `19df593` (fe-dev tahap-5 `ses_f7060031dffeFpTJlMt5NVXMTT`; tahap-6 sesi `ses_f6fd547b4ffee4lli1lcr0VIEO` setelah sesi pertama mati)
+- `static/app.js:1313-1319` tombol `.acc-edit` (`fa-pen`, `aria-label`+`title`) sebelum `.acc-del`; `:1356-1359` cabang handler
+  di listener delegasi `#accList` yang SUDAH ada (nol listener per kartu); `:1444-1571` `#accModal` dua mode
+  (`accModalMode`/`accEditingId`, seed eksplisit mode tambah, `openAccountEditModal` baca `accountRows` tanpa fetch ulang,
+  `setAccountModalChrome` satu tempat untuk semua beda mode, `closeAccountModal` reset ke mode tambah);
+  `:1553-1560` `syncAccountKeyRow` memperluas → baris kunci TERSEMBUNYI + catatan oauth; `:1577-1615` `saveAccountEdit` →
+  `PUT /api/accounts/{id}` HANYA `{label, api_key, enabled}` (akun kunci) / `{label, enabled}` (akun oauth) — ditegaskan tes
+  `toEqual` + `not.toHaveProperty("auth_type"|"priority"|"last_used_at"|"provider_id")`.
+- `static/index.html:991-1044` (`#accOauthNote`, `#accEnabledRow`+switch, id baris prioritas) — `enabled` hanya mode UBAH,
+  `priority` hanya mode TAMBAH (satu pintu untuk satu urusan; mengurut sudah ▲▼).
+- `static/styles.css:1204` ukuran tombol aksi kartu (0 warna hex baru).
+- i18n +7 kunci × 7 kamus (`provider_detail.edit_account|edit_title|save_changes|enabled|oauth_key_note|edit_error|edit_missing`).
+- **Vendoring (aturan G3 — CDN selama ini dipakai PRODUK):** `static/vendor/font-awesome/` 5 berkas **409.388 B**
+  (`LICENSE.txt` 7.427 · `css/all.min.css` 102.641 · woff2 brands 117.372 / regular 25.452 / solid 156.496) diambil dari
+  branch `docs/wiki` dengan `git restore --source=docs/wiki` (nol unduhan, TIDAK ikut ter-staging); PM mencocokkan
+  **hash blob 5/5**. `index.html:43` = `href="vendor/font-awesome/css/all.min.css?v=20260919"`; tag cdnjs DIHAPUS;
+  grep `cdnjs|cdn.jsdelivr|unpkg|@import url("http` pada `static/**` = **0**. `.ttf` (4 rujukan) + `fa-v4compatibility.woff2`
+  sengaja tidak di-vendor (woff2 menang di rantai `src`; family legacy `"FontAwesome"` 0 pemakaian di luar `@font-face`).
+- **Guard BARU** `tests/vendor_assets.test.js` (7 tes, 160 baris): scan STRUKTUR `static/**` (link/script/img/source/iframe/
+  embed/object/video/audio/track + `@import`/`url()` CSS + `<style>` inline) menuntut nol aset eksternal + setiap `woff2`
+  yang dirujuk `@font-face` wajib ada di disk; tautan "Repo" ke github = navigasi, dikecualikan dengan alasan tertulis.
+  Ketajaman dibuktikan dengan sabotase sementara (sisip CDN → 3/7 gagal; singkirkan woff2 → 2/7 gagal; dipulihkan + hash dicocokkan).
+- **Label menu:** `providers.accounts_menu` (kunci TETAP) EN "Alternative/secondary accounts" → **"Manage accounts"**,
+  ID → **"Kelola akun"** (+ ru/nl/ja/zh/zh-tw setingkat). Perilaku item tidak berubah (`accounts|edit|delete`, `fa-users`, `openDetail`).
+  Catatan: teks yang dikira user "contoh" itu nilai kamus EN — bahasa aplikasi sedang di-set Inggris.
+- Cache-buster serentak `20260919` (V/styles/i18n/app — dijaga `tests/i18n.test.js:307-316`).
+- Tes: `accounts.test.js` 18→27, `provider_detail.test.js` 40→47, +`vendor_assets.test.js` 7 → **25 berkas / 609 tes LOLOS**
+  (gate PM sendiri; nol tes dihapus). Paritas 436 kunci × 7 kamus, hilang 0 thừa 0 kosong 0.
+- `e2e/b5_features.mjs` diperluas (assert `.acc-edit`, chrome tambah vs ubah, auth_type read-only) — `node --check` OK, TIDAK dijalankan.
+
+### Dokumen yang ikut diselaraskan (akibat vendoring — supaya sesi berikutnya tidak menulis fakta lama)
+- `documents/architecture/TSD.md` §3.4 bullet Ikon + **ADR-015 "Aset front-end: vendor lokal, tanpa CDN"** (`b256064`,
+  tech-architect; sensus `documents/architecture/**` = 1 klaim usang, `anthropic-inbound-endpoint.md` bersih).
+- `documents/analysis/FSD.md:321` (rujuk ADR-015, tanpa duplikasi byte/path) + `:454` kebutuhan "dapat dipakai offline"
+  tercatat TERBUKTI + versi spec 1.0→1.1 (`bb759e4`, system-analyst; sensus analisis = 1 klaim usang).
+- `THIRD_PARTY_NOTICES.md` §2 ditulis ulang 118+/18− (`15862bf`, fullstack-dev — berkas root, di luar akar agen lain):
+  tabel berkas + lapisan lisensi, kutipan `LICENSE.txt` per baris (CC BY :13-17 / OFL :21-31 / MIT :121-126 / atribusi :147-156 /
+  syarat redistribusi :80-85), atribusi ditulis nyata, **provenance diakui jujur** ("6.5.1" hanya dari string header CSS,
+  belum diverifikasi terhadap artefak rilis upstream), fallback tak di-vendor + penjaga tes disebut.
+- `documents/plan/wiki-backlog.md`: **WL.5 dicentang SELESAI** (keputusan user = vendor lokal), **WL.4 diperluas** ke provenance FA.
+
+### Keputusan agen di luar perintah (semua DITERIMA PM)
+`enabled` hanya di mode ubah (POST tambah tetap byte-identik) · `auth_type` ditampilkan read-only, bukan disembunyikan ·
+penolakan oauth+`api_key` berlaku termasuk string kosong (UI menyembunyikan kolomnya) · tanpa `log_warning` untuk 4xx
+(meniru gaya modul; kalau mau semua 4xx dicatat = perubahan lintas modul, tugas terpisah) · `window.aigate.backToProviders`
+diekspos + satu tes dibuat deterministik (bukan melemahkan assertion) · `?v=` ikut dipasang di berkas vendor baru.
+
+### BELUM diverifikasi
+Belum di-exercise di peramban nyata (G3) — cukup muat ulang HALAMAN (statis dibaca dari berkas), TIDAK perlu restart server;
+**uji mata mode pesawat** (ikon harus tetap muncul) belum dilakukan; e2e/Playwright belum dijalankan; terjemahan non-EN belum
+ditinjau penutur; provenance FA belum diverifikasi ke hulu (WL.4); `documents/analysis/FSD.md:7,19` masih merujuk path
+`docs/business/BRD.md` yang tidak ada (temuan system-analyst, belum ditugaskan); ahead 19 BELUM push; PR #17 masih terbuka.

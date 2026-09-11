@@ -4,6 +4,41 @@
 (empty — diisi PM saat task pertama)
 
 ## Decisions
+- 2026-09-11 (TAHAP 5+6 — ubah akun, ikon dilokalkan, label menu): satu pesan user memuat tiga permintaan:
+  "localin aja semua aset font atau icon" + "kenapa teks menunya 'Alternative/secondary accounts' itu kan cuma contoh,
+  ganti jadi yang lebih representatif" + "kok gak ada tombol edit ya di daftar secondary account? cuma ada delete doang".
+  RANTAI SEBAB-AKIBAT yang penting dicatat: tombol edit TIDAK ADA karena API-nya memang hanya menerima `priority`
+  (kontrak tahap-1) → jadi backend dulu (`be-dev`), baru layar (`fe-dev`). Bukan kelalaian fe-dev.
+  JAWABAN soal label: teks itu BUKAN contoh/komentar — itu nilai kamus **EN**, dan bahasa aplikasi sedang di-set Inggris
+  (nilai ID-nya "Akun alternatif/sekunder"). Tetap diganti karena kaku di bahasa mana pun → kini "Kelola akun"/"Manage accounts"
+  (+ ru/nl/ja/zh/zh-tw), kunci TETAP `providers.accounts_menu`, perilaku item tak berubah.
+  Backend (`eea7504`): `AccountUpdate` partial pakai `exclude_unset` (absen ≠ kosong → `label=""`/`api_key=""` sah ditulis sadar;
+  `null` = no-op karena kolom NOT NULL); `auth_type`/`last_used_at` tetap tak bisa ditulis (diabaikan senyap); SATU penolakan
+  `api_key` (termasuk `""`) ke akun oauth → 400 `oauth_account_key_readonly`; log hanya NAMA field (ada tes yang membaca
+  `LogEntry` memastikan nilai kunci tak masuk log). Gate PM sendiri: **537 passed, 1 skipped, 0 failed**.
+  Frontend (`19df593`): `.acc-edit` per kartu lewat listener delegasi yang sudah ada; `#accModal` DUA MODE (tambah|ubah) tanpa
+  modal ketiga, chrome disatukan di satu fungsi, reset saat ditutup; PUT hanya `{label,api_key,enabled}` / `{label,enabled}`
+  (oauth: kolom kunci DISEMBUNYIKAN supaya UI tidak pernah menabrak 400); `enabled` hanya di mode ubah, `priority` hanya di
+  mode tambah (▲▼ satu-satunya pintu mengurut). Tes 18→27 dan 40→47, nol tes dihapus.
+  VENDOR (aturan G3 selama ini DILANGGAR produk, bukan oleh kita): FA Free 6.5.1 diambil dari branch `docs/wiki` lewat
+  `git restore --source=docs/wiki` (nol unduhan, nol staging), 5 berkas 409.388 B, **hash blob 5/5 PM cocokkan sendiri**;
+  `index.html:43` path relatif; grep `cdnjs|jsdelivr|unpkg|@import url("http` = 0. Guard BARU `tests/vendor_assets.test.js`
+  (7 tes, scan STRUKTUR bukan daftar hitam host) + ketajamannya dibuktikan dengan sabotase sementara (sisip CDN → 3/7 gagal;
+  hilangkan woff2 → 2/7 gagal; dipulihkan). `.ttf` + `fa-v4compatibility.woff2` sengaja tidak di-vendor (woff2 menang di rantai
+  `src`; family legacy tak dipakai selector) — komentar guard yang tadinya SALAH fakta dikoreksi sesi kedua.
+  INSIDIEN: spawn tahap-6 MATI di tengah ("upstream authentication failed") → PM ulangi handover yang sama; sesi kedua
+  menemukan working tree sudah terisi sebagian lalu MENGAUDIT ULANG total (hash+grep+tes) dan menemukan 1 komentar salah fakta.
+  Pelajaran: spawn yang gagal di tengah = state tak tentu → wajib audit ulang, bukan dipercaya.
+  DOKUMEN YANG MENIPU IKUT DISELARASKAN (biar sesi berikutnya tidak lagi menulis "via CDN"): `TSD.md` §3.4 + **ADR-015
+  "Aset front-end: vendor lokal, tanpa CDN"** (`b256064`, tech-architect), `FSD.md:321` + kebutuhan "dapat dipakai offline"
+  kini tercatat TERBUKTI + spec naik ke 1.1 (`bb759e4`, system-analyst), `THIRD_PARTY_NOTICES.md` §2 ditulis ulang dengan
+  kutipan `LICENSE.txt` per baris + provenance diakui jujur (`15862bf`, fullstack-dev — berkas root, di luar akar agen lain).
+  Gate PM akhir MANDIRI: vitest **25 berkas / 609 tes LOLOS**, paritas 436 × 7 kamus (hilang 0 thừa 0 kosong 0), hash vendor 5/5.
+  KOREKSI UNTUK ENTRI DI ATAS/SEBELUMNYA di berkas ini: pernyataan "Font Awesome masih dari CDN cloudflare (index.html:42)"
+  dan "temuan luar cakupan WL.5" **SUDANG TERTUTUP** hari ini; baris kini `:43`. `documents/plan/wiki-backlog.md` WL.5 dicentang,
+  WL.4 DIPERLUAS mencakup provenance Font Awesome. Supersede kontrak tahap-1: laporan `1351` baris 81 ("PUT accounts HANYA
+  priority") sudah digantikan laporan `1850` (berkas laporan lama tidak diedit = arsip titik-waktu).
+  BELUM: exercise nyata + uji mata offline (G3); e2e belum dijalankan; terjemahan belum ditinjau penutur; ahead 19 BELUM push; PR #17 open.
 - 2026-09-11 (TAHAP 4 — akses lewat menu ⋮, bukan klik nama): user mencoba hasil tahap-3 di layar betulan dan
   menolak pola "nama bisa diklik" ("aneh kalo tap/klik di namanya gitu") → perintahkan item MENU BARU bernama
   "Akun alternatif/sekunder" yang DIGABUNG ke menu tiga titik yang sudah ada. Bentuk+nama+letak ditentukan USER
@@ -18,7 +53,7 @@
   LOLOS = identik baseline** (nol penurunan cakupan), paritas 429 hilang 0 thừa 0 kosong 0, 13 berkas semua
   `src/frontend/**`, diff-check bersih. Glif `fa-users` dibuktikan ada di FA Free 6.5.1 yang di-load.
   TEMUAN LUAR CAKUPAN (tidak disentuh, laporkan ke user): Font Awesome masih dari CDN cloudflare
-  (`index.html:42`) = utang WL.5. PELAJARAN: "akses tersembunyi di teks" gagal di uji mata user walau 586 tes
+  (`index.html:42`) = utang WL.5 — **TERTUTUP hari ini oleh entri TAHAP 5+6 di atas** (keputusan user: vendor lokal). PELAJARAN: "akses tersembunyi di teks" gagal di uji mata user walau 586 tes
   hijau — konsistensi pola tabel lain (nama polos) lebih penting daripada pintasan; aturan D6 soal desain
   perlu menyinggung "jalur masuk fitur = pola yang sudah dikenal user".
 - 2026-09-11 (TAHAP 3 Opsi A — halaman rinci penyedia, DESAIN DULU BARU KODE): user marah "desain multi akun
@@ -170,13 +205,27 @@
 
 ## Progress
 [entri lama dipindah ke `documents/pm/archive/memory-bank-progress-lama.md` — tidak dihapus]
+- 2026-09-11: **TAHAP 5+6 SELESAI — akun bisa DIUBAH, ikon Font Awesome jadi LOKAL, label menu jadi "Kelola akun".**
+  Rantai: user tanya kenapa tidak ada tombol edit → ternyata API hanya menerima `priority` → be-dev perluas `PUT /api/accounts/{id}`
+  (parsial `label|api_key|enabled|priority`, `auth_type`/`last_used_at` tetap milik mesin, 400 `oauth_account_key_readonly`,
+  log tanpa nilai rahasia) → gate PM **537/1skip/0fail** → fe-dev pasang `.acc-edit` + `#accModal` dua mode (oauth: kolom kunci
+  disembunyikan) → 602 tes. Lalu user minta semua aset font/ikon dilokal­kan → FA 6.5.1 di-vendor dari branch `docs/wiki`
+  (`git restore --source`, 5 berkas 409.388 B, hash PM cocokkan 5/5), `index.html:43` relatif, grep CDN = 0, guard baru
+  `tests/vendor_assets.test.js` (7 tes, ketajaman dibuktikan dengan sabotase sementara). Label EN "Alternative/secondary
+  accounts" yang dikira user itu contoh = nilai kamus EN (aplikasi sedang berbahasa Inggris) → diganti "Kelola akun"/"Manage
+  accounts" di 7 kamus, kunci tetap. Dokumen yang masih menulis "via CDN" ikut dibetulkan: TSD + **ADR-015** (`b256064`),
+  FSD 321 + kebutuhan offline terbukti (`bb759e4`), THIRD_PARTY_NOTICES §2 + provenance jujur (`15862bf`).
+  Gate akhir PM: vitest **25 berkas / 609 tes LOLOS**, paritas 436 × 7, `git diff --check` bersih. Commit `eea7504` `19df593`
+  `15862bf` `b256064` `bb759e4` — ahead 19, BELUM push. WL.5 dicentang; WL.4 diperluas ke provenance FA.
+  MENUNGGU USER: muat ulang halaman + uji mata (termasuk mode pesawat → ikon harus tetap muncul), push, PR #17.
+  Laporan: `.opencode/reports/20260911/implementation/1850_ubah-ikon-lokal-label-tahap5-6.md`.
 - 2026-09-11: **TAHAP 4 TERPASANG — akses halaman rinci lewat menu ⋮ "Akun alternatif/sekunder", klik nama DIMATIKAN.**
   User menentukan sendiri bentuk+nama+letak (D6 terpenuhi oleh user). 13 berkas `src/frontend/**` (+63/−55): nama kembali
   teks polos (0 sisa `.prov-name-btn` + listener delegasi dihapus), ⋮ = akun|ubah|hapus pakai infrastruktur menu yang sudah ada
   (tetap satu tombol ⋮), ikon `fa-users` dibuktikan ada di FA Free 6.5.1 ter-load, +1 kunci i18n ×7 (429), cache-buster
   `20260917`, tes + e2e disesuaikan plus penjaga negatif. Gate PM mandiri: vitest **24/586 LOLOS identik baseline**, paritas
   429 hilang 0 thừa 0, 0 hex baru, diff-check bersih. Menunggu: uji mata user (cukup muat ulang halaman, tanpa restart server),
-  push (ahead 10), PR #17. Temuan luar cakupan: Font Awesome masih CDN (WL.5).
+  push (ahead 10), PR #17. Temuan luar cakupan: Font Awesome masih CDN (WL.5) — **ditutup di TAHAP 5+6 (lihat atas)**.
 - 2026-09-11: **TAHAP 3 Opsi A TERPASANG — gate HIJAU (24 berkas / 586 tes).** Proses: koreksi user → rule D6 →
   lembar desain ACC dulu → baru fe-dev 1 putaran tanpa blocker. View `provider-detail` (tanpa entri nav) + 4 kartu
   satu kolom + modal akun + prioritas ▲▼ (PUT hanya yang berubah, selalu baca ulang) + discovery dengan baris status;
