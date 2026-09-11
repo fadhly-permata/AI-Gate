@@ -22,7 +22,9 @@ A12 Fakta dunia luar (status PR/branch/isu/merge) = rekaman titik-waktu: boleh d
 ## B — Penempatan & higienitas berkas
 B1 Semua dokumen proyek di `documents/**`, bukan `docs/**`. [R5]
 B2 Artefak opencode (command/rule/skill/agent) di `.opencode/**` proyek; global hanya bila user menyebut "global". [R6]
-B3 Laporan tugas di `.opencode/reports/[yyyymmdd]/[jenis]/[hhmm]_[slug].md`; root `reports/**` dilarang. [R23] → `.opencode/rules/task-report.md`.
+B3 Laporan tugas di `.opencode/reports/[yyyymmdd]/[jenis]/[hhmm]_[slug].md`; root `reports/**` dilarang.
+   HANYA PM yang menulis berkas laporan — sub-agent mengembalikan receipt di sesi, bukan file laporan.
+   [R23] → `.opencode/rules/task-report.md`.
 B4 Dilarang file/folder baru di root repo; artefak masuk rumah yang sudah ada; belum ada tempat → tanya user. [R33]
 B5 File scratch/temp/one-off wajib dihapus setelah dipakai; produk (`src/**`, `documents/**`, `.opencode/reports/**`) dikecualikan. [R8]
 
