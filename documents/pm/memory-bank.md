@@ -4,7 +4,27 @@
 (empty — diisi PM saat task pertama)
 
 ## Decisions
-- 2026-09-11 (TAHAP 2 UI multiakun 9router — SELESAI tingkat tes): ACC user ("1") → spawn `fe-dev` (agen+skill sudah
+- 2026-09-11 (TAHAP 3 Opsi A — halaman rinci penyedia, DESAIN DULU BARU KODE): user marah "desain multi akun
+  berantakan amat" → PM berhenti, audit realisasi `d1ff215` (6 titik lemah berbukti `file:line`), TULIS RULE
+  **D6** (fitur UI wajib 1 lembar desain + ACC user sebelum spawn fe-dev; kontrak data ≠ persetujuan interaksi;
+  tes hijau ≠ ACC desain), terbitkan lembar desain `documents/pm/handovers/handover-20260911-opsi-a-halaman-
+  rinci-penyedia.md`, DAN TAHAN eksekusi (nol kode disentuh) sampai user menegaskan "coba dulu yang a kita
+  kerjain". Barulah spawn `fe-dev`. D6 TERBUKTI BERGUNA: user mengoreksi arah sebelum ada 1500 baris lagi.
+  Hasil satu putaran (17 berkas `src/frontend/**`, +1527/−1149): view baru `provider-detail` TANPA entri nav
+  (menu sorot Penyedia), 4 kartu satu kolom (profil baca-saja | strategi | akun sebagai kartu | pemakaian),
+  modal akun terpisah, **prioritas ▲▼ = tukar + normalisasi 0..n-1, PUT hanya yang berubah, selalu baca ulang
+  server, PUT berurutan**, `saveProvider` tidak lagi mengirim field strategi (satu pemilik per field — henti
+  timpa-menimpa), discovery senyap + baris status (bukan bisu), tab tahap-2 + 10 kunci i18n mati DICABUT bersih
+  (0 sisa markup), 27 kunci baru → 428/kamus 7/7. Bonus tambalan bug lama: `.form-row[hidden]` masih tampil
+  karena `display:flex` penulis > aturan peramban (`styles.css:511-515`). KOREKSI DEFECT oleh fe-dev yang PM
+  terima: prioritas akun baru = jumlah akun (append), bukan 0 — default 0 bikin akun baru melompati antrean.
+  `usage.js`/`combos.js`/`src/backend/**` NOL sentuh (Kartu D hanya pindah rumah, id lama tetap).
+  Gate PM MANDIRI: vitest **24 berkas / 586 tes LOLOS** (23/547 sebelumnya), parity 7/7 428 hilang 0 thừa 0,
+  `git diff --check` bersih, 0 hex baru, grep sisa tab = 0. Commit `6ede872` (kode) + dokumen PM, BELUM push.
+  BELUM: exercise nyata (G3) — user wajib muat ulang server (J6) + uji mata kartu/▲▼ di HP + mode gelap;
+  Playwright belum jalan; terjemahan 6 bahasa belum ditinjau; ahead 8; PR #17 masih terbuka.
+  BATASAN yang diterima user lewat lembar desain: tanpa rute URL → tidak bisa di-bookmark, back peramban tak berlaku.
+- 2026-09-11 (TAHAP 2 UI multiakun 9router — SELESAI tingkat tes, lalu DITOLAK desainnya): ACC user ("1") → spawn `fe-dev` (agen+skill sudah
   ada → reuse, nol generasi; Task tool TERSEDIA di sesi ini, beda dari sesi backend kemarin). Handover memuat kontrak
   tahap-1 + peta `file:line` yang diverifikasi ULANG PM sebelum tulis (anchor checkpoint lama masih valid). Hasil: modal
   provider ber-tab ARIA `[Provider|Akun]` (keyboard panah/Home/End, roving tabindex), pemilih strategi
@@ -133,6 +153,13 @@
 
 ## Progress
 [entri lama dipindah ke `documents/pm/archive/memory-bank-progress-lama.md` — tidak dihapus]
+- 2026-09-11: **TAHAP 3 Opsi A TERPASANG — gate HIJAU (24 berkas / 586 tes).** Proses: koreksi user → rule D6 →
+  lembar desain ACC dulu → baru fe-dev 1 putaran tanpa blocker. View `provider-detail` (tanpa entri nav) + 4 kartu
+  satu kolom + modal akun + prioritas ▲▼ (PUT hanya yang berubah, selalu baca ulang) + discovery dengan baris status;
+  tab tahap-2 & 10 kunci i18n mati dibongkar bersih (0 sisa), 27 kunci baru (428 × 7 kamus), bonus tambalan
+  `.form-row[hidden]`. `usage.js`/`combos.js`/`src/backend/**` nol sentuh. Commit `6ede872` + dokumen, ahead 8 BELUM push.
+  MENUNGGU USER: muat ulang server + uji mata di HP (G3), push, PR #17.
+  Laporan: `.opencode/reports/20260911/implementation/1100_ui-halaman-rinci-penyedia-tahap3.md`.
 - 2026-09-11: **TAHAP 2 UI multiakun 9router SELESAI — HIJAU di tingkat tes.** fe-dev spawned (reuse agen+skill), 2 putaran.
   Modal provider ber-tab ARIA (Provider|Akun) + pemilih strategi + limit sticky kondisional + kolom Prioritas/Last-used di
   tab akun; UI discovery dihapus, `/discover` jalan diam-diam; jalur masuk kartu detail pindah ke tombol nama. Combo &

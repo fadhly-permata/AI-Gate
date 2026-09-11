@@ -2,6 +2,32 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260911-1105 — TAHAP 3 Opsi A dibangun setelah ACC desain (fe-dev, 1 putaran) — gate PM HIJAU (ProjectManager)
+- Perintah user: "coba dulu yang a kita kerjain" = ACC lembar desain → baru spawn. **Rule D6 dipatuhi penuh** (nol kode sebelum ACC; 07:05→10:5x hanya handover + kerja agen).
+- Spawn `fe-dev` (sesi `ses_f721dd91bffeZOiRtn33N0XqnF`), reuse agen+skill. Handover = lembar desain + kontrak tahap-1
+  + peta `file:line` `d1ff215` yang harus dibongkar + batas tulis (haram `usage.js`, `combos.js`, `src/backend/**`) + definisi selesai.
+- Hasil: 17 berkas `src/frontend/**` (+1527/−1149). **Tanpa blocker**: `usage.js` tidak tersentuh — Kartu D hanya pindah rumah
+  (id lama `provUsageMsg`/`provUsageTotals`/`provUsageModelBody` tetap).
+  View baru `provider-detail` TANPA entri nav (paritas nav `views.test.js` utuh, sorot menu = Penyedia), 4 kartu satu kolom,
+  modal akun `#accModal` sendiri, prioritas ▲▼ (tukar + normalisasi `0..n-1`, PUT hanya yang berubah, PUT berurutan,
+  selalu baca ulang dari server, batas atas/bawah `aria-disabled` + alasan), `saveProvider` tidak lagi mengirim field strategi
+  (satu pemilik per field), discovery senyap + baris status teks (gagal = `console.warn`, R12), tab tahap-2 + 10 kunci i18n
+  mati DICABUT (0 sisa), 27 kunci baru → 428 kunci × 7 kamus, cache-buster `20260916`.
+  TAMBALAN BUG LAMA di luar daftar: `.form-row[hidden]` masih tampil karena `display:flex` penulis > aturan peramban
+  (`styles.css:511-515`) — tanpa ini baris limit sticky "tersembunyi" sebenarnya terlihat.
+- KOREKSI DEFECT oleh fe-dev yang PM terima: prioritas akun BARU = jumlah akun saat ini (append), BUKAN 0 — default 0
+  membuat akun baru melompati seluruh antrean ("angka kecil = lebih dulu"). Di luar acuan, masuk akal, dites.
+- GATE PM MANDIRI: `node node_modules/.bin/vitest run` = **24 berkas / 586 tes LOLOS** (sebelum 23/547);
+  `i18n-parity-check.mjs` 7/7 = 428 kunci hilang 0 thừa 0 kosong 0; `git status` = 17 berkas semua `src/frontend/**`;
+  grep sisa tab (`provTabList|provPanelAccounts|modal-tab|prov-tabpanel|wireProvTabs`) = 0; 4 kunci dicabut = 0 di 7 kamus;
+  0 warna hex baru; `git diff --check` bersih; `node --check` app.js + `e2e/b5_features.mjs` OK.
+- Tes: `provider_detail.test.js` BARU 40 tes; tes tab tahap-2 DIPINDAH jadi tes perilaku nyata (tabel pemindahan di
+  laporan §6) — nol penghapusan tanpa pengganti; providers 32→27, accounts 17→18, views 25→27, row-actions 4→5, usage retarget.
+- Commit: `6ede872` (kode) + dokumen PM (laporan 1100, register, memory bank, state, status). TIDAK push (user belum perintah; ahead 8).
+- BELUM / NEXT: user muat ulang server (J6 = hak user) lalu **uji mata** kartu akun + ▲▼ di layar sempit & mode gelap (G3);
+  Playwright/e2e belum dijalankan; terjemahan 6 bahasa belum ditinjau penutur; keputusan push + review PR #17 masih di user.
+- Laporan: `.opencode/reports/20260911/implementation/1100_ui-halaman-rinci-penyedia-tahap3.md`.
+
 ## 20260911-0655 — Opsi A DIPILIH user → lembar desain diterbitkan, eksekusi DITAHAN menunggu ACC (ProjectManager)
 - Perintah user: "kita coba dulu opsi a" (halaman rinci penyedia). Rule **D6** dijalankan: belum ada satu berkas `src/**` yang disentuh.
 - Lembar desain: `documents/pm/handovers/handover-20260911-opsi-a-halaman-rinci-penyedia.md` — denah 2 layar, flow 6 langkah,

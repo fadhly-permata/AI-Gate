@@ -1519,3 +1519,63 @@ dipanggil diam-diam; purging = riuh 7 berkas tanpa nilai tes). Boleh dicabut use
 Aplikasi nyata (butuh muat ulang server oleh user — J6, keputusan user) + uji mata papan ketik/tab
 di HP (G3); Playwright belum dijalankan; terjemahan 6 bahasa belum ditinjau penutur;
 commit belum di-push; PR #17 masih terbuka.
+
+## 2026-09-11 — OPSI A halaman rinci penyedia (tahap-3 UI multiakun; commit `6ede872`, BELUM push)
+
+**Asal:** user menilai tahap-2 berantakan → PM audit (6 titik, bukti di blok 20260911-0645) → rule **D6**
+(lembar desain + ACC sebelum fe-dev) → user pilih "coba dulu opsi a" → ACC ditekan pada lembar desain →
+`fe-dev` spawned (sesi `ses_f721dd91bffeZOiRtn33N0XqnF`, 1 putaran, tanpa blocker).
+Lembar desain: `documents/pm/handovers/handover-20260911-opsi-a-halaman-rinci-penyedia.md`.
+Laporan: `.opencode/reports/20260911/implementation/1100_ui-halaman-rinci-penyedia-tahap3.md`.
+Batas lingkup dijaga: **nol `src/backend/**`, nol `combos.js`, nol `usage.js`** (Kartu D pakai id lama).
+
+### Perubahan (17 berkas `src/frontend/**`, +1527/−1149)
+- `static/index.html` (+256/−183): `#provDetail` lama DIHAPUS (:311); view BARU `.view.provider-detail
+  [data-view="provider-detail"]` (:316-465) = kepala (`#provDetailBackBtn` :332, judul+badge, Ubah/Hapus
+  :341-347) + Kartu A profil baca-saja `<dl>` (:352-389, status `#pdModelStatus` :388) + Kartu B strategi
+  (`#pdStrategy` :400-404, `#pdStickyRow`/`#pdStickyLimit` :407-410, `#pdStrategySaveBtn` :412,
+  `#pdStrategyMsg` :415) + Kartu C akun (`#pdAccAddBtn`/`#provConnectOAuthBtn`/`#pdAccReloadBtn`,
+  `#accList` DIV :443 — tabel 6 kolom hilang) + Kartu D pemakaian (:446-465); `#provModal` jadi profil-only
+  (:901-976); modal BARU `#accModal` (:978-1018); cache-buster `20260915→20260916`.
+- `static/app.js` (+497/−314): `navViewFor` + sorot nav Penyedia TANPA entri nav baru (:78-88,162-174);
+  `openDetail`/`loadProviderDetail`/`backToProviders` (:1032-1136); `saveProvider` TIDAK lagi mengirim
+  field strategi (:985-1030); `saveStrategy` PUT HANYA 2 field routing + clamp ≥1 + 400 inline di kartunya
+  (:1138-1186); discovery senyap + baris status + `discoverSeq` + gagal `console.warn` (R12) (:1190-1237);
+  akun dirender KARTU (posisi 1..n, kunci polos ber-`title`, ▲▼ `aria-disabled` beralasan) (:1259-1364);
+  `moveAccount` tukar → normalisasi `0..n-1` → PUT hanya yang berubah → selalu baca ulang server, PUT
+  berurutan (:1366-1412); modal akun (:1438-1528); `wireProviderUi()` terpadu (:1607-1668); ekspor
+  `window.aigate` dipangkas.
+- `static/styles.css` (+142/−32): hapus `.modal-tabs/.modal-tab/.prov-tabpanel/.acc-priority/.acc-never/
+  .providers-detail` (0 rujukan tersisa); halaman rinci :1083-1156; kartu akun :1158-1238 (sentuh ▲▼
+  44px di ponsel); **tambalan bug lama** :511-515 `.form-row[hidden]{display:none}` (`display:flex` penulis
+  mengalahkan `[hidden]` peramban → baris "hidden" sebelumnya masih tampil). NOL warna hex baru.
+- `static/i18n/{en,id,ru,nl,ja,zh,zh-tw}.js`: 10 kunci mati dicabut (`providers.tab_*`,
+  `providers.tabs_label`, `providers.strategy`, `providers.sticky_limit`, `accounts.priority`,
+  `accounts.last_used`, `accounts.never_used`, `accounts.save_first`, `accounts.none`), 27 kunci baru
+  (`providers.models_hint|models_failed` + `provider_detail.*`) → **428 kunci/kamus**, paritas 7/7 lolos.
+- `tests/provider_detail.test.js` BARU (40 tes): 4 kartu, Kembali, ▲▼ (2 PUT pada daftar 0..n-1; semua-0;
+  batas aria-disabled; gagal → pesan inline + baca ulang), Kartu B satu-satunya pemilik strategi,
+  modal akun POST `priority`, kosong-state, Kartu D menunjuk `loadProviderUsage`, 10 kunci dicabut tak
+  menggantung, "app.js tidak punya logika tab tersisa".
+- `tests/providers.test.js` 32→27 (tab→"profil-only"), `tests/accounts.test.js` 17→18 (kartu, bukan tabel),
+  `tests/views.test.js` 25→27 (view baru TANPA entri nav), `tests/row-actions.test.js` 4→5 (tooltip Model),
+  `tests/usage.test.js` (1 tes retarget id). Tabel pemindahan tes lama→baru lengkap di laporan §6.
+- `e2e/b5_features.mjs` (+71/−43): alur B5.1 = `.prov-name-btn` → halaman rinci → kepala → `#pdApiKey`
+  polos → `#pdStrategy`+simpan → `#accList .acc-card` (assert tanpa tabel) → `#accModal` → Kembali.
+  `node --check` OK; BELUM dijalankan (nol browser di Termux).
+
+### Gate PM (mandiri)
+`node node_modules/.bin/vitest run` = **24 berkas / 586 tes LOLOS** (sebelum 23/547);
+`i18n-parity-check.mjs` 7/7 kode = 428 kunci, hilang 0 thừa 0 kosong 0; grep sisa tab di `static/**` = 0;
+grep 4 kunci dicabut di 7 kamus = 0; `git status --short` = 17 berkas semua `src/frontend/**`;
+0 hex baru; `git diff --check` bersih; `node --check` app.js + e2e OK; `rules-index.py` LOLOS.
+
+### Keputusan fe-dev di luar acuan (semua diterima PM)
+Prioritas akun baru = jumlah akun (append) — **koreksi defect nyata**: default 0 bikin akun baru melompati
+antrean; `accounts.none` ikut dicabut; PUT berurutan (bukan serentak) agar urutan server pasti;
+`stopOAuthPoll()` saat berpindah penyedia; permukaan `window.aigate` dipangkas.
+
+### BELUM diverifikasi
+Belum di-exercise di aplikasi nyata (G3) — user wajib muat ulang server (J6) + uji mata kartu/▲▼ di HP dan
+mode gelap; Playwright belum jalan; terjemahan 6 bahasa belum ditinjau penutur; halaman rinci tanpa rute
+URL (tidak bisa di-bookmark, back peramban tak berlaku — diterima di lembar desain); ahead 8, PR #17 open.
