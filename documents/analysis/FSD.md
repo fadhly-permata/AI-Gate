@@ -1,7 +1,8 @@
 # Functional Specification Document (FSD): aigate
 
-**Versi:** 1.0
-**Tanggal:** 2026-09-03
+**Versi:** 1.1
+**Tanggal:** 2026-09-03 (revisi 2026-09-11)
+**Revisi 1.1 (2026-09-11):** koreksi fakta — §2.7 tidak lagi menyebut "ikon via Font Awesome CDN"; aset ikon di-vendor lokal (TSD ADR-015). §4 mencatat kebutuhan "zero external runtime" berlaku juga untuk lapisan UI dan kini terbukti terpenuhi.
 **Penulis:** System Analyst (stand-in)
 **Sumber rujukan:** `documents/PRD.md` (PRD aigate), `docs/business/BRD.md` (BRD aigate), `documents/pm/memory-bank.md`, `documents/pm/status.md`
 **Storage engine target:** SQLite (lihat PRD §3 — Configuration Engine)
@@ -317,7 +318,7 @@ Konsol manajemen (Providers, Combos, Proxy Pools, Endpoints, CLI Tools) dan Term
 4. Klik pengalih bahasa → muat kamus `i18n[locale]` → ganti node ber-`data-i18n` → simpan localStorage.
 5. Tema & i18n bersifat global (mencakup Terminal pane); tidak ada round-trip ke backend.
 
-**Catatan implementasi (TSD §3.4):** Tanpa framework/build (ADR-001) — layout & gaya ditulis vanilla CSS meniru AdminLTE; ikon via Font Awesome CDN (atau SVG inline); tema via CSS custom properties.
+**Catatan implementasi (TSD §3.4):** Tanpa framework/build (ADR-001) — layout & gaya ditulis vanilla CSS meniru AdminLTE; ikon via Font Awesome yang **di-vendor lokal, tanpa CDN** (ADR-015 — rumah keputusan daftar berkas, path, ukuran, dan penjaga tesnya ada di TSD §3.4/ADR-015; tidak diduplikasi di sini); tema via CSS custom properties.
 
 **Traceability**
 - US-2.7.1 (Collapsible Sidebar) — M
@@ -450,6 +451,7 @@ Entitas tambahan (adopsi 9router): `ProviderAccount` (banyak akun per Provider; 
 - **Multiplatform:** config SQLite portabel antar OS.
 - **Low footprint:** health check & gateway background ringan.
 - **Native Python run:** aigate dijalankan langsung sebagai aplikasi Python (tanpa deployment/container, tanpa packaging); semua entitas di storage lokal, zero external runtime.
+- **Aset UI offline-safe (revisi 2026-09-11):** prinsip "zero external runtime" di atas juga berlaku untuk lapisan penyajian UI. Kebutuhan implisit "dapat digunakan offline" kini TERBUKTI terpenuhi: seluruh aset front-end (pustaka JS/CSS/font/ikon) di-vendor lokal tanpa CDN — keputusan di TSD ADR-015, ditegakkan otomatis oleh tes penjaga `src/frontend/tests/vendor_assets.test.js` (nol rujukan aset eksternal). Tidak ada permintaan jaringan keluar untuk memuat UI. Aturan induk: `documents/pm/OPERATING_RULES.md` tema G3.
 
 ---
 
