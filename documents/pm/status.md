@@ -2,6 +2,29 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260913-0330 — Konfirmasi user: restart SUDAH dilakukan, PR #19 DI-MERGE, server uji tertinggal dimatikan (ProjectManager)
+- User: "iya gua baru aja mulai ulang aplikasi aigate" → cocok dengan ukuran PM: pelayan `:8080` kini `AccountUpdate =
+  ['api_key','enabled','label','priority']` (sebelum restart hanya `['priority']`). **Fitur "Ubah akun" kini aktif di aplikasi user.**
+- User: "pr #19 udah gua merge" → diverifikasi ke API: `#19 state closed, merged True, merged_at 2026-09-12T20:21:41Z,
+  merge commit 467b7f6, merged_by fadhly-permata`, label `bug`+`documentation`, 8 commit / 17 berkas / +748 −46.
+  `refactor/ui` di-fast-forward ke `467b7f6` (nol commit merge baru, nol konflik).
+- User: "server uji matiin aja kalo udah gak dipake" → **sebelum membunuh, PM mengidentifikasi pemiliknya** lewat
+  `/proc/<pid>/fd`: PID 5934 = `run.py --port 8251` membuka basis data SEMENTARA
+  (`$TMPDIR/opencode/fe-followup/inst.db`) = sisa sesi fe-dev yang koneksi-nya putus, BUKAN aplikasi user
+  (milik user = PID 15777 membuka `~/.aigate/aigate.db`). Hanya PID 5934 yang dimatikan (SIGTERM spesifik-PID, nol `pkill`);
+  folder sementara ikut dihapus (B5). Verifikasi sesudahnya: `:8251` = 000 (mati), `:8080` = 200 dan `{"status":"ok"}`,
+  satu proses aigate tersisa = milik user. Ini pengecualian terukur dari aturan restart — atas perintah eksplisit user,
+  dan hanya untuk proses uji; proses user tidak pernah disentuh.
+- User: "teks lisensi gak perlu di simpan di dokumen analisis/arsitektur/bisnis" → PM memahami ini MENOLAK dua usulan
+  PM (vendor teks lisensi MIT xterm + perlebar gerbang aturan ke `documents/{analysis,architecture,business}/**`).
+  TIDAK ada yang dihapus/dirombak sebagai efek kalimat ini: teks lisensi yang sudah ada tetap di tempatnya
+  (`THIRD_PARTY_NOTICES.md` + `LICENSE.txt` milik Font Awesome di folder vendor). Kalau maksud user sebenarnya
+  "hapus kutipan lisensi dari dokumen itu", koreksi → PM jalankan sebagai tugas terpisah.
+  Akibat pencatatan: `WL.4` dibiarkan `[~]` selamanya (provenance versi = selesai; vendor teks lisensi xterm = DITOLAK user),
+  dan kelas kesalahan "rujukan hantu di dokumen" TIDAK akan dicek otomatis — keputusan user, dicatat agar tidak ditanya ulang.
+- SISA menunggu user: tes mata "Ubah akun" tersimpan + uji mode pesawat untuk ikon; bentuk favicon (netral atau logo);
+  pilih pekerjaan berikutnya (wiki 2–8 / Chat Fase 6 / skrip pasang CLI / moda anthropic-inbound).
+
 ## 20260913-0310 — KEBENARAN BARU: browser NYATA ada di Termux + API user ternyata SUDAH kode baru + 6 bug perkakas uji diperbaiki (qa-engineer → fe-dev → PM)
 - **Koreksi klaim berulang di laporan sesi ini** ("mustahil ada browser di Termux → uji nyata harus dikerjakan user"): SALAH.
   `/data/data/com.termux/files/usr/bin/chromium-browser --version` = `Chromium 149.0.7827.155`, dan `node_modules` sudah
