@@ -220,6 +220,7 @@ window.I18N.ja = {
     "combos.error": "問題が発生しました。もう一度お試しください。",
     "combos.no_items": "まだコンボがありません。",
     "combos.strategy.three_tier": "3段階（サブスク → 低コスト → 無料）",
+    "combos.strategy.round_robin": "Round robin",
     "combos.strategy.fallback": "フォールバック",
     "combos.strategy.load_balance": "負荷分散",
     "combos.strategy.latency_cost": "レイテンシ/コスト",

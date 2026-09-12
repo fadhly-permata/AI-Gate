@@ -192,6 +192,10 @@ class Combo(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     strategy: Mapped[str] = mapped_column(String, default="fallback")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Combo ``round_robin`` cursor (task 2026-09-13). Index into the
+    # priority-asc candidate list; wrapped with modulo at selection time.
+    # Mirrors ``ProxyPool.last_used_index`` (B2.3). Defaults to 0.
+    last_used_index: Mapped[int] = mapped_column(Integer, default=0)
 
     members: Mapped[list["ComboMember"]] = relationship(back_populates="combo")
     bindings: Mapped[list["EndpointBinding"]] = relationship(

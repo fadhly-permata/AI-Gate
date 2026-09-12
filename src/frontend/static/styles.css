@@ -832,8 +832,27 @@ body[data-device="phone"] .modal { width: 100%; }
 /* Drag handle for reordering combo-member rows: the SECOND reorder affordance
    alongside ▲▼. Pointer Events (not the whole row) drive it so touch + mouse
    share one path; touch-action:none stops the table scrolling under a finger. */
-.js-mem-drag { touch-action: none; cursor: grab; }
-.js-mem-drag:active { cursor: grabbing; }
+ .js-mem-drag { touch-action: none; cursor: grab; }
+ .js-mem-drag:active { cursor: grabbing; }
+
+ /* Transient highlight on the row that just moved (▲▼ OR drag-drop reorder).
+    Token-only colours (no new hex): a brief accent tint that fades. Animates
+    background-color only — paint, never layout — so no reflow / flicker / dup
+    rows. combos.js adds `.just-moved` on the moved row, then removes it. */
+ @keyframes member-row-just-moved {
+   from { background-color: color-mix(in srgb, var(--accent) 22%, transparent); }
+   to   { background-color: transparent; }
+ }
+ .member-row.just-moved { animation: member-row-just-moved 600ms ease-out; }
+
+ /* Minimal in-drag feedback, sitting alongside the existing grab cursor. */
+ .member-row.is-dragging {
+   background-color: color-mix(in srgb, var(--accent) 14%, transparent);
+ }
+
+ @media (prefers-reduced-motion: reduce) {
+   .member-row.just-moved { animation: none; }
+ }
 
 /* Danger variant */
 .btn-danger { background: #dc3545; color: #fff; }

@@ -1,12 +1,16 @@
 """Combo strategy routing engine (task B2.4).
 
-Implements the three Combo strategies from FSD.md §2.3 / TSD §4.3:
+Implements the Combo strategies from FSD.md §2.3 / TSD §4.3:
 
 * ``fallback``      — try members in ``priority`` asc order; on ``UpstreamError``
   log a warning and advance to the next; re-raise the LAST error if all fail.
 * ``load_balance``  — weighted random selection across members.
 * ``latency_cost``  — pick the lowest-``weight`` member (weight models relative
   cost), tie-break by ``priority`` asc. Single attempt, no retry.
+* ``round_robin``   — one member at a time in ``priority`` asc order, wrapping
+  around (``combo.last_used_index`` cursor, modulo ``len(candidates)``). ``weight``
+  is IGNORED. Single attempt, no retry within the request; the cursor advances
+  even on failure so the next request does not repeat the just-failed member.
 
 ADR-011 / R12: every method logs to ``LogEntry`` via ``backend.log``; no
 swallowed exceptions.
@@ -226,8 +230,10 @@ def select_member(
     strategy: str,
     candidates: List[ResolvedTarget],
     session: Optional[Session] = None,
+    combo: Optional[Combo] = None,
 ) -> ResolvedTarget:
-    """Pick a single member for ``load_balance`` / ``latency_cost``.
+    """Pick a single member for ``load_balance`` / ``latency_cost`` /
+    ``round_robin``.
 
     ``fallback`` is NOT used here (it is handled by :func:`execute_combo`).
 
@@ -235,13 +241,23 @@ def select_member(
       floor of ``0.0001`` so zero-weight members are still reachable.
     * ``latency_cost`` -> lowest ``weight``, tie-break by ``priority`` asc
       (candidates are already ordered by priority). Single attempt, no retry.
+    * ``round_robin`` -> ``candidates[combo.last_used_index % n]`` (candidates
+      are ordered by ``priority`` asc), then advance ``combo.last_used_index``
+      and persist it via ``session`` (commit, like ``ProxyPool.select_node``).
+      ``weight`` is ignored — selection is purely positional. Single attempt,
+      no retry; the cursor advances even when the chosen member fails so the
+      next request moves on past the just-failed member.
 
     :param strategy: combo strategy string.
     :param candidates: non-empty ordered candidate list.
-    :param session: reserved for B2.5 (per-node latency lookups); unused now.
+    :param session: active SQLAlchemy session used to persist the ``round_robin``
+      cursor; ignored for the other strategies (pass-through for B2.5 latency
+      lookups too).
+    :param combo: the owning :class:`Combo` (required only for ``round_robin``
+      cursor read/advance). When ``None`` for ``round_robin``, falls back to the
+      first (priority asc) candidate for safety.
     :raises UpstreamError: if ``candidates`` is empty (nothing to select).
     """
-    _ = session  # reserved for future latency data (B2.5)
     if not candidates:
         raise UpstreamError(
             502,
@@ -266,6 +282,27 @@ def select_member(
         # `weight` therefore models RELATIVE COST: choose the lowest-weight
         # candidate, tie-break by priority asc. Single attempt, no retry.
         return min(candidates, key=lambda c: (c.weight, c.priority))
+
+    if strat == "round_robin":
+        # Single attempt, weight ignored — pick strictly by priority-asc order
+        # (the cursor into the already-ordered candidate list), then advance.
+        if combo is None:
+            return candidates[0]
+        n = len(candidates)
+        cursor = combo.last_used_index % n
+        chosen = candidates[cursor]
+        combo.last_used_index = (combo.last_used_index + 1) % n
+        if session is not None:
+            try:
+                session.commit()
+            except Exception as exc:  # noqa: BLE001 - cursor persist must not crash
+                log_warning(
+                    f"select_member: failed to persist round_robin cursor for "
+                    f"combo {getattr(combo, 'id', '?')}: {exc}",
+                    source=LOG_SOURCE,
+                )
+                session.rollback()
+        return chosen
 
     # fallback / unknown -> single select is not used by execute_combo; default
     # to the first (priority asc) candidate for safety.
@@ -349,6 +386,43 @@ async def execute_combo(
                         context={"provider_id": target.provider_id, "account_id": acc.id},
                     )
             account_creds[target.provider_id] = creds
+
+        # round_robin: persistent cursor selection + single attempt. Runs while
+        # the session is still open so the advanced cursor can be committed
+        # (mirrors ProxyPool.select_node). Weight is ignored; the choice is
+        # positional in the priority-asc candidate list. No intra-request retry;
+        # the cursor advances even on failure (handled inside select_member
+        # before the network call).
+        if strategy == "round_robin":
+            if not candidates:
+                raise UpstreamError(
+                    502,
+                    {
+                        "error": {
+                            "message": f"combo '{combo_name}' has no usable members",
+                            "type": "upstream_error",
+                            "code": "combo_no_members",
+                        }
+                    },
+                )
+            target = select_member(strategy, candidates, session, combo=combo)
+            result = await provider_adapter.chat_completion(target, payload, proxy_url)
+            # B5.5: record usage for the selected member (fail-open inside usage).
+            usage_service.record_usage_from_result(
+                result,
+                provider_id=target.provider_id,
+                account_id=target.account_id,
+                model=target.upstream_model,
+                endpoint_id=endpoint_id,
+                saved_tokens_est=saved_tokens_est,
+            )
+            log_info(
+                f"execute_combo: round_robin success via member "
+                f"(model={target.upstream_model})",
+                source=LOG_SOURCE,
+                context={"combo": combo_name, "model": target.upstream_model},
+            )
+            return result
 
     # three_tier reuses the sequential fallback semantics (advance on error);
     # the only difference (tier ordering) is already applied in build_candidates.

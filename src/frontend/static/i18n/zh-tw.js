@@ -222,6 +222,7 @@ window.I18N["zh-tw"] = {
     "combos.error": "發生錯誤，請再試一次。",
     "combos.no_items": "尚無組合。",
     "combos.strategy.three_tier": "三層式（訂閱 → 廉價 → 免費）",
+    "combos.strategy.round_robin": "Round robin",
     "combos.strategy.fallback": "備援",
     "combos.strategy.load_balance": "負載平衡",
     "combos.strategy.latency_cost": "延遲/成本",

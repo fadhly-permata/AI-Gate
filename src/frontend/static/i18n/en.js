@@ -219,6 +219,7 @@ window.I18N.en = {
     "combos.error": "Something went wrong. Please try again.",
     "combos.no_items": "No combos yet.",
     "combos.strategy.three_tier": "Three-tier (subscription → cheap → free)",
+    "combos.strategy.round_robin": "Round robin",
     "combos.strategy.fallback": "Fallback",
     "combos.strategy.load_balance": "Load balance",
     "combos.strategy.latency_cost": "Latency/cost",

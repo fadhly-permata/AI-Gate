@@ -218,6 +218,7 @@ window.I18N.ru = {
     "combos.error": "Что-то пошло не так. Повторите попытку.",
     "combos.no_items": "Комбо пока нет.",
     "combos.strategy.three_tier": "Трёхуровневая (подписка → дешёвая → бесплатная)",
+    "combos.strategy.round_robin": "Round robin",
     "combos.strategy.fallback": "Резервирование",
     "combos.strategy.load_balance": "Балансировка нагрузки",
     "combos.strategy.latency_cost": "Задержка/стоимость",

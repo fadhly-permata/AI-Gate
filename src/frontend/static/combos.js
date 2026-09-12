@@ -87,6 +87,8 @@
   var modelFetchSeq = 0;        // race-guard token for the model auto-fetch
   var modelLoading = false;     // true while a discover fetch is in flight
   var dragState = null;         // active grip-drag: {fromIdx, tr, pointerId}
+  var pendingMovedRef = null;   // member object that just moved (drives the move flash)
+  var movedFlashTimer = null;   // handle for the transient highlight cleanup
 
   /* ---- Pure mapping (importable + testable) ---- */
   function mapComboToRow(c) {
@@ -127,6 +129,18 @@
 
   /* ---- DOM helpers ---- */
   function el(id) { return document.getElementById(id); }
+
+  /* Respect users who asked for minimal motion: when true, the move flash is
+      never started (see renderMembers / scheduleMovedFlash). Guarded so a
+      missing or throwing matchMedia can never break the reorder path. */
+  function prefersReducedMotion() {
+    try {
+      return !!(window.matchMedia &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    } catch (_) {
+      return false;
+    }
+  }
 
   function setMsg(text, kind) {
     var m = el("comboMsg");
@@ -387,15 +401,33 @@
     });
   }
 
+  /* Remove the transient `just-moved` highlight once it has played, so the next
+      render starts clean. Uses a single timer; re-entrancy-safe via clearTimeout.
+      Under reduced motion the class is never added, so this is a no-op there. */
+  function scheduleMovedFlash(body) {
+    var row = body ? body.querySelector("tr.member-row.just-moved") : null;
+    if (!row) return;
+    if (movedFlashTimer) { clearTimeout(movedFlashTimer); movedFlashTimer = null; }
+    movedFlashTimer = setTimeout(function () {
+      var r = body.querySelector("tr.member-row.just-moved");
+      if (r) r.classList.remove("just-moved");
+      movedFlashTimer = null;
+    }, 650);
+  }
+
   /* ---- Members table render ----
-     There is no Priority column: the ROW ORDER is the priority (stage-8), and
-     ▲▼ in the action cell is the only way to change it — the same affordance as
-     the account cards on the provider page. */
+      There is no Priority column: the ROW ORDER is the priority (stage-8), and
+      ▲▼ in the action cell is the only way to change it — the same affordance as
+      the account cards on the provider page. */
   function renderMembers(members, byId) {
     var body = el("comboMembersBody");
     if (!body) return;
     members = members || [];
     byId = byId || providersById();
+    // Capture the move marker for THIS render, then clear it so it can only ever
+    // highlight the single row of the single move that just happened.
+    var movedRef = pendingMovedRef;
+    pendingMovedRef = null;
     if (!members.length) {
       body.innerHTML = '<tr><td colspan="4" class="empty-cell">' +
         escapeHtml(getStr("combos.members.none")) + "</td></tr>";
@@ -403,6 +435,13 @@
     }
     var total = members.length;
     body.innerHTML = members.map(function (m, i) {
+      // Flash the row that just moved (▲▼ OR drag). Matched by object reference
+      // in buffer mode, by id after a server reload (new objects from JSON).
+      var movedCls = (movedRef && !prefersReducedMotion() &&
+        (m === movedRef ||
+         (m.id != null && movedRef.id != null &&
+          String(m.id) === String(movedRef.id))))
+        ? " just-moved" : "";
       var prov = byId[String(m.provider_id)];
       var pname = prov ? prov.name : ("#" + m.provider_id);
       var idAttr = m.id != null ? ' data-id="' + escapeHtml(m.id) + '"' : "";
@@ -419,7 +458,7 @@
       var downAttrs = 'aria-label="' + escapeHtml(downLbl) + '" title="' +
         escapeHtml(downOff ? getStr("combos.member.already_last") : downLbl) + '"' +
         (downOff ? ' aria-disabled="true"' : "");
-      return '<tr class="member-row"' + idAttr + ' data-idx="' + i + '">' +
+      return '<tr class="member-row' + movedCls + '"' + idAttr + ' data-idx="' + i + '">' +
         '<td>' +
           '<button type="button" class="icon-btn-small js-mem-drag"' +
             ' aria-label="' + escapeHtml(dragLbl) + '" title="' + escapeHtml(dragLbl) + '">' +
@@ -473,6 +512,10 @@
       // path serves touch + mouse. startDrag guards on .js-mem-drag itself.
       body.addEventListener("pointerdown", startDrag);
     }
+
+    // Transient highlight on the row that just moved (▲▼ OR drag). Purely
+    // cosmetic — never touches the order logic or the wiring above.
+    if (movedRef && !prefersReducedMotion()) scheduleMovedFlash(body);
   }
 
   /* ---- Priority = row order (stage-8) ----
@@ -547,6 +590,7 @@
     var swap = order[index];
     order[index] = order[target];
     order[target] = swap;
+    pendingMovedRef = swap; // flash the row that changed position
     return applyOrderAndPersist(order);
   }
 
@@ -572,6 +616,7 @@
       if (order[i] !== list[i]) unchanged = false;
     }
     if (unchanged) return Promise.resolve();
+    pendingMovedRef = item; // flash the row that changed position
     return applyOrderAndPersist(order);
   }
 
@@ -606,6 +651,7 @@
       try { tr.setPointerCapture(e.pointerId); } catch (_) {}
     }
     dragState = { fromIdx: fromIdx, tr: tr, pointerId: e.pointerId };
+    if (tr) tr.classList.add("is-dragging"); // minimal in-drag feedback (token tint)
     document.addEventListener("pointermove", onGripPointerMove);
     document.addEventListener("pointerup", onGripPointerUp);
     document.addEventListener("pointercancel", onGripPointerUp);
@@ -624,6 +670,7 @@
     document.removeEventListener("pointercancel", onGripPointerUp);
     var from = dragState.fromIdx;
     var tr = dragState.tr;
+    if (tr) tr.classList.remove("is-dragging");
     if (tr && typeof tr.releasePointerCapture === "function" && dragState.pointerId != null) {
       try { tr.releasePointerCapture(dragState.pointerId); } catch (_) {}
     }

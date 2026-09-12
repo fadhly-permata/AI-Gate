@@ -213,6 +213,7 @@ window.I18N.nl = {
     "combos.error": "Er is iets misgegaan. Probeer het opnieuw.",
     "combos.no_items": "Nog geen combo's.",
     "combos.strategy.three_tier": "Drie niveaus (abonnement → goedkoop → gratis)",
+    "combos.strategy.round_robin": "Round robin",
     "combos.strategy.fallback": "Fallback",
     "combos.strategy.load_balance": "Lastverdeling",
     "combos.strategy.latency_cost": "Latentie/kosten",

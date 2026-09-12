@@ -221,6 +221,7 @@ window.I18N.id = {
     "combos.error": "Terjadi kesalahan. Silakan coba lagi.",
     "combos.no_items": "Belum ada kombo.",
     "combos.strategy.three_tier": "Tiga tingkat (langganan → murah → gratis)",
+    "combos.strategy.round_robin": "Round robin",
     "combos.strategy.fallback": "Fallback",
     "combos.strategy.load_balance": "Beban merata",
     "combos.strategy.latency_cost": "Latensi/biaya",

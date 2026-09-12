@@ -1139,10 +1139,14 @@ describe("combos strategy select — three_tier (B5.2)", () => {
     const doc = indexDocument();
     const sel = doc.getElementById("comboStrategy");
     const values = Array.from(sel.querySelectorAll("option")).map((o) => o.value);
-    expect(values).toEqual(["fallback", "load_balance", "latency_cost", "three_tier"]);
+    expect(values).toEqual(["fallback", "load_balance", "latency_cost", "three_tier", "round_robin"]);
     // i18n label wired on the new option.
     const opt = sel.querySelector('option[value="three_tier"]');
     expect(opt.getAttribute("data-i18n")).toBe("combos.strategy.three_tier");
+    // round_robin option (B. UI) is wired to its own i18n key.
+    const rr = sel.querySelector('option[value="round_robin"]');
+    expect(rr).toBeTruthy();
+    expect(rr.getAttribute("data-i18n")).toBe("combos.strategy.round_robin");
   });
 
   it("i18n has EN + ID labels for three_tier, every combos.member(s) key + the combobox keys", () => {
@@ -1471,5 +1475,115 @@ describe("combos members — drag-to-reorder (grip handle, optie b)", () => {
     await flush();
     expect(stub.calls).toHaveLength(0);
     expect(shownModels()).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("combos members — move animation (▲▼ + drag flash, reduced-motion safe)", () => {
+  // membersBuffer is module-internal, so reset it via openAddModal (which sets
+  // membersBuffer=[] and renders empty) before each test — withComboModalDom
+  // alone does NOT clear it.
+  const realMatchMedia = window.matchMedia;
+  beforeEach(async () => {
+    withComboModalDom();
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve({
+      ok: true, headers: { get: () => "application/json" },
+      json: () => Promise.resolve({ object: "list", data: [] })
+    })));
+    await window.aigate.combos.openAddModal(); // resets membersBuffer=[] + empty render
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    if (realMatchMedia) window.matchMedia = realMatchMedia;
+    else delete window.matchMedia;
+  });
+
+  // Fill the buffer (new-combo mode: no network, synchronous render).
+  function fillBuffer(c) {
+    ["a", "b", "c"].forEach((m) =>
+      c.bufferMemberLocal({ provider_id: 1, provider_model: m, weight: 1 }));
+  }
+
+  it("▲▼ move adds .just-moved to the moved row, then it is removed after the flash", () => {
+    vi.useFakeTimers();
+    try {
+      const c = window.aigate.combos;
+      fillBuffer(c);
+      c.moveMember(0, 1); // a trades with b -> a now at index 1
+      const moved = document.querySelector("#comboMembersBody tr.member-row.just-moved");
+      expect(moved).not.toBeNull();
+      expect(moved.querySelectorAll("td")[1].textContent).toBe("a");
+      // Exactly one row flashes — neighbours are left alone.
+      expect(document.querySelectorAll("#comboMembersBody tr.member-row.just-moved").length).toBe(1);
+      vi.advanceTimersByTime(700);
+      expect(document.querySelector("#comboMembersBody tr.member-row.just-moved")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("drag reorder adds .just-moved to the dropped row (shared contract)", () => {
+    const c = window.aigate.combos;
+    fillBuffer(c);
+    c.reorderMembers(0, 2); // move a to the end -> [b, c, a]
+    const moved = document.querySelector("#comboMembersBody tr.member-row.just-moved");
+    expect(moved).not.toBeNull();
+    expect(moved.querySelectorAll("td")[1].textContent).toBe("a");
+  });
+
+  it("prefers-reduced-motion: no .just-moved is added (no animation under minimal motion)", () => {
+    const orig = window.matchMedia;
+    window.matchMedia = () => ({
+      matches: true, addEventListener() {}, removeEventListener() {},
+      addListener() {}, removeListener() {}
+    });
+    try {
+      const c = window.aigate.combos;
+      fillBuffer(c);
+      c.moveMember(0, 1);
+      expect(document.querySelector("#comboMembersBody tr.member-row.just-moved")).toBeNull();
+      // Rows still render correctly.
+      expect(document.querySelectorAll("#comboMembersBody tr.member-row").length).toBe(3);
+    } finally {
+      if (orig) window.matchMedia = orig; else delete window.matchMedia;
+    }
+  });
+
+  it("reduced-motion / matchMedia path never throws (missing or throwing matchMedia)", () => {
+    const orig = window.matchMedia;
+    // Case 1: matchMedia missing entirely.
+    delete window.matchMedia;
+    try {
+      const c = window.aigate.combos;
+      fillBuffer(c);
+      expect(() => c.moveMember(0, 1)).not.toThrow();
+      expect(document.querySelectorAll("#comboMembersBody tr.member-row").length).toBe(3);
+      // Case 2: matchMedia that throws.
+      window.matchMedia = () => { throw new Error("no matchMedia"); };
+      expect(() => c.moveMember(1, 1)).not.toThrow();
+      expect(document.querySelectorAll("#comboMembersBody tr.member-row").length).toBe(3);
+    } finally {
+      if (orig) window.matchMedia = orig; else delete window.matchMedia;
+    }
+  });
+
+  it("drag adds .is-dragging on grab and removes it on release (no-op drop)", () => {
+    const c = window.aigate.combos;
+    fillBuffer(c);
+    const grip = document.querySelectorAll("#comboMembersBody tr.member-row")[0]
+      .querySelector(".js-mem-drag");
+    // jsdom returns all-zero rects; stub geometry so a clientY above row0 mid
+    // (20) drops back on row 0 = no-op reorder (no re-render, tr stays put).
+    Array.from(document.querySelectorAll("#comboMembersBody tr.member-row")).forEach((tr, i) => {
+      tr.getBoundingClientRect = () => ({ top: i * 40, height: 40, bottom: (i + 1) * 40, left: 0, right: 100, width: 100 });
+    });
+    const down = new MouseEvent("pointerdown", { bubbles: true, cancelable: true });
+    down.pointerId = 1;
+    grip.dispatchEvent(down);
+    expect(document.querySelectorAll("#comboMembersBody tr.member-row")[0]
+      .classList.contains("is-dragging")).toBe(true);
+    const up = new MouseEvent("pointerup", { bubbles: true, cancelable: true, clientY: 5 });
+    up.pointerId = 1;
+    document.dispatchEvent(up);
+    expect(document.querySelectorAll("#comboMembersBody tr.member-row.is-dragging").length).toBe(0);
   });
 });

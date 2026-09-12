@@ -28,7 +28,7 @@ LOG_SOURCE = "backend.combos.router"
 # fallback ordering (subscription -> cheap -> free) on top of sequential
 # fallback semantics (B5.2).
 ALLOWED_STRATEGIES = frozenset(
-    {"fallback", "load_balance", "latency_cost", "three_tier"}
+    {"fallback", "load_balance", "latency_cost", "three_tier", "round_robin"}
 )
 
 router = APIRouter()

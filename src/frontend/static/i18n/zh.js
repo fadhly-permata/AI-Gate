@@ -220,6 +220,7 @@ window.I18N.zh = {
     "combos.error": "出现错误，请重试。",
     "combos.no_items": "暂无组合。",
     "combos.strategy.three_tier": "三层（订阅 → 低价 → 免费）",
+    "combos.strategy.round_robin": "Round robin",
     "combos.strategy.fallback": "回退",
     "combos.strategy.load_balance": "负载均衡",
     "combos.strategy.latency_cost": "延迟/成本",
