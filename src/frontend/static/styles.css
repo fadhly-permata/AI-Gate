@@ -829,6 +829,11 @@ body[data-device="phone"] .modal { width: 100%; }
   transition: background var(--transition), color var(--transition);
 }
 .icon-btn-small:hover { background: var(--accent); color: var(--accent-contrast); }
+/* Drag handle for reordering combo-member rows: the SECOND reorder affordance
+   alongside ▲▼. Pointer Events (not the whole row) drive it so touch + mouse
+   share one path; touch-action:none stops the table scrolling under a finger. */
+.js-mem-drag { touch-action: none; cursor: grab; }
+.js-mem-drag:active { cursor: grabbing; }
 
 /* Danger variant */
 .btn-danger { background: #dc3545; color: #fff; }
@@ -853,12 +858,20 @@ body[data-device="phone"] .modal { width: 100%; }
 .header-row .hdr-val { width: 100%; flex: 1; max-width: none; }
 
 /* Combo members editor (B5.x) — inline add/edit/remove. The sub-form is a
-   responsive labeled grid: 4 fields in 2 columns (Provider|Model over
-   Priority|Weight) so no field is orphaned by mid-row wrapping, with the
-   Add/Cancel buttons on their own aligned row. Stacks to a single column on
-   narrow screens. Reuses .form-label/.form-input; theme-safe (custom props). */
+   responsive labeled grid: the 3 fields the form owns (Provider, Model,
+   Weight) in 2 columns, with the Add/Cancel buttons on their own aligned row.
+   Priority is NOT in it: the row order is the priority, moved with ▲▼ in the
+   table (stage-8). Stacks to a single column on narrow screens. Reuses
+   .form-label/.form-input; theme-safe (custom props). */
 .combo-members-row { display: block; }
 .combo-members-row > .form-label { display: block; margin-bottom: 8px; }
+/* One line above the members table: row order = the retry queue, and for the
+   strategies where weight rules, so the order does not read as "ignored". */
+.combo-members-hint {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
 
 .combo-member-form {
   display: flex;
@@ -1189,26 +1202,35 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
   flex-wrap: wrap;
   margin-top: 10px;
 }
-.acc-move { display: inline-flex; gap: 4px; }
+/* .member-move = the SAME affordance on the combo members table (stage-8): the
+   ▲▼ pair that replaces the old Priority column. One set of rules for both, so
+   the two reorder UIs can never drift apart. */
+.acc-move, .member-move { display: inline-flex; gap: 4px; }
 /* The arrows are the ONLY reorder affordance, so they get a slightly bigger
    target than a table icon button — and a phone-sized one on the phone shell. */
 .acc-up, .acc-down { width: 34px; height: 34px; }
 @media (max-width: 600px) {
   .acc-move .icon-btn-small { width: 44px; height: 36px; }
+  /* Combo rows: on a phone ALL four row actions grow together, so the cell
+     stays one even row of buttons (the table scrolls sideways if needed). */
+  .member-row .row-actions .icon-btn-small { width: 44px; height: 36px; }
 }
 body[data-device="phone"] .acc-move .icon-btn-small { width: 44px; height: 36px; }
+body[data-device="phone"] .member-row .row-actions .icon-btn-small { width: 44px; height: 36px; }
 .acc-last { flex: 1 1 120px; min-width: 0; color: var(--muted); font-size: 12px; }
 /* Edit + Delete are the two footer actions on ONE level: Ubah is a neutral
    secondary (.btn), Hapus stays danger (.btn-danger). Same footprint so the
    footer never jumps between an account with 1 action and one with 2. */
 .acc-edit, .acc-del { flex: 0 0 auto; font-size: 12px; padding: 6px 12px; }
 /* aria-disabled is the honest state: visible, announced, and a no-op tap. */
-.acc-move .icon-btn-small[aria-disabled="true"] {
+.acc-move .icon-btn-small[aria-disabled="true"],
+.member-move .icon-btn-small[aria-disabled="true"] {
   color: var(--muted);
   opacity: 0.45;
   cursor: not-allowed;
 }
-.acc-move .icon-btn-small[aria-disabled="true"]:hover {
+.acc-move .icon-btn-small[aria-disabled="true"]:hover,
+.member-move .icon-btn-small[aria-disabled="true"]:hover {
   background: transparent;
   color: var(--muted);
 }

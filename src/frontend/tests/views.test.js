@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { indexDocument, stylesCss, staticSource } from "./helpers/dom.js";
+import { indexDocument, indexHtml, stylesCss, staticSource, htmlRefBase } from "./helpers/dom.js";
 
 // i18n.js is a side-effect module: attaches window.I18N (no document access at
 // load). Imported so the collapse-key regression guard can read the dicts.
@@ -98,13 +98,17 @@ describe("index.html structure — missing views + global Log Window", () => {
   });
 
   it("loads the three new module scripts (after app.js)", () => {
-    const srcs = Array.from(doc.querySelectorAll("script[src]")).map(function (s) {
-      return s.getAttribute("src");
-    });
-    expect(srcs).toContain("combos.js");
-    expect(srcs).toContain("proxies.js");
-    expect(srcs).toContain("endpoints.js");
-    expect(srcs.indexOf("app.js")).toBeLessThan(srcs.indexOf("combos.js"));
+    // Version-aware (stage-8 follow-up): every module now carries a `?v=`
+    // cache-buster, so compare BASENAMES — the presence + order contract is
+    // unchanged, it just survives version bumps.
+    const bases = Array.from(doc.querySelectorAll("script[src]"))
+      .map((s) => htmlRefBase(s.getAttribute("src")));
+    expect(bases).toContain("combos.js");
+    expect(bases).toContain("proxies.js");
+    expect(bases).toContain("endpoints.js");
+    expect(bases.indexOf("app.js")).toBeLessThan(bases.indexOf("combos.js"));
+    expect(bases.indexOf("app.js")).toBeLessThan(bases.indexOf("proxies.js"));
+    expect(bases.indexOf("app.js")).toBeLessThan(bases.indexOf("endpoints.js"));
   });
 
   it("Log Window keeps severity filter + refresh; the old collapse button is gone", () => {
@@ -448,6 +452,70 @@ describe("phone shell — hamburger hidden, bottom nav scrollable", () => {
     expect(rule).toMatch(/width:\s*1px/);                     // hairline
     expect(rule).toMatch(/background:\s*var\(--panel-border\)/); // token, light+dark aware
     expect(rule).not.toMatch(/#[0-9a-fA-F]{3,8}/);            // no new hex
+  });
+});
+
+/* ===== Cache-buster guard — every LOCAL script/stylesheet carries ?v= =====
+   Stage-8 follow-up (2026-09-12): six modules (device/combos/proxies/endpoints/
+   usage/clitools) shipped with a bare src, so a browser holding a stale cached
+   copy ran the OLD code after an update — the exact "kok tab-nya gak ada"
+   incident class. This guard makes a bare local ref fail loudly: it scans the
+   RENDERED markup (jsdom parses out HTML comments, so no commented-out tag can
+   satisfy it — proven by temporarily reverting one ?v= and watching it fail).
+   Rule: local .js/.css refs must match ?v=<digits>. External refs are banned
+   outright by vendor_assets.test.js (G3), so "local" needs no extra check. */
+describe("cache-buster guard — every local script/stylesheet has ?v=", () => {
+  // EXPLICIT exceptions, each with its reason. Keep this list empty unless a
+  // ref genuinely cannot carry a static ?v=, and say WHY next to it.
+  const EXEMPT = [];
+
+  const CACHEABLE = /\.(?:js|mjs|css)$/;
+  // V is a single source of truth per release day; ?raw= / ?data= style dynamic
+  // refs would slip past a `[?&]v=` test, so only ?v=<digits> counts as busted.
+  const BUSTED = /\?v=\d+$/;
+
+  it("every <script src> of a local .js carries ?v=<digits> (or is exempted)", () => {
+    const offenders = Array.from(doc.querySelectorAll("script[src]"))
+      .map((s) => s.getAttribute("src"))
+      .filter((src) => CACHEABLE.test(htmlRefBase(src)) && !EXEMPT.includes(src))
+      .filter((src) => {
+        const q = src.indexOf("?");
+        const query = q === -1 ? "" : src.slice(q).split("#")[0];
+        return !BUSTED.test(query);
+      });
+    expect(offenders, "scripts missing ?v=").toEqual([]);
+  });
+
+  it("every <link rel=stylesheet href> of a local .css carries ?v=<digits> (or is exempted)", () => {
+    const offenders = Array.from(doc.querySelectorAll('link[rel~="stylesheet"][href]'))
+      .map((l) => l.getAttribute("href"))
+      .filter((href) => CACHEABLE.test(htmlRefBase(href)) && !EXEMPT.includes(href))
+      .filter((href) => {
+        const q = href.indexOf("?");
+        const query = q === -1 ? "" : href.slice(q).split("#")[0];
+        return !BUSTED.test(query);
+      });
+    expect(offenders, "stylesheets missing ?v=").toEqual([]);
+  });
+
+  it("the guard is not vacuous (it sees the real module + css refs)", () => {
+    // If these ever hit 0, the scan broke (selector/markup change) and the two
+    // tests above would pass on an empty list — the exact silent failure this
+    // whole block exists to prevent.
+    const scripts = Array.from(doc.querySelectorAll("script[src]"))
+      .map((s) => s.getAttribute("src"))
+      .filter((src) => CACHEABLE.test(htmlRefBase(src)));
+    expect(scripts.length, "cacheable <script src> count").toBeGreaterThanOrEqual(13);
+    expect(scripts.some((s) => htmlRefBase(s) === "combos.js")).toBe(true);
+    const csses = Array.from(doc.querySelectorAll('link[rel~="stylesheet"][href]'))
+      .map((l) => l.getAttribute("href"))
+      .filter((href) => CACHEABLE.test(htmlRefBase(href)));
+    expect(csses.length, "cacheable stylesheet count").toBeGreaterThanOrEqual(2);
+    // i18n preloader (inline in <head>) is NOT covered by the scan above: its
+    // dictionary tags are document.write'd at runtime and already carry the
+    // shared V (window.I18N_VER). Pinned here, straight from the raw source,
+    // so removing the runtime ?v= also fails this file.
+    expect(indexHtml()).toMatch(/\.js\?v="\s*\+\s*V/);
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { indexDocument } from "./helpers/dom.js";
+import { indexDocument, htmlRefBase } from "./helpers/dom.js";
 
 // i18n dict (window.I18N) so getStr() resolves labels during render.
 import "../static/i18n.js";
@@ -354,10 +354,11 @@ describe("index.html wiring (B5.5 structure)", () => {
   });
 
   it("loads usage.js after app.js", () => {
-    const srcs = Array.from(doc.querySelectorAll("script[src]"))
-      .map((s) => s.getAttribute("src"));
-    expect(srcs).toContain("usage.js");
-    expect(srcs.indexOf("app.js")).toBeLessThan(srcs.indexOf("usage.js"));
+    // Version-aware: compare basenames so the wiring assertion survives ?v= bumps.
+    const bases = Array.from(doc.querySelectorAll("script[src]"))
+      .map((s) => htmlRefBase(s.getAttribute("src")));
+    expect(bases).toContain("usage.js");
+    expect(bases.indexOf("app.js")).toBeLessThan(bases.indexOf("usage.js"));
   });
 });
 

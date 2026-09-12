@@ -17,7 +17,7 @@
        below; it is also read by i18n.js for the on-demand URLs. -->
   <script>
     (function () {
-      var V = "20260919";
+      var V = "20260920";
       window.I18N_VER = V;
       var loc = "en";
       try {
@@ -48,14 +48,17 @@
   <!-- Font Awesome 6.5.1 vendored LOCALLY (offline-safe; OPERATING_RULES G3 — no
        CDN). Files live in vendor/font-awesome/ (css + webfonts woff2, + LICENSE).
        No network request: icons render with the phone offline. -->
-  <link rel="stylesheet" href="vendor/font-awesome/css/all.min.css?v=20260919" />
+  <link rel="stylesheet" href="vendor/font-awesome/css/all.min.css?v=20260920" />
   <!-- xterm.js 5.x + FitAddon vendored LOCALLY (offline-safe; ADR-001 no build,
-       ADR-009 native run). No CDN dependency — terminal works with no internet. -->
-  <link rel="stylesheet" href="vendor/xterm/xterm.css" />
-  <script defer src="vendor/xterm/xterm.js"></script>
-  <script defer src="vendor/xterm/xterm-addon-fit.js"></script>
+        ADR-009 native run). No CDN dependency — terminal works with no internet.
+        ?v= cache-buster: required on EVERY local asset (see the cache-buster
+        guard in tests/views.test.js). Vendored files are immutable, so all
+        three share the release V; bump only when the vendor copy is replaced. -->
+  <link rel="stylesheet" href="vendor/xterm/xterm.css?v=20260920" />
+  <script defer src="vendor/xterm/xterm.js?v=20260920"></script>
+  <script defer src="vendor/xterm/xterm-addon-fit.js?v=20260920"></script>
 
-  <link rel="stylesheet" href="styles.css?v=20260919" />
+  <link rel="stylesheet" href="styles.css?v=20260920" />
 </head>
 <body>
   <div class="layout">
@@ -1111,16 +1114,19 @@
                 <span class="switch-slider"></span>
               </label>
             </div>
-            <!-- Members editor (multi-provider routes, 9router-style) -->
+            <!-- Members editor (multi-provider routes, 9router-style).
+                 There is NO Priority column/field: the ROW ORDER is the priority
+                 (stage-8) and ▲▼ in the action cell is the only way to change it. -->
             <div class="form-row combo-members-row">
               <label class="form-label" data-i18n="combos.members">Members</label>
+              <p class="combo-members-hint" id="comboMembersHint"
+                 data-i18n="combos.member.order_hint">Row order is the retry queue.</p>
               <p class="settings-msg" id="comboMemberMsg" role="status" aria-live="polite"></p>
               <table class="data-table" id="comboMembersTable">
                 <thead>
                   <tr>
                     <th data-i18n="combos.member.provider">Provider</th>
                     <th data-i18n="combos.member.model">Model</th>
-                    <th data-i18n="combos.member.priority">Priority</th>
                     <th data-i18n="combos.member.weight">Weight</th>
                     <th></th>
                   </tr>
@@ -1129,8 +1135,8 @@
               </table>
               <!-- Add/edit member sub-form: responsive labeled grid. Each field
                    has a visible <label for=...> (a11y + i18n); fields sit in a
-                   2-col grid (Provider|Model / Priority|Weight) so nothing is
-                   orphaned by mid-row wrap; buttons on their own aligned row.
+                   2-col grid (Provider|Model / Weight) so nothing is orphaned
+                   by mid-row wrap; buttons on their own aligned row.
                    Element ids unchanged — combos.js + tests depend on them. -->
               <div class="combo-member-form" id="comboMemberForm">
                 <div class="combo-member-fields">
@@ -1161,11 +1167,6 @@
                               hidden aria-hidden="true"><i class="fa fa-spinner fa-spin"></i></span>
                       </div>
                     </div>
-                  </div>
-                  <div class="combo-member-field">
-                    <label class="form-label" for="comboMemberPriority"
-                           data-i18n="combos.member.priority">Priority</label>
-                    <input class="form-input" type="number" id="comboMemberPriority" value="0" step="1" />
                   </div>
                   <div class="combo-member-field">
                     <label class="form-label" for="comboMemberWeight"
@@ -1386,28 +1387,34 @@
        Translation strings live in i18n/<code>.js, loaded by the inline
        preloader in <head> (active language) and on demand by this file.
        ?v= cache-buster: bump whenever i18n.js changes (stale cache = missing labels). -->
-  <script src="i18n.js?v=20260919" defer></script>
-  <!-- Device simulation helper (B4.2) — must load before app.js uses it -->
-  <script src="device.js" defer></script>
+  <script src="i18n.js?v=20260920" defer></script>
+   <!-- Device simulation helper (B4.2) — must load before app.js uses it.
+        ?v= cache-buster: bump whenever device.js changes. -->
+   <script src="device.js?v=20260920" defer></script>
   <!-- Searchable combobox widget (model pickers) — must load before app.js /
        combos.js, which call window.aigate.createCombobox.
        ?v= cache-buster: bump whenever combobox.js changes. -->
   <script src="combobox.js?v=20260911" defer></script>
   <!-- App bootstrap (defer preserves order).
        ?v= cache-buster: bump whenever app.js changes. -->
-  <script src="app.js?v=20260919" defer></script>
-  <!-- Combos / Proxy Pools / Endpoints management (B2.4 / B2.3 / B2.5) -->
-  <script src="combos.js" defer></script>
-  <script src="proxies.js" defer></script>
-  <script src="endpoints.js" defer></script>
-  <!-- Usage & Quota tracking (B5.5) — needs app.js (window.aigate helpers) -->
-  <script src="usage.js" defer></script>
+  <script src="app.js?v=20260920" defer></script>
+   <!-- Combos / Proxy Pools / Endpoints management (B2.4 / B2.3 / B2.5).
+        ?v= cache-buster: bump whenever these modules change — combos.js held
+        a plain src through the stage-8 rewrite, so browsers kept serving the
+        stale cached copy (the "tab hilang" class of incident). -->
+   <script src="combos.js?v=20260920" defer></script>
+   <script src="proxies.js?v=20260920" defer></script>
+   <script src="endpoints.js?v=20260920" defer></script>
+   <!-- Usage & Quota tracking (B5.5) — needs app.js (window.aigate helpers).
+        ?v= cache-buster: bump whenever usage.js changes. -->
+   <script src="usage.js?v=20260920" defer></script>
   <!-- Usage Analytics + Request Log viewer (B5.6) — needs app.js + usage.js formatters.
        ?v= cache-buster: a plain src lets the browser run a STALE cached copy after
        an update (bump the value whenever analytics.js changes). -->
   <script src="analytics.js?v=20260906" defer></script>
-  <!-- CLI Tools launcher (B3.4) — needs app.js (window.aigate) + terminal.js -->
-  <script src="clitools.js" defer></script>
+   <!-- CLI Tools launcher (B3.4) — needs app.js (window.aigate) + terminal.js.
+        ?v= cache-buster: bump whenever clitools.js changes. -->
+   <script src="clitools.js?v=20260920" defer></script>
   <!-- Self-Heal UI (B4.1) — needs i18n.js (window.I18N) + clitools.js.
        ?v= cache-buster: bump the value whenever selfheal.js changes. -->
   <script src="selfheal.js?v=20260911" defer></script>
