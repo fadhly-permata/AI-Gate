@@ -2,6 +2,23 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260913-0415 — Permintaan baru (urutan manual anggota kombo) → lembar desain D6 terbit, eksekusi DITAHAN (ProjectManager)
+- User: saat edit kombo tidak bisa mengurutkan model; minta urutan ▲▼/drag = prioritas, kolom & field Priority disembunyikan,
+  anggota baru selalu di paling bawah.
+- PM meluruskan fakta dulu dengan UKURAN di server uji TERISOLASI (port acak + DB tmp di luar repo, PID sendiri dimatikan,
+  aplikasi user tidak disentuh): (a) daftar anggota TIDAK pernah diurut abjad — server mengirim urut `priority` asc lalu id asc
+  (`combos_router.py:117`); empat anggota ditambah berurutan tetap tiba berurutan (`zebra-alpha, mike9-xray, bravo-kilo, yankee-tango`).
+  (b) keluhan "tidak bisa mengurutkan" = BENAR dan ini lubangnya: nol penangan klik judul kolom di `combos.js`, nol tombol
+  naik/turun, nol geser — satu-satunya jalan adalah mengetik angka. (c) yang benar-benar urut abjad = **daftar pilihan model
+  di form anggota** (`combos.js:215-223`), bukan susunan kombo.
+- Lembar desain: `documents/pm/handovers/handover-20260913-urutan-manual-anggota-kombo.md` — denah sebelum/sesudah,
+  6 aturan main (normalisasi `0..n-1` + PUT hanya yang berubah secara berurutan + baca ulang; anggota baru `priority` = jumlah
+  anggota; combo lama TIDAK dinormalkan diam-diam, normalisasi terjadi saat ▲▼ pertama dan langsung tersimpan; mode buffer
+  tanpa API; bobot tetap manual; daftar model form tetap abjad kecuali user minta sebaliknya), 5 risiko jujur, cakupan tes.
+- 1 keputusan terbuka untuk user: **(a) ▲▼ saja** vs **(b) ▲▼ + pegangan geser**. Default kalau user cuma menjawab "jalan" = (a),
+  karena gulir layar sentuh rawan bertabrakan dengan seret dan ▲▼ sudah disetujui user di halaman penyedia.
+- NOL baris kode disentuh (aturan D6). NEXT: ACC user → spawn `fe-dev` dengan handover = lembar desain ini.
+
 ## 20260913-0355 — User mengoreksi cara PM bicara → aturan I8 (istilah teknis jangan diterjemahkan) (ProjectManager)
 
 ### Violation
