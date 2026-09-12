@@ -1,5 +1,32 @@
 # Code Changes Register (code ↔ docs alignment)
 
+## 2026-09-13 — Urutan manual anggota kombo: ▲▼ + drag handle (audit PM + fe-dev) — DONE (DI-COMMIT 00e2d08, refactor/ui, BELUM push)
+
+**Asal:** user minta urutan anggota kombo bisa di-atur naik/turun ATAU drag; kolom & field Priority disembunyikan,
+susunan = priority; anggota baru di bawah. Lembar desain D6 terbit (`handover-20260913-urutan-manual-anggota-kombo.md`).
+User ACC kedua opsi: (a) ▲▼ + (b) handle geser.
+
+**Audit tak terduga (A29/R29):** sebelum spawn, `git status` tunjukkan 15 berkas `src/frontend/**` SUDAH berubah
+tapi BELUM di-commit — implementasi penuh (a) ▲▼ kelepas dari catatan PM ("nol baris disentuh"). PM audit: baca
+diff + gerbang mandiri hijau (646 tes), logika cocok lembar desain → TERIMA (a). fe-dev lalu tumpuk (b) drag di atas.
+
+### Perubahan (semua `src/frontend/**`; 0 backend; 0 tes dihapus)
+- `static/combos.js`: hapus kolom/fields Priority; `renderMembers` pasang `▲▼` per baris + grip `js-mem-drag`
+  (di dalam cell Provider, 4 cell tetap). Ekstrak `applyOrderAndPersist(newOrder)` (renumber 0..n-1 → PUT hanya
+  berubah berurutan → reload) dipakai BERSAMA `moveMember` (▲▼) & `reorderMembers` (drag). `computeDropIndex`,
+  `startDrag/onGripPointerMove/onGripPointerUp` (Pointer Events, guard `.js-mem-drag`, `touch-action:none`).
+  `addMember` `priority = appendPriority()` (baris baru paling bawah). Mode buffer = reorder array tanpa jaringan.
+- `static/styles.css`: `.js-mem-drag { touch-action:none; cursor:grab }` + `:active grabbing`; `.combo-members-hint`
+  (teks "row order = retry queue"). Nol hex baru.
+- `static/index.html`: header tabel 4 kolom (tanpa Priority); elemen `order_hint`.
+- `static/i18n/{en,id,ru,nl,ja,zh,zh-tw}.js`: +5 kunci (`move_up|move_down|already_first|already_last|drag`).
+- `tests/combos.test.js`: +21 (▲▼) +10 (drag) kasus. `tests/analytics|usage|views|helpers/dom`: penyesuaian markup.
+
+### Verifikasi (PM mandiri)
+- `node node_modules/.bin/vitest run` → **26 file / 656 tes PASS, 0 fail** (baseline 646 + 10 drag).
+- `git diff --check` bersih; `git status --short` scope murni `src/frontend/**`.
+- CAVEAT: uji mata HP milik user (G3 + J6) — tampilan drag di sentuh belum diverifikasi PM.
+
 ## 2026-09-09 — Harness tes FE: `localStorage` ke-mask global Node (PR #15, branch fix/fe-test-env) — DONE (DI-COMMIT 95d46e4, PR #15 open)
 
 **Asal:** isu tertunda (#3) dari sesi bottom-nav ponsel — suite FE penuh merah **22 fail**

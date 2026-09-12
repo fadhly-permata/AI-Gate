@@ -2,6 +2,33 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260913-06xx — (b) drag SELESAI; fitur urutan-manual ▲▼+drag DI-COMMIT 00e2d08 (ProjectManager)
+- fe-dev (reuse) tumpuk (b): grip `js-mem-drag` di kiri tiap baris (Pointer Events, `touch-action:none`), pakai
+  kontrak SAMA `applyOrderAndPersist` (renumber 0..n-1 → PUT-only-changed → reload) bersama ▲▼; `reorderMembers` +
+  `computeDropIndex` + handler pointer. Grip di-dalam cell Provider (4 cell tetap) biar tes 4-cell hijau — deviasi
+  kecil dari denah §2 yang menggambar kolom tersendiri; PM terima (cocok "grip di kiri baris", tes tetap hijau).
+  Live-drag visual di-skip (drop-based) — pilihan fe-dev, simpel + testable; user belum minta live.
+- VERIFIKASI PM MANDIRI: vitest **26 berkas / 656 tes LOLOS** (646 +10 drag); `git diff --check` bersih; scope murni
+  `src/frontend/**`, nol backend; nol hex baru; parity i18n 7 kamus +5 kunci.
+- COMMIT `00e2d08` (refactor/ui) — satukan (a)+(b) jadi satu fitur, 15 berkas / +1091 −119. TIDAK push, TIDAK buka PR
+  (user belum perintah). Sisa milik user: uji mata drag di HP (G3+J6); putuskan push/PR berikutnya.
+
+## 20260913-05xx — User ACC kedua opsi (▲▼ + drag); (a) ternyata sudah ada di working tree, fe-dev ditugaskan tambah (b) (ProjectManager)
+- User: "kalo bisa sih pake kedua opsi tersebut" = ACC lembar desain + pilih (a) ▲▼ DAN (b) handle geser.
+- TEMUAN AUDIT (aturan A29/R29 — kerja kelewat ke main thread): `git status` tunjukkan 15 berkas `src/frontend/**`
+  SUDAH berubah tapi BELUM di-commit — padahal status 0415 tulis "NOL baris kode disentuh". Isi = implementasi
+  penuh opsi (a) ▲▼ (kombo urutan-manual: tanpa kolom Priority, anggota baru di bawah, `order_hint` di atas tabel).
+- AUDIT PM: baca diff + jalankan gerbang mandiri → **vitest 26 berkas / 646 tes LOLOS** (naik dari 625; +21 tes baru
+  `combos.test.js`). Logika cocok lembar desain: `moveMember` (`combos.js:475`) tukar→renormalisasi `0..n-1`→
+  `PUT` hanya baris berubah berurutan→reload; `addMember` (`:639`) `priority = appendPriority()` jatuh paling bawah;
+  mode buffer tanpa jaringan; i18n 7 kamus +4 kunci (`move_up|move_down|already_first|already_last` + `order_hint`).
+  Keputusan PM: TERIMA (a) lewat audit; TIDAK di-commit sendiri dulu — fe-dev tumpuk (b) lalu commit satu fitur utuh.
+- Sisa (b) untuk fe-dev: handle geser (`grip` di kiri baris, BUKAN seluruh baris) pakai kontrak SAMA persis ▲▼
+  (`moveMember`/renumber/PUT-only-changed/sequential/reload) — geser = cara kedua ubah susunan, bukan logika ketiga;
+  ▲▼ tetap ada & jalan; keduanya koeksis tanpa bentrok (drag tak hapus tombol, tombol tak tabrak drag). §5 lembar
+  desain sudah diperbarui (decision = kedua opsi; (a) sudah ada, (b) sisa).
+- NEXT: spawn `fe-dev` (reuse) — handover = lembar desain ini + catatan "(a) sudah ada di working tree, cuma tambah (b)".
+
 ## 20260913-0415 — Permintaan baru (urutan manual anggota kombo) → lembar desain D6 terbit, eksekusi DITAHAN (ProjectManager)
 - User: saat edit kombo tidak bisa mengurutkan model; minta urutan ▲▼/drag = prioritas, kolom & field Priority disembunyikan,
   anggota baru selalu di paling bawah.

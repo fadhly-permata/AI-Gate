@@ -1,7 +1,8 @@
 # Lembar Desain — Urutan Manual Anggota Kombo (ganti kolom Priority dengan ▲▼)
 
 - Tanggal: 2026-09-13 · Penulis: ProjectManager (aturan **D6**: lembar desain + ACC user SEBELUM spawn fe-dev)
-- Status: **DRAF — MENUNGGU ACC USER.** Nol baris kode disentuh.
+- Status: **DI-ACC — user pilih (a) ▲▼ + (b) handle geser.** (a) sudah terimplementasi di working tree (uncommitted,
+  diaudit PM, gerbang hijau 26 berkas / 646 tes); (b) masih diserahkan ke fe-dev.
 - Permintaan user (verbatim): "di halaman combo, ketika edit combo gua gak bisa sortir model" → lalu
   "gak usah sort berdasarkan abjad, jadi bisa di sortir up/down atau pake drag up/down. Jadikan susunan tersebut sebagai
   urutan priority, jadi kolom & field priority bisa di hide aja. Jadi gak usah set manual user-nya.. nah untuk model baru
@@ -65,7 +66,13 @@ mesin routing (`combo_routing.py`). Perilaku penyedia/akun/kartu kombo tidak ber
   berkelahi dengan gulir layar sentuh.
 - **Geser-seret** di ponsel rawan: area baris kombo sempit dan satu layar dengan gulir. Kalau mau, bisa dibuat
   **handle khusus** (ikon `grip` di kiri baris, bukan seluruh baris) sebagai tambahan, bukan pengganti.
-- Pilih: **(a)** ▲▼ saja · **(b)** ▲▼ + handle geser. Default kalau kamu cuma jawab "jalan": **(a)**.
+- **Keputusan user (2026-09-13): PILIH KEDUA-DUANYA — (a) ▲▼ + (b) handle geser.** (a) sudah ada di working tree
+  (uncommitted, diaudit PM: `moveMember` `combos.js:475` sudah menukar→normalisasi `0..n-1`→PUT hanya berubah
+  berurutan→reload; `addMember` `:639` `priority = appendPriority()` jatuh paling bawah; gerbang hijau 646 tes).
+  **Sisa untuk fe-dev = (b) saja:** tambahkan **handle geser** (`grip` di kiri baris, bukan seluruh baris) yang
+  memanggil kontrak yang SAMA persis dengan ▲▼ (`moveMember`/renumber/PUT-only-changed/sequential/reload) — geser
+  adalah cara kedua mengubah susunan, BUKAN logika ketiga. ▲▼ tetap ada dan jalan; keduanya harus koeksis tanpa
+  bentrok (drag tidak menghapus tombol, tombol tidak menabrak drag).
 
 ## 6. Cakupan tes
 
