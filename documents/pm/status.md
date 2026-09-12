@@ -2,6 +2,27 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260913-0355 — User mengoreksi cara PM bicara → aturan I8 (istilah teknis jangan diterjemahkan) (ProjectManager)
+
+### Violation
+- Rule broken: belum ada (lubang rule). Yang terjadi: PM menulis "usulan" untuk *pull request* dan "titik penggabungan"
+  untuk *merge commit* karena menuruti frasa "non-IT clear" di `language.md` + I7.
+- What PM did: user balas bingung dua kali — "usulan kecil? usulan apaan?" lalu "jangan disebut usulan dong... PR aja".
+
+### Correction
+- Durable rule captured: **I8** — bicara ke user pakai istilah apa adanya (PR, commit, merge, branch, tes); padanan
+  Indonesia yang tidak dipakai user DILARANG; tidak paham → jelaskan sekali, lalu tetap pakai istilah itu;
+  "non-IT jelas" = tambah penjelasan, bukan ganti istilah.
+- Decision: user memilih istilah industri, bukan padanan yang diciptakan PM.
+
+### Prevention
+- Mechanism: I8 ditulis di `documents/pm/OPERATING_RULES.md` tema I (posisi I8 sudah diverifikasi urut I1..I8) +
+  amandemen `.opencode/rules/language.md` (rumah kanonik) + satu blok di bagian **Language** `AGENTS.md`
+  (berkas yang SELALU ter-load — alasan berkas ini disentuh: aturan yang cuma hidup di `documents/**` tidak pernah
+  sampai ke eksekutor; preseden ada di kepala AGENTS.md).
+- Verification: `python3 .opencode/tools/governance/rules-index.py` → LOLOS, 54 rule / 10 tema; grep tema I menampilkan I1..I8;
+  penempilan salah (I8 jatuh ke ujung berkas) ketahuan oleh pemeriksaan PM sendiri dan sudah dipindah ke bawah I7.
+
 ## 20260913-0345 — Konfirmasi user: SEMUA IKON MUNCUL di aplikasi nyata (ProjectManager)
 - User: "semua icon udah mucul" = hasil pemeriksaan mata terhadap aplikasi yang ia mulai ulang → bagian G3 untuk klaim
   "ikon dilokalkan" **TERBUKTI di perangkat nyata** (sebelumnya cuma terbukti lewat audit 55 permintaan jaringan + `fonts.check`).
