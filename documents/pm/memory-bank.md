@@ -4,6 +4,16 @@
 (empty — diisi PM saat task pertama)
 
 ## Decisions
+- 2026-09-13 (konfirmasi user + dua penolakan jadi keputusan final): user (a) sudah memulai ulang aigate → API ubah-akun
+  hidup di aplikasinya (dibuktikan PM: `:8080` `AccountUpdate` 4 field, sebelumnya 1), (b) sudah menggabungkan PR #19
+  (dicek ke API, bukan mengutip catatan = rule A12), (c) memerintahkan server uji tertinggal dimatikan — PM membuktikan
+  dulu lewat `/proc/<pid>/fd` bahwa itu instance sementara (DB di `$TMPDIR`, PID 5934) dan bukan aplikasinya (PID 15777,
+  DB `~/.aigate/aigate.db`) baru SIGTERM spesifik-PID; `:8080` tetap sehat sesudahnya, (d) MENOLAK dua usulan PM:
+  menyimpan teks lisensi MIT xterm di folder vendor DAN memperluas gerbang aturan ke `documents/{analysis,architecture,business}/**`.
+  Keduanya dicatat sebagai KEPUTUSAN, bukan utang yang akan ditagih ulang; tidak ada berkas dihapus karenanya.
+  Konsekuensi yang harus diterima bersama: kelas kesalahan "rujukan hantu di dokumen spesifikasi" tidak akan ketahuan
+  otomatis lagi — hanya ketahuan kalau seseorang membacanya.
+
 - 2026-09-13 (browser NYATA + kebenaran soal restart + perkakas uji yang selama ini mati): (1) Klaim "tidak ada browser di
   Termux" yang gua ulang di beberapa laporan itu SALAH — `chromium-browser` = Chromium 149 tersedia dan `playwright`/
   `puppeteer-core` sudah terpasang. Ganti kebiasaan: sebelum menulis "mustahil di lingkungan ini", CEK dulu (versi biner +
