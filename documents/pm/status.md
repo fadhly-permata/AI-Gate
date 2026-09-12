@@ -2,6 +2,17 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260913-0345 — Konfirmasi user: SEMUA IKON MUNCUL di aplikasi nyata (ProjectManager)
+- User: "semua icon udah mucul" = hasil pemeriksaan mata terhadap aplikasi yang ia mulai ulang → bagian G3 untuk klaim
+  "ikon dilokalkan" **TERBUKTI di perangkat nyata** (sebelumnya cuma terbukti lewat audit 55 permintaan jaringan + `fonts.check`).
+  Rantai bukti kini lengkap: grep CDN = 0 → Chromium nyata 55 permintaan semuanya lokal → mata user.
+  CATATAN JUJUR: user tidak menyebut eksplisit apakah percobaan dilakukan dalam mode pesawat; angka jaringan di atas yang
+  menutup aspek "tanpa permintaan keluar", jadi tidak perlu ditanya ulang kecuali user sendiri mengangkatnya.
+- Yang BELUM dikonfirmasi user setelah restart: apakah "Ubah akun" benar-benar menyimpan di aplikasi nyata (API-nya sudah
+  terbukti 4 field lewat `/openapi.json` milik proses user).
+- Dua commit paperwork PM (`906cb42`, `a831f52`) masih di `refactor/ui`, belum masuk `main`; user sedang diberi pilihan:
+  PR tersendiri atau ditumpuk ke PR pekerjaan berikutnya (istilah "usulan/PR" perlu dijelaskan ke user = bukan istilah teknis umum).
+
 ## 20260913-0330 — Konfirmasi user: restart SUDAH dilakukan, PR #19 DI-MERGE, server uji tertinggal dimatikan (ProjectManager)
 - User: "iya gua baru aja mulai ulang aplikasi aigate" → cocok dengan ukuran PM: pelayan `:8080` kini `AccountUpdate =
   ['api_key','enabled','label','priority']` (sebelum restart hanya `['priority']`). **Fitur "Ubah akun" kini aktif di aplikasi user.**
