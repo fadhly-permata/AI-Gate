@@ -1700,3 +1700,57 @@ Belum di-exercise di peramban nyata (G3) — cukup muat ulang HALAMAN (statis di
 **uji mata mode pesawat** (ikon harus tetap muncul) belum dilakukan; e2e/Playwright belum dijalankan; terjemahan non-EN belum
 ditinjau penutur; provenance FA belum diverifikasi ke hulu (WL.4); `documents/analysis/FSD.md:7,19` masih merujuk path
 `docs/business/BRD.md` yang tidak ada (temuan system-analyst, belum ditugaskan); ahead 19 BELUM push; PR #17 masih terbuka.
+
+## 2026-09-13 — Perkakas uji e2e dibetuli (TERBUKTI belum pernah jalan) + favicon lokal (fe-dev; commit `ddf33df`)
+
+**Asal:** perintah user "lanjut". PM menemukan Chromium 149 TERSEDIA di Termux (`chromium-browser --version`) padahal
+laporan-laporan sebelumnya menulis "tidak ada browser di lingkungan ini" → QA + PM menjalankan uji nyata di instance
+TERISOLASI (`run.py --port <acak>`, `AIGATE_DB_PATH` di luar repo, PID sendiri dimatikan; proses user 8080 tidak disentuh).
+Laporan: `.opencode/reports/20260913/qa/0300_bukti-browser-nyata-dan-perbaikan-perkakas-uji.md`.
+
+### Bug yang dibuktikan dulu, baru diperbaiki (semua dicek ulang PM)
+- `e2e/b5_features.mjs:208` → `:268`: `pg.$$eval("#accList .acc-card:first-child", (card)=>card.querySelector(...))` —
+  `$$eval` mengirim ARRAY → `TypeError: card.querySelector is not a function`. Runner ini mustahil lolos di browser mana pun;
+  vitest/jsdom tidak pernah mengeksekusi berkas e2e, jadi 600+ tes hijau pun tidak menjangkaunya. → `$eval`.
+- viewport tak pernah di-set (default 800×600) + Log Window bawaan terbuka menutupi tombol ⋮ (terukur: tombol `top 294..bottom 322`,
+  panel log `top 219`, `elementFromPoint` = SPAN panel) → klik mendarat di panel, menu tak pernah muncul.
+  Fix paling kecil TANPA mengubah produk: `VIEWPORT 1280×900` + set preferensi yang sudah ada (`aigate.logVisible="0"`) lewat
+  `evaluateOnNewDocument`, plus jaring `ensureLogWindowClosed` (toggle produk); `force:true` sengaja tidak dipakai.
+- `e2e/playwright.config.js:41` → `:68`: `testDir: "e2e"` relatif folder config = `e2e/e2e` → `Error: No tests found` → `testDir: HERE`.
+- `e2e/playwright.config.js:50` → `:83`: `use.executablePath` BUKAN opsi Playwright Test (`test.d.ts`: 0 kemunculan) → diabaikan
+  diam-diam lalu mencari headless_shell bawaan yang tak ada → pindah ke `use.launchOptions.executablePath` (kunci sah di
+  `playwright-core/types/types.d.ts`).
+- CLI Playwright crash saat import di Termux: `Unsupported platform: android` (`coreBundle.js:32822`, dihitung sebelum env dibaca)
+  → runner BARU `e2e/run.mjs`: selalu kirim `--config` dan memasang shim `NODE_OPTIONS=--import=data:text/javascript,...`
+  (`process.platform`→`linux`; properti terukur `configurable:true`). **`node_modules` tidak ditambal, tidak ada berkas temp.**
+  `package.json` → `"test:e2e": "node e2e/run.mjs"` (diagnosa tambahan: CLI juga ikut mengumpulkan `tests/*.test.js` vitest
+  kalau `--config` tidak dikirim → "Vitest failed to access its internal state").
+- `GET /favicon.ico` = 404 (tidak ada rujukan favicon sama sekali) → BARU `static/favicon.svg` (325 B) + `static/favicon.ico`
+  (4.286 B; container ICO 1 gambar 32×32 32bpp, dibuat pure-stdlib Python karena PIL/ImageMagick tidak ada) + rujukan di
+  `index.html:46-48`. Semua LOKAL (aturan G3). Bentuk = tanda NETRAL (kotak warna `--accent` + "a" geometris), bukan logo merek.
+
+### Penjaga BARU
+`tests/e2e_tooling.test.js` (16 tes statis): larang pola `$$eval` dengan `.querySelector`, tuntut `$eval` untuk kartu,
+viewport ≥1280×720 + pref `aigate.logVisible` + larangan `force`, `testDir: HERE`, `executablePath` hanya di `launchOptions`
+(dibandingkan ke `test.d.ts`/`types.d.ts` asli), `run.mjs` mengirim `--config`, setiap skrip `test:e2e*` menunjuk berkas NYATA,
+favicon dirujuk + ada + header ICO sah. **Divalidasi dengan mutasi:** 4 bug lama dikembalikan → 4 penjaga gagal; dipulihkan → hijau.
+
+### Bukti di browser nyata (Chromium 149 headless, instance terisolasi)
+`node e2e/b5_features.mjs` (runner ASLI, bukan salinan) → `B5.1/B5.5/B5.6/B5.7 OK` + `B5 E2E PASS`, exit 0 (diulang PM di port 8321: sama)
+· `node e2e/run.mjs` → `2 passed` (smoke) · `GET /favicon.ico` = 200 (sebelum 404) · `GET /favicon.svg` = 200
+· `vendor/font-awesome/css/all.min.css` + `webfonts/fa-solid-900.woff2` = 200 · audit `page.on('request')`: 55 permintaan,
+host hanya `127.0.0.1:<port>`, nol permintaan keluar · `document.fonts.check('900 16px "Font Awesome 6 Free"')` = true,
+`::before` = `U+F05A` (banner) dan `U+F0C0` (menu) · `#pdStickyRow`: `offsetHeight` 0 saat `fill-first` (input nonaktif) vs
+34 saat `round-robin` → tambalan `display:flex` terbukti di peramban, bukan cuma di jsdom.
+Gate reguler PM sendiri: `node node_modules/.bin/vitest run` = **26 berkas / 625 tes LOLOS** (sebelum 25/609).
+
+### Fakta tambahan yang mengubah jawaban ke user
+`GET :8080/openapi.json` kini = `AccountUpdate ['api_key','enabled','label','priority']` (pelayan = `python run.py` PID 15777,
+berumur ±11 menit; pengukuran 11 menit sebelumnya = `['priority']` dengan PID 15400) → **aplikasi user sudah memuat API
+ubah-akun**, jadi tidak ada lagi alasan "tombol Ubah tidak menyimpan". PM tidak menyentuh/mematikan proses apa pun (aturan restart = hak user).
+Temuan lingkungan: `python3 run.py --port 8251` (PID 5934, ±1 hari 2 jam) masih hidup dari sesi lama — DILAPORKAN, tidak dibunuh.
+
+### BELUM diverifikasi
+Sentuhan layar asli / WebView ponsel (hanya chromium desktop-headless) · OAuth connect end-to-end ke penyedia eksternal ·
+discovery model ke API sungguhan · hasil screenshot bukti (model PM tanpa masukan gambar; angka DOM yang dipakai) ·
+bentuk favicon menunggu selera user · `trace/screenshot on-failure` masih menulis ke `<cwd>/test-results` (dibersihkan manual; `.gitignore` root bukan milik fe-dev).
