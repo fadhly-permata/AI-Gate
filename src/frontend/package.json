@@ -6,7 +6,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test",
+    "test:e2e": "node e2e/run.mjs",
     "test:e2e:android": "node e2e/android.mjs",
     "test:e2e:b5": "node e2e/b5_features.mjs"
   },
