@@ -4,6 +4,20 @@
 (empty — diisi PM saat task pertama)
 
 ## Decisions
+- 2026-09-13 (browser NYATA + kebenaran soal restart + perkakas uji yang selama ini mati): (1) Klaim "tidak ada browser di
+  Termux" yang gua ulang di beberapa laporan itu SALAH — `chromium-browser` = Chromium 149 tersedia dan `playwright`/
+  `puppeteer-core` sudah terpasang. Ganti kebiasaan: sebelum menulis "mustahil di lingkungan ini", CEK dulu (versi biner +
+  isi node_modules). (2) Karena itu G3 bisa ditutup sendiri lewat instance terisolasi (port acak + `AIGATE_DB_PATH` di luar
+  repo + PID sendiri), dan dari sanalah 6 bug nyata muncul — termasuk `b5_features.mjs` yang selama ini MUSTAHIL lolos
+  (`$$eval` dipakai untuk satu elemen) dan tidak ada satu pun tes yang menangkapnya karena runner e2e tidak pernah dieksekusi
+  oleh vitest. Sekarang runner asli `B5 E2E PASS`, smoke `2 passed`, plus penjaga statis + validasi mutasi (`ddf33df`).
+  (3) Pertanyaan "perlu restart?" dijawab dengan ukuran, bukan dugaan — dan jawabannya berubah di tengah sesi: ±11 menit
+  sebelumnya `:8080/openapi.json` = `['priority']` (PID 15400, kode lama), sekarang = 4 field (PID 15777) → proses user
+  SUDAH memuat API ubah-akun + favicon + ikon lokal (semua 200 di port user). PM tidak pernah menyentuh proses (J6).
+  (4) Bukti kuat dari audit jaringan: 55 permintaan halaman = hanya host `127.0.0.1:<port>` → klaim privasi "tanpa CDN"
+  kini terbukti di peramban nyata, bukan cuma lewat grep. (5) Temuan lingkungan: server uji tertinggal dari sesi lama di
+  port 8251 (PID 5934, ±1 hari) — dilaporkan, TIDAK dibunuh, keputusan user.
+
 - 2026-09-11 (RULING user soal tabrakan rule + provenance + fakta proses lama): (1) **"Tetap, cuma PM yang boleh nulis
   report."** → aturan lama "siapa yang mengerjakan menulis laporannya sendiri" DICABUT dari `.opencode/rules/task-report.md`
   + B3 dipertegas; spesialis = receipt di sesi, PM = laporan. Tabrakan task-report vs agent-boundaries beres, permanen.

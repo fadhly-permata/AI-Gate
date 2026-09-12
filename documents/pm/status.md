@@ -2,6 +2,37 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260913-0310 — KEBENARAN BARU: browser NYATA ada di Termux + API user ternyata SUDAH kode baru + 6 bug perkakas uji diperbaiki (qa-engineer → fe-dev → PM)
+- **Koreksi klaim berulang di laporan sesi ini** ("mustahil ada browser di Termux → uji nyata harus dikerjakan user"): SALAH.
+  `/data/data/com.termux/files/usr/bin/chromium-browser --version` = `Chromium 149.0.7827.155`, dan `node_modules` sudah
+  berisi `playwright` + `@playwright/test` + `puppeteer-core@23.11.1`. Jadi "di-exercise nyata" bisa ditutup sendiri, tanpa menunggu user.
+- qa-engineer menjalankan instance TERISOLASI (port acak, `AIGATE_DB_PATH` di luar repo, PID sendiri; diverifikasi via
+  `/proc/<pid>/fd` bahwa proses user tidak tersentuh, jumlah provider user tetap 3). Hasil: fitur akun-ganda BERFUNGSI di
+  peramban nyata — ⋮ → "Kelola akun" → halaman rinci 4 kartu → kartu akun + ▲▼ → modal dua mode → `PUT {label,api_key,enabled}`
+  tersimpan → `auth_type` diabaikan → `api_key` ke oauth = 400 `oauth_account_key_readonly` → Kembali; **audit jaringan: 55
+  permintaan, host = `127.0.0.1:<port>` saja** (bukti klaim "ikon lokal tanpa CDN" di peramban); glyph ter-render
+  (`fonts.check` true, `::before` U+F05A / U+F0C0); baris limit sticky `offsetHeight` 0 saat fill-first vs 34 saat round-robin
+  (tambalan `display:flex` terbukti di peramban, bukan cuma di jsdom).
+- **6 bug nyata dihasilkan dari situ** (semua PM cek ulang sendiri sebelum mendelegasi): `$$eval` dipakai untuk elemen tunggal
+  (`b5_features.mjs:208` → TypeError → runner itu MUSTAHIL lolos, dan tak ada satu pun tes yang menangkapnya karena vitest/jsdom
+  tidak pernah mengeksekusi berkas e2e); tidak ada viewport + Log Window menutupi tombol ⋮ (terukur 294–322 vs logTop 219 →
+  klik mendarat di panel); `testDir:"e2e"` → `e2e/e2e` → `No tests found`; `use.executablePath` bukan opsi Playwright Test
+  (0 kemunculan di `test.d.ts`) → diam-diam diabaikan; CLI Playwright crash `Unsupported platform: android` di Termux; `GET /favicon.ico` = 404.
+- fe-dev memperbaiki semuanya (`ddf33df`): runner ASLI kini `B5 E2E PASS` exit 0 dan smoke `2 passed`; penjaga statis baru
+  `tests/e2e_tooling.test.js` (16 tes) **divalidasi dengan mutasi** (4 bug lama dikembalikan → 4 penjaga gagal);
+  `e2e/run.mjs` + shim `--import data:` (`process.platform`→linux) TANPA menambal `node_modules`; `test:e2e` → `node e2e/run.mjs`;
+  favicon SVG+ICO lokal (bentuk NETRAL, bukan logo merek — tunggu selera user).
+- Verifikasi PM sendiri (instance 8321 milik sendiri, lalu dimatikan + berkas sementara dihapus): `node e2e/b5_features.mjs`
+  → `B5 E2E PASS` exit 0; `vitest run` → **26 berkas / 625 tes LOLOS**.
+- **JAWABAN "perlu restart?" — TERNYATA SUDAH:** `GET :8080/openapi.json` sekarang = `AccountUpdate ['api_key','enabled','label','priority']`
+  (11 menit lalu diukur = `['priority']` saja, dengan PID 15400; sekarang pelayan 8080 = `python run.py` PID 15777, berumur ±11 menit).
+  Jadi proses yang melayani user SUDAH memuat API ubah-akun + tampilan + favicon: `favicon.ico` 200, `favicon.svg` 200,
+  `vendor/font-awesome/css/all.min.css` 200, `webfonts/fa-solid-900.woff2` 200 di port user. PM tidak menyentuh proses apa pun (J6).
+- TEMUAN LINGKUNGAN untuk keputusan user: ada server uji tertinggal dari sesi lama — `python3 run.py --port 8251`, berumur
+  ±1 hari 2 jam (PID 5934). PM TIDAK mematikannya (aturan: tidak membunuh proses aigate/uvicorn; hanya PID sendiri yang boleh). User yang putuskan.
+- Berkas laporan yang menulis "user wajib muat ulang / belum ada browser" dibiarkan utuh (arsip titik-waktu) — koreksi di blok ini
+  + laporan `.opencode/reports/20260913/qa/0300_bukti-browser-nyata-dan-perbaikan-perkakas-uji.md`.
+
 ## 20260911-2215 — PR #19 DIBUKA (4 commit dokumen pasca-merge #18) + jawaban "perlu restart?" = YA, untuk API (ProjectManager)
 - `origin/refactor/ui` = `ab67fe1` (sinkron 0/0). **PR #19** `refactor/ui -> main`: https://github.com/fadhly-permata/AI-Gate/pull/19
   — 4 commit / 7 berkas / +149 −40 (murni dokumen: ruling laporan-hanya-PM, provenance, catatan PM), `mergeable: True / clean`.
