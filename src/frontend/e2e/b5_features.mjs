@@ -38,6 +38,9 @@
 //   B5.7   : nav settings -> #exportBtn + #importFile (+ #importBtn)
 //
 // Jalankan (server aigate sudah nyala): npm run test:e2e:b5
+//   (butuh env PW_EXECUTABLE + AIGATE_URL; contoh Termux:
+//    PW_EXECUTABLE=/data/data/com.termux/files/usr/bin/chromium-browser \
+//    PW_NO_SANDBOX=1 AIGATE_URL=http://127.0.0.1:8080 node e2e/b5_features.mjs)
 // Exit 0 = PASS, non-zero = FAIL. Cleanup seed best-effort di akhir.
 
 import puppeteer from "puppeteer-core";
@@ -52,6 +55,16 @@ if (!EXEC) {
 
 const WAIT = 15000; // per-assertion wait (SPA load data async)
 const GO_WAIT = 30000;
+
+// Viewport DIEKSPLISIT. Tanpa ini puppeteer pakai default 800x600 dan tes jadi
+// mustahil lolos: Log Window (#logWindow) tampil bawaan, dipaku ke bawah
+// (position:fixed; bottom:0; z-index:30 — styles.css:1637-1648), dan di 800x600
+// puncaknya naik sampai y=219 sementara tombol ⋮ baris provider duduk di
+// y=294-322 (diukur, lihat catatan di bawah) -> klik mendarat di panel log,
+// menu tidak pernah terbuka. 1280x900 = ukuran desktop yang realistis dan
+// sama dengan yang dipakai Playwright (devices["Desktop Chrome"] = 1280x720)
+// plus ruang vertikal lebih.
+const VIEWPORT = { width: 1280, height: 900 };
 
 const args = [
   "--no-sandbox",
@@ -141,6 +154,48 @@ async function gotoView(pg, view) {
   await pg.click('.nav-item[data-view="' + view + '"]');
 }
 
+/* ---- Log Window: disiapkan TERTUTUP sebelum halaman sempat merender ----
+   Kenapa perlu: #logWindow tampil secara bawaan (app.js:2384 membaca
+   "aigate.logVisible" dengan default "1") dan dipaku ke bawah layar
+   (position:fixed, styles.css:1637-1648). Pada viewport kecil panelnya menutupi
+   tombol ⋮ baris, jadi klik tes mendarat di panel log. Pengukuran nyata
+   (chromium 149 headless, provider seed 1 baris, viewport default 800x600):
+     tombol ⋮  top 294 .. bottom 322
+     panel log top 219 .. bottom 600
+     elementFromPoint(titik tengah tombol) = SPAN milik panel log (BUKAN tombol)
+   Pilihan perbaikan: menyetel preferensi yang SUDAH ADA di produk lewat
+   localStorage sebelum skrip halaman jalan (evaluateOnNewDocument). Ini nol
+   perubahan kode produk dan deterministik. Alternatif yang DIBUANG:
+   page.click(..., {force}) — memaksa klik buta dan tidak membuktikan tombolnya
+   benar-benar terjangkau pengguna; menutup panel dengan mengklik tombol toggle
+   — menambah langkah UI yang bisa gagal sendiri. Assert TIDAK ada yang
+   dikurangi; satu-satunya yang berubah adalah kondisi awal halaman. */
+async function preparePage(pg) {
+  await pg.setViewport(VIEWPORT);
+  await pg.evaluateOnNewDocument(() => {
+    try { localStorage.setItem("aigate.logVisible", "0"); } catch (e) { /* storage diblokir */ }
+  });
+}
+
+/* Jaring pengaman: kalau suatu saat panel log muncul lagi, buka kunci area
+   tabel dengan menyembunyikannya lewat preferensi yang sama (runtime). */
+async function ensureLogWindowClosed(pg) {
+  const open = await pg.evaluate(() => {
+    const lw = document.getElementById("logWindow");
+    return !!(lw && !lw.hidden);
+  });
+  if (!open) return;
+  await pg.evaluate(() => {
+    try { localStorage.setItem("aigate.logVisible", "0"); } catch (e) { /* ignore */ }
+    const btn = document.getElementById("logWindowToggle");
+    if (btn) btn.click();
+  });
+  await pg.waitForFunction(() => {
+    const lw = document.getElementById("logWindow");
+    return !lw || lw.hidden;
+  }, { timeout: WAIT });
+}
+
 /* ---- B5.1: Providers -> halaman rinci -> kartu akun -> modal akun ---- */
 async function testProvidersAccounts(pg, providerId) {
   await gotoView(pg, "providers");
@@ -205,7 +260,12 @@ async function testProvidersAccounts(pg, providerId) {
     (bs) => bs.map((b) => b.getAttribute("aria-label")));
   assert(move.length === 2, "tombol ▲/▼ tidak dua: " + JSON.stringify(move));
   // stage-5: tiap kartu punya tombol "Ubah" (acc-edit) SAME LEVEL dengan "Hapus".
-  const cardBtns = await pg.$$eval("#accList .acc-card:first-child", (card) => {
+  // CATATAN: $eval (BUKAN $$eval) — callback $$eval menerima ARRAY hasil
+  // querySelectorAll, jadi `card.querySelector` di sini dulu melempar
+  // "TypeError: card.querySelector is not a function" dan runner ini mustahil
+  // lolos di browser mana pun (tidak ada satu pun tes unit yang mengeksekusi
+  // berkas ini: vitest/jsdom hanya mem-parse modul, tidak menyentuh e2e/).
+  const cardBtns = await pg.$eval("#accList .acc-card:first-child", (card) => {
     const edit = card.querySelector(".acc-edit");
     return {
       edit: !!edit,
@@ -325,6 +385,7 @@ let exitCode = 0;
 try {
   browser = await puppeteer.launch({ executablePath: EXEC, headless: true, args });
   page = await browser.newPage();
+  await preparePage(page);
 
   await page.goto(BASE + "/", { waitUntil: "domcontentloaded", timeout: GO_WAIT });
   const title = await page.title();
@@ -335,6 +396,11 @@ try {
     !!window.aigate && !!window.aigate.usage && !!window.aigate.analytics &&
     typeof window.aigate.loadAccounts === "function",
   { timeout: GO_WAIT });
+
+  // Panel log harus benar-benar tertutup sebelum ada klik yang bergantung pada
+  // posisi (lihat catatan di preparePage). Biasanya no-op: preferensinya sudah
+  // disetel sebelum skrip halaman jalan.
+  await ensureLogWindowClosed(page);
 
   console.log("[b5-e2e] seed provider + account ...");
   seededProviderId = await seedData(page);

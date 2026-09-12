@@ -2,6 +2,93 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260913-0310 — KEBENARAN BARU: browser NYATA ada di Termux + API user ternyata SUDAH kode baru + 6 bug perkakas uji diperbaiki (qa-engineer → fe-dev → PM)
+- **Koreksi klaim berulang di laporan sesi ini** ("mustahil ada browser di Termux → uji nyata harus dikerjakan user"): SALAH.
+  `/data/data/com.termux/files/usr/bin/chromium-browser --version` = `Chromium 149.0.7827.155`, dan `node_modules` sudah
+  berisi `playwright` + `@playwright/test` + `puppeteer-core@23.11.1`. Jadi "di-exercise nyata" bisa ditutup sendiri, tanpa menunggu user.
+- qa-engineer menjalankan instance TERISOLASI (port acak, `AIGATE_DB_PATH` di luar repo, PID sendiri; diverifikasi via
+  `/proc/<pid>/fd` bahwa proses user tidak tersentuh, jumlah provider user tetap 3). Hasil: fitur akun-ganda BERFUNGSI di
+  peramban nyata — ⋮ → "Kelola akun" → halaman rinci 4 kartu → kartu akun + ▲▼ → modal dua mode → `PUT {label,api_key,enabled}`
+  tersimpan → `auth_type` diabaikan → `api_key` ke oauth = 400 `oauth_account_key_readonly` → Kembali; **audit jaringan: 55
+  permintaan, host = `127.0.0.1:<port>` saja** (bukti klaim "ikon lokal tanpa CDN" di peramban); glyph ter-render
+  (`fonts.check` true, `::before` U+F05A / U+F0C0); baris limit sticky `offsetHeight` 0 saat fill-first vs 34 saat round-robin
+  (tambalan `display:flex` terbukti di peramban, bukan cuma di jsdom).
+- **6 bug nyata dihasilkan dari situ** (semua PM cek ulang sendiri sebelum mendelegasi): `$$eval` dipakai untuk elemen tunggal
+  (`b5_features.mjs:208` → TypeError → runner itu MUSTAHIL lolos, dan tak ada satu pun tes yang menangkapnya karena vitest/jsdom
+  tidak pernah mengeksekusi berkas e2e); tidak ada viewport + Log Window menutupi tombol ⋮ (terukur 294–322 vs logTop 219 →
+  klik mendarat di panel); `testDir:"e2e"` → `e2e/e2e` → `No tests found`; `use.executablePath` bukan opsi Playwright Test
+  (0 kemunculan di `test.d.ts`) → diam-diam diabaikan; CLI Playwright crash `Unsupported platform: android` di Termux; `GET /favicon.ico` = 404.
+- fe-dev memperbaiki semuanya (`ddf33df`): runner ASLI kini `B5 E2E PASS` exit 0 dan smoke `2 passed`; penjaga statis baru
+  `tests/e2e_tooling.test.js` (16 tes) **divalidasi dengan mutasi** (4 bug lama dikembalikan → 4 penjaga gagal);
+  `e2e/run.mjs` + shim `--import data:` (`process.platform`→linux) TANPA menambal `node_modules`; `test:e2e` → `node e2e/run.mjs`;
+  favicon SVG+ICO lokal (bentuk NETRAL, bukan logo merek — tunggu selera user).
+- Verifikasi PM sendiri (instance 8321 milik sendiri, lalu dimatikan + berkas sementara dihapus): `node e2e/b5_features.mjs`
+  → `B5 E2E PASS` exit 0; `vitest run` → **26 berkas / 625 tes LOLOS**.
+- **JAWABAN "perlu restart?" — TERNYATA SUDAH:** `GET :8080/openapi.json` sekarang = `AccountUpdate ['api_key','enabled','label','priority']`
+  (11 menit lalu diukur = `['priority']` saja, dengan PID 15400; sekarang pelayan 8080 = `python run.py` PID 15777, berumur ±11 menit).
+  Jadi proses yang melayani user SUDAH memuat API ubah-akun + tampilan + favicon: `favicon.ico` 200, `favicon.svg` 200,
+  `vendor/font-awesome/css/all.min.css` 200, `webfonts/fa-solid-900.woff2` 200 di port user. PM tidak menyentuh proses apa pun (J6).
+- TEMUAN LINGKUNGAN untuk keputusan user: ada server uji tertinggal dari sesi lama — `python3 run.py --port 8251`, berumur
+  ±1 hari 2 jam (PID 5934). PM TIDAK mematikannya (aturan: tidak membunuh proses aigate/uvicorn; hanya PID sendiri yang boleh). User yang putuskan.
+- Berkas laporan yang menulis "user wajib muat ulang / belum ada browser" dibiarkan utuh (arsip titik-waktu) — koreksi di blok ini
+  + laporan `.opencode/reports/20260913/qa/0300_bukti-browser-nyata-dan-perbaikan-perkakas-uji.md`.
+
+## 20260911-2215 — PR #19 DIBUKA (4 commit dokumen pasca-merge #18) + jawaban "perlu restart?" = YA, untuk API (ProjectManager)
+- `origin/refactor/ui` = `ab67fe1` (sinkron 0/0). **PR #19** `refactor/ui -> main`: https://github.com/fadhly-permata/AI-Gate/pull/19
+  — 4 commit / 7 berkas / +149 −40 (murni dokumen: ruling laporan-hanya-PM, provenance, catatan PM), `mergeable: True / clean`.
+  Label dipasang via endpoint `issues/19/labels` (field `labels` saat create PR terbukti TIDAK menempel — pelajaran berulang, #18 juga begitu).
+- Jawaban restart, dengan bukti terukur (bukan dugaan): **YA, masih perlu muat ulang — tapi hanya untuk API, bukan untuk tampilan.**
+  · `GET http://127.0.0.1:8080/` = tampilan SUDAH baru (penghitung: `provider-detail` 1, `accModal` 5, `v=20260919` 4, tautan
+    `vendor/font-awesome/css/all.min.css` 1) — berkas statis dibaca ulang tiap permintaan.
+  · `GET /openapi.json` (skema dibuat dari modul Python yang terpasang di memori proses) = `AccountUpdate: ['priority']`,
+    sedangkan `src/backend/accounts_router.py` di disk berisi 4 field → **proses lama masih jalan**.
+  · Konsekuensi nyata: selama belum dimuat ulang, tombol "Ubah akun" akan **kelihatannya berhasil tapi tidak menyimpan apa pun**
+    (Pydantic v1 membuang field asing tanpa error, lalu layar membaca ulang daftar dan nilai lama muncul lagi). Ini kelas kegagalan
+    yang tidak tertangkap tes apa pun — hanya tertangkap oleh cek proses hidup.
+  · PM tidak menyentuh proses (aturan restart = hak user). `ps -o lstart` di Termux mengembalikan waktu acak (1970) jadi tidak
+    bisa dipakai adu-mtime; bukti sah = selisih skema `/openapi.json` vs kode di disk.
+- Ruling user soal laporan sudah ditulis permanen (`dd2f51d`): berkas laporan hanya PM; agen mengembalikan receipt di sesi.
+  Tabrakan `task-report.md` vs `agent-boundaries.md` = BERES.
+- Provenance (user: "boleh") selesai diverifikasi: FA 6.5.1 5/5 identik artefak resmi; xterm TERNYATA `xterm@5.3.0` +
+  `xterm-addon-fit@0.8.0` (3/3 identik) padahal selama ini tidak ada catatan versi sama sekali. WL.4 → `[~]`, sisa = teks
+  lisensi MIT xterm belum ikut di-vendor/di-diff + usulan `PROVENANCE.txt` per folder vendor.
+
+## 20260911-2205 — PR #18 DI-MERGE user (dicek ulang ke API, bukan kutipan memori) + 3 commit menggantung menunggu PR baru (ProjectManager)
+- Fakta diperbarui di sesi ini: `GET /pulls/18` → `state: closed, merged: True, merged_by: fadhly-permata`, merge commit `c620f54`,
+  `origin/main` kini = `c620f54`. (Kebiasaan baru = aturan A12: status eksternal dicek ke sumbernya sebelum dikutip.)
+- PR #18 membawa 25 commit / 59 berkas / +7.400 −469 = seluruh fitur akun ganda (backend + layar) + ikon lokal + ADR-015 + perapian dokumen.
+- NAMUN 3 commit yang gua buat SETELAH merge masih menggantung di `refactor/ui` (7 berkas, +137/−40, murni dokumen/legal/governance):
+  `dd2f51d` (ruling "laporan hanya PM"), `8a85135`→`8a85435` (provenance terverifikasi), `4a7717f` (catatan PM + WL.4 `[~]`).
+  PR baru (#19) BELUM gua buka — menunggu perintah user (D1: ini pertanyaan, bukan perintah).
+- FAKTA PROSES HIDUP (jawaban "perlu restart?"): **YA, masih perlu** — tapi bukan untuk tampilan, untuk API.
+  `GET /openapi.json` dari proses yang jalan = `AccountUpdate: ['priority']`; disk = 4 field (`priority|label|api_key|enabled`)
+  → tanpa muat ulang, tombol "Ubah akun" akan terlihat menyimpan lalu nilainya balik sendiri (Pydantic v1 mengabaikan field asing, tanpa error).
+  Bukti tampilan SUDAH baru: `GET /` = `provider-detail` 1×, `accModal` 5×, `v=20260919` 4×, `vendor/font-awesome/...` 1× (statis dibaca dari berkas tiap permintaan).
+
+## 20260911-2155 — Ruling user: laporan = HANYA PM · provenance aset terverifikasi · PROSES HIDUP masih kode LAMA (ProjectManager)
+- Ruling user (pertanyaan tabrakan rule): **"Tetap, cuma PM yang boleh nulis report."** → ditulis nyata:
+  `.opencode/rules/task-report.md` (ownership dibalik: spesialis mengembalikan receipt di sesi; PM yang menyusun laporan
+  dari receipt + verifikasi sendiri; dilarang melebarkan akar tulis agen "demi laporan") + `OPERATING_RULES.md` B3 diperjelas.
+  commit `dd2f51d`. Gate `rules-index.py` LOLOS (53 rule/10 tema). Tabrakan rule task-report vs agent-boundaries = SELESAI.
+- Provenance (user: "boleh"): PM mengunduh tarball RESMI lalu membuang file sementara; pencocokan sha256 per berkas:
+  `@fortawesome/fontawesome-free@6.5.1` = 5/5 identik (tarball 4.951.025 B, sha512+sha1 cocok metadata registry);
+  `xterm@5.3.0` (`lib/xterm.js` 283.404 B + `css/xterm.css` 5.383 B) dan `xterm-addon-fit@0.8.0` (1.503 B) = 3/3 identik
+  → xterm yang selama ini TANPA catatan versi kini teridentifikasi pasti (buktinya hash, bukan string `version="6"` di dalam file).
+  Dicatat + diberi tanggal oleh fullstack-dev (`ses_f6f0013b8ffe...`) di `THIRD_PARTY_NOTICES.md` §1–§2, commit `8a85435`.
+  SISA JELAS: teks lisensi MIT xterm belum disimpan sebagai berkas di folder vendor + belum di-diff per-baris; usulan manifest
+  `PROVENANCE.txt` per folder vendor (wilayah fe-dev) — `WL.4` dijadikan `[~]` (sebagian), bukan ditutup.
+- **TEMUAN PALING PENTING untuk user ("apa masih perlu restart?"): YA — tapi bukan untuk tampilan, untuk APInya.**
+  Bukti terukur dari proses yang SEDANG jalan (`python run.py`, PID 15400):
+  · `GET /` (statis dibaca dari berkas per permintaan) = SUDAH baru: `data-view="provider-detail"` 1×, `accModal` 5×,
+    `vendor/font-awesome/css/all.min.css` 1×, `v=20260919` 4× — sama persis dengan isi berkas di disk.
+  · `GET /openapi.json` (skema dibuat dari modul Python yang TERPASANG di memori) = `AccountUpdate: ['priority']`,
+    padahal `src/backend/accounts_router.py` di disk punya 4 field (`priority/label/api_key/enabled`, baris 17-21 potonganku).
+  → artinya tombol "Ubah akun" di layar yang sudah terlihat **belum tentu tersimpan** selama server lama belum dimuat ulang:
+  field ekstra diabaikan Pydantic v1 (bukan error) → suntingan bisa tampak "sukses" lalu nilainya balik lagi.
+  PM TIDAK menyentuh proses (aturan restart = hak user). Catatan: `ps -o lstart` di Termux mengembalikan waktu acak
+  (1970) jadi tidak bisa dipakai untuk adu waktu-ubah-berkas; bukti yang sah = selisih skema `/openapi.json` vs kode di disk.
+- Peta sisa pekerjaan user-side ditulis di balasan PM (restart → tes ubah akun + mode pesawat → review/merge PR #18 → putuskan 4 item terbuka).
+
 ## 20260911-1950 — KOREKSI DIRI: klaim "aturan A11/A12 sudah dicatat" ternyata belum tertulis (ProjectManager)
 - Fakta: blok 19:35 di berkas ini + laporan `1935_rapikan-path-push-pr18.md` menulis A11/A12 "sudah dicatat" dan gerbang
   "52 rule". Verifikasi setelahnya: `grep "^A1[12]" documents/pm/OPERATING_RULES.md` = KOSONG, `AGENTS.md` tanpa butir 13,

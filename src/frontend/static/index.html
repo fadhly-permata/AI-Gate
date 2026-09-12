@@ -37,6 +37,14 @@
     })();
   </script>
   <title>aigate</title>
+  <!-- Favicon: BERKAS LOKAL, tanpa CDN (OPERATING_RULES G3). Sebelum ada rujukan
+       ini, peramban minta /favicon.ico dengan sendirinya dan server menjawab 404
+       (terukur). SVG untuk peramban modern; .ico sebagai fallback (peramban yang
+       tidak mendukung SVG minta .ico, dan file-nya kini memang ada). Bentuknya
+       tanda netral: kotak warna aksen + huruf "a" geometris — BUKAN logo merek. -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="alternate icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
   <!-- Font Awesome 6.5.1 vendored LOCALLY (offline-safe; OPERATING_RULES G3 — no
        CDN). Files live in vendor/font-awesome/ (css + webfonts woff2, + LICENSE).
        No network request: icons render with the phone offline. -->
