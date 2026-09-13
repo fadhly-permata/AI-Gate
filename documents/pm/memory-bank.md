@@ -4,6 +4,33 @@
 (empty — diisi PM saat task pertama)
 
 ## Decisions
+- 2026-09-13 (AUDIT kepemilikan edit clip-lr — A2 TIDAK dilanggar): user curiga PM yang nulis `src/` (karena receipt
+  fe-dev bilang "edit sudah ada di working tree, saya cuma verifikasi"). PM telusuri session DB `opencode.db` (tabel
+  `part`): sesi fe-dev `ses_f6384…` yang menulis styles.css/index.html/device_modal.test.js (tool-call `edit`
+  03:36:39–03:37:33); sesi PM `ses_f63a…` HANYA `documents/pm/**` + skrip scratch tmp, dan skrip validasi `dp_target.mjs`
+  berkomentar "NO file write" (after-state diukur lewat injeksi `<style>` runtime). KEPUTUSAN: commit fix `430f33b`
+  (staging 3 berkas fitur eksplisit) + push → PR #23 diperbarui; NOL postmortem "PM tulis src" krn tak terjadi (nol
+  pengakuan palsu). TEMUAN: receipt fe-dev tidak akurat ttg penulis → pola claim-vs-fact (F5/F6) kini di sisi sub-agent;
+  kandidat rule akurasi-receipt utk user putuskan. Gerbang PM: vitest 27/685 LOLOS, `git diff --check` bersih.
+
+- 2026-09-13 (diagnosis BERBUKTI device-preview kepotong kiri-kanan = flexbox centering overflow): user lapor bug
+  BARU di PR #23 / commit `735d9e2`. PM ukur pakai Chromium 149 NYATA (CDP + Node24 global WebSocket, tanpa npm;
+  instance terisolasi port-acak + `AIGATE_DB_PATH` tmp luar repo + PID sendiri; `:8080` user tak disentuh — J6,
+  diverifikasi `:8080`=200 + port sendiri down sesudahnya). AKAR: `.device-preview{ display:flex; justify-content:center;
+  overflow:auto }` (`styles.css:779-788`) + `.modal.device-modal{ width:var(--dev-w) }` (`styles.css:738-743`) +
+  `box-sizing:border-box` (`styles.css:77`); iframe `.device-frame{ width:var(--dev-w) }` (`styles.css:790-793`) lebih lebar
+  dari scroll-viewport kontainer → overflow dipusatkan simetris → setengah-kiri di `scrollLeft` negatif (tak tercapai).
+  **leftUnreach>0 di 9/9 sel** (mis. desktop@360=506.5px, bahkan phone@1280=30.5px); `transform:none` semua = BUKAN isu
+  scale 48% lama. Hipotesis user `overflow:hidden`/`92vw`/`scale` DITOLAK angka (overflow auto, cap tepat, transform none) —
+  yang benar cuma "flexbox centering overflow". Cacat sekunder: modal `overflow:auto` → Close terdorong keluar viewport di
+  viewer pendek. FIX divalidasi PM 12/12 sel: modal `width:fit-content; overflow:hidden; flex-direction:column`;
+  `.device-preview{ flex:0 1 auto; min-height:0; justify-content:flex-start }`; `.device-frame-wrap{ margin-inline:auto }`
+  (safe-center) → leftUnreach=0, rightUnreach=0, header/modes/Close selalu in-view, perangkat-muat nol-scroll, transform none.
+  MURNI CSS (`app.js` tak diubah → invarian i18n.test.js:307-315 utuh; cuma `styles.css?v`→20260924). Handover:
+  `documents/pm/handovers/handover-20260913-device-preview-clip-lr.md`. Owner fe-dev; user yang spawn (PM tak punya Task tool).
+  BELUM eksekusi src / commit. Pelajaran pola: keluhan "kepotong kiri-kanan" = centering overflow klasik, TAPI tetap diukur
+  dulu sebelum tulis fix (F5), dan fix-nya pun diukur before/after sebelum ditanam ke handover (F3).
+
 - 2026-09-13 (ATURAN F5 — PM dilarang salah-arti gejala + karang akar masalah): user menegur keras. Di task
   device-sim gua mendiagnosis settings "lemot/laggy" (teori re-render 26 CSS rule + terminal reflow) bahkan tulis
   balik "terasa lemot" ke user. user TIDAK PERNAH bilang lemot. Kata aslinya: "gak responsif" + "desain aneh" +

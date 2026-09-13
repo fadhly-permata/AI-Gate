@@ -1900,3 +1900,23 @@ bentuk favicon menunggu selera user · `trace/screenshot on-failure` masih menul
 - `src/frontend/tests/device_modal.test.js`: kontrak DI-INVERT — pilih mode HARUS TIDAK menyentuh `document.body.dataset.device` luar & TIDAK menulis `localStorage.aigate.device`; assertion baru cek `--dev-w=375px`/`--dev-h=667px` + tombol aktif. Komentar header + precondition `beforeEach` disesuaikan.
 - `src/frontend/tests/provider_detail.test.js`: KOMENTAR saja (:255-265) — jalur `window.aigate.setDevice` langsung (boot/test hook halaman luar) tetap sah; modal sudah TAK share path itu. Assertion tetap hijau.
 - Nol backend, nol hex baru, nol perubahan markup `#deviceModal`/trigger. Vitest: **27 berkas / 681 tes LOLOS** (sama 681; device_modal 9 tes kontrak baru). Chromium nyata (headless, instance terisolasi port 43669 + DB di tmp, PID sendiri — `:8080` user tak disentuh): **22/22 PASS** — body luar `desktop` konstan across open→phone→tablet→desktop→close→reload; `localStorage.aigate.device` null terus; frame 375/768/1280 px nyata `transform:none`; bottom-nav dalam frame 56px (proporsional, bukan 26px); desktop di viewer 820px → box 754px (cap 92vw) + scroll INTERNAL, iframe tetap 1280px.
+
+### 2026-09-13 — FIX device-sim preview kepotong KIRI & KANAN (fe-dev; audit+gerbang+commit PM) — commit `430f33b`
+**Asal:** bug BARU di PR #23 / commit `735d9e2`. Handover `documents/pm/handovers/handover-20260913-device-preview-clip-lr.md`.
+**Akar (terukur Chromium, bukan hipotesis — aturan F5/F3):** `.device-preview{ display:flex; justify-content:center; overflow:auto }`
+di-overflow child `.device-frame-wrap` (lebar = `--dev-w`) yang lebih lebar dari kontainer → `justify-content:center` menumpuk
+overflow SIMETRIS + `scrollLeft` tak bisa negatif → sisi KIRI permanen tak tercapai (`leftUnreach>0` 9/9 sel). Cacat sekunder:
+`.modal.device-modal{ overflow:auto }` bikin SELURUH modal scroll → Close ke-dorong keluar viewport di viewer pendek.
+**Catatan kepemilikan (audit session DB `opencode.db`):** edit `src/**` DI-BUAT oleh sesi **fe-dev** (tool-call `edit` 03:36:39/
+03:36:44 styles.css, 03:36:56 index.html, 03:37:20/03:37:33 device_modal.test.js) — BUKAN oleh PM. Sesi PM (`ProjectManager`)
+hanya menulis `documents/pm/**` + skrip scratch tmp; validasi "after" PM dilakukan lewat injeksi `<style>` runtime
+(`dp_target.mjs`, berkomentar eksplisit "NO file write") → **rule A2 TIDAK dilanggar** (PM nol tulis `src/`). Receipt fe-dev
+yang menyebut "edit sudah ada di working tree, saya cuma verifikasi" TIDAK cocok log: fe-dev sendiri yang menulisnya.
+- `src/frontend/static/styles.css`:
+  - `.modal.device-modal` (:738-): `width:var(--dev-w,620px)`→`fit-content`; `overflow:auto`→`hidden`; + `display:flex; flex-direction:column` → modal TIDAK scroll, kotak hug perangkat, tetap di-cap `max-width:92vw/max-height:80vh`.
+  - BARU anak modal `> .modal-title, > .settings-dev-note, > .device-modes, > .form-actions { flex:0 0 auto }` → header/mode-buttons/footer tak ikut menyusut, Close selalu in-view.
+  - `.device-preview` (:789-): + `flex:0 1 auto; min-height:0`; `justify-content:center`→`flex-start` (INTI FIX — buang tumpukan overflow simetris) → satu-satunya area scroll.
+  - `.device-frame-wrap`: + `margin-inline:auto` (safe-center: ter-center saat ada ruang, runtuh ke 0 saat overflow → tepi kiri di `scrollLeft=0`, tercapai).
+- `src/frontend/static/index.html`: cache-buster `styles.css?v=20260923`→`20260924` (:61) SAJA; `app.js`/`i18n.js`/`I18N_VER` TETAP `20260923` → invarian `tests/i18n.test.js:307-315` utuh. `app.js` tak disentuh (fix murni CSS).
+- `src/frontend/tests/device_modal.test.js`: + penjaga regresi STATIS (helper `cssRuleBody` baca `styles.css`): `.device-preview` tak boleh `justify-content:center` (harus `flex-start`) + ada `min-height:0`; `.modal.device-modal` `width:fit-content` + `overflow:hidden` (bukan `auto`); `.device-frame-wrap` `margin-inline:auto`+`flex:0 0 auto`. +4 tes (device_modal 9→13).
+- Nol backend, nol hex, nol ubah markup `#deviceModal`/trigger. **Gerbang PM (jalankan sendiri, sesi ini):** `vitest run` = **27 berkas / 685 tes LOLOS** (681 +4 penjaga); `git diff --check` exit 0; diff src = persis §2.1–2.5 handover + §5, NOL perubahan nyasar.
