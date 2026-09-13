@@ -17,7 +17,7 @@
        below; it is also read by i18n.js for the on-demand URLs. -->
   <script>
     (function () {
-      var V = "20260920";
+      var V = "20260922";
       window.I18N_VER = V;
       var loc = "en";
       try {
@@ -58,7 +58,7 @@
   <script defer src="vendor/xterm/xterm.js?v=20260920"></script>
   <script defer src="vendor/xterm/xterm-addon-fit.js?v=20260920"></script>
 
-  <link rel="stylesheet" href="styles.css?v=20260921" />
+  <link rel="stylesheet" href="styles.css?v=20260922" />
 </head>
 <body>
   <div class="layout">
@@ -160,6 +160,16 @@
            thing as before. No data-view: app.js only hijacks clicks on items
            that carry one, so this anchor keeps native link behaviour. -->
       <div class="sidebar-footer">
+        <!-- Device-view simulation (moved OUT of Settings, Opsi A): opens the
+             #deviceModal preview. A <button> (not .nav-item[data-view]) so it is
+             never treated as a view by app.js's nav wiring. -->
+        <button type="button" class="device-trigger" id="deviceTriggerDesktop"
+                data-device-trigger aria-haspopup="dialog" aria-controls="deviceModal"
+                aria-label="Device view simulation" data-i18n-aria="settings.device_sim"
+                title="Device view simulation">
+          <i class="nav-icon fa-solid fa-mobile-screen-button" aria-hidden="true"></i>
+          <span class="nav-label" data-i18n="settings.device_sim">Device Simulation</span>
+        </button>
         <a class="nav-item" href="https://github.com/fadhly-permata/AI-Gate"
            target="_blank" rel="noopener noreferrer"
            aria-label="aigate Repo" data-i18n-aria="nav.repo" title="aigate Repo">
@@ -224,19 +234,6 @@
               </select>
             </div>
 
-            <!-- Device Simulation (B4.2): dev/visual aid only, client-side. -->
-            <div class="form-row">
-              <label class="form-label" for="setDevice" data-i18n="settings.device_sim">Device Simulation</label>
-              <select class="form-input" id="setDevice" name="device">
-                <option value="desktop" data-i18n="settings.device_desktop">Desktop</option>
-                <option value="tablet" data-i18n="settings.device_tablet">Tablet</option>
-                <option value="phone" data-i18n="settings.device_phone">Phone</option>
-              </select>
-            </div>
-            <p class="settings-dev-note" id="setDeviceNote" data-i18n="settings.device_note">
-              Visual aid for development only — does not change server behavior.
-            </p>
-
             <div class="form-actions">
               <button type="submit" class="btn btn-primary" id="setSave"
                       data-i18n="settings.save">Save</button>
@@ -257,13 +254,6 @@
           </p>
 
           <div class="form-row">
-            <span class="form-label" data-i18n="settings.export">Export settings</span>
-            <a class="btn btn-primary" id="exportBtn" href="/api/settings/export"
-               role="button"><i class="fa fa-download"></i>
-              <span data-i18n="settings.export">Export settings</span></a>
-          </div>
-
-          <div class="form-row">
             <label class="form-label" for="importMode" data-i18n="settings.import.mode">Mode</label>
             <select class="form-input" id="importMode">
               <option value="replace" data-i18n="settings.import.mode.replace">Replace (overwrite all)</option>
@@ -276,7 +266,15 @@
             <input class="form-input" type="file" id="importFile" accept="application/json" />
           </div>
 
-          <div class="form-actions">
+          <!-- One action bar for both backup actions (was: a lone Export label
+               row whose <a.btn> sat taller/wider than the field rows above it,
+               breaking the rhythm — handover §1.B). Both are anchors/buttons of
+               the SAME .btn.btn-primary footprint, side by side, wrapping to a
+               stack on narrow screens. -->
+          <div class="form-actions backup-actions">
+            <a class="btn btn-primary" id="exportBtn" href="/api/settings/export"
+               role="button"><i class="fa fa-download"></i>
+              <span data-i18n="settings.export">Export settings</span></a>
             <button type="button" class="btn btn-primary" id="importBtn">
               <i class="fa fa-upload"></i> <span data-i18n="settings.import">Import settings</span>
             </button>
@@ -1349,6 +1347,45 @@
         </div>
       </div>
 
+      <!-- Device-view simulation modal (moved OUT of the Settings form, Opsi A).
+           Reuses the shared .modal-overlay + .modal shell (index.html provModal).
+           role=dialog + aria-modal + aria-labelledby; app.js adds the focus trap,
+           ESC-to-close, click-outside-to-close and focus restore to the trigger.
+           A same-origin <iframe> previews THIS app at the picked device size. -->
+      <div class="modal-overlay" id="deviceModal" hidden>
+        <div class="modal device-modal" role="dialog" aria-modal="true" aria-labelledby="deviceModalTitle">
+          <h3 class="modal-title" id="deviceModalTitle" data-i18n="settings.device_sim">Device Simulation</h3>
+          <p class="settings-dev-note" data-i18n="settings.device_note">
+            Visual aid for development only — does not change server behavior.
+          </p>
+          <div class="device-modes" role="group" aria-label="Device size" data-i18n-aria="settings.device_sim">
+            <button type="button" class="btn device-mode" data-device-mode="phone" aria-pressed="false">
+              <i class="fa-solid fa-mobile-screen-button" aria-hidden="true"></i>
+              <span data-i18n="settings.device_phone">Phone</span>
+              <small>375×667</small>
+            </button>
+            <button type="button" class="btn device-mode" data-device-mode="tablet" aria-pressed="false">
+              <i class="fa-solid fa-tablet-screen-button" aria-hidden="true"></i>
+              <span data-i18n="settings.device_tablet">Tablet</span>
+              <small>768×1024</small>
+            </button>
+            <button type="button" class="btn device-mode" data-device-mode="desktop" aria-pressed="false">
+              <i class="fa-solid fa-desktop" aria-hidden="true"></i>
+              <span data-i18n="settings.device_desktop">Desktop</span>
+              <small>1280×800</small>
+            </button>
+          </div>
+          <div class="device-preview" id="devicePreview">
+            <div class="device-frame-wrap" id="deviceFrameWrap">
+              <iframe class="device-frame" id="deviceFrame" title="aigate device preview"></iframe>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn" id="deviceModalClose" data-i18n="common.close">Close</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Mobile bottom navigation (B4.2): shown only on phone device
            simulation or real narrow viewports. Icons only, non-AdminLTE shell.
            Mirrors the sidebar 1:1 — its 9 app views plus the repository link
@@ -1378,6 +1415,14 @@
         <a class="bn-item" href="#" data-view="settings"
            data-i18n-aria="nav.settings"><i class="fa fa-gear"></i></a>
         <span class="bn-sep" aria-hidden="true"></span>
+        <!-- Device-view simulation trigger (moved OUT of Settings, Opsi A). It is
+             a <button class="bn-device">, NOT a .bn-item: it opens the #deviceModal
+             rather than switching a view, and keeping it out of .bn-item preserves
+             the "10 nav items mirror the sidebar" parity the views test asserts.
+             Placed directly ABOVE the Repo item. -->
+        <button type="button" class="bn-device" id="deviceTriggerMobile"
+                data-device-trigger aria-haspopup="dialog" aria-controls="deviceModal"
+                aria-label="Device view simulation" data-i18n-aria="settings.device_sim"><i class="fa-solid fa-mobile-screen-button" aria-hidden="true"></i></button>
         <a class="bn-item" href="https://github.com/fadhly-permata/AI-Gate"
            target="_blank" rel="noopener noreferrer"
            aria-label="aigate Repo" data-i18n-aria="nav.repo"><i class="fa-brands fa-github"></i></a>
@@ -1388,17 +1433,17 @@
        Translation strings live in i18n/<code>.js, loaded by the inline
        preloader in <head> (active language) and on demand by this file.
        ?v= cache-buster: bump whenever i18n.js changes (stale cache = missing labels). -->
-  <script src="i18n.js?v=20260920" defer></script>
+  <script src="i18n.js?v=20260922" defer></script>
    <!-- Device simulation helper (B4.2) — must load before app.js uses it.
         ?v= cache-buster: bump whenever device.js changes. -->
-   <script src="device.js?v=20260920" defer></script>
+    <script src="device.js?v=20260922" defer></script>
   <!-- Searchable combobox widget (model pickers) — must load before app.js /
        combos.js, which call window.aigate.createCombobox.
        ?v= cache-buster: bump whenever combobox.js changes. -->
   <script src="combobox.js?v=20260911" defer></script>
   <!-- App bootstrap (defer preserves order).
        ?v= cache-buster: bump whenever app.js changes. -->
-  <script src="app.js?v=20260920" defer></script>
+  <script src="app.js?v=20260922" defer></script>
    <!-- Combos / Proxy Pools / Endpoints management (B2.4 / B2.3 / B2.5).
         ?v= cache-buster: bump whenever these modules change — combos.js held
         a plain src through the stage-8 rewrite, so browsers kept serving the

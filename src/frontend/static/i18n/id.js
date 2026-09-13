@@ -12,6 +12,7 @@ window.I18N.id = {
     "common.edit": "Ubah",
     "common.delete": "Hapus",
     "common.remove": "Hapus",
+    "common.close": "Tutup",
     "nav.group.gateway": "Penyiapan Gateway",
     "nav.group.operations": "Operasi",
     "nav.group.insights": "Wawasan",

@@ -254,8 +254,12 @@ it("the mobile bottom-nav also highlights 'Penyedia' (no entry of its own)", asy
     stubApi({ provider: PROVIDER, accounts: [], discover: { ok: true, models: [] } });
     window.aigate.openDetail("p1");
     await flush();
-    document.getElementById("setDevice").value = "phone";
-    document.getElementById("setDevice").dispatchEvent(new Event("change", { bubbles: true }));
+    // The device control moved OUT of the Settings form into a modal trigger (Opsi
+    // A). The mode buttons and this path share setDevice() -> applyDevice(mode),
+    // which re-syncs the bottom-nav highlight. Rendering a phone device while on
+    // the detail page must keep the parent ("providers") item highlighted.
+    window.aigate.setDevice("phone");
+    expect(document.body.dataset.device).toBe("phone");
     expect(document.querySelector('.bn-item[data-view="providers"]').classList.contains("active")).toBe(true);
     vi.unstubAllGlobals();
   });

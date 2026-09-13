@@ -439,11 +439,18 @@ describe("phone shell — hamburger hidden, bottom nav scrollable", () => {
       return [sep.previousElementSibling.getAttribute("data-i18n-aria"),
               sep.nextElementSibling.getAttribute("data-i18n-aria")];
     });
+    // Parity note (2026-09-13, device-sim moved out of Settings -> modal, Opsi A):
+    // the control is now a <button class="bn-device"> placed directly ABOVE the Repo
+    // item. It is NOT a .bn-item (so the 10-item mirror count above stays valid) and
+    // carries data-i18n-aria "settings.device_sim". The dividers still mark the same
+    // four sidebar group edges; the LAST one now sits System -> device-sim, with Repo
+    // immediately after the control (no dedicated divider: both are non-view tail
+    // controls, and Repo stays the final bottom-nav item).
     expect(boundaries).toEqual([
-      ["nav.endpoints", "nav.terminal"],  // Gateway  -> Operations
-      ["nav.cli", "nav.usage"],           // Operations -> Insights
-      ["nav.analytics", "nav.settings"],  // Insights -> System
-      ["nav.settings", "nav.repo"]        // System   -> Repo
+      ["nav.endpoints", "nav.terminal"],       // Gateway  -> Operations
+      ["nav.cli", "nav.usage"],                // Operations -> Insights
+      ["nav.analytics", "nav.settings"],       // Insights -> System
+      ["nav.settings", "settings.device_sim"]  // System   -> device-sim (Repo follows)
     ]);
     // jsdom has no layout: the rule text carries the visible-divider contract.
     const rule = ruleBlock(/(^|\n)\.bn-sep\s*\{[^}]*\}/);

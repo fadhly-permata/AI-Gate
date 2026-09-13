@@ -15,6 +15,7 @@ window.I18N["zh-tw"] = {
     "common.edit": "編輯",
     "common.delete": "刪除",
     "common.remove": "移除",
+    "common.close": "關閉",
     "nav.group.gateway": "閘道器設定",
     "nav.group.operations": "維運",
     "nav.group.insights": "洞察",

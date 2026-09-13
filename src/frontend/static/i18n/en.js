@@ -12,6 +12,7 @@ window.I18N.en = {
     "common.edit": "Edit",
     "common.delete": "Delete",
     "common.remove": "Remove",
+    "common.close": "Close",
     "nav.group.gateway": "Gateway Setup",
     "nav.group.operations": "Operations",
     "nav.group.insights": "Insights",

@@ -63,8 +63,6 @@
   function applyDevice(device) {
     var norm = deviceAttr(device);
     document.body.dataset.device = norm;
-    var sel = document.getElementById("setDevice");
-    if (sel) sel.value = norm;
     // Keep the bottom-nav active highlight in sync with the current view.
     var active = document.querySelector(".view.is-active");
     var view = active ? active.getAttribute("data-view") : null;
@@ -83,6 +81,151 @@
     var target = navViewFor(view);
     document.querySelectorAll(".bn-item").forEach(function (n) {
       n.classList.toggle("active", !!target && n.getAttribute("data-view") === target);
+    });
+  }
+
+  /* ---- Device-simulation modal (Opsi A — moved out of the Settings form) ----
+     A small device-sim control (sidebar-footer on desktop, bottom-nav on mobile)
+     opens an accessible dialog that previews THIS app in an iframe at the chosen
+     device size. Selecting a mode calls applyDevice(mode) so the live page + the
+     preview both react. No global modal helper exists yet, so the focus-trap /
+     ESC / click-outside / restore-focus behaviour lives here, scoped to this
+     dialog only. */
+  var DEVICE_SIZES = { phone: [375, 667], tablet: [768, 1024], desktop: [1280, 800] };
+
+  var deviceModal = null;
+  var deviceFrame = null;
+  var deviceLastTrigger = null;
+  var deviceKeyHandler = null;
+
+  function deviceFocusables() {
+    if (!deviceModal) return [];
+    // Everything inside this dialog is always visible (no conditionally-hidden
+    // controls), so a plain focusable selector is enough — and it stays correct
+    // under jsdom, where offsetParent is always null (no layout engine).
+    return Array.prototype.slice.call(
+      deviceModal.querySelectorAll(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+    );
+  }
+
+  // Scale the iframe's real device pixels down to fit the preview box, and
+  // reserve the scaled area via the wrapper (a transform alone would leave the
+  // layout box at full size and clip). Capped at 1 so small devices aren't blown up.
+  function deviceRenderPreview(mode) {
+    if (!deviceFrame) return;
+    var dims = DEVICE_SIZES[mode] || DEVICE_SIZES.desktop;
+    var box = document.getElementById("devicePreview");
+    var availW = box ? box.clientWidth : dims[0];
+    var availH = box ? box.clientHeight : dims[1];
+    var scale = Math.min(1, (availW > 0 ? availW : dims[0]) / dims[0],
+                              (availH > 0 ? availH : dims[1]) / dims[1]);
+    deviceFrame.style.width = dims[0] + "px";
+    deviceFrame.style.height = dims[1] + "px";
+    deviceFrame.style.transform = "scale(" + scale + ")";
+    var wrap = document.getElementById("deviceFrameWrap");
+    if (wrap) {
+      wrap.style.width = Math.round(dims[0] * scale) + "px";
+      wrap.style.height = Math.round(dims[1] * scale) + "px";
+    }
+  }
+
+  function deviceSetActiveMode(mode) {
+    if (!deviceModal) return;
+    Array.prototype.forEach.call(
+      deviceModal.querySelectorAll("[data-device-mode]"),
+      function (btn) {
+        var on = btn.getAttribute("data-device-mode") === mode;
+        btn.classList.toggle("is-active", on);
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
+      }
+    );
+  }
+
+  /* Set + persist the device-view preference (B4.2, client-only). One entry
+     point for the modal mode buttons and the boot re-apply; returns the
+     canonical token so callers (and tests) can read what was applied. */
+  function setDevicePreference(mode) {
+    var norm = deviceAttr(mode);
+    applyDevice(norm);
+    write(DEVICE_KEY, norm);
+    return norm;
+  }
+
+  function deviceSelectMode(mode) {
+    var norm = setDevicePreference(mode);
+    deviceSetActiveMode(norm);
+    deviceRenderPreview(norm);
+  }
+
+  function openDeviceModal(trigger) {
+    if (!deviceModal) return;
+    deviceLastTrigger = trigger || null;
+    deviceModal.hidden = false;
+    var cur = document.body.dataset.device || DEFAULT_DEVICE;
+    deviceSetActiveMode(cur);
+    deviceRenderPreview(cur);
+    // Load the preview once (same origin -> the app itself). Skip in non-DOM
+    // test envs where the frame has no real layout.
+    if (deviceFrame && !deviceFrame.getAttribute("src")) {
+      deviceFrame.setAttribute("src", location.pathname || "/");
+    }
+    var f = deviceFocusables();
+    if (f.length) f[0].focus();
+    deviceKeyHandler = function (e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeDeviceModal();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      var list = deviceFocusables();
+      if (!list.length) return;
+      var first = list[0], last = list[list.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first || !deviceModal.contains(document.activeElement)) {
+          e.preventDefault(); last.focus();
+        }
+      } else {
+        if (document.activeElement === last || !deviceModal.contains(document.activeElement)) {
+          e.preventDefault(); first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", deviceKeyHandler, true);
+  }
+
+  function closeDeviceModal() {
+    if (!deviceModal || deviceModal.hidden) return;
+    deviceModal.hidden = true;
+    if (deviceKeyHandler) {
+      document.removeEventListener("keydown", deviceKeyHandler, true);
+      deviceKeyHandler = null;
+    }
+    if (deviceLastTrigger && typeof deviceLastTrigger.focus === "function") {
+      deviceLastTrigger.focus(); // restore focus to the trigger
+    }
+    deviceLastTrigger = null;
+  }
+
+  function setupDeviceModal() {
+    deviceModal = document.getElementById("deviceModal");
+    if (!deviceModal) return;
+    deviceFrame = document.getElementById("deviceFrame");
+    // Triggers (desktop sidebar-footer + mobile bottom-nav share the attribute).
+    Array.prototype.forEach.call(
+      document.querySelectorAll("[data-device-trigger]"),
+      function (t) {
+        t.addEventListener("click", function () { openDeviceModal(t); });
+      }
+    );
+    // Mode buttons (delegated — they exist at load, but keep it cheap).
+    deviceModal.addEventListener("click", function (e) {
+      if (e.target === deviceModal) { closeDeviceModal(); return; } // click backdrop
+      var btn = e.target.closest ? e.target.closest("[data-device-mode]") : null;
+      if (btn) { deviceSelectMode(btn.getAttribute("data-device-mode")); return; }
+      if (e.target.closest && e.target.closest("#deviceModalClose")) closeDeviceModal();
     });
   }
 
@@ -288,6 +431,13 @@
   /* Test hook: lets vitest assert the PUT body stringifies values. */
   window.aigate = window.aigate || {};
   window.aigate.buildSettingsBody = buildSettingsBody;
+  // Device-view simulation (Opsi A): exposed so tests drive the same entry point
+  // the modal's mode buttons use; the shipped control is the modal trigger.
+  window.aigate.setDevice = setDevicePreference;
+  window.aigate.applyDevice = applyDevice;
+  // Wiring the device-sim modal is exposed like wireProviderUi so a test that
+  // re-mounts the shipped body can bind the triggers + focus trap in isolation.
+  window.aigate.setupDeviceModal = setupDeviceModal;
 
   /* ===== Backup & Restore (B5.7, PRD §2.4.4) ===== */
   /* Export/import the whole local config as one JSON file (no cloud). The export
@@ -2240,15 +2390,12 @@
       });
     }
 
-    // --- Device simulation toggle (B4.2): client-only, persisted. ---
-    var devSel = document.getElementById("setDevice");
-    if (devSel) {
-      devSel.addEventListener("change", function () {
-        var d = devSel.value;
-        applyDevice(d);
-        write(DEVICE_KEY, d);
-      });
-    }
+    // --- Device simulation (B4.2, Opsi A): the control moved OUT of the Settings
+    //     form into a small trigger above the Repo link (sidebar-footer on desktop,
+    //     .bn-device in the bottom-nav on phone). Clicking it opens an accessible
+    //     modal with a live iframe preview; selecting a mode calls applyDevice().
+    //     The #setDevice <select> + its change listener are gone.
+    setupDeviceModal();
 
     // --- Nav / view switching (top sidebar + mobile bottom-nav share logic) ---
     function handleNav(item) {

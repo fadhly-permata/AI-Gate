@@ -11,6 +11,7 @@ window.I18N.ru = {
     "common.edit": "Изменить",
     "common.delete": "Удалить",
     "common.remove": "Убрать",
+    "common.close": "Закрыть",
     "nav.group.gateway": "Настройка шлюза",
     "nav.group.operations": "Эксплуатация",
     "nav.group.insights": "Аналитика",
