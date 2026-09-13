@@ -2,6 +2,22 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260913-09aa — REQUEST: redesign CLI Tools jadi card + logo platform + responsif (ProjectManager → fe-dev)
+- User: "daftar cli-tools masing-masing jadi card, platform pakai logo aja, desain jelek → redesign bagus + responsif" (branch `refactor/ui`). BUKAN pertanyaan (D1) → langsung eksekusi.
+- PM: investigate via explore agent → map view `index.html:855` / `clitools.js` / `styles.css:1836-1925`; data `ToolDTO.compat` key termux/linux/windows/macos; FA brand glyph LOKAL ada (`fa-android/fa-linux/fa-windows/fa-apple`, no CDN). Handover: `documents/pm/handovers/handover-20260913-cli-tools-card-redesign.md`.
+- EKSEKUSI: fe-dev (frontend-only, sekuensial). Ubah: `clitools.js` (fungsi `platformTile` + `renderGroups` jadi 1 `<button>` card, logo `fa-brands`, aria-label per platform, fail-closed tetap = verified→`openLaunchModal`, else `setCliMsg` warn); `styles.css` (`.cli-tool` card radius 12 + shadow + hover lift + status color + grid `minmax(220px)`→phone `150px` + dark theme); `index.html` (cache-buster `?v=` styles.css `20260913→20260921`, clitools.js `20260920→20260921` — pelajaran cache-buster diterapkan).
+- GATE PM MANDIRI: `node --check clitools.js` OK; `git diff` = 3 berkas frontend (index.html cuma 2 baris `?v=`); grep dangling class (`cli-tool-cell`/`cli-compat-chip`/`cli-compat-current`) = NONE; `vitest` `src/frontend` `tests/clitools.test.js`(19)+`tests/views.test.js`(30) = **49 passed/0 fail**; reasoning responsif 1024/768/360 + dark OK.
+- FLAG (minor, bukan bug): `tests/clitools.test.js:137,166-192` masih tulis "struck/strike-through" padahal styling kini muted (opacity .66, no line-through). Assertion cuma cek class `cli-tool-unsupported` (masih ada) → hijau, tapi WORDING usang. Scope tests = milik qa-engineer; PM serahkan reword ke QA bila user mau.
+- BELUM di-commit (D1). SISA MILIK USER: (a) reload browser → uji mata nyata view cli (card + logo + responsif phone/tablet/desktop, dark+light); (b) perintah commit/push/PR; (c) OPSI: user bilang "banyak page gak responsif" → tawarkan audit + perbaiki responsif page lain (task terpisah, bisa paralel/sekuensial).
+
+## 20260913-08zz — User "push + PR": kerjaan terminal DI-COMMIT (2 commit) → PUSH → **PR #21 TERBUKA** (ProjectManager)
+- FAKTA DICEK KE SUMBER (A12): `gh pr view 20` → **MERGED** (`608766e Merge pull request #20`, merge-commit bukan squash; `300005e` = ancestor `origin/main` → `git merge-base --is-ancestor` YES). Jadi PR #20 udah beres; kerjaan terminal = delta baru → butuh PR baru.
+- PM tidak bikin branch baru: reuse `refactor/ui` (pola repo). Langkah: `git merge --ff-only origin/main` (300005e→608766e, kerjaan uncommitted utuh) → commit per-fitur (BUKAN `git add -A`, H1-H3).
+- COMMIT `b4e25a3` fix(terminal): index.html + terminal.js + styles.css + 4 test. COMMIT `f830787` docs(pm): status + memory-bank + laporan.
+- PUSH `origin refactor/ui` (`300005e..f830787`, kredensial git sdh ke-set-up sesi lalu, token gak dicetak). Delta vs main = 10 berkas / +272 −38 (persis fix + catatan PM).
+- **PR #21** `refactor/ui → main` (OPEN) → https://github.com/fadhly-permata/AI-Gate/pull/21. Label `bug` dipasang via `gh issue edit 21 --add-label bug` lalu DI-VERIFIKASI ulang lewat `gh pr view 21` (state OPEN, base main, head refactor/ui, labels=[bug]).
+- SISA MILIK USER: (a) refresh halaman → uji nyata (G3) X tab terakhir = empty state + reconnect banner gak numpuk; (b) review + merge PR #21.
+
 ## 20260913-08yy — KOREKSI: fix terminal gak kelihatan di browser — cache-buster lupa di-bump (G3)
 - User balik lapor: "masih gak nutup terminalnya" padahal test 171 hijau. PM diagnosis: `index.html:1425` `terminal.js?v=20260907` & `:61` `styles.css?v=20260920` TIDAK di-bump pas fe-dev ubah isinya — browser cache versi lama, fix gak sampai ke user. Ini celah KIRIMAN: `index.html` kemarin gak masuk scope fe-dev (cuma terminal.js/styles.css/test) → cache-buster kelewat.
 - TESIS G3 TERBUKTI LAGI: test hijau (171) ≠ aplikasi beneran jalan. Server baca disk tiap request, TAPI browser pakai asset cached karena URL `?v=` identik.
