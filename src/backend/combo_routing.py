@@ -534,13 +534,20 @@ def resolve_combo_stream_target(combo_ref: "str | int") -> Optional[ResolvedTarg
 
     :param combo_ref: the combo's ``name`` OR integer ``id`` (parity with
       :func:`execute_combo`).
-    :returns: a ``format == 'openai'`` :class:`ResolvedTarget` for the first
-      usable member, or ``None`` when the combo HAS members but none are
+    :returns: a ``format == 'openai'`` :class:`ResolvedTarget` for the selected
+      member, or ``None`` when the combo HAS members but none are
       OpenAI-compatible (the router maps that to the ``streaming_unsupported_format``
       400 envelope).
     :raises TargetNotFound: if no combo matches ``combo_ref``.
     :raises UpstreamError: if the combo has no usable members at all
       (``combo_no_members``) — mirrors :func:`execute_combo`.
+
+    Member selection happens INSIDE the ``with SessionLocal()`` block so the
+    ``round_robin`` cursor (``combo.last_used_index``) can be advanced + committed
+    via the same ``session`` that :func:`select_member` uses. This makes the
+    streaming path rotate members exactly like :func:`execute_combo`. The returned
+    :class:`ResolvedTarget` is a plain (non-DB-bound) object, so returning it after
+    the session closes is safe.
     """
     with SessionLocal() as session:
         if isinstance(combo_ref, int):
@@ -553,40 +560,68 @@ def resolve_combo_stream_target(combo_ref: "str | int") -> Optional[ResolvedTarg
             raise TargetNotFound(f"combo '{combo_ref}' not found")
         candidates = build_candidates(combo, session)
 
-    if not candidates:
-        raise UpstreamError(
-            502,
-            {
-                "error": {
-                    "message": f"combo '{combo_ref}' has no usable members",
-                    "type": "upstream_error",
-                    "code": "combo_no_members",
-                }
-            },
-        )
+        if not candidates:
+            raise UpstreamError(
+                502,
+                {
+                    "error": {
+                        "message": f"combo '{combo_ref}' has no usable members",
+                        "type": "upstream_error",
+                        "code": "combo_no_members",
+                    }
+                },
+            )
 
-    for target in candidates:
-        if (target.format or "openai").lower() == "openai":
+        strategy = (combo.strategy or "fallback").lower()
+        openai_candidates = [
+            c for c in candidates if (c.format or "openai").lower() == "openai"
+        ]
+        if not openai_candidates:
+            # Combo has members but none are OpenAI-compatible -> caller returns
+            # the 400. Bail out of the session before warning so the (no-op)
+            # session is already closed.
+            log_warning(
+                "resolve_combo_stream_target: combo has no OpenAI-format member "
+                "to stream from",
+                source=LOG_SOURCE,
+                context={"combo": str(combo_ref), "members": len(candidates)},
+            )
+            return None
+
+        if strategy == "round_robin":
+            # Rotate across streamable (OpenAI-format) members; select_member
+            # advances + commits the combo.last_used_index cursor via `session`.
+            # This mirrors execute_combo's non-streaming rotation.
+            chosen = select_member(
+                "round_robin", openai_candidates, session, combo=combo
+            )
             log_info(
-                "resolve_combo_stream_target: streaming via first OpenAI-format "
-                f"member (model={target.upstream_model})",
+                "resolve_combo_stream_target: streaming via round_robin member "
+                f"(model={chosen.upstream_model}, cursor={combo.last_used_index})",
                 source=LOG_SOURCE,
                 context={
                     "combo": str(combo_ref),
-                    "model": target.upstream_model,
-                    "provider_id": target.provider_id,
+                    "model": chosen.upstream_model,
+                    "provider_id": chosen.provider_id,
+                    "last_used_index": combo.last_used_index,
                 },
             )
-            return target
+            return chosen
 
-    # Combo has members but none are OpenAI-compatible -> caller returns the 400.
-    log_warning(
-        "resolve_combo_stream_target: combo has no OpenAI-format member to "
-        "stream from",
-        source=LOG_SOURCE,
-        context={"combo": str(combo_ref), "members": len(candidates)},
-    )
-    return None
+        # fallback / three_tier / unknown: first OpenAI-format candidate
+        # (old behavior — no rotation).
+        target = openai_candidates[0]
+        log_info(
+            "resolve_combo_stream_target: streaming via first OpenAI-format "
+            f"member (model={target.upstream_model})",
+            source=LOG_SOURCE,
+            context={
+                "combo": str(combo_ref),
+                "model": target.upstream_model,
+                "provider_id": target.provider_id,
+            },
+        )
+        return target
 
 
 __all__ = [

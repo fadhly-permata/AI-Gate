@@ -2,6 +2,17 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260913-09xx — BUG: round_robin diabaikan di jalur streaming combo (ProjectManager → be-dev)
+- User: combo "B.AI" strategi `round_robin`, 4 anggota (2 disabled), tapi usage/quota cuma Hy3.
+- PM diagnosis: jalur streaming (`gateway/router.py:316-341` → `resolve_combo_stream_target`
+  `combo_routing.py:525`) mengembalikan kandidat OpenAI PERTAMA & abaikan cursor round_robin;
+  jalur non-streaming (`execute_combo`→`select_member` `combo_routing.py:286-305`) muter benar.
+  UI ngobrol pakai SSE streaming → selalu `candidates[0]`=Hy3. Kolom `last_used_index` valid
+  (`models.py:198`, migrasi `config/db.py:280`).
+- Lembar desain: `handover-20260913-roundrobin-streaming.md`. Fix: `resolve_combo_stream_target`
+  pakai `select_member("round_robin", openai_candidates, session, combo)` di dalam `with session`.
+- EKSEKUSI: be-dev (backend-only), mode **sekuensial**. NEXT: spawn be-dev → gate PM → commit.
+
 ## 20260913-08yy — User minta UI: header kolom toggle + ganti edit/hapus jadi kebab submenu (ProjectManager)
 - User: "toggle enable/disable per model kenapa gak ada nama kolomnya, gua sampe bingung nyarinya" + "tombol aksi edit dan hapus mending diganti tombol tiga titik dengan submenu edit dan delete".
 - PM investigasi: kebab SUDAH ada (`app.js:733 rowMenuCellHtml` + `:741 wireRowMenu`, dipakai provider/pool/endpoint).
@@ -10,6 +21,7 @@
   (B) ganti `js-mem-edit`+`js-mem-del` jadi SATU kebab (`rowMenuCellHtml`) submenu [Edit, Delete(danger)], reuse `wireRowMenu`,
   ▲▼ tetap terpisah. Scope murni `src/frontend/**`, nol backend.
 - EKSEKUSI: fe-dev (frontend-only), mode **sekuensial** (user pilih di sesi ini). NEXT: spawn fe-dev → gate PM → commit.
+- SELESAI 2026-09-13: fe-dev kerjakan (header col1 `combos.member.enabled` "Enabled"; kebab `js-row-menu` submenu Edit/Delete via `wireRowMenu`). PM gate: vitest **26/670 hijau**, `git diff --check` bersih, scope murni `src/frontend/**`, `app()` aman (combos.js:44), `common.actions`+`combos.member.enabled` ada 7/7 locale. Commit `68ead44` (9 ahead origin/refactor/ui).
 
 ## 20260913-08xx — User lapor error round_robin + klarifikasi enable/disable per-model (ProjectManager)
 - User: ganti strategy ke round_robin → error `invalid strategy 'round_robin' (expected one of ['fallback','latency_cost','load_balance','three_tier'])`;
