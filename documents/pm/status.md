@@ -2,6 +2,214 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260913-09xx — BUG: round_robin diabaikan di jalur streaming combo (ProjectManager → be-dev)
+- User: combo "B.AI" strategi `round_robin`, 4 anggota (2 disabled), tapi usage/quota cuma Hy3.
+- PM diagnosis: jalur streaming (`gateway/router.py:316-341` → `resolve_combo_stream_target`
+  `combo_routing.py:525`) mengembalikan kandidat OpenAI PERTAMA & abaikan cursor round_robin;
+  jalur non-streaming (`execute_combo`→`select_member` `combo_routing.py:286-305`) muter benar.
+  UI ngobrol pakai SSE streaming → selalu `candidates[0]`=Hy3. Kolom `last_used_index` valid
+  (`models.py:198`, migrasi `config/db.py:280`).
+- Lembar desain: `handover-20260913-roundrobin-streaming.md`. Fix: `resolve_combo_stream_target`
+  pakai `select_member("round_robin", openai_candidates, session, combo)` di dalam `with session`.
+- EKSEKUSI: be-dev (backend-only), mode **sekuensial**. NEXT: spawn be-dev → gate PM → commit.
+- SELESAI 2026-09-13: be-dev benerin `resolve_combo_stream_target` (pakai `select_member` round_robin + commit cursor di dalam `with session`). PM gate: pytest **557 passed/1 skipped** (+4 tes), `git diff --check` bersih, scope murni `src/backend/**`. Commit `abbe245` (10 ahead origin/refactor/ui).
+- VERIFIKASI LIVE (setelah user restart, port 8080, PID 20134): 4 request streaming `combo:B.AI` bergiliran `qwen3.8-flash → hy3 → qwen3.8-flash → hy3` (enabled: hy3 prio0 + qwen3.8-flash prio2; 2 disabled di-skip). `GET /api/usage` `by_model` catat hy3 + qwen3.8-flash. G3 terpenuhi — diuji di server beneran, bukan cuma tes unit.
+- PUSH & PR: user minta → `git push -u origin refactor/ui` (`f6e0d30..f327d9b`, 11 commit sesi ini; total 15 ahead of main) + **PR #20** `refactor/ui → main` (OPEN) → https://github.com/fadhly-permata/AI-Gate/pull/20. Isi: urutan manual ▲▼+drag, animasi, round_robin, enable/disable per-model, label header toggle + kebab Edit/Delete, fix streaming round_robin. Vitest 670 / pytest 557+1skip / verifikasi live rotasi.
+
+## 20260913-08yy — User minta UI: header kolom toggle + ganti edit/hapus jadi kebab submenu (ProjectManager)
+- User: "toggle enable/disable per model kenapa gak ada nama kolomnya, gua sampe bingung nyarinya" + "tombol aksi edit dan hapus mending diganti tombol tiga titik dengan submenu edit dan delete".
+- PM investigasi: kebab SUDAH ada (`app.js:733 rowMenuCellHtml` + `:741 wireRowMenu`, dipakai provider/pool/endpoint).
+  Header kolom ke-1 kombo dibiarin `<th></th>` (fe-dev sebelumnya), makanya user bingung. Tombol edit+hapus masih terpisah (`combos.js:476-486`).
+- Lembar desain: `handover-20260913-toggle-header-dan-kebab.md` (DI-ACC). (A) header kolom ke-1 = `combos.member.enabled` ("Enabled");
+  (B) ganti `js-mem-edit`+`js-mem-del` jadi SATU kebab (`rowMenuCellHtml`) submenu [Edit, Delete(danger)], reuse `wireRowMenu`,
+  ▲▼ tetap terpisah. Scope murni `src/frontend/**`, nol backend.
+- EKSEKUSI: fe-dev (frontend-only), mode **sekuensial** (user pilih di sesi ini). NEXT: spawn fe-dev → gate PM → commit.
+- SELESAI 2026-09-13: fe-dev kerjakan (header col1 `combos.member.enabled` "Enabled"; kebab `js-row-menu` submenu Edit/Delete via `wireRowMenu`). PM gate: vitest **26/670 hijau**, `git diff --check` bersih, scope murni `src/frontend/**`, `app()` aman (combos.js:44), `common.actions`+`combos.member.enabled` ada 7/7 locale. Commit `68ead44` (9 ahead origin/refactor/ui).
+
+## 20260913-08xx — User lapor error round_robin + klarifikasi enable/disable per-model (ProjectManager)
+- User: ganti strategy ke round_robin → error `invalid strategy 'round_robin' (expected one of ['fallback','latency_cost','load_balance','three_tier'])`;
+  + klarifikasi "bukan enable/disable kombo, tapi model di dalam combo".
+- DIAGNOSA (PM baca kode + git, tidak percaya receipt): BUKAN bug kode. `ALLOWED_STRATEGIES` (`combos_router.py:31`)
+  SUDAH berisi `round_robin` (sejak commit 4c5d3fa); validator cuma di `:166` (create) + `:231` (update), tak ada validasi lain.
+  Pesan error cuma 4 strategi = proses server yang JALAN masih pakai kode LAMA di memori (belum di-restart sejak commit
+  round_robin + per-member-enabled). Sama persis pola "Ubah akun" (status 20260911): proses lama di memori, statis dibaca tiap permintaan.
+- FIX: user wajib RESTART aigate (aturan J6 = hak user, PM tak boleh bunuh proses). Setelah restart, round_robin + toggle
+  per-model (ComboMember.enabled) jadi hidup; sebelum itu backend tolak strategy & PUT {enabled}.
+- KLARIFIKASI enable/disable: yang gua bangun = per-MODEL (checkbox tiap baris di tabel anggota, kolom-1 setelah grip),
+  BUKAN on/off kombo utuh. Toggle level kombo di daftar kombo adalah fitur terpisah yg sudah ada sejak awal. Cocok dgn maksud user.
+- TIDAK ada perubahan kode. NEXT: user restart → uji mata (G3+J6); kalau masih error setelah restart, PM selidiki lebih dalem.
+
+## 20260913-07zz — SELESAI: hapus nama provider + switch enable/disable per-model kombo DI-COMMIT (ProjectManager)
+- be-dev (backend) + fe-dev (frontend) SELESAI, diaudit PM mandiri: vitest **26 file / 664 tes LOLOS**; pytest
+  **553 passed / 1 skipped**.
+- (A) Frontend: teks nama provider dibuang dari baris anggota (grip tetap, kolom tetap 4; header Provider jadi kosong);
+  `byId`/`pname` jadi unused (dibiarin, aman). (B) Backend: `ComboMember.enabled` (Boolean default True) + migrasi
+  idempoten + filter `enabled=True` di `build_candidates` (skip di SEMUA strategi: fallback/load_balance/latency_cost/
+  three_tier/round_robin) + DTO/API bawa `enabled` (create + update partial). Frontend: toggle per baris (checkbox
+  kolom-1) → `PUT {enabled}` (bypass normalizeMember) lalu reloadCombo; buffer lokal; baris mati `opacity:0.5`
+  (token, nol hex). i18n `combos.member.enabled` = "Enabled" x7.
+- COMMIT: (1) kode (A+B) di `refactor/ui`; (2) dokumen PM + design sheet. TIDAK push, TIDAK buka PR.
+- Catatan: `enabled` LEVEL KOMBO (sudah ada sejak awal) tetap beda & utuh — ini per-member. Sisa milik user:
+  tes mata HP (G3+J6): toggle matiin model, lalu panggil kombo → model itu tak muncul di routing.
+
+## 20260913-07yy — User minta (A) hapus nama provider di daftar anggota + (B) switch enable/disable per model kombo (ProjectManager)
+- User: "hapus nama providernya di list model tersebut. karna jadi redundan" + "butuh switch enable/disable model
+  dari daftar combo... yang di-disabled tidak akan digunakan untuk fallback/round-robin/dan lain sebagainya".
+- PM investigasi: tabel anggota kombo (`combos.js:422`) kolom [grip+provider][model][weight][aksi]; `ComboMember`
+  model (`models.py:206`) BELUM punya `enabled` — yang ada cuma `enabled` level KOMBO UTUH (`combos_router.py:53/122/238`).
+  `build_candidates` (`combo_routing.py:150`) tidak filter enabled.
+- Lembar desain: `handover-20260913-hapus-provider-dan-switch-enable.md` (DI-ACC). (A) frontend-only hapus teks
+  provider (grip tetap, kolom tetap 4); (B) backend tambah `ComboMember.enabled`+migrasi idempoten+filter
+  `enabled=True` di build_candidates (skip di semua strategi) + DTO/API bawa enabled; fe-dev toggle per baris.
+- Mode: **sekuensial** (user pilih di sesi ini). EKSEKUSI: be-dev (backend) dulu → fe-dev (frontend: hapus
+  provider + toggle).
+- NEXT: spawn be-dev (backend enabled) → audit PM → spawn fe-dev (frontend) → gate → commit.
+
+## 20260913-07xx — SELESAI: animasi reorder + strategi round-robin kombo DI-COMMIT (ProjectManager)
+- fe-dev(animasi) + be-dev(backend round-robin) + fe-dev(UI round-robin) SELESAI, diaudit PM mandiri:
+  vitest **26 file / 661 tes LOLOS**; pytest **547 passed / 1 skipped**. Nol merah, nol regresi.
+- COMMIT: (1) kode fitur (animation + round_robin backend+frontend) di branch `refactor/ui`; (2) dokumen PM +
+  klarifikasi `parallel-sequential.md` (reset `multiagent_mode`=ask tiap sesi baru). TIDAK push, TIDAK buka PR.
+- Catatan be-dev (jujur): round-robin pakai read-modify-write cursor → ada race lintas-request (sama seperti
+  ProxyPool.last_used_index); semantik per-request benar, cuma konkurensi tinggi bisa meleset. Mirip limitasi
+  ProxyPool, sengaja tidak di-hardening biar konsisten.
+- Sisa milik user: tes mata di HP (animasi + drag + round-robin lewat UI; G3+J6); putuskan push/PR berikutnya.
+
+## 20260913-0655 — User pilih SEKUENSIAL (R16); PM lanjut UI round-robin tanpa ulang yang beres (ProjectManager)
+- User: "sekuen.. tapi kalo udah selesai ya gak usah dikerjain lagi". `state.md:multiagent_mode` → `sequential`.
+  PM TIDAK spawn ulang fe-dev(animasi) / be-dev(backend) yang sudah hijau; langsung lanjut ke sisa:
+  fe-dev UI round-robin (option+i18n) secara berurutan, lalu gate, lalu commit utuh. User juga komentar
+  bahasa PM berantakan (slang + istilah Inggris nyampur) → PM rapihin komunikasi ke user (istilah PR/commit/
+  merge/branch/test tetap apa adanya per I8).
+- NEXT: spawn fe-dev (UI round-robin) → PM gate → commit (kode + docs PM).
+
+## 20260913-0650 — KOREKSI: PM langgar R16 (parallel tanpa tanya di sesi baru) — user ingatkan (ProjectManager)
+- PELANGGARAN: di task ini PM langsung jalanin 2 sub-agent BERSAMAAN (fe-dev animasi + be-dev backend round-robin)
+  TANPA menawarkan pilihan paralel/sekuensial ke user. Langgar **R16** + `.opencode/rules/parallel-sequential.md`
+  (wajib tanya SEBELUM eksekusi multi-agent; pilihan berlaku 1 sesi; sesi baru = tanya lagi).
+- AKAR: `state.md:multiagent_mode` masih `"sequential"` warisan **2026-09-10** (bukan sesi ini). PM salah anggap
+  itu default sesi sekarang, PADAHAL aturan jelas: nilai usang wajib diabaikan & PM tanya di awal sesi baru.
+- TINDAKAN PM (pm-postmortem): (1) reset `multiagent_mode` → `ask`; (2) perkuat `parallel-sequential.md`
+  §Session persistence: PM WAJIB reset state.md ke `ask` + tanya sebelum task multi-agent PERTAMA tiap sesi;
+  (3) catat koreksi ini; (4) TANYA user sekarang untuk mode sisa sesi.
+- STATUS: 2 agen sudah ke-spawn & balik receipt (animasi HIJAU 661 tes; backend round-robin HIJAU 547 passed/1skip,
+  cursor `Combo.last_used_index`, migrasi idempoten). Nol di-commit (PM tahan sampai UI round-robin selesai +
+  mode sesi dipilih). Sisa: fe-dev UI round-robin (option+i18n) → gate → commit; tes mata HP milik user.
+- KEPUTUSAN user (DITANYA, belum jawab): parallel / sekuensial untuk sisa sesi ini.
+
+## 20260913-06xx — User minta (A) animasi reorder + (B) strategi round-robin kombo; lembar desain terbit, eksekusi mulai (ProjectManager)
+- User: "kasih animasinya lah buat perpindahan naek turunnya" + "kalo bisa gua mau ditambahin fitur round robin dong".
+- PM investigasi dulu (aturan C4/F3): kombo strategi cuma `fallback|load_balance|latency_cost|three_tier`
+  (`combo_routing.py:151`, `index.html:1104-1107`); `round_robin` SUDAH ada di proxy (`models.py:158` `last_used_index`)
+  & akun provider (`oauth.py:315`) tapi BELUM di kombo. `Combo` model (`models.py:186-193`) belum punya kolom penunjuk.
+- Lembar desain: `handover-20260913-animasi-dan-roundrobin-kombo.md` — (A) animasi ringan pas baris pindah (▲▼+drag),
+  hormati `prefers-reduced-motion`, nol hex baru; (B) `round_robin` kombo = rotasi rata per urutan baris, `weight` diabaikan,
+  penunjuk `last_used_index` (mirip ProxyPool) + migrasi idempoten, single-attempt tanpa retry, cursor tetap maju walau gagal.
+- Keputusan default PM (user boleh veto): animasi teknik bebas asal nol layout-thrash; round-robin simpan cursor ke DB
+  tiap request (mirip ProxyPool); unknown strategy → fallback aman.
+- EKSEKUSI: (A) fe-dev (frontend-only) + (B) be-dev (backend) dijalankan BERSAMAAN (scope berkas disjoint:
+  combos.js/styles.css vs combo_routing.py/models.py/tests/backend), lalu (B) fe-dev frontend (option+i18n) setelahnya.
+- NEXT: terima receipt fe-dev(anim) + be-dev(backend) → audit PM → spawn fe-dev(UI round-robin) → gate → commit.
+
+## 20260913-06xx — (b) drag SELESAI; fitur urutan-manual ▲▼+drag DI-COMMIT 00e2d08 (ProjectManager)
+- fe-dev (reuse) tumpuk (b): grip `js-mem-drag` di kiri tiap baris (Pointer Events, `touch-action:none`), pakai
+  kontrak SAMA `applyOrderAndPersist` (renumber 0..n-1 → PUT-only-changed → reload) bersama ▲▼; `reorderMembers` +
+  `computeDropIndex` + handler pointer. Grip di-dalam cell Provider (4 cell tetap) biar tes 4-cell hijau — deviasi
+  kecil dari denah §2 yang menggambar kolom tersendiri; PM terima (cocok "grip di kiri baris", tes tetap hijau).
+  Live-drag visual di-skip (drop-based) — pilihan fe-dev, simpel + testable; user belum minta live.
+- VERIFIKASI PM MANDIRI: vitest **26 berkas / 656 tes LOLOS** (646 +10 drag); `git diff --check` bersih; scope murni
+  `src/frontend/**`, nol backend; nol hex baru; parity i18n 7 kamus +5 kunci.
+- COMMIT `00e2d08` (refactor/ui) — satukan (a)+(b) jadi satu fitur, 15 berkas / +1091 −119. TIDAK push, TIDAK buka PR
+  (user belum perintah). Sisa milik user: uji mata drag di HP (G3+J6); putuskan push/PR berikutnya.
+
+## 20260913-05xx — User ACC kedua opsi (▲▼ + drag); (a) ternyata sudah ada di working tree, fe-dev ditugaskan tambah (b) (ProjectManager)
+- User: "kalo bisa sih pake kedua opsi tersebut" = ACC lembar desain + pilih (a) ▲▼ DAN (b) handle geser.
+- TEMUAN AUDIT (aturan A29/R29 — kerja kelewat ke main thread): `git status` tunjukkan 15 berkas `src/frontend/**`
+  SUDAH berubah tapi BELUM di-commit — padahal status 0415 tulis "NOL baris kode disentuh". Isi = implementasi
+  penuh opsi (a) ▲▼ (kombo urutan-manual: tanpa kolom Priority, anggota baru di bawah, `order_hint` di atas tabel).
+- AUDIT PM: baca diff + jalankan gerbang mandiri → **vitest 26 berkas / 646 tes LOLOS** (naik dari 625; +21 tes baru
+  `combos.test.js`). Logika cocok lembar desain: `moveMember` (`combos.js:475`) tukar→renormalisasi `0..n-1`→
+  `PUT` hanya baris berubah berurutan→reload; `addMember` (`:639`) `priority = appendPriority()` jatuh paling bawah;
+  mode buffer tanpa jaringan; i18n 7 kamus +4 kunci (`move_up|move_down|already_first|already_last` + `order_hint`).
+  Keputusan PM: TERIMA (a) lewat audit; TIDAK di-commit sendiri dulu — fe-dev tumpuk (b) lalu commit satu fitur utuh.
+- Sisa (b) untuk fe-dev: handle geser (`grip` di kiri baris, BUKAN seluruh baris) pakai kontrak SAMA persis ▲▼
+  (`moveMember`/renumber/PUT-only-changed/sequential/reload) — geser = cara kedua ubah susunan, bukan logika ketiga;
+  ▲▼ tetap ada & jalan; keduanya koeksis tanpa bentrok (drag tak hapus tombol, tombol tak tabrak drag). §5 lembar
+  desain sudah diperbarui (decision = kedua opsi; (a) sudah ada, (b) sisa).
+- NEXT: spawn `fe-dev` (reuse) — handover = lembar desain ini + catatan "(a) sudah ada di working tree, cuma tambah (b)".
+
+## 20260913-0415 — Permintaan baru (urutan manual anggota kombo) → lembar desain D6 terbit, eksekusi DITAHAN (ProjectManager)
+- User: saat edit kombo tidak bisa mengurutkan model; minta urutan ▲▼/drag = prioritas, kolom & field Priority disembunyikan,
+  anggota baru selalu di paling bawah.
+- PM meluruskan fakta dulu dengan UKURAN di server uji TERISOLASI (port acak + DB tmp di luar repo, PID sendiri dimatikan,
+  aplikasi user tidak disentuh): (a) daftar anggota TIDAK pernah diurut abjad — server mengirim urut `priority` asc lalu id asc
+  (`combos_router.py:117`); empat anggota ditambah berurutan tetap tiba berurutan (`zebra-alpha, mike9-xray, bravo-kilo, yankee-tango`).
+  (b) keluhan "tidak bisa mengurutkan" = BENAR dan ini lubangnya: nol penangan klik judul kolom di `combos.js`, nol tombol
+  naik/turun, nol geser — satu-satunya jalan adalah mengetik angka. (c) yang benar-benar urut abjad = **daftar pilihan model
+  di form anggota** (`combos.js:215-223`), bukan susunan kombo.
+- Lembar desain: `documents/pm/handovers/handover-20260913-urutan-manual-anggota-kombo.md` — denah sebelum/sesudah,
+  6 aturan main (normalisasi `0..n-1` + PUT hanya yang berubah secara berurutan + baca ulang; anggota baru `priority` = jumlah
+  anggota; combo lama TIDAK dinormalkan diam-diam, normalisasi terjadi saat ▲▼ pertama dan langsung tersimpan; mode buffer
+  tanpa API; bobot tetap manual; daftar model form tetap abjad kecuali user minta sebaliknya), 5 risiko jujur, cakupan tes.
+- 1 keputusan terbuka untuk user: **(a) ▲▼ saja** vs **(b) ▲▼ + pegangan geser**. Default kalau user cuma menjawab "jalan" = (a),
+  karena gulir layar sentuh rawan bertabrakan dengan seret dan ▲▼ sudah disetujui user di halaman penyedia.
+- NOL baris kode disentuh (aturan D6). NEXT: ACC user → spawn `fe-dev` dengan handover = lembar desain ini.
+
+## 20260913-0355 — User mengoreksi cara PM bicara → aturan I8 (istilah teknis jangan diterjemahkan) (ProjectManager)
+
+### Violation
+- Rule broken: belum ada (lubang rule). Yang terjadi: PM menulis "usulan" untuk *pull request* dan "titik penggabungan"
+  untuk *merge commit* karena menuruti frasa "non-IT clear" di `language.md` + I7.
+- What PM did: user balas bingung dua kali — "usulan kecil? usulan apaan?" lalu "jangan disebut usulan dong... PR aja".
+
+### Correction
+- Durable rule captured: **I8** — bicara ke user pakai istilah apa adanya (PR, commit, merge, branch, tes); padanan
+  Indonesia yang tidak dipakai user DILARANG; tidak paham → jelaskan sekali, lalu tetap pakai istilah itu;
+  "non-IT jelas" = tambah penjelasan, bukan ganti istilah.
+- Decision: user memilih istilah industri, bukan padanan yang diciptakan PM.
+
+### Prevention
+- Mechanism: I8 ditulis di `documents/pm/OPERATING_RULES.md` tema I (posisi I8 sudah diverifikasi urut I1..I8) +
+  amandemen `.opencode/rules/language.md` (rumah kanonik) + satu blok di bagian **Language** `AGENTS.md`
+  (berkas yang SELALU ter-load — alasan berkas ini disentuh: aturan yang cuma hidup di `documents/**` tidak pernah
+  sampai ke eksekutor; preseden ada di kepala AGENTS.md).
+- Verification: `python3 .opencode/tools/governance/rules-index.py` → LOLOS, 54 rule / 10 tema; grep tema I menampilkan I1..I8;
+  penempilan salah (I8 jatuh ke ujung berkas) ketahuan oleh pemeriksaan PM sendiri dan sudah dipindah ke bawah I7.
+
+## 20260913-0345 — Konfirmasi user: SEMUA IKON MUNCUL di aplikasi nyata (ProjectManager)
+- User: "semua icon udah mucul" = hasil pemeriksaan mata terhadap aplikasi yang ia mulai ulang → bagian G3 untuk klaim
+  "ikon dilokalkan" **TERBUKTI di perangkat nyata** (sebelumnya cuma terbukti lewat audit 55 permintaan jaringan + `fonts.check`).
+  Rantai bukti kini lengkap: grep CDN = 0 → Chromium nyata 55 permintaan semuanya lokal → mata user.
+  CATATAN JUJUR: user tidak menyebut eksplisit apakah percobaan dilakukan dalam mode pesawat; angka jaringan di atas yang
+  menutup aspek "tanpa permintaan keluar", jadi tidak perlu ditanya ulang kecuali user sendiri mengangkatnya.
+- Yang BELUM dikonfirmasi user setelah restart: apakah "Ubah akun" benar-benar menyimpan di aplikasi nyata (API-nya sudah
+  terbukti 4 field lewat `/openapi.json` milik proses user).
+- Dua commit paperwork PM (`906cb42`, `a831f52`) masih di `refactor/ui`, belum masuk `main`; user sedang diberi pilihan:
+  PR tersendiri atau ditumpuk ke PR pekerjaan berikutnya (istilah "usulan/PR" perlu dijelaskan ke user = bukan istilah teknis umum).
+
+## 20260913-0330 — Konfirmasi user: restart SUDAH dilakukan, PR #19 DI-MERGE, server uji tertinggal dimatikan (ProjectManager)
+- User: "iya gua baru aja mulai ulang aplikasi aigate" → cocok dengan ukuran PM: pelayan `:8080` kini `AccountUpdate =
+  ['api_key','enabled','label','priority']` (sebelum restart hanya `['priority']`). **Fitur "Ubah akun" kini aktif di aplikasi user.**
+- User: "pr #19 udah gua merge" → diverifikasi ke API: `#19 state closed, merged True, merged_at 2026-09-12T20:21:41Z,
+  merge commit 467b7f6, merged_by fadhly-permata`, label `bug`+`documentation`, 8 commit / 17 berkas / +748 −46.
+  `refactor/ui` di-fast-forward ke `467b7f6` (nol commit merge baru, nol konflik).
+- User: "server uji matiin aja kalo udah gak dipake" → **sebelum membunuh, PM mengidentifikasi pemiliknya** lewat
+  `/proc/<pid>/fd`: PID 5934 = `run.py --port 8251` membuka basis data SEMENTARA
+  (`$TMPDIR/opencode/fe-followup/inst.db`) = sisa sesi fe-dev yang koneksi-nya putus, BUKAN aplikasi user
+  (milik user = PID 15777 membuka `~/.aigate/aigate.db`). Hanya PID 5934 yang dimatikan (SIGTERM spesifik-PID, nol `pkill`);
+  folder sementara ikut dihapus (B5). Verifikasi sesudahnya: `:8251` = 000 (mati), `:8080` = 200 dan `{"status":"ok"}`,
+  satu proses aigate tersisa = milik user. Ini pengecualian terukur dari aturan restart — atas perintah eksplisit user,
+  dan hanya untuk proses uji; proses user tidak pernah disentuh.
+- User: "teks lisensi gak perlu di simpan di dokumen analisis/arsitektur/bisnis" → PM memahami ini MENOLAK dua usulan
+  PM (vendor teks lisensi MIT xterm + perlebar gerbang aturan ke `documents/{analysis,architecture,business}/**`).
+  TIDAK ada yang dihapus/dirombak sebagai efek kalimat ini: teks lisensi yang sudah ada tetap di tempatnya
+  (`THIRD_PARTY_NOTICES.md` + `LICENSE.txt` milik Font Awesome di folder vendor). Kalau maksud user sebenarnya
+  "hapus kutipan lisensi dari dokumen itu", koreksi → PM jalankan sebagai tugas terpisah.
+  Akibat pencatatan: `WL.4` dibiarkan `[~]` selamanya (provenance versi = selesai; vendor teks lisensi xterm = DITOLAK user),
+  dan kelas kesalahan "rujukan hantu di dokumen" TIDAK akan dicek otomatis — keputusan user, dicatat agar tidak ditanya ulang.
+- SISA menunggu user: tes mata "Ubah akun" tersimpan + uji mode pesawat untuk ikon; bentuk favicon (netral atau logo);
+  pilih pekerjaan berikutnya (wiki 2–8 / Chat Fase 6 / skrip pasang CLI / moda anthropic-inbound).
+
 ## 20260913-0310 — KEBENARAN BARU: browser NYATA ada di Termux + API user ternyata SUDAH kode baru + 6 bug perkakas uji diperbaiki (qa-engineer → fe-dev → PM)
 - **Koreksi klaim berulang di laporan sesi ini** ("mustahil ada browser di Termux → uji nyata harus dikerjakan user"): SALAH.
   `/data/data/com.termux/files/usr/bin/chromium-browser --version` = `Chromium 149.0.7827.155`, dan `node_modules` sudah

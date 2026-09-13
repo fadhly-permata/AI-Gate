@@ -82,6 +82,9 @@ I5 Wiki TIDAK boleh membocorkan `documents/**` (path, struktur, nomor ADR, nama 
 I6 Dilarang referensi relatif-ke-diri ("repo ini", "this repo", "link di atas") di materi publik → URL absolut; tautan antar-file repo sendiri boleh relatif. [R45]
 I7 Berkas `.md` ditulis caveman ultra (pendek, padat); balasan ke user bahasa Indonesia casual normal, utuh, tanpa singkatan. Gaya ringkas tidak boleh memangkas format wajib rule lain. [R52] → `.opencode/rules/language.md`.
 
+I8 Bicara ke user: istilah teknis dipakai APA ADANYA (PR, commit, merge, branch, tes). Jangan ganti dengan padanan Indonesia yang tidak dipakai user (contoh nyata: "usulan" untuk PR). Kalau user tidak paham → jelaskan artinya sekali, lalu tetap pakai istilah itu. "non-IT jelas" = tambah penjelasan, bukan ganti istilah. [I7] → `.opencode/rules/language.md`.
+
+
 ## J — Kontrak produk, kredensial, keselamatan host
 J1 FastAPI `>=0.95,<0.100` + Pydantic `>=1.10,<2` (v1, pure Python). Semua dependency pure-Python (Termux/Windows/Linux/macOS); tanpa Rust/`pydantic-core`. [R10]
 J2 UI = HTML/CSS/JS vanilla (tanpa React/Vue/Expo/bundler); state global di `app.js`; tidak ada langkah compile. [R13]

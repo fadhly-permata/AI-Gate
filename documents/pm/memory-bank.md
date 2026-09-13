@@ -4,6 +4,25 @@
 (empty — diisi PM saat task pertama)
 
 ## Decisions
+- 2026-09-13 (aturan I8 — cara PM bicara ke user): user mengoreksi dua kali ("usulan kecil? usulan apaan?" lalu
+  "jangan disebut usulan dong... PR aja"). Sebab akarnya bukan salah ketik, tapi tafsir rule "non-IT clear" di
+  `language.md`/I7 yang gua pakai untuk MENERJEMHKAN istilah (PR → "usulan", merge commit → "titik penggabungan").
+  Keputusan user: pakai istilah industri apa adanya. Ditulis permanen di tiga tempat: I8 (daftar rule aktif),
+  `.opencode/rules/language.md` (rumah kanonik), dan bagian Language `AGENTS.md` (berkas yang selalu ter-load — karena
+  aturan yang cuma ada di `documents/**` tidak pernah sampai ke yang mengerjakan). Peristiwa penuluran I8 juga
+  menghasilkan aturan tak tertulis baru buat PM: setiap suntingan rule harus dibaca ulang posisinya, bukan cuma
+  dipercaya karena gerbang LOLOS — gerbang menghitung jumlah, bukan urutan.
+
+- 2026-09-13 (konfirmasi user + dua penolakan jadi keputusan final): user (a) sudah memulai ulang aigate → API ubah-akun
+  hidup di aplikasinya (dibuktikan PM: `:8080` `AccountUpdate` 4 field, sebelumnya 1), (b) sudah menggabungkan PR #19
+  (dicek ke API, bukan mengutip catatan = rule A12), (c) memerintahkan server uji tertinggal dimatikan — PM membuktikan
+  dulu lewat `/proc/<pid>/fd` bahwa itu instance sementara (DB di `$TMPDIR`, PID 5934) dan bukan aplikasinya (PID 15777,
+  DB `~/.aigate/aigate.db`) baru SIGTERM spesifik-PID; `:8080` tetap sehat sesudahnya, (d) MENOLAK dua usulan PM:
+  menyimpan teks lisensi MIT xterm di folder vendor DAN memperluas gerbang aturan ke `documents/{analysis,architecture,business}/**`.
+  Keduanya dicatat sebagai KEPUTUSAN, bukan utang yang akan ditagih ulang; tidak ada berkas dihapus karenanya.
+  Konsekuensi yang harus diterima bersama: kelas kesalahan "rujukan hantu di dokumen spesifikasi" tidak akan ketahuan
+  otomatis lagi — hanya ketahuan kalau seseorang membacanya.
+
 - 2026-09-13 (browser NYATA + kebenaran soal restart + perkakas uji yang selama ini mati): (1) Klaim "tidak ada browser di
   Termux" yang gua ulang di beberapa laporan itu SALAH — `chromium-browser` = Chromium 149 tersedia dan `playwright`/
   `puppeteer-core` sudah terpasang. Ganti kebiasaan: sebelum menulis "mustahil di lingkungan ini", CEK dulu (versi biner +

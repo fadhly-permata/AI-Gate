@@ -52,6 +52,16 @@ export function staticSource(name) {
 }
 
 /**
+ * Basename of a script `src` / link `href` with any `?v=` cache-buster (and
+ * fragment) stripped, e.g. "combos.js?v=20260920" -> "combos.js". Tests that
+ * assert on WHICH module loads (presence/order) must compare through this so
+ * they stay true across version bumps — without losing coverage.
+ */
+export function htmlRefBase(ref) {
+  return ref.split("?")[0].split("#")[0];
+}
+
+/**
  * jsdom is loaded LAZILY (createRequire inside the accessor, never a
  * top-level import) on purpose: most consumers only want HTML/CSS text, and
  * pulling jsdom in eagerly would make every file that imports this helper load

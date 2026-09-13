@@ -1,5 +1,32 @@
 # Code Changes Register (code ↔ docs alignment)
 
+## 2026-09-13 — Urutan manual anggota kombo: ▲▼ + drag handle (audit PM + fe-dev) — DONE (DI-COMMIT 00e2d08, refactor/ui, BELUM push)
+
+**Asal:** user minta urutan anggota kombo bisa di-atur naik/turun ATAU drag; kolom & field Priority disembunyikan,
+susunan = priority; anggota baru di bawah. Lembar desain D6 terbit (`handover-20260913-urutan-manual-anggota-kombo.md`).
+User ACC kedua opsi: (a) ▲▼ + (b) handle geser.
+
+**Audit tak terduga (A29/R29):** sebelum spawn, `git status` tunjukkan 15 berkas `src/frontend/**` SUDAH berubah
+tapi BELUM di-commit — implementasi penuh (a) ▲▼ kelepas dari catatan PM ("nol baris disentuh"). PM audit: baca
+diff + gerbang mandiri hijau (646 tes), logika cocok lembar desain → TERIMA (a). fe-dev lalu tumpuk (b) drag di atas.
+
+### Perubahan (semua `src/frontend/**`; 0 backend; 0 tes dihapus)
+- `static/combos.js`: hapus kolom/fields Priority; `renderMembers` pasang `▲▼` per baris + grip `js-mem-drag`
+  (di dalam cell Provider, 4 cell tetap). Ekstrak `applyOrderAndPersist(newOrder)` (renumber 0..n-1 → PUT hanya
+  berubah berurutan → reload) dipakai BERSAMA `moveMember` (▲▼) & `reorderMembers` (drag). `computeDropIndex`,
+  `startDrag/onGripPointerMove/onGripPointerUp` (Pointer Events, guard `.js-mem-drag`, `touch-action:none`).
+  `addMember` `priority = appendPriority()` (baris baru paling bawah). Mode buffer = reorder array tanpa jaringan.
+- `static/styles.css`: `.js-mem-drag { touch-action:none; cursor:grab }` + `:active grabbing`; `.combo-members-hint`
+  (teks "row order = retry queue"). Nol hex baru.
+- `static/index.html`: header tabel 4 kolom (tanpa Priority); elemen `order_hint`.
+- `static/i18n/{en,id,ru,nl,ja,zh,zh-tw}.js`: +5 kunci (`move_up|move_down|already_first|already_last|drag`).
+- `tests/combos.test.js`: +21 (▲▼) +10 (drag) kasus. `tests/analytics|usage|views|helpers/dom`: penyesuaian markup.
+
+### Verifikasi (PM mandiri)
+- `node node_modules/.bin/vitest run` → **26 file / 656 tes PASS, 0 fail** (baseline 646 + 10 drag).
+- `git diff --check` bersih; `git status --short` scope murni `src/frontend/**`.
+- CAVEAT: uji mata HP milik user (G3 + J6) — tampilan drag di sentuh belum diverifikasi PM.
+
 ## 2026-09-09 — Harness tes FE: `localStorage` ke-mask global Node (PR #15, branch fix/fe-test-env) — DONE (DI-COMMIT 95d46e4, PR #15 open)
 
 **Asal:** isu tertunda (#3) dari sesi bottom-nav ponsel — suite FE penuh merah **22 fail**
@@ -1754,3 +1781,15 @@ Temuan lingkungan: `python3 run.py --port 8251` (PID 5934, ±1 hari 2 jam) masih
 Sentuhan layar asli / WebView ponsel (hanya chromium desktop-headless) · OAuth connect end-to-end ke penyedia eksternal ·
 discovery model ke API sungguhan · hasil screenshot bukti (model PM tanpa masukan gambar; angka DOM yang dipakai) ·
 bentuk favicon menunggu selera user · `trace/screenshot on-failure` masih menulis ke `<cwd>/test-results` (dibersihkan manual; `.gitignore` root bukan milik fe-dev).
+
+### 2026-09-13 — UI anggota kombo: header kolom toggle + menu tiga titik (fe-dev)
+- `src/frontend/static/index.html`: thead tabel anggota kombo, kolom-1 `<th></th>` → `<th data-i18n="combos.member.enabled">Enabled</th>` (kolom toggle enable/disable kini berlabel; user tadinya bingung mencari toggle).
+- `src/frontend/static/combos.js`: hapus tombol `js-mem-edit`+`js-mem-del` (pencil/trash) di cell aksi; ganti dengan SATU kebab `js-row-menu` (`fa-ellipsis-vertical`) yang membuka submenu [Edit, Delete(danger)] via `window.aigate.wireRowMenu` (pola bersama `app.js:733/741`). `memberRowActions(tr)` mereplika logika lama persis: Edit→`editMemberRow(mid,idx)`, Delete→`removeMember(mid)`(saved)/`removeMemberLocal(idx)`(buffer). Kebab di-re-wire tiap `renderMembers` (grip pakai `pointerdown`, kebab `click` → tak bentrok). ▲▼ tetap terpisah di luar kebab.
+- `src/frontend/tests/combos.test.js`: +6 tes kebab (label header, kebab ada, submenu Edit+Delete, Edit→sub-form, Delete saved→`DELETE /api/combos/5/members/7`, Delete buffer→lokal).
+- Nol backend, nol hex baru, parity i18n 7/7 utuh (`common.actions` + `combos.member.enabled` sudah ada). Vitest: **26 berkas / 670 tes LOLOS** (664+6).
+
+### 2026-09-13 — BUG: round_robin diabaikan di jalur streaming kombo (be-dev)
+- Akar masalah: jalur streaming (`gateway/router.py:316-341`) memanggil `resolve_combo_stream_target` (`combo_routing.py:525`) yang mengembalikan kandidat OpenAI PERTAMA & mengabaikan cursor round_robin; jalur non-streaming (`execute_combo`→`select_member`) muter benar. UI ngobrol pakai SSE → selalu `candidates[0]` (Hy3). Kolom `last_used_index` valid (`models.py:198`, migrasi `config/db.py:280`).
+- `src/backend/combo_routing.py`: `resolve_combo_stream_target` direstrukturisasi — seluruh pemilihan anggota DIPINDAH ke dalam `with SessionLocal() as session:`; untuk strategi `round_robin` delegasi ke `select_member("round_robin", openai_candidates, session, combo=combo)` (naikkan + commit cursor `combo.last_used_index`); `fallback`/`three_tier`/lain → `openai_candidates[0]` (perilaku lama). Rotasi streaming kini sama dengan non-streaming untuk kombo all-OpenAI.
+- `tests/backend/test_combo_round_robin_stream.py` (BARU): 4 tes — rotasi streaming 2 anggota (cursor 0→1→0, model beda tiap panggilan), rotasi by-id, fallback/three_tier tetap anggota pertama (tanpa rotasi, cursor tetap 0).
+- Nol skema/DB berubah, nol frontend. Pytest: **557 passed / 1 skipped** (+4 tes baru).

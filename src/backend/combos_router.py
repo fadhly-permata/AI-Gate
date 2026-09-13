@@ -28,7 +28,7 @@ LOG_SOURCE = "backend.combos.router"
 # fallback ordering (subscription -> cheap -> free) on top of sequential
 # fallback semantics (B5.2).
 ALLOWED_STRATEGIES = frozenset(
-    {"fallback", "load_balance", "latency_cost", "three_tier"}
+    {"fallback", "load_balance", "latency_cost", "three_tier", "round_robin"}
 )
 
 router = APIRouter()
@@ -42,6 +42,7 @@ class ComboMemberCreate(BaseModel):
     provider_model: Optional[str] = ""
     priority: Optional[int] = 0
     weight: Optional[float] = 1.0
+    enabled: Optional[bool] = True
 
     class Config:
         pass
@@ -71,6 +72,7 @@ class ComboMemberUpdate(BaseModel):
     provider_model: Optional[str] = None
     priority: Optional[int] = None
     weight: Optional[float] = None
+    enabled: Optional[bool] = None
 
     class Config:
         pass
@@ -83,6 +85,7 @@ class ComboMemberDTO(BaseModel):
     provider_model: str
     priority: int
     weight: float
+    enabled: bool
 
     class Config:
         pass
@@ -110,6 +113,7 @@ def _member_to_dto(member: ComboMember) -> ComboMemberDTO:
         provider_model=member.provider_model or "",
         priority=member.priority,
         weight=member.weight,
+        enabled=bool(member.enabled),
     )
 
 
@@ -184,6 +188,7 @@ def create_combo(req: ComboCreate) -> dict:
                         provider_model=m.provider_model or "",
                         priority=m.priority or 0,
                         weight=m.weight if m.weight is not None else 1.0,
+                        enabled=bool(m.enabled),
                     )
                 )
             session.commit()
@@ -286,6 +291,7 @@ def create_member(combo_id: int, req: ComboMemberCreate) -> dict:
             provider_model=req.provider_model or "",
             priority=req.priority or 0,
             weight=req.weight if req.weight is not None else 1.0,
+            enabled=bool(req.enabled),
         )
         session.add(member)
         session.commit()
@@ -326,6 +332,9 @@ def update_member(combo_id: int, member_id: int, req: ComboMemberUpdate) -> dict
         if req.weight is not None:
             member.weight = req.weight
             changed.append("weight")
+        if req.enabled is not None:
+            member.enabled = bool(req.enabled)
+            changed.append("enabled")
 
         session.commit()
         session.refresh(member)

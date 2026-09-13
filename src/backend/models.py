@@ -192,6 +192,10 @@ class Combo(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     strategy: Mapped[str] = mapped_column(String, default="fallback")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Combo ``round_robin`` cursor (task 2026-09-13). Index into the
+    # priority-asc candidate list; wrapped with modulo at selection time.
+    # Mirrors ``ProxyPool.last_used_index`` (B2.3). Defaults to 0.
+    last_used_index: Mapped[int] = mapped_column(Integer, default=0)
 
     members: Mapped[list["ComboMember"]] = relationship(back_populates="combo")
     bindings: Mapped[list["EndpointBinding"]] = relationship(
@@ -216,6 +220,10 @@ class ComboMember(Base):
     provider_model: Mapped[str] = mapped_column(String, default="")
     priority: Mapped[int] = mapped_column(Integer, default=0)
     weight: Mapped[float] = mapped_column(Float, default=1.0)
+    # Per-member on/off (task 2026-09-13 §B). Independent of ``Combo.enabled``
+    # (the whole-combo switch). Disabled members are excluded from ALL combo
+    # routing strategies at ``build_candidates`` time.
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
     combo: Mapped["Combo"] = relationship(back_populates="members")
     provider: Mapped["Provider"] = relationship(back_populates="combo_members")

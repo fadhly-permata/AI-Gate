@@ -60,3 +60,6 @@ Rule gate after editing any rule file: `python3 .opencode/tools/governance/rules
 `.opencode/**`: English caveman ultra. `documents/**/*.md`: Indonesian caveman ultra.
 Reports `.opencode/reports/**`: Indonesian formal. User talk/confirm: Indonesian casual, full
 sentences, no abbreviations, non-IT clear. Terse never cuts a mandatory format. [I7]
+Keep technical terms as-is when talking to the user — PR / commit / merge / branch / test. Never invent an
+Indonesian substitute the user does not use (real mistake: calling a PR an "usulan"). If the user asks what a
+term means, explain once in plain words, then keep using the term. [I8]

@@ -277,6 +277,71 @@ def _ensure_provider_account_routing_columns(engine) -> None:
         logger.warning("skipping provider-account routing columns migration: %s", exc)
 
 
+def _ensure_combo_last_used_index_column(engine) -> None:
+    """Self-heal ``combos.last_used_index`` on pre-existing DBs (task 2026-09-13
+    — Combo ``round_robin`` cursor).
+
+    ``create_all`` never alters existing tables, so a DB created before this
+    column existed lacks it and every ``round_robin`` combo would 500 when the
+    cursor is read/advanced. Additive-only and idempotent: a PRAGMA check guards
+    the ALTER (a repeated run never raises a duplicate-column ``OperationalError``),
+    the default ``0`` is applied by SQLite to pre-existing rows, and only the
+    specific ``OperationalError`` is swallowed (R12 — no bare ``except``).
+    Mirrors the existing ``_ensure_*`` self-heal helpers.
+    """
+    try:
+        with engine.connect() as conn:
+            existing = {
+                row[1]
+                for row in conn.execute(
+                    text("PRAGMA table_info(combos)")
+                ).fetchall()
+            }
+            if "last_used_index" not in existing:
+                conn.execute(
+                    text(
+                        "ALTER TABLE combos ADD COLUMN last_used_index INTEGER "
+                        "NOT NULL DEFAULT 0"
+                    )
+                )
+                conn.commit()
+    except OperationalError as exc:  # e.g. table missing on a bare/empty engine
+        logger.warning("skipping combos.last_used_index migration: %s", exc)
+
+
+def _ensure_combo_member_enabled_column(engine) -> None:
+    """Self-heal ``combo_members.enabled`` on pre-existing DBs (task 2026-09-13
+    §B — per-member enable/disable switch).
+
+    ``create_all`` never alters existing tables, so a DB created before this
+    column existed lacks it and every disabled-member filter would 500. Additive-
+    only and idempotent: a PRAGMA check guards the ALTER (a repeated run never
+    raises a duplicate-column ``OperationalError``), the boolean default ``1``
+    (True) is applied by SQLite to pre-existing rows, and only the specific
+    ``OperationalError`` is swallowed (R12 — no bare ``except``). Mirrors the
+    existing ``_ensure_*`` self-heal helpers, e.g. ``_ensure_combo_last_used_
+    index_column``.
+    """
+    try:
+        with engine.connect() as conn:
+            existing = {
+                row[1]
+                for row in conn.execute(
+                    text("PRAGMA table_info(combo_members)")
+                ).fetchall()
+            }
+            if "enabled" not in existing:
+                conn.execute(
+                    text(
+                        "ALTER TABLE combo_members ADD COLUMN enabled BOOLEAN "
+                        "NOT NULL DEFAULT 1"
+                    )
+                )
+                conn.commit()
+    except OperationalError as exc:  # e.g. table missing on a bare/empty engine
+        logger.warning("skipping combo_members.enabled migration: %s", exc)
+
+
 def init_db() -> None:
     """Create all tables declared on ``Base.metadata`` (idempotent).
 
@@ -296,3 +361,5 @@ def init_db() -> None:
     _ensure_usage_record_saved_tokens_column(engine)
     _ensure_log_entry_resolved_column(engine)
     _ensure_provider_account_routing_columns(engine)
+    _ensure_combo_last_used_index_column(engine)
+    _ensure_combo_member_enabled_column(engine)
