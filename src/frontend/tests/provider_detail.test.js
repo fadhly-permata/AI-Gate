@@ -255,9 +255,11 @@ it("the mobile bottom-nav also highlights 'Penyedia' (no entry of its own)", asy
     window.aigate.openDetail("p1");
     await flush();
     // The device control moved OUT of the Settings form into a modal trigger (Opsi
-    // A). The mode buttons and this path share setDevice() -> applyDevice(mode),
-    // which re-syncs the bottom-nav highlight. Rendering a phone device while on
-    // the detail page must keep the parent ("providers") item highlighted.
+    // A). The modal now previews INSIDE an iframe and no longer calls setDevice(),
+    // so it shares none of this path. This direct setDevice() still drives the LIVE
+    // page (the outer document) as before, re-syncing the bottom-nav highlight via
+    // applyDevice(mode). Rendering a phone device while on the detail page must
+    // keep the parent ("providers") item highlighted.
     window.aigate.setDevice("phone");
     expect(document.body.dataset.device).toBe("phone");
     expect(document.querySelector('.bn-item[data-view="providers"]').classList.contains("active")).toBe(true);

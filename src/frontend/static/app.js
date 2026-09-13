@@ -87,16 +87,19 @@
   /* ---- Device-simulation modal (Opsi A — moved out of the Settings form) ----
      A small device-sim control (sidebar-footer on desktop, bottom-nav on mobile)
      opens an accessible dialog that previews THIS app in an iframe at the chosen
-     device size. Selecting a mode calls applyDevice(mode) so the live page + the
-     preview both react. No global modal helper exists yet, so the focus-trap /
-     ESC / click-outside / restore-focus behaviour lives here, scoped to this
-     dialog only. */
+     device size. The preview is scoped to the iframe only — selecting a mode
+     applies the device INSIDE the frame (contentWindow.aigate.applyDevice), so
+     the live page (the outer document) is never touched. The focus-trap / ESC /
+     click-outside / restore-focus behaviour lives here, scoped to this dialog. */
   var DEVICE_SIZES = { phone: [375, 667], tablet: [768, 1024], desktop: [1280, 800] };
 
   var deviceModal = null;
   var deviceFrame = null;
   var deviceLastTrigger = null;
   var deviceKeyHandler = null;
+  // Session-local preview mode. NOT localStorage, NOT the outer body — the modal
+  // never reads or writes the live page's device view (see deviceSelectMode).
+  var devicePreviewMode = null;
 
   function deviceFocusables() {
     if (!deviceModal) return [];
@@ -110,24 +113,33 @@
     );
   }
 
-  // Scale the iframe's real device pixels down to fit the preview box, and
-  // reserve the scaled area via the wrapper (a transform alone would leave the
-  // layout box at full size and clip). Capped at 1 so small devices aren't blown up.
+  /* Size the device box to the chosen device's REAL pixels. The box is clamped
+     to the viewer in CSS (max-width:92vw / max-height:80vh) and scrolls
+     internally — the content is NEVER scaled down. --dev-w / --dev-h are set per
+     mode on .device-modal and cascade into the box + iframe, so the frame keeps
+     its exact device px and the iframe's own media queries + body[data-device]
+     rules fire INSIDE the frame. Returns the dims so callers (and tests) can read
+     what was applied. */
   function deviceRenderPreview(mode) {
-    if (!deviceFrame) return;
+    if (!deviceModal) return null;
     var dims = DEVICE_SIZES[mode] || DEVICE_SIZES.desktop;
-    var box = document.getElementById("devicePreview");
-    var availW = box ? box.clientWidth : dims[0];
-    var availH = box ? box.clientHeight : dims[1];
-    var scale = Math.min(1, (availW > 0 ? availW : dims[0]) / dims[0],
-                              (availH > 0 ? availH : dims[1]) / dims[1]);
-    deviceFrame.style.width = dims[0] + "px";
-    deviceFrame.style.height = dims[1] + "px";
-    deviceFrame.style.transform = "scale(" + scale + ")";
-    var wrap = document.getElementById("deviceFrameWrap");
-    if (wrap) {
-      wrap.style.width = Math.round(dims[0] * scale) + "px";
-      wrap.style.height = Math.round(dims[1] * scale) + "px";
+    deviceModal.style.setProperty("--dev-w", dims[0] + "px");
+    deviceModal.style.setProperty("--dev-h", dims[1] + "px");
+    return dims;
+  }
+
+  /* Apply the device mode INSIDE the iframe only. The frame loads the app
+     itself, so its contentWindow exposes aigate.applyDevice; calling it there
+     writes body[data-device] on the FRAME's document, never the outer one. */
+  function deviceApplyInFrame(mode) {
+    if (!deviceFrame || !deviceFrame.contentWindow) return;
+    try {
+      var w = deviceFrame.contentWindow;
+      if (w.aigate && typeof w.aigate.applyDevice === "function") {
+        w.aigate.applyDevice(mode);
+      }
+    } catch (e) {
+      /* not loaded yet / inaccessible — nothing to apply */
     }
   }
 
@@ -143,9 +155,11 @@
     );
   }
 
-  /* Set + persist the device-view preference (B4.2, client-only). One entry
-     point for the modal mode buttons and the boot re-apply; returns the
-     canonical token so callers (and tests) can read what was applied. */
+  /* Set + persist the device-view preference (B4.2, client-only) on the LIVE
+     page. Entry point for the boot re-apply and the test-facing
+     window.aigate.setDevice hook; returns the canonical token. NOTE: the
+     device-sim modal no longer calls this — its preview is scoped to the iframe
+     (deviceApplyInFrame), so it never mutates the outer page or localStorage. */
   function setDevicePreference(mode) {
     var norm = deviceAttr(mode);
     applyDevice(norm);
@@ -153,17 +167,24 @@
     return norm;
   }
 
+  /* Preview-only mode switch. Marks the active button, sizes the device box, and
+     applies the device INSIDE the iframe. It never calls setDevicePreference, so
+     the outer page is never mutated and localStorage is never written here. */
   function deviceSelectMode(mode) {
-    var norm = setDevicePreference(mode);
+    var norm = deviceAttr(mode);
+    devicePreviewMode = norm;
     deviceSetActiveMode(norm);
     deviceRenderPreview(norm);
+    deviceApplyInFrame(norm);
   }
 
   function openDeviceModal(trigger) {
     if (!deviceModal) return;
     deviceLastTrigger = trigger || null;
     deviceModal.hidden = false;
-    var cur = document.body.dataset.device || DEFAULT_DEVICE;
+    // Default to the last previewed mode this session — NOT the outer page's
+    // body[data-device] and NOT localStorage (the modal never reads the live view).
+    var cur = devicePreviewMode || DEFAULT_DEVICE;
     deviceSetActiveMode(cur);
     deviceRenderPreview(cur);
     // Load the preview once (same origin -> the app itself). Skip in non-DOM
@@ -226,6 +247,19 @@
       var btn = e.target.closest ? e.target.closest("[data-device-mode]") : null;
       if (btn) { deviceSelectMode(btn.getAttribute("data-device-mode")); return; }
       if (e.target.closest && e.target.closest("#deviceModalClose")) closeDeviceModal();
+    });
+    // Once the iframe loads the app, apply the current preview mode INSIDE it.
+    if (deviceFrame) {
+      deviceFrame.addEventListener("load", function () {
+        deviceApplyInFrame(devicePreviewMode || DEFAULT_DEVICE);
+      });
+    }
+    // Refit the open modal when the viewport changes / rotates. CSS clamps (92vw /
+    // 80vh) already size the box; re-rendering keeps the per-mode vars current.
+    window.addEventListener("resize", function () {
+      if (deviceModal && !deviceModal.hidden) {
+        deviceRenderPreview(devicePreviewMode || DEFAULT_DEVICE);
+      }
     });
   }
 
@@ -2393,8 +2427,9 @@
     // --- Device simulation (B4.2, Opsi A): the control moved OUT of the Settings
     //     form into a small trigger above the Repo link (sidebar-footer on desktop,
     //     .bn-device in the bottom-nav on phone). Clicking it opens an accessible
-    //     modal with a live iframe preview; selecting a mode calls applyDevice().
-    //     The #setDevice <select> + its change listener are gone.
+    //     modal with a live iframe preview. The preview is scoped to the iframe
+    //     only — selecting a mode never touches the live page. The #setDevice
+    //     <select> + its change listener are gone.
     setupDeviceModal();
 
     // --- Nav / view switching (top sidebar + mobile bottom-nav share logic) ---

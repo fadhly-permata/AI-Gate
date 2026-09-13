@@ -1,8 +1,9 @@
 /* Device-view simulation modal (Opsi A — moved OUT of the Settings form).
  *
- * Contract under test (handover §1.C): a trigger (sidebar-footer on desktop,
- * .bn-device in the bottom-nav on phone) opens #deviceModal; selecting a mode
- * applies + persists body[data-device]; the dialog is accessible — focus moves
+ * Contract under test (handover §2.5): a trigger (sidebar-footer on desktop,
+ * .bn-device in the bottom-nav on phone) opens #deviceModal; selecting a mode is
+ * scoped to the iframe ONLY — the live page (outer body[data-device]) and
+ * localStorage are never touched; the dialog is accessible — focus moves
  * in on open, Tab is trapped inside, ESC closes and restores focus to the
  * trigger, and clicking the backdrop (outside the dialog) closes it.
  *
@@ -60,6 +61,8 @@ describe("device-sim modal behaviour", () => {
 
   beforeEach(() => {
     localStorage.removeItem("aigate.device");
+    // Precondition for the isolation test: the live page is on "desktop". Selecting
+    // a mode in the modal must NOT change this (proof the outer body is untouched).
     document.body.dataset.device = "desktop";
     mount();
     modal = document.getElementById("deviceModal");
@@ -81,11 +84,17 @@ describe("device-sim modal behaviour", () => {
     expect(document.activeElement).toBe(first); // focus the first control
   });
 
-  it("selecting a mode applies + persists body[data-device] and marks it pressed", () => {
+  it("selecting a mode previews in the iframe WITHOUT touching the live page", () => {
     trigger.click();
     first.click(); // phone
-    expect(document.body.dataset.device).toBe("phone");
-    expect(localStorage.getItem("aigate.device")).toBe("phone");
+    // The live page must be untouched: the outer body keeps its pre-test value
+    // (set in beforeEach) and the modal must never persist a device to localStorage.
+    expect(document.body.dataset.device, "outer body unchanged").toBe("desktop");
+    expect(localStorage.getItem("aigate.device"), "no localStorage write").toBeNull();
+    // The preview IS sized to the device — the --dev-w/--dev-h vars that the
+    // iframe + box read are set to the phone dims, and the button is marked.
+    expect(modal.style.getPropertyValue("--dev-w")).toBe("375px");
+    expect(modal.style.getPropertyValue("--dev-h")).toBe("667px");
     expect(first.classList.contains("is-active")).toBe(true);
     expect(first.getAttribute("aria-pressed")).toBe("true");
   });

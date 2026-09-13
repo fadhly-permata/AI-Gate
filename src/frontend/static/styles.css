@@ -728,7 +728,19 @@ body.sidebar-collapsed .device-trigger { justify-content: center; padding: 12px 
 }
 .bn-device:hover { color: var(--sidebar-fg-hover); }
 
-.device-modal { max-width: 620px; }
+/* Device-sized dialog. --dev-w / --dev-h are set per mode by JS on this box and
+   cascade into .device-frame. The box auto-sizes to the device but is clamped to
+   the viewer (max-width/height); anything larger scrolls INSIDE it (overflow:auto)
+   instead of being scaled down. The live page behind is never resized.
+   Selector is `.modal.device-modal` (not just `.device-modal`) so it outranks the
+   base `.modal{width:100%;max-width:540px;max-height:90vh}` rule further down —
+   equal specificity + later source order would otherwise pin the box to 540px. */
+.modal.device-modal {
+  width: var(--dev-w, 620px);
+  max-width: 92vw;
+  max-height: 80vh;
+  overflow: auto;
+}
 .device-modes { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 16px; }
 .device-mode {
   flex: 1 1 0;
@@ -758,27 +770,30 @@ body.sidebar-collapsed .device-trigger { justify-content: center; padding: 12px 
 }
 .device-mode.is-active small { color: var(--accent-contrast); }
 
-/* Scaled live preview of the app itself. .device-frame is sized to the real
-   device pixels in JS and scaled down (transform-origin: top left); the outer
-   .device-frame-wrap reserves the SCALED area, since a transform leaves the
-   element's own layout box at full size and would otherwise clip/overflow. */
+/* Live preview of the app itself, rendered at REAL device size inside the iframe.
+   No scale transform: .device-frame keeps its exact device px (--dev-w/--dev-h) so
+   the iframe's own media queries + body[data-device] rules fire INSIDE the frame.
+   The .device-frame-wrap is a non-shrinking flex child (flex:0 0 auto) so the box
+   never squeezes the device; anything wider/taller than the viewer scrolls inside
+   .device-preview (overflow:auto), content stays full size. */
 .device-preview {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  height: 340px;
   padding: 10px;
   background: var(--bg);
   border: 1px solid var(--panel-border);
   border-radius: var(--radius);
-  overflow: hidden;
+  overflow: auto;
 }
-.device-frame-wrap { overflow: hidden; }
+.device-frame-wrap { flex: 0 0 auto; }
 .device-frame {
-  transform-origin: top left;
+  display: block;
+  width: var(--dev-w, 100%);
+  height: var(--dev-h, 500px);
+  transform: none;
   border: 1px solid var(--panel-border);
   background: var(--panel);
-  display: block;
 }
 
 /* Tablet: keep the AdminLTE-like layout, just tighten spacing/widths. */
