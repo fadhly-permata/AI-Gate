@@ -205,6 +205,7 @@ window.I18N.zh = {
     "lang.ja": "日本語",
     "lang.zh": "简体中文",
     "lang.zh-tw": "繁體中文",
+    "lang.hi": "हिन्दी",
     "providers.header_key_ph": "键",
     "providers.header_val_ph": "值",
     "combos.title": "组合",

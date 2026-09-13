@@ -204,6 +204,7 @@ window.I18N.en = {
     "lang.ja": "日本語",
     "lang.zh": "简体中文",
     "lang.zh-tw": "繁體中文",
+    "lang.hi": "हिन्दी",
     "providers.header_key_ph": "Key",
     "providers.header_val_ph": "Value",
     "combos.title": "Combos",

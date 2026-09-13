@@ -203,6 +203,7 @@ window.I18N.ru = {
     "lang.ja": "日本語",
     "lang.zh": "简体中文",
     "lang.zh-tw": "繁體中文",
+    "lang.hi": "हिन्दी",
     "providers.header_key_ph": "Ключ",
     "providers.header_val_ph": "Значение",
     "combos.title": "Комбо",
