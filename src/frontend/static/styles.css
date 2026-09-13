@@ -736,11 +736,23 @@ body.sidebar-collapsed .device-trigger { justify-content: center; padding: 12px 
    base `.modal{width:100%;max-width:540px;max-height:90vh}` rule further down —
    equal specificity + later source order would otherwise pin the box to 540px. */
 .modal.device-modal {
-  width: var(--dev-w, 620px);
+  /* Hug the device instead of forcing the box to --dev-w; the modal itself must
+     NOT scroll — only .device-preview scrolls. fit-content lets the box shrink to
+     the device yet stay clamped by max-width/height to the viewer. */
+  width: fit-content;
   max-width: 92vw;
   max-height: 80vh;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
+/* Direct children must not shrink — they carry their own height (title, note,
+   mode buttons, footer) so they always stay in the viewport; only the preview
+   area between them is allowed to shrink and scroll internally. */
+.modal.device-modal > .modal-title,
+.modal.device-modal > .settings-dev-note,
+.modal.device-modal > .device-modes,
+.modal.device-modal > .form-actions { flex: 0 0 auto; }
 .device-modes { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 16px; }
 .device-mode {
   flex: 1 1 0;
@@ -777,8 +789,17 @@ body.sidebar-collapsed .device-trigger { justify-content: center; padding: 12px 
    never squeezes the device; anything wider/taller than the viewer scrolls inside
    .device-preview (overflow:auto), content stays full size. */
 .device-preview {
+  /* flex:0 1 auto + min-height:0 = the ONE scrollable area: it may shrink so the
+     footer (Close) stays in view, and it scrolls internally instead of pushing the
+     Close button out of a short viewport. justify-content:flex-start (NOT center)
+     is the core fix: centering splits overflow symmetrically and scrollLeft can't
+     go negative, so the LEFT edge was permanently unreachable. With flex-start the
+     content starts at scrollLeft=0; the child's margin-inline:auto below re-centers
+     it only when there is free space (safe-center). */
+  flex: 0 1 auto;
+  min-height: 0;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: flex-start;
   padding: 10px;
   background: var(--bg);
@@ -786,7 +807,9 @@ body.sidebar-collapsed .device-trigger { justify-content: center; padding: 12px 
   border-radius: var(--radius);
   overflow: auto;
 }
-.device-frame-wrap { flex: 0 0 auto; }
+/* margin-inline:auto centers the device when it fits, and collapses to 0 on
+   overflow so the left edge sits at scrollLeft=0 — both edges stay reachable. */
+.device-frame-wrap { flex: 0 0 auto; margin-inline: auto; }
 .device-frame {
   display: block;
   width: var(--dev-w, 100%);
