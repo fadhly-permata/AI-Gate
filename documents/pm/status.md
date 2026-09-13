@@ -14,6 +14,7 @@
 - EKSEKUSI: be-dev (backend-only), mode **sekuensial**. NEXT: spawn be-dev → gate PM → commit.
 - SELESAI 2026-09-13: be-dev benerin `resolve_combo_stream_target` (pakai `select_member` round_robin + commit cursor di dalam `with session`). PM gate: pytest **557 passed/1 skipped** (+4 tes), `git diff --check` bersih, scope murni `src/backend/**`. Commit `abbe245` (10 ahead origin/refactor/ui).
 - VERIFIKASI LIVE (setelah user restart, port 8080, PID 20134): 4 request streaming `combo:B.AI` bergiliran `qwen3.8-flash → hy3 → qwen3.8-flash → hy3` (enabled: hy3 prio0 + qwen3.8-flash prio2; 2 disabled di-skip). `GET /api/usage` `by_model` catat hy3 + qwen3.8-flash. G3 terpenuhi — diuji di server beneran, bukan cuma tes unit.
+- PUSH & PR: user minta → `git push -u origin refactor/ui` (`f6e0d30..f327d9b`, 11 commit sesi ini; total 15 ahead of main) + **PR #20** `refactor/ui → main` (OPEN) → https://github.com/fadhly-permata/AI-Gate/pull/20. Isi: urutan manual ▲▼+drag, animasi, round_robin, enable/disable per-model, label header toggle + kebab Edit/Delete, fix streaming round_robin. Vitest 670 / pytest 557+1skip / verifikasi live rotasi.
 
 ## 20260913-08yy — User minta UI: header kolom toggle + ganti edit/hapus jadi kebab submenu (ProjectManager)
 - User: "toggle enable/disable per model kenapa gak ada nama kolomnya, gua sampe bingung nyarinya" + "tombol aksi edit dan hapus mending diganti tombol tiga titik dengan submenu edit dan delete".
