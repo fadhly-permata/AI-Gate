@@ -1781,3 +1781,9 @@ Temuan lingkungan: `python3 run.py --port 8251` (PID 5934, ±1 hari 2 jam) masih
 Sentuhan layar asli / WebView ponsel (hanya chromium desktop-headless) · OAuth connect end-to-end ke penyedia eksternal ·
 discovery model ke API sungguhan · hasil screenshot bukti (model PM tanpa masukan gambar; angka DOM yang dipakai) ·
 bentuk favicon menunggu selera user · `trace/screenshot on-failure` masih menulis ke `<cwd>/test-results` (dibersihkan manual; `.gitignore` root bukan milik fe-dev).
+
+### 2026-09-13 — UI anggota kombo: header kolom toggle + menu tiga titik (fe-dev)
+- `src/frontend/static/index.html`: thead tabel anggota kombo, kolom-1 `<th></th>` → `<th data-i18n="combos.member.enabled">Enabled</th>` (kolom toggle enable/disable kini berlabel; user tadinya bingung mencari toggle).
+- `src/frontend/static/combos.js`: hapus tombol `js-mem-edit`+`js-mem-del` (pencil/trash) di cell aksi; ganti dengan SATU kebab `js-row-menu` (`fa-ellipsis-vertical`) yang membuka submenu [Edit, Delete(danger)] via `window.aigate.wireRowMenu` (pola bersama `app.js:733/741`). `memberRowActions(tr)` mereplika logika lama persis: Edit→`editMemberRow(mid,idx)`, Delete→`removeMember(mid)`(saved)/`removeMemberLocal(idx)`(buffer). Kebab di-re-wire tiap `renderMembers` (grip pakai `pointerdown`, kebab `click` → tak bentrok). ▲▼ tetap terpisah di luar kebab.
+- `src/frontend/tests/combos.test.js`: +6 tes kebab (label header, kebab ada, submenu Edit+Delete, Edit→sub-form, Delete saved→`DELETE /api/combos/5/members/7`, Delete buffer→lokal).
+- Nol backend, nol hex baru, parity i18n 7/7 utuh (`common.actions` + `combos.member.enabled` sudah ada). Vitest: **26 berkas / 670 tes LOLOS** (664+6).

@@ -44,7 +44,7 @@ const MODAL_HTML =
         '<p id="comboMemberMsg"></p>' +
         '<table id="comboMembersTable">' +
           '<thead><tr>' +
-            '<th></th>' +
+            '<th data-i18n="combos.member.enabled">Enabled</th>' +
             '<th data-i18n="combos.member.model">Model</th>' +
             '<th data-i18n="combos.member.weight">Weight</th>' +
             '<th></th>' +
@@ -230,8 +230,10 @@ describe("combos members — renderMembers", () => {
     expect(html).toContain("llama-3.1");    // model
     expect(html).toContain("qwen");
     expect(html).toContain(">0.5<");        // weight
-    expect(html).toContain("js-mem-edit");
-    expect(html).toContain("js-mem-del");
+    // (B) Edit + Delete are now ONE kebab submenu trigger, not two buttons.
+    expect(html).toContain("js-row-menu");
+    expect(html).not.toContain("js-mem-edit");
+    expect(html).not.toContain("js-mem-del");
     expect(html).toContain('data-id="7"');
     // (B) One enable/disable checkbox per row, with the i18n aria-label.
     const toggles = body.querySelectorAll(".js-mem-enabled");
@@ -321,6 +323,111 @@ describe("combos members — renderMembers", () => {
     });
     // The hint is rendered from i18n by applyLocale (data-i18n hook exists).
     expect(indexDocument().querySelector('[data-i18n="combos.member.order_hint"]')).not.toBeNull();
+  });
+});
+
+describe("combos members — kebab submenu (edit/delete) replaces pencil+trash", () => {
+  beforeEach(() => { withComboModalDom(); });
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  // (a) The toggle column header is now labelled "Enabled".
+  it("member table header column 1 is labelled 'Enabled'", () => {
+    const ths = document.querySelectorAll("#comboMembersTable thead th");
+    expect(ths.length).toBe(4);
+    expect(ths[0].getAttribute("data-i18n")).toBe("combos.member.enabled");
+    expect(ths[0].textContent).toBe("Enabled");
+  });
+
+  // (b) Actions cell shows ONE kebab trigger, not the old separate buttons; ▲▼ stay.
+  it("actions cell shows ONE kebab (js-row-menu), not separate edit/delete buttons", () => {
+    window.aigate.combos.renderMembers(sampleCombo().members, {});
+    const body = document.getElementById("comboMembersBody");
+    expect(body.querySelectorAll(".js-row-menu").length).toBe(2);
+    expect(body.querySelectorAll(".js-mem-edit").length).toBe(0);
+    expect(body.querySelectorAll(".js-mem-del").length).toBe(0);
+    // ▲▼ still present and OUTSIDE the kebab.
+    expect(body.querySelectorAll(".js-mem-up").length).toBe(2);
+    expect(body.querySelectorAll(".js-mem-down").length).toBe(2);
+    expect(body.querySelectorAll(".member-move").length).toBe(2);
+  });
+
+  // (c) Clicking the kebab opens a submenu with Edit + Delete (danger).
+  it("clicking the kebab opens a submenu with Edit + Delete", () => {
+    window.aigate.combos.renderMembers(sampleCombo().members, {});
+    const kebab = document.querySelector("#comboMembersBody .js-row-menu");
+    kebab.click();
+    const menu = document.querySelector(".row-menu");
+    expect(menu).toBeTruthy();
+    const actions = Array.from(menu.querySelectorAll("[data-action]"))
+      .map((b) => b.getAttribute("data-action"));
+    expect(actions).toEqual(["edit", "delete"]);
+    // Delete item is flagged danger; Edit is not.
+    expect(menu.querySelector('[data-action="delete"]').classList.contains("is-danger")).toBe(true);
+    expect(menu.querySelector('[data-action="edit"]').classList.contains("is-danger")).toBe(false);
+    // Labels come from i18n (reused keys, parity intact).
+    expect(menu.querySelector('[data-action="edit"]').textContent)
+      .toContain(window.I18N.en["combos.member.edit"]);
+    expect(menu.querySelector('[data-action="delete"]').textContent)
+      .toContain(window.I18N.en["combos.member.remove"]);
+  });
+
+  // (d) Kebab Edit loads the row into the sub-form (calls editMemberRow).
+  it("kebab Edit loads the row into the sub-form (editMemberRow)", async () => {
+    vi.stubGlobal("fetch", vi.fn((url) =>
+      String(url).indexOf("/api/providers") !== -1 ? jsonResponse(sampleProviders()) : jsonResponse({})));
+    await window.aigate.combos.openAddModal();
+    // Row 0 = "a" (weight 1), Row 1 = "b" (weight 5).
+    window.aigate.combos.bufferMemberLocal({ provider_id: 1, provider_model: "a", weight: "1" });
+    window.aigate.combos.bufferMemberLocal({ provider_id: 1, provider_model: "b", weight: "5" });
+    document.querySelector("#comboMembersBody .js-row-menu").click();
+    document.querySelector('.row-menu [data-action="edit"]').click();
+    // fillMemberForm (via editMemberRow) flips the form into edit mode and loads
+    // member "a"'s weight.
+    expect(document.getElementById("comboMemberAddBtn").textContent)
+      .toBe(window.I18N.en["combos.member.update"]);
+    expect(document.getElementById("comboMemberCancelEdit").hidden).toBe(false);
+    expect(document.getElementById("comboMemberWeight").value).toBe("1");
+  });
+
+  // (e) Delete path: SAVED member -> removeMember (DELETE /api/combos/5/members/7).
+  it("kebab Delete removes a SAVED member via DELETE /api/combos/:id/members/:mid", async () => {
+    const calls = [];
+    vi.stubGlobal("fetch", vi.fn((url, opts) => {
+      calls.push({ url: String(url), opts });
+      if (String(url) === "/api/providers") return jsonResponse(sampleProviders());
+      if (String(url) === "/api/combos/5") return jsonResponse(sampleCombo());
+      if (String(url).indexOf("/api/combos/5/members/") === 0) return jsonResponse({ ok: true });
+      return jsonResponse({});
+    }));
+    window.confirm = vi.fn(() => true);
+    await window.aigate.combos.openEditModal("5");
+    document.querySelector("#comboMembersBody .js-row-menu").click();
+    document.querySelector('.row-menu [data-action="delete"]').click();
+    await new Promise((r) => setTimeout(r, 0));
+    const del = calls.find((c) =>
+      c.url === "/api/combos/5/members/7" && c.opts && c.opts.method === "DELETE");
+    expect(del).toBeTruthy();
+  });
+
+  // (e) Delete path: BUFFER member -> removeMemberLocal (no request).
+  it("kebab Delete removes a BUFFER member locally (no request, not Edit path)", async () => {
+    const calls = [];
+    vi.stubGlobal("fetch", vi.fn((url, opts) => {
+      calls.push({ url: String(url), opts });
+      if (String(url).indexOf("/api/providers") !== -1) return jsonResponse(sampleProviders());
+      return jsonResponse({});
+    }));
+    await window.aigate.combos.openAddModal();
+    window.aigate.combos.bufferMemberLocal({ provider_id: 1, provider_model: "a", weight: "1" });
+    window.aigate.combos.bufferMemberLocal({ provider_id: 1, provider_model: "b", weight: "5" });
+    expect(window.aigate.combos.getMembersBuffer().length).toBe(2);
+    document.querySelector("#comboMembersBody .js-row-menu").click();
+    document.querySelector('.row-menu [data-action="delete"]').click();
+    await new Promise((r) => setTimeout(r, 0));
+    // Buffer member dropped locally; no member endpoint hit.
+    expect(window.aigate.combos.getMembersBuffer().length).toBe(1);
+    expect(calls.filter((c) => c.url.indexOf("/members") !== -1).length).toBe(0);
+    expect(document.querySelectorAll("#comboMembersBody tr.member-row").length).toBe(1);
   });
 });
 
@@ -734,7 +841,8 @@ describe("combos members — NEW combo mode (client-side buffer)", () => {
     const body = document.getElementById("comboMembersBody");
     // Edit "a" (index 0), then move it down one BEFORE submitting: the pending
     // edit must follow the row, not stay pinned to index 0 (which is "b" now).
-    body.querySelectorAll(".js-mem-edit")[0].click();
+    body.querySelector(".js-row-menu").click();
+    document.querySelector('.row-menu [data-action="edit"]').click();
     body.querySelectorAll(".js-mem-down")[0].click();
     await new Promise((r) => setTimeout(r, 0));
     document.getElementById("comboMemberWeight").value = "7";
@@ -884,7 +992,8 @@ describe("combos members — EXISTING combo mode (member endpoints)", () => {
     // Row 1 -> Edit: the form has no priority field, so nothing can leak a 0
     // (which would have jumped the edited row to the front of the queue).
     document.getElementById("comboMembersBody")
-      .querySelectorAll(".js-mem-edit")[0].click();
+      .querySelector(".js-row-menu").click();
+    document.querySelector('.row-menu [data-action="edit"]').click();
     document.getElementById("comboMemberWeight").value = "3";
     await window.aigate.combos.submitMemberForm();
     const put = calls.find((c) => c.url === "/api/combos/5/members/7" && c.opts.method === "PUT");
@@ -1175,9 +1284,9 @@ describe("combos members — shipped markup: no Priority column/field (stage-8)"
   it("the members table has no Priority column and the sub-form no Priority field", () => {
     const heads = Array.from(doc.querySelectorAll("#comboMembersTable thead th"))
       .map((th) => th.getAttribute("data-i18n"));
-    // (A) The first column is now a controls cell (grip + enable toggle) — its
-    // header carries no label, exactly like the trailing actions column. 4 cols.
-    expect(heads).toEqual([null, "combos.member.model",
+    // (A) The first column is now labelled "Enabled" (it carries the enable
+    // toggle + grip); the trailing actions column stays unlabeled. 4 cols.
+    expect(heads).toEqual(["combos.member.enabled", "combos.member.model",
       "combos.member.weight", null]);
     expect(heads).not.toContain("combos.member.priority");
     expect(doc.getElementById("comboMemberPriority")).toBeNull();

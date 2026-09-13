@@ -415,6 +415,33 @@
     }, 650);
   }
 
+  /* Actions for the per-row kebab (three-dots) submenu in the members table.
+      Replicates EXACTLY the edit/delete logic the old pencil/trash buttons ran
+      (combos.js delegated listener). Edit -> editMemberRow(mid, idx); Delete ->
+      removeMember(mid) for a saved row, removeMemberLocal(idx) for a buffer row. */
+  function memberRowActions(tr) {
+    var idx = parseInt(tr.getAttribute("data-idx"), 10);
+    var mid = tr.getAttribute("data-id");
+    return [
+      {
+        action: "edit",
+        label: getStr("combos.member.edit"),
+        icon: "fa-pen",
+        onClick: function () { editMemberRow(mid, idx); }
+      },
+      {
+        action: "delete",
+        label: getStr("combos.member.remove"),
+        icon: "fa-trash",
+        danger: true,
+        onClick: function () {
+          if (selectedId && mid != null) removeMember(mid);
+          else removeMemberLocal(idx);
+        }
+      }
+    ];
+  }
+
   /* ---- Members table render ----
       There is no Priority column: the ROW ORDER is the priority (stage-8), and
       ▲▼ in the action cell is the only way to change it — the same affordance as
@@ -480,10 +507,15 @@
             '<button type="button" class="icon-btn-small js-mem-down"' + downAttrs + '>' +
               '<i class="fa fa-arrow-down" aria-hidden="true"></i></button>' +
           "</span>" +
-          '<button type="button" class="icon-btn-small js-mem-edit" title="' +
-            escapeHtml(getStr("combos.member.edit")) + '"><i class="fa fa-pen"></i></button>' +
-          '<button type="button" class="icon-btn-small js-mem-del" title="' +
-            escapeHtml(getStr("combos.member.remove")) + '"><i class="fa fa-trash"></i></button>' +
+          // (B) Edit + Delete collapsed into ONE kebab (three-dots) submenu — reuses
+          // the shared row-menu wiring in app.js (window.aigate.wireRowMenu). ▲▼ stay
+          // OUTSIDE the kebab as a separate affordance. Button markup mirrors
+          // rowMenuCellHtml() (button only — this table keeps ▲▼ in the same actions
+          // <td>, so we do not wrap the kebab in its own <td>).
+          '<button type="button" class="icon-btn-small js-row-menu" aria-haspopup="true" ' +
+            'aria-expanded="false" title="' + escapeHtml(getStr("common.actions")) + '" ' +
+            'aria-label="' + escapeHtml(getStr("common.actions")) + '">' +
+            '<i class="fa fa-ellipsis-vertical" aria-hidden="true"></i></button>' +
         "</td>" +
       "</tr>";
     }).join("");
@@ -502,12 +534,9 @@
         var idx = parseInt(tr.getAttribute("data-idx"), 10);
         if (isNaN(idx)) return;
         var mid = tr.getAttribute("data-id");
-        if (e.target.closest(".js-mem-edit")) { editMemberRow(mid, idx); return; }
-        if (e.target.closest(".js-mem-del")) {
-          if (selectedId && mid != null) removeMember(mid);
-          else removeMemberLocal(idx);
-          return;
-        }
+        // Edit + Delete now live in the kebab submenu (wired via
+        // window.aigate.wireRowMenu at the end of renderMembers), so they are no
+        // longer handled by this delegated listener.
         var up = e.target.closest(".js-mem-up");
         var down = e.target.closest(".js-mem-down");
         // aria-disabled buttons explain themselves and never hit the network.
@@ -538,6 +567,17 @@
         }
       });
     }
+
+    // (B) Re-wire the kebab (three-dots) submenu after EVERY render:
+    // renderMembers rewrites tbody.innerHTML on each mutation, so the freshly
+    // recreated .js-row-menu buttons must be re-bound. wireRowMenu only attaches
+    // the per-button click that opens the shared row-menu; the document-level
+    // click-outside / Escape close handler is owned by app.js initRowMenuGlobal
+    // (registered ONCE at module load), so no document listener is added here and
+    // none can be duplicated. The grip/drag path uses pointerdown; the kebab uses
+    // click via wireRowMenu — the two never collide.
+    var a0 = app();
+    if (typeof a0.wireRowMenu === "function") a0.wireRowMenu(body, memberRowActions);
 
     // Transient highlight on the row that just moved (▲▼ OR drag). Purely
     // cosmetic — never touches the order logic or the wiring above.

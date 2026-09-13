@@ -2,6 +2,15 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260913-08yy — User minta UI: header kolom toggle + ganti edit/hapus jadi kebab submenu (ProjectManager)
+- User: "toggle enable/disable per model kenapa gak ada nama kolomnya, gua sampe bingung nyarinya" + "tombol aksi edit dan hapus mending diganti tombol tiga titik dengan submenu edit dan delete".
+- PM investigasi: kebab SUDAH ada (`app.js:733 rowMenuCellHtml` + `:741 wireRowMenu`, dipakai provider/pool/endpoint).
+  Header kolom ke-1 kombo dibiarin `<th></th>` (fe-dev sebelumnya), makanya user bingung. Tombol edit+hapus masih terpisah (`combos.js:476-486`).
+- Lembar desain: `handover-20260913-toggle-header-dan-kebab.md` (DI-ACC). (A) header kolom ke-1 = `combos.member.enabled` ("Enabled");
+  (B) ganti `js-mem-edit`+`js-mem-del` jadi SATU kebab (`rowMenuCellHtml`) submenu [Edit, Delete(danger)], reuse `wireRowMenu`,
+  ▲▼ tetap terpisah. Scope murni `src/frontend/**`, nol backend.
+- EKSEKUSI: fe-dev (frontend-only), mode **sekuensial** (user pilih di sesi ini). NEXT: spawn fe-dev → gate PM → commit.
+
 ## 20260913-08xx — User lapor error round_robin + klarifikasi enable/disable per-model (ProjectManager)
 - User: ganti strategy ke round_robin → error `invalid strategy 'round_robin' (expected one of ['fallback','latency_cost','load_balance','three_tier'])`;
   + klarifikasi "bukan enable/disable kombo, tapi model di dalam combo".
