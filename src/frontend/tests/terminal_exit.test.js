@@ -365,17 +365,17 @@ describe("session-ended toast (DoD 2 of round 2)", () => {
   });
 });
 
-describe("deliberate close behavior is unchanged (regression)", () => {
-  it("closeTab still sends the kill frame and replaces the last tab", () => {
+describe("deliberate close of the LAST tab → empty state (bug #1)", () => {
+  it("closeTab sends the kill frame and shows the empty state (no replacement tab)", () => {
     const tab = T().openTab();
     tab.ws._open();
     const n = MockWebSocket.instances.length;
 
     T().closeTab(tab.id);
 
-    expect(tab.ws.sent).toContain('{"type":"close"}');
-    expect(T()._tabs.size).toBe(1);            // a replacement was opened
-    expect(MockWebSocket.instances.length).toBe(n + 1);
-    expect(document.getElementById("termEmpty").hidden).toBe(true);
+    expect(tab.ws.sent).toContain('{"type":"close"}'); // PTY still killed
+    expect(T()._tabs.size).toBe(0);                   // NO respawn: the tab is gone
+    expect(MockWebSocket.instances.length).toBe(n);   // no new shell was opened
+    expect(document.getElementById("termEmpty").hidden).toBe(false); // empty state shows
   });
 });

@@ -396,14 +396,23 @@ describe("BUG2 — terminal.js ResizeObserver wiring", () => {
     expect(theObserver().targets).toContain(a.container);
   });
 
-  it("opening a tab clears the empty-state hint (panel is never a blank box)", () => {
+  it("opening a tab clears the hint; closing to the LAST reveals it (no blank box)", () => {
     const empty = document.getElementById("termEmpty");
     expect(empty).not.toBeNull();
     empty.hidden = false;               // simulate "no tabs yet"
-    const tab = T().openTab();
+    const a = T().openTab();
     expect(empty.hidden).toBe(true);    // hint gone as soon as a session exists
-    T().closeTab(tab.id);               // closing re-opens one -> still no hint
+
+    // With ≥2 tabs, closing one keeps the survivor -> hint stays hidden.
+    T().openTab();
+    T().closeTab(a.id);
     expect(empty.hidden).toBe(true);
+
+    // Closing the LAST remaining tab now reveals the empty-state hint (no
+    // auto-respawn), instead of leaving the panel a blank box.
+    const last = Array.from(T()._tabs.keys())[0];
+    T().closeTab(last);
+    expect(empty.hidden).toBe(false);
   });
 
   it("the active tab is marked aria-selected (tablist semantics survive redesign)", () => {

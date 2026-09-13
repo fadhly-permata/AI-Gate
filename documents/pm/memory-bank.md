@@ -264,6 +264,7 @@
 
 ## Progress
 [entri lama dipindah ke `documents/pm/archive/memory-bank-progress-lama.md` — tidak dihapus]
+- 2026-09-13: **BUG terminal SELESAI (tingkat tes) — (1) X di tab terakhir kini TUTUP ke empty state, (2) teks Reconnect jadi banner DOM, bukan di dalam buffer TUI.** fe-dev (frontend) 2 putaran. Akar: `closeTab` cabang last-tab `openTab()` (terminal.js:701-703) vs `exit` (698-700); `writeStatus` nulis langsung ke `term.write` (300-304). Fix: cabang last-tab tanpa `openTab()` → `activeId=null` + kill frame tetap; status → `.term-status-banner` overlay + `clearStatus` di `onopen` (flash "Reconnected" auto-clear 1800ms) + "Connecting" ikut banner. 4 test lama di `terminal_discard`/`terminal_layout` yang mengasumsi "tutup terakhir = respawn" disesuaikan ke kontrak baru. Gate PM mandiri: **6 berkas / 171 tes LOLOS, 0 gagal**; 6 berkas semua `src/frontend/**`. BELUM di-commit (D1, tunggu perintah). Sisa user: uji mata nyata (G3) + keputusan commit/push/PR. Laporan: `.opencode/reports/20260913/frontend/0835_terminal-last-tab-close-dan-reconnect-banner.md`.
 - 2026-09-11: **PUSH SELESAI + PR #18 TERBUKA (refactor/ui -> main).** "rapikan, commit, push, & pr": 6 rujukan path mati
   `docs/...`→`documents/...` dibersihkan 3 agen (analisis/arsitektur/bisnis) + folder hantu `docs/` di root dihapus →
   commit `6e3cf3f` → push dengan token dari `.env` (nol nilai dicetak) → **PR #18** 23 commit / 57 berkas / +7.251 −467,

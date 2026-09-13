@@ -2,6 +2,24 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260913-08yy — KOREKSI: fix terminal gak kelihatan di browser — cache-buster lupa di-bump (G3)
+- User balik lapor: "masih gak nutup terminalnya" padahal test 171 hijau. PM diagnosis: `index.html:1425` `terminal.js?v=20260907` & `:61` `styles.css?v=20260920` TIDAK di-bump pas fe-dev ubah isinya — browser cache versi lama, fix gak sampai ke user. Ini celah KIRIMAN: `index.html` kemarin gak masuk scope fe-dev (cuma terminal.js/styles.css/test) → cache-buster kelewat.
+- TESIS G3 TERBUKTI LAGI: test hijau (171) ≠ aplikasi beneran jalan. Server baca disk tiap request, TAPI browser pakai asset cached karena URL `?v=` identik.
+- FIX: fe-dev (putaran 3, scope `index.html` saja) bump `terminal.js?v=20260907→20260913` & `styles.css?v=20260920→20260913`. git diff = 2 baris di index.html. Test 4 berkas terminal ulang = **90 passed/0 fail**.
+- PELAJARAN PROSES (catat, belum jadi rule baru): setiap ubah `.js`/`.css` frontend WAJIB ikut ubah `?v=` di `index.html` — PM wajib masukkan `index.html` ke scope handover (atau cek eksplisit pas integrasi). Guard `i18n.test.js:307-316` cuma jaga sebagian token, gak semua aset.
+- SISA MILIK USER: reload halaman (refresh) lalu uji nyata — X di tab terakhir harusnya kini nutup ke empty state; reconnect pas TUI jalan = banner hilang tanpa numpuk. Belum di-commit (D1).
+
+## 20260913-08xx — BUG terminal: (1) X di tab terakhir gak nutup, (2) teks Reconnect numpuk di TUI (ProjectManager → fe-dev)
+- User (pertanyaan dulu, D1 → PM cuma jawab, gak langsung spawn): "saat tutup tab terminal (sisa satu) kenapa gak bisa ketutup semua? padahal `exit` bisa. Terus teks reconnecting/reconnected kenapa gak di clear? numpuk sama TUI."
+- DIAGNOSA PM (baca kode, berbukti `file:line`): (1) **by design** — `closeTab` cabang deliberate-close tab terakhir (`terminal.js:701-703`) manggil `openTab()` → selalu sisakan 1 tab; jalur `exit` (`:698-700`, flag `exited`) tunjukin empty state. (2) **bug** — `writeStatus` (`terminal.js:300-304`) nulis status LANGSUNG ke buffer xterm (`term.write`), gak pernah dihapus → baris nyangkut + posisi kursor TUI geser saat replay → tumpang tindih.
+- User: "kerjain kedunya" → PERINTAH eksplisit. EKSEKUSI: fe-dev (frontend-only), mode **sekuensial** (2 putaran; reuse agen+skill, nol generasi).
+- PUTARAN 1 (scope ketat 4 berkas): banner DOM overlay `.term-status-banner` (`statusBanner`/`writeStatus`/`clearStatus`); `onopen` flash "Reconnected" + auto-clear 1800ms; "Connecting" pindah ke banner; `closeTab` cabang last-tab `openTab()` DIHAPUS → `activeId=null` (empty state), kill frame tetap. Update `terminal_exit.test.js:368` + `terminal_reconnect.test.js:182`. Receipt jujur: 171 target-test hijau TAPI 4 assertion di `terminal_discard.test.js`/`terminal_layout.test.js` (DI LUAR scope) merah — akibat sah bug #1.
+- PUTARAN 2 (PM PERLUAS scope eksplisit — pengecualian boundary rule, handover 2 file test lagi): 4 assertion disesuaikan ke kontrak baru (tutup tab terakhir → `tabs.size===0` + `termEmpty.hidden===false`). `terminal.js`/`styles.css` gak disentuh lagi.
+- GATE PM MANDIRI: `node ./node_modules/vitest/vitest.mjs run` 6 berkas terminal → **171 passed / 0 failed** (exit 20, reconnect 26, discard 16, layout 28, toolbar 63, swipe 18). `git status`: 6 berkas semua `src/frontend/**`, nol backend, nol hex baru, i18n key lama doang.
+- CATATAN LINGKUNGAN (fe-dev): `npx vitest` gagal shebang di Termux (`/usr/bin/env: bad interpreter`) → pakai `node ./node_modules/vitest/vitest.mjs`. Sudah tercatat di Tooling (npx shebang).
+- SISA MILIK USER: (a) uji mata nyata (G3) — X tab terakhir → empty state; putus/reconnect pas TUI (vim/htop) → banner hilang tanpa numpuk; (b) commit/push/PR (D1 — BELUM di-commit, tunggu perintah).
+- Laporan: `.opencode/reports/20260913/frontend/0835_terminal-last-tab-close-dan-reconnect-banner.md`.
+
 ## 20260913-09xx — BUG: round_robin diabaikan di jalur streaming combo (ProjectManager → be-dev)
 - User: combo "B.AI" strategi `round_robin`, 4 anggota (2 disabled), tapi usage/quota cuma Hy3.
 - PM diagnosis: jalur streaming (`gateway/router.py:316-341` → `resolve_combo_stream_target`
