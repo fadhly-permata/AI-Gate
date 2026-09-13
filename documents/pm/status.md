@@ -2,6 +2,32 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260913-07zz — SELESAI: hapus nama provider + switch enable/disable per-model kombo DI-COMMIT (ProjectManager)
+- be-dev (backend) + fe-dev (frontend) SELESAI, diaudit PM mandiri: vitest **26 file / 664 tes LOLOS**; pytest
+  **553 passed / 1 skipped**.
+- (A) Frontend: teks nama provider dibuang dari baris anggota (grip tetap, kolom tetap 4; header Provider jadi kosong);
+  `byId`/`pname` jadi unused (dibiarin, aman). (B) Backend: `ComboMember.enabled` (Boolean default True) + migrasi
+  idempoten + filter `enabled=True` di `build_candidates` (skip di SEMUA strategi: fallback/load_balance/latency_cost/
+  three_tier/round_robin) + DTO/API bawa `enabled` (create + update partial). Frontend: toggle per baris (checkbox
+  kolom-1) → `PUT {enabled}` (bypass normalizeMember) lalu reloadCombo; buffer lokal; baris mati `opacity:0.5`
+  (token, nol hex). i18n `combos.member.enabled` = "Enabled" x7.
+- COMMIT: (1) kode (A+B) di `refactor/ui`; (2) dokumen PM + design sheet. TIDAK push, TIDAK buka PR.
+- Catatan: `enabled` LEVEL KOMBO (sudah ada sejak awal) tetap beda & utuh — ini per-member. Sisa milik user:
+  tes mata HP (G3+J6): toggle matiin model, lalu panggil kombo → model itu tak muncul di routing.
+
+## 20260913-07yy — User minta (A) hapus nama provider di daftar anggota + (B) switch enable/disable per model kombo (ProjectManager)
+- User: "hapus nama providernya di list model tersebut. karna jadi redundan" + "butuh switch enable/disable model
+  dari daftar combo... yang di-disabled tidak akan digunakan untuk fallback/round-robin/dan lain sebagainya".
+- PM investigasi: tabel anggota kombo (`combos.js:422`) kolom [grip+provider][model][weight][aksi]; `ComboMember`
+  model (`models.py:206`) BELUM punya `enabled` — yang ada cuma `enabled` level KOMBO UTUH (`combos_router.py:53/122/238`).
+  `build_candidates` (`combo_routing.py:150`) tidak filter enabled.
+- Lembar desain: `handover-20260913-hapus-provider-dan-switch-enable.md` (DI-ACC). (A) frontend-only hapus teks
+  provider (grip tetap, kolom tetap 4); (B) backend tambah `ComboMember.enabled`+migrasi idempoten+filter
+  `enabled=True` di build_candidates (skip di semua strategi) + DTO/API bawa enabled; fe-dev toggle per baris.
+- Mode: **sekuensial** (user pilih di sesi ini). EKSEKUSI: be-dev (backend) dulu → fe-dev (frontend: hapus
+  provider + toggle).
+- NEXT: spawn be-dev (backend enabled) → audit PM → spawn fe-dev (frontend) → gate → commit.
+
 ## 20260913-07xx — SELESAI: animasi reorder + strategi round-robin kombo DI-COMMIT (ProjectManager)
 - fe-dev(animasi) + be-dev(backend round-robin) + fe-dev(UI round-robin) SELESAI, diaudit PM mandiri:
   vitest **26 file / 661 tes LOLOS**; pytest **547 passed / 1 skipped**. Nol merah, nol regresi.
