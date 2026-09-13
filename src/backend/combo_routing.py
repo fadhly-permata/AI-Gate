@@ -148,7 +148,7 @@ def build_candidates(combo: Combo, session: Session) -> List[ResolvedTarget]:
     """
     members = (
         session.query(ComboMember)
-        .filter_by(combo_id=combo.id)
+        .filter_by(combo_id=combo.id, enabled=True)
         .all()
     )
 

@@ -44,7 +44,7 @@ const MODAL_HTML =
         '<p id="comboMemberMsg"></p>' +
         '<table id="comboMembersTable">' +
           '<thead><tr>' +
-            '<th data-i18n="combos.member.provider">Provider</th>' +
+            '<th></th>' +
             '<th data-i18n="combos.member.model">Model</th>' +
             '<th data-i18n="combos.member.weight">Weight</th>' +
             '<th></th>' +
@@ -215,7 +215,7 @@ describe("combos mapper + render (B2.4)", () => {
 describe("combos members — renderMembers", () => {
   beforeEach(() => { withComboModalDom(); });
 
-  it("renders one row per member with provider NAME (not id) + model + weight + ▲▼", () => {
+  it("renders one row per member — provider NAME removed, enable toggle present, model + weight + ▲▼ kept", () => {
     window.aigate.combos.renderMembers(sampleCombo().members, {
       1: { id: 1, name: "OpenRouter" },
       2: { id: 2, name: "Ollama" }
@@ -223,14 +223,22 @@ describe("combos members — renderMembers", () => {
     const body = document.getElementById("comboMembersBody");
     expect(body.querySelectorAll("tr.member-row").length).toBe(2);
     const html = body.innerHTML;
-    expect(html).toContain("OpenRouter");   // provider NAME, not raw id
-    expect(html).toContain("Ollama");
+    // (A) Provider NAME is gone from the row — only the model is shown.
+    expect(html).not.toContain("OpenRouter");
+    expect(html).not.toContain("Ollama");
+    expect(html).not.toContain("#1");           // nor the unknown-provider fallback
     expect(html).toContain("llama-3.1");    // model
     expect(html).toContain("qwen");
     expect(html).toContain(">0.5<");        // weight
     expect(html).toContain("js-mem-edit");
     expect(html).toContain("js-mem-del");
     expect(html).toContain('data-id="7"');
+    // (B) One enable/disable checkbox per row, with the i18n aria-label.
+    const toggles = body.querySelectorAll(".js-mem-enabled");
+    expect(toggles.length).toBe(2);
+    expect(toggles[0].getAttribute("aria-label")).toBe("Enabled");
+    // Members without an explicit `enabled` default ON (checkbox checked).
+    expect(toggles[0].hasAttribute("checked")).toBe(true);
     // Stage-8: priority is the ROW ORDER, not a cell. Neither stored value (0 /
     // 1) survives into the markup, and the row has exactly 4 cells.
     const cells = body.querySelectorAll("tr.member-row")[0].querySelectorAll("td");
@@ -244,6 +252,18 @@ describe("combos members — renderMembers", () => {
       .toBe(window.I18N.en["combos.member.move_up"]);
     expect(body.querySelectorAll(".js-mem-down")[1].getAttribute("title"))
       .toBe(window.I18N.en["combos.member.already_last"]);
+  });
+
+  it("a disabled member row gets the greyed `is-disabled` class", () => {
+    window.aigate.combos.renderMembers([
+      { id: 7, combo_id: 5, provider_id: 1, provider_model: "llama-3.1", priority: 0, weight: 1, enabled: true },
+      { id: 8, combo_id: 5, provider_id: 2, provider_model: "qwen", priority: 1, weight: 0.5, enabled: false }
+    ], {});
+    const rows = document.querySelectorAll("#comboMembersBody tr.member-row");
+    expect(rows[0].classList.contains("is-disabled")).toBe(false);
+    expect(rows[0].querySelector(".js-mem-enabled").hasAttribute("checked")).toBe(true);
+    expect(rows[1].classList.contains("is-disabled")).toBe(true);
+    expect(rows[1].querySelector(".js-mem-enabled").hasAttribute("checked")).toBe(false);
   });
 
   it("boundary arrows are aria-disabled with a reason, interior arrows are live", () => {
@@ -274,9 +294,9 @@ describe("combos members — renderMembers", () => {
     const html = document.getElementById("comboMembersBody").innerHTML;
     expect(html).toContain("&lt;img src=x&gt;");
     expect(html).not.toContain("<img src=x>");
-    // Unknown provider id -> fallback label, never "undefined".
-    expect(html).toContain("#9");
+    // Provider NAME was removed (handover §A) — no provider label, never "undefined".
     expect(html).not.toContain("undefined");
+    expect(html).toContain('class="js-mem-enabled"');
   });
 
   it("shows the empty-state message when there are no members", () => {
@@ -786,14 +806,18 @@ describe("combos members — EXISTING combo mode (member endpoints)", () => {
     return calls;
   }
 
-  it("openEditModal loads the combo and renders its members with provider names", async () => {
+  it("openEditModal loads the combo and renders its members (no provider NAME, toggle present)", async () => {
     stubComboApi();
     await window.aigate.combos.openEditModal("5");
     expect(window.aigate.combos.getSelectedId()).toBe("5");
-    const body = document.getElementById("comboMembersBody").innerHTML;
-    expect(body).toContain("OpenRouter");
-    expect(body).toContain("Ollama");
-    expect(body).toContain("llama-3.1");
+    const body = document.getElementById("comboMembersBody");
+    const html = body.innerHTML;
+    // (A) Provider NAME no longer rendered in the row.
+    expect(html).not.toContain("OpenRouter");
+    expect(html).not.toContain("Ollama");
+    expect(html).toContain("llama-3.1");
+    // (B) One enable toggle per member.
+    expect(body.querySelectorAll(".js-mem-enabled").length).toBe(2);
   });
 
   it("addMember POSTs /api/combos/<id>/members and joins at the END, then reloads", async () => {
@@ -889,6 +913,50 @@ describe("combos members — EXISTING combo mode (member endpoints)", () => {
     const msg = document.getElementById("comboMemberMsg");
     expect(msg.textContent).toContain("combo 5 not found");
     expect(msg.className).toContain("settings-msg-error");
+  });
+
+  it("(B) toggling a SAVED member PUTs { enabled } directly (not via normalizeMember)", async () => {
+    const calls = stubComboApi();
+    await window.aigate.combos.openEditModal("5");
+    const toggle = document.querySelectorAll("#comboMembersBody .js-mem-enabled")[0];
+    expect(toggle.hasAttribute("checked")).toBe(true);  // member #7 starts enabled
+    // Disable it (set the post-toggle state, then fire `change` — the handler
+    // reads `checked` which is already the new value by the time `change` runs).
+    toggle.checked = false;
+    toggle.dispatchEvent(new Event("change", { bubbles: true }));
+    for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0));
+    const put = calls.find((c) => c.url === "/api/combos/5/members/7" && c.opts.method === "PUT");
+    expect(put).toBeTruthy();
+    // The body is EXACTLY { enabled: false } — normalizeMember would have stripped it.
+    expect(JSON.parse(put.opts.body)).toEqual({ enabled: false });
+    expect(JSON.parse(put.opts.body)).not.toHaveProperty("provider_id");
+    // A reload happened after the toggle (GET /api/combos/5 again).
+    const gets = calls.filter((c) => c.url === "/api/combos/5" && (!c.opts || !c.opts.method));
+    expect(gets.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("(B) toggling a BUFFER member updates the local object (sent on Save, no request)", async () => {
+    const calls = [];
+    vi.stubGlobal("fetch", vi.fn((url, opts) => {
+      calls.push({ url: String(url), opts });
+      if (String(url).indexOf("/api/providers") !== -1) return jsonResponse(sampleProviders());
+      return jsonResponse({});
+    }));
+    await window.aigate.combos.openAddModal();
+    window.aigate.combos.bufferMemberLocal(
+      { provider_id: 1, provider_model: "llama-3.1", weight: 1 });
+    const body = document.getElementById("comboMembersBody");
+    const toggle = body.querySelector(".js-mem-enabled");
+    expect(toggle.hasAttribute("checked")).toBe(true);   // new buffer row defaults ON
+    toggle.checked = false;
+    toggle.dispatchEvent(new Event("change", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 0));
+    // No member endpoint was hit in buffer mode.
+    expect(calls.filter((c) => c.url.indexOf("/members") !== -1)).toHaveLength(0);
+    // The buffered object now carries enabled:false.
+    expect(window.aigate.combos.getMembersBuffer()[0].enabled).toBe(false);
+    // And the row is greyed.
+    expect(body.querySelector("tr.member-row").classList.contains("is-disabled")).toBe(true);
   });
 });
 
@@ -1107,7 +1175,9 @@ describe("combos members — shipped markup: no Priority column/field (stage-8)"
   it("the members table has no Priority column and the sub-form no Priority field", () => {
     const heads = Array.from(doc.querySelectorAll("#comboMembersTable thead th"))
       .map((th) => th.getAttribute("data-i18n"));
-    expect(heads).toEqual(["combos.member.provider", "combos.member.model",
+    // (A) The first column is now a controls cell (grip + enable toggle) — its
+    // header carries no label, exactly like the trailing actions column. 4 cols.
+    expect(heads).toEqual([null, "combos.member.model",
       "combos.member.weight", null]);
     expect(heads).not.toContain("combos.member.priority");
     expect(doc.getElementById("comboMemberPriority")).toBeNull();

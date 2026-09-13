@@ -239,6 +239,7 @@ window.I18N.en = {
     "combos.member.weight": "Weight",
     "combos.member.remove": "Remove",
     "combos.member.edit": "Edit",
+    "combos.member.enabled": "Enabled",
     "combos.member.cancel_edit": "Cancel edit",
     "combos.member.confirm_delete": "Remove this member?",
     "combos.member.provider_required": "Select a provider first.",

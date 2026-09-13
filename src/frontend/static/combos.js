@@ -442,9 +442,14 @@
          (m.id != null && movedRef.id != null &&
           String(m.id) === String(movedRef.id))))
         ? " just-moved" : "";
-      var prov = byId[String(m.provider_id)];
-      var pname = prov ? prov.name : ("#" + m.provider_id);
+      // (A) Provider NAME removed from the row — the column keeps the drag grip
+      // only (see handover §A). `byId` is no longer needed here.
       var idAttr = m.id != null ? ' data-id="' + escapeHtml(m.id) + '"' : "";
+      // (B) Per-member enable/disable — server now ships `enabled`. Default True
+      // when absent (old members / new buffer rows).
+      var enabled = m.enabled === false ? false : true;
+      var disCls = enabled ? "" : " is-disabled";
+      var enLbl = getStr("combos.member.enabled");
       // Boundary buttons: aria-disabled + a title that says WHY (never a dead
       // tap that pretends nothing happened) — same contract as the account cards.
       var upOff = i === 0;
@@ -458,12 +463,13 @@
       var downAttrs = 'aria-label="' + escapeHtml(downLbl) + '" title="' +
         escapeHtml(downOff ? getStr("combos.member.already_last") : downLbl) + '"' +
         (downOff ? ' aria-disabled="true"' : "");
-      return '<tr class="member-row' + movedCls + '"' + idAttr + ' data-idx="' + i + '">' +
+      return '<tr class="member-row' + movedCls + disCls + '"' + idAttr + ' data-idx="' + i + '">' +
         '<td>' +
           '<button type="button" class="icon-btn-small js-mem-drag"' +
             ' aria-label="' + escapeHtml(dragLbl) + '" title="' + escapeHtml(dragLbl) + '">' +
             '<i class="fa fa-grip-vertical" aria-hidden="true"></i></button>' +
-          escapeHtml(pname) +
+          '<input type="checkbox" class="js-mem-enabled"' +
+            ' aria-label="' + escapeHtml(enLbl) + '"' + (enabled ? " checked" : "") + ' />' +
         "</td>" +
         "<td>" + escapeHtml(m.provider_model) + "</td>" +
         "<td>" + escapeHtml(m.weight) + "</td>" +
@@ -511,6 +517,26 @@
       // Drag-to-reorder (handle only, not the row) — Pointer Events so the same
       // path serves touch + mouse. startDrag guards on .js-mem-drag itself.
       body.addEventListener("pointerdown", startDrag);
+      // (B) Enable/disable toggle. Uses `change` (not `click`): a checkbox click
+      // handler would read the PRE-toggle value, but `change` fires AFTER the
+      // box flips, so `tgl.checked` is the true new state. A saved member fires a
+      // direct partial PUT of {enabled}; a buffer member flips the local object.
+      body.addEventListener("change", function (e) {
+        if (!e.target || !e.target.closest) return;
+        var tgl = e.target.closest(".js-mem-enabled");
+        if (!tgl) return;
+        var tr = tgl.closest(".member-row");
+        if (!tr) return;
+        var mid = tr.getAttribute("data-id");
+        var idx = parseInt(tr.getAttribute("data-idx"), 10);
+        var newEnabled = !!tgl.checked;
+        if (selectedId && mid != null) {
+          setMemberEnabled(mid, newEnabled);
+        } else if (!isNaN(idx) && membersBuffer[idx]) {
+          membersBuffer[idx].enabled = newEnabled;
+          renderMembers(membersBuffer, providersById());
+        }
+      });
     }
 
     // Transient highlight on the row that just moved (▲▼ OR drag). Purely
@@ -826,6 +852,28 @@
     }).catch(function (err) { setMemberMsg(err.message, "error"); });
   }
 
+  /* Enable/disable ONE member: a DIRECT partial PUT of { enabled } only.
+     MUST bypass normalizeMember() (which strips `enabled`): this toggle is the
+     one field normalizeMember drops, so routing it through there would send an
+     empty body and silently no-op. On success the combo reloads (the row's
+     greyed state then reflects the server); on failure the message surfaces AND
+     the optimistic checkbox reverts to the last known server truth (currentMembers). */
+  function setMemberEnabled(mid, enabled) {
+    if (!selectedId || mid == null) return Promise.resolve();
+    setMemberMsg("");
+    return fetchJson(COMBO_API + "/" + selectedId + "/members/" + encodeURIComponent(mid), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify({ enabled: !!enabled })
+    }).then(function () {
+      return reloadCombo();
+    }).catch(function (err) {
+      // Revert the optimistic toggle to the stored server state.
+      renderMembers(currentMembers, providersById());
+      setMemberMsg(err.message, "error");
+    });
+  }
+
   function removeMember(mid) {
     if (!selectedId) return Promise.resolve();
     if (!window.confirm(getStr("combos.member.confirm_delete"))) return Promise.resolve();
@@ -1042,6 +1090,7 @@
     resetMemberForm: resetMemberForm,
     addMember: addMember,
     saveMember: saveMember,
+    setMemberEnabled: setMemberEnabled,
     removeMember: removeMember,
     reloadCombo: reloadCombo,
     bufferMemberLocal: bufferMemberLocal,

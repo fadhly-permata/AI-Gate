@@ -233,6 +233,7 @@ window.I18N.nl = {
     "combos.member.weight": "Gewicht",
     "combos.member.remove": "Verwijderen",
     "combos.member.edit": "Bewerken",
+    "combos.member.enabled": "Enabled",
     "combos.member.cancel_edit": "Bewerken annuleren",
     "combos.member.confirm_delete": "Dit lid verwijderen?",
     "combos.member.provider_required": "Selecteer eerst een provider.",

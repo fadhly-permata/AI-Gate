@@ -241,6 +241,7 @@ window.I18N.id = {
     "combos.member.weight": "Bobot",
     "combos.member.remove": "Hapus",
     "combos.member.edit": "Ubah",
+    "combos.member.enabled": "Enabled",
     "combos.member.cancel_edit": "Batal ubah",
     "combos.member.confirm_delete": "Hapus anggota ini?",
     "combos.member.provider_required": "Pilih penyedia terlebih dahulu.",

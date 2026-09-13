@@ -240,6 +240,7 @@ window.I18N.ja = {
     "combos.member.weight": "重み",
     "combos.member.remove": "削除",
     "combos.member.edit": "編集",
+    "combos.member.enabled": "Enabled",
     "combos.member.cancel_edit": "編集をキャンセル",
     "combos.member.confirm_delete": "このメンバーを削除しますか？",
     "combos.member.provider_required": "最初にプロバイダを選択してください。",

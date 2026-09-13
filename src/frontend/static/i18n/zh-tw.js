@@ -242,6 +242,7 @@ window.I18N["zh-tw"] = {
     "combos.member.weight": "權重",
     "combos.member.remove": "移除",
     "combos.member.edit": "編輯",
+    "combos.member.enabled": "Enabled",
     "combos.member.cancel_edit": "取消編輯",
     "combos.member.confirm_delete": "移除此成員？",
     "combos.member.provider_required": "請先選擇供應商。",

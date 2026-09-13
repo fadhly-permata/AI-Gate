@@ -845,10 +845,14 @@ body[data-device="phone"] .modal { width: 100%; }
  }
  .member-row.just-moved { animation: member-row-just-moved 600ms ease-out; }
 
- /* Minimal in-drag feedback, sitting alongside the existing grab cursor. */
- .member-row.is-dragging {
-   background-color: color-mix(in srgb, var(--accent) 14%, transparent);
- }
+  /* Minimal in-drag feedback, sitting alongside the existing grab cursor. */
+  .member-row.is-dragging {
+    background-color: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+
+  /* (B) Disabled member rows are greyed but stay visible (can be re-enabled).
+     Uses the existing opacity token pattern — no new hex colours. */
+  .member-row.is-disabled { opacity: 0.5; }
 
  @media (prefers-reduced-motion: reduce) {
    .member-row.just-moved { animation: none; }

@@ -240,6 +240,7 @@ window.I18N.zh = {
     "combos.member.weight": "权重",
     "combos.member.remove": "移除",
     "combos.member.edit": "编辑",
+    "combos.member.enabled": "Enabled",
     "combos.member.cancel_edit": "取消编辑",
     "combos.member.confirm_delete": "移除此成员？",
     "combos.member.provider_required": "请先选择提供商。",

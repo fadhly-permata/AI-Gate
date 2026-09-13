@@ -238,6 +238,7 @@ window.I18N.ru = {
     "combos.member.weight": "Вес",
     "combos.member.remove": "Убрать",
     "combos.member.edit": "Изменить",
+    "combos.member.enabled": "Enabled",
     "combos.member.cancel_edit": "Отменить изменение",
     "combos.member.confirm_delete": "Убрать этого участника?",
     "combos.member.provider_required": "Сначала выберите провайдера.",
