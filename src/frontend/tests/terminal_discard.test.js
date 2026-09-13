@@ -277,16 +277,22 @@ describe("closeTab() forgets the id", () => {
     expect(JSON.parse(window.sessionStorage.getItem(T._TAB_IDS_KEY))).toEqual([b.id]);
   });
 
-  it("keeps the 'at least one tab' invariant and persists the replacement id", async () => {
+  it("closing the last tab forgets its id and leaves NO tab (empty state)", async () => {
     const T = await reloadPage();
     const a = T.openTab();
-    T.closeTab(a.id);                      // last tab -> a fresh one must take over
+    a.ws._open();                            // live socket so the kill frame is sent
+    const n = MockWebSocket.instances.length;
+    T.closeTab(a.id);                        // last tab -> empty state, no respawn
+
+    expect(a.ws.sent).toContain('{"type":"close"}');   // PTY still killed
+    expect(MockWebSocket.instances.length).toBe(n);    // no replacement socket
 
     const saved = JSON.parse(window.sessionStorage.getItem(T._TAB_IDS_KEY));
-    expect(saved).not.toContain(a.id);
-    expect(saved.length).toBe(1);
-    expect(idsOf(T)).toEqual(saved);
-    expect(T._tabs.size).toBe(1);
+    expect(saved).not.toContain(a.id);       // never resurrected on reload
+    expect(saved).toEqual([]);               // nothing left persisted
+    expect(idsOf(T)).toEqual(saved);         // registry agrees
+    expect(T._tabs.size).toBe(0);            // deliberate close of the last tab
+    expect(document.getElementById("termEmpty").hidden).toBe(false); // empty state shows
   });
 
   it("a user-closed tab is never resurrected by a later reload", async () => {
@@ -325,19 +331,28 @@ describe("storage failure never blocks the terminal", () => {
       expect(T._readSavedTabIds()).toEqual([]);   // reads degrade to "nothing saved"
       T.onShow();                                 // restore path is safe too
       expect(T._tabs.size).toBe(1);               // no extra tab, no throw
-      T.closeTab(tab.id);                          // and so is the forget path
-      expect(T._tabs.size).toBe(1);                // replacement tab opened anyway
+      T.closeTab(tab.id);                          // the forget path is safe too
+      // Closing the LAST tab tears down to the empty state even with storage
+      // unavailable — no replacement is spawned, and removeSavedTabId's guarded
+      // setItem never throws.
+      expect(T._tabs.size).toBe(0);
+      expect(document.getElementById("termEmpty").hidden).toBe(false);
     });
   });
 
-  it("a failing setItem (quota) still opens a fully working tab", async () => {
+  it("a failing setItem (quota) still opens a working tab and closes to empty", async () => {
     await withStorageWriteFailing(async () => {
       const T = await reloadPage();
       const tab = T.openTab();
       expect(tab).toBeTruthy();
       expect(tab.ws.url).toContain(encodeURIComponent(tab.id));
+      tab.ws._open();                            // live socket so the kill frame is sent
       T.closeTab(tab.id);
-      expect(T._tabs.size).toBe(1);
+      // A quota error must not stop the teardown: the last tab closes to the
+      // empty state, it is NOT replaced by a resurrected one.
+      expect(T._tabs.size).toBe(0);
+      expect(tab.ws.sent).toContain('{"type":"close"}');
+      expect(document.getElementById("termEmpty").hidden).toBe(false);
     });
   });
 

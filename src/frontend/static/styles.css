@@ -1454,6 +1454,8 @@ body[data-device="phone"] .pd-row dt { flex: 0 0 auto; }
   width: 100%;
   height: 100%;
   padding: 0 0 0 var(--term-pad);
+  /* Anchor for the status banner overlay (.term-status-banner). */
+  position: relative;
 }
 /* The vertical inset lives on the .xterm element itself, which FitAddon DOES
    subtract from the row budget -> the grid always fits inside the panel and the
@@ -1498,6 +1500,30 @@ body[data-device="phone"] .pd-row dt { flex: 0 0 auto; }
 .term-empty-icon { font-size: 26px; opacity: 0.55; }
 .term-empty-text { margin: 0; max-width: 34ch; line-height: 1.5; }
 .term-empty .btn { font-size: 13px; padding: 8px 16px; }
+
+/* ---- Status banner overlay (terminal.js writeStatus/clearStatus) ----
+   A connection status (Connecting… / Reconnecting… / Reconnected) is rendered
+   as a DOM overlay ABOVE the xterm node — never into the PTY buffer, so it can
+   never corrupt a full-screen TUI. Reuses the toast surface tokens; pointer-
+   events:none so it never intercepts keystrokes or swipes meant for the term. */
+.term-status-banner {
+  position: absolute;
+  top: var(--term-pad);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  padding: 4px 12px;
+  border-radius: 6px;
+  background: var(--term-chrome, #26292f);
+  color: var(--term-chrome-fg-strong, #f4f6f9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0.85;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.term-status-banner[hidden] { display: none; }
 
 /* ---- Session-ended toast (terminal.js) ----
    Lives on <body> so it outlives the disposed tab; above the modals (1000). */
