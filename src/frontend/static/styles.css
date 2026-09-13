@@ -512,6 +512,16 @@ body.sidebar-collapsed .nav-item {
 .view[data-view="settings"] .page-banner { grid-column: 1 / -1; }
 .view[data-view="settings"] .backup-card { margin-top: 0; }
 
+/* The 540px cap (line 493, warisan era satu-kolom) still clamps each card INSIDE
+   the wider grid columns → 46% @1440, 32.6% @1920 (user: "gak kayak 50%"), and
+   75–97% in the 781–960 stacked band (user: "gak 100% di layar kecil"). Inside the
+   Settings view only, drop the cap: grid items then fill their column (≈50% minus
+   half the 18px gap) and stacked cards fill the container (100%). Specificity
+   (0,2,0) beats `.settings-card` :493 (0,1,0) and the ≤600 `max-width:100%` rule
+   (:880) — `none` there is equivalent, so phones keep the proven 100%. No new
+   breakpoint, no colors, no other view touched (.welcome-card cap stays). */
+.view[data-view="settings"] .settings-card { max-width: none; }
+
 .settings-title {
   margin: 0 0 18px;
   color: var(--accent);
