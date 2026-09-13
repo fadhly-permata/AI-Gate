@@ -685,3 +685,10 @@ lebar viewer, vitest hijau, `git diff --check` bersih, bump cache-buster (kini `
 - **COMMIT `808d04e`** `feat(i18n): tambah bahasa Hindi (hi)` di branch BARU `feat/i18n-hindi` (PR #23 sudah MERGED → kerja baru, nggak nebeng). Staging eksplisit 12 berkas fitur + commit docs(CODE_CHANGES) terpisah.
 - Utang kualitas (sama spt 6 bahasa lain): terjemahan Hindi = generate, BELUM ditinjau penutur asli.
 - **BELUM push / BELUM PR** (nunggu perintah user). Sisa: uji mata user (pilih Hindi di Settings → seluruh UI Devanagari).
+
+## Bahasa Hindi (hi) — PUSH + PR #24 TERBUKA (2026-09-13, PM)
+- `git push -u origin feat/i18n-hindi` → branch baru di remote, nol force, fast-forward bersih, working tree bersih.
+- `gh pr create --base main --head feat/i18n-hindi --label enhancement` → **PR #24 TERBUKA**: https://github.com/fadhly-permata/AI-Gate/pull/24
+- Verifikasi mandiri via API (bukan output create): state=OPEN, labels=[enhancement] (nempel), mergeable=MERGEABLE, base=main, head=feat/i18n-hindi, 17 berkas +538/-8. H5 (PR wajib ≥1 label) terpenuhi.
+- Co-author catatan di body: fe-dev (implementasi) + PM (audit & verifikasi).
+- SISA user: review + merge PR #24; uji mata pilih Hindi di Settings; (opsional) review penutur asli utk akurasi.
