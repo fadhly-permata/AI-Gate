@@ -4,6 +4,19 @@
 (empty — diisi PM saat task pertama)
 
 ## Decisions
+- 2026-09-13 (ATURAN F5 — PM dilarang salah-arti gejala + karang akar masalah): user menegur keras. Di task
+  device-sim gua mendiagnosis settings "lemot/laggy" (teori re-render 26 CSS rule + terminal reflow) bahkan tulis
+  balik "terasa lemot" ke user. user TIDAK PERNAH bilang lemot. Kata aslinya: "gak responsif" + "desain aneh" +
+  "berantakan". Di UI-web Indonesia, "gak responsif" = layout tak adaptif ke ukuran layar (responsive-design),
+  bukan performa. Jadi akar "lemot" = gua PABRIKASI dari gejala yang tak ada. Ditulis permanen sebagai **F5** di
+  `OPERATING_RULES.md`: jangan maknai ulang gejala user dgn arti teknis lain, jangan karang akar yang user tak
+  sebut; istilah UI kolokial ambigu ("responsif","lemot","aneh","berantakan") wajib diklarifikasi sebelum
+  diagnose. Re-diagnosis benar (bukti `file:line`, lihat handover `handover-20260913-settings-responsif-rapi.md`):
+  (A) `.form-row` (`styles.css:503`) tak pernah stacking di HP (`@media max-600px :692` + `body[data-device=phone]
+  :718` hanya melebarin card) → label+input terhimpit = inti "gak responsif"; helper `.form-row-stack` (`:867`)
+  tak dipakai; (B) baris Backup/Export (`index.html:259`) campur `<span>` label + `<a class=btn>` ≠ ritme baris
+  input = "berantakan/aneh". Opsi A tetap: device-sim keluar dari settings → modal + kontrol di sidebar/bottom-nav.
+
 - 2026-09-13 (aturan I8 — cara PM bicara ke user): user mengoreksi dua kali ("usulan kecil? usulan apaan?" lalu
   "jangan disebut usulan dong... PR aja"). Sebab akarnya bukan salah ketik, tapi tafsir rule "non-IT clear" di
   `language.md`/I7 yang gua pakai untuk MENERJEMHKAN istilah (PR → "usulan", merge commit → "titik penggabungan").
@@ -478,3 +491,54 @@ Arsip: `documents/pm/archive/memory-bank-decisions-lama.md`.
 - 4 bug nyata di `scripts/cli-tools/` diverifikasi & dibenerin: aichat.sh (`pkg install -y`, `export AICHAT_CONFIG_FILE` + `exec $BIN $@`), codex.sh (`pkg install -y`), oterm.sh (`export OTERM_DATA_DIR` + `exec $BIN $@`). Kelas bug: (a) `pkg install` tanpa `-y` abort di non-interaktif; (b) `exec VAR=val $BIN` → quoted assignment dibaca sebagai command name (exit 127).
 - Re-test aichat sukses (EXIT 0). Env Termux read-only `/etc/apt` (hope2333-mirrorlist) blokir install/uninstall via pkg — di luar script.
 - Commit: `61d64337b686a8b5ee0f58d17d52807119922d0a`.
+
+## Device-Simulation → Modal + Settings UX (2026-09-13) — PM, sesi ini
+- User report: settings page "gak responsif" + UI "aneh"; pindahkan device-sim di atas icon github;
+  select mode → buka modal dialog isi preview live di viewport device (phone/tablet/desktop).
+- Diagnosis (targeted read, perlu konfirmasi browser): `applyDevice()` (`app.js:63-74`) set
+  `body.dataset.device` → 26 rule `body[data-device=...]` (`styles.css:718-741` + override phone)
+  restyle SELURUH shell tiap ganti device; terminal punya `ResizeObserver` `.term-stage`
+  (`terminal.js:239` "BUG2", `:1410-1414`) yang refit xterm tiap layout berubah → reflow global
+  di CPU HP = jank ("gak responsif") + swap shell utuh = "aneh". Fix: pindah sim ke modal preview
+  terisolasi (iframe same-origin) → live app gak restyle lagi.
+- Modes ada: phone/tablet/desktop (`device.js:9`); DEFAULT desktop. Viewport device BELUM ada angka
+  eksplisit (sim = CSS-shell, bukan ukuran fixed) → fe-dev tetapkan (phone 375×667, tablet 768×1024,
+  desktop 1280×800).
+- GitHub icon link: `.sidebar-footer` (`index.html:162-169`, desktop) + `.bottom-nav` (`:1381`, HP).
+  Device-sim sekarang `<select id="setDevice">` di form settings (`:228-238`).
+- Primitive modal ADA & wajib reuse: `.modal-overlay`+`.modal role=dialog aria-modal` (`index.html:917`
+  dst, `styles.css:1089-1120`); toggle via `hidden`. Sayangnya modal sekarang TIDAK punya focus-trap
+  & ESC-global → fe-dev tambah untuk modal baru (aksesibilitas wajib).
+- Keputusan PM: owner = **fe-dev** (scope `src/frontend/**`, sudah ada, reuse tak generate). 1 agen,
+  file overlap (index.html/app.js/styles.css) → sekvential otomatis (E1/R16 gak perlu tanya).
+- GATE **D6**: fitur UI baru wajib lembar desain + ACC user SEBELUM spawn fe-dev. Lembar desain =
+  `documents/pm/handovers/handover-20260913-device-sim-modal.md`. STATUS: BELUM spawn — nunggu ACC
+  user. (i18n key `settings.device_sim/phone/tablet/desktop/note` sudah ada ×7 dict.)
+
+## Device-Sim → Modal + Settings Responsif — SELESAI + TERVERIFIKASI BROWSER (2026-09-13 12:10) — PM integrate & verify
+Blok di atas = titik-waktu (diagnosis "lemot" sudah DITARIK oleh F5; jangan dibaca sebagai fakta aktif). Hasil akhir:
+- fe-dev mengerjakan sesuai `handover-20260913-settings-responsif-rapi.md` (bukan lembar device-sim-modal lama).
+  Receipt: 13 berkas `src/frontend/**` (10 static + 2 tes diubah) + tes baru `device_modal.test.js` (9 tes).
+- **Klaim diukur ulang PM, bukan ditelan:** vitest **27 berkas / 681 LOLOS**; run `--exclude device_modal.test.js`
+  = 26/672 → delta **+9 persis** klaim. `git diff --check` bersih. Nol file luar scope. Nol hex baru (grep baris `+`).
+  Rujukan `#setDevice` = NONE. `.bn-item` tetap 10. Paritas i18n 443 kunci × 7 (+1 `common.close`).
+- **G3 tertutup (pertama kali untuk fitur ini):** Chromium 149 headless + static server ad-hoc di TMPDIR, port acak,
+  `:8080` user tidak disentuh (J6). 35 cek terukur → 34 PASS + 11/11 PASS di run ulang. Angka kunci: 360px
+  `.form-row` = `column`, input **298/298px** = selebar baris, `scrollWidth-clientWidth = 0` (nol overflow);
+  `body[data-device=phone]` identik (preview jujur); desktop 1280 tetap `row` (nol regresi); dua tombol backup tinggi
+  sama 34px & tumpuk 298/298 di phone; modal `role=dialog aria-modal` + fokus masuk + Tab/Shift+Tab melingkar (4
+  focusable) + ESC tutup DAN `activeElement` balik ke trigger (diuji dua shell, urutan bersih); pilih phone →
+  `body[data-device]=phone` + `localStorage aigate.device=phone` + iframe di-resize 375px; tablet di shell phone →
+  768px; `contentDocument` iframe = app asli (`.layout` ada).
+  1 FAIL awal = **artefak skrip PM sendiri** (memilih "phone" dulu → sidebar `display:none` → fokus ke trigger desktop
+  memang mustahil), BUKAN cacat fitur; dibuktikan lewat run ulang berurutan bersih.
+- **Keputusan PM atas open question fe-dev: iframe aplikasi-penuh DITERIMA, nol kerja backend.** Alasan: handover §1.C
+  memang mensyaratkan preview = app sendiri di 3 ukuran; nol risiko PTY (`terminal.js:503/582` buka `WebSocket` hanya
+  saat tab terminal dibuat, iframe buka view awal); nol umpan-balik antar-dokumen (`applyDevice` cuma sentuh `body`
+  dokumen masing-masing + TIDAK ada listener `storage` di `app.js`); 404 API di static server = expected. Konsekuensi
+  diterima: iframe mengulang polling GET selama modal terbuka (biaya trafik, bukan bug). **Follow-up opsional (belum
+  disetujui user, TIDAK dipaksakan ke fe-dev):** mode preview ringan `?preview=1` non-interaktif/nol-fetch.
+- Commit `refactor/ui`: **`161bcaf`** feat(ui) (per fitur, staging eksplisit 13 berkas — BUKAN `git add -A`) +
+  docs(pm) untuk Memory Bank/status/state/`CODE_CHANGES.md`/laporan. **BELUM push, BELUM PR** (nunggu perintah user).
+- Utang terbuka: (1) uji mata + sentuhan layar asli di HP user; (2) terjemahan `common.close` 6 bahasa belum ditinjau
+  penutur; (3) opsi mode preview ringan.

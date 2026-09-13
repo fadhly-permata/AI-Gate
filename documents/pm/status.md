@@ -2,6 +2,43 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260913-1210 — PM INTEGRATE & VERIFY: settings responsif + device-sim→modal SELESAI, DI-COMMIT `161bcaf` (ProjectManager)
+- RECEIPT fe-dev diaudit (bukan ditelan): `git status`/`git diff` = 13 berkas `src/frontend/**` (+ tes baru
+  `tests/device_modal.test.js` 9 tes) — 100% dalam write-root-nya, NOL berkas luar scope, NOL artefak uji sisa.
+- GERBANG PM MANDIRI: `node node_modules/.bin/vitest run` = **27 berkas / 681 LOLOS**; diulang
+  `--exclude tests/device_modal.test.js` = **26 / 672** → delta **+9 persis** klaim. `git diff --check` exit 0.
+  grep baris `+` styles.css/index.html → **nol hex baru**; `#setDevice` di `static/`+`src/backend/` → **NONE**;
+  `.bn-item` tetap **10**; paritas i18n **443 × 7** (+`common.close`). Spot-check `file:line` semua klaim ADA
+  (`index.html:166/1423/1355/1380/274`, `styles.css:822/854/693/715/731`, `app.js:65/94/149/160-210/2398`).
+- **G3 DI-TUTUP-PAKSA oleh PM pakai browser nyata** (receipt tidak melampirkan bukti browser): Chromium 149 headless,
+  static server ad-hoc di TMPDIR port acak, proses user `:8080` tidak disentuh (J6). 35 cek → 34 PASS: stacking
+  360px `column` + input 298/298px + nol overflow; `body[data-device=phone]` sama persis (preview jujur); 1280 tetap
+  `row` (nol regresi); backup buttons tinggi sama 34px / tumpuk 298 di phone; modal `role=dialog aria-modal` + fokus
+  masuk + Tab&Shift+Tab melingkar + ESC tutup & restore fokus; mode phone → `body[data-device]` + `localStorage` +
+  iframe 375px, tablet → 768px; `contentDocument` iframe = app asli. 1 FAIL awal = artefak sequencing skrip PM
+  (device=phone ⇒ sidebar `display:none` ⇒ fokus ke trigger desktop mustahil) → run ulang bersih **11/11 PASS** dua shell.
+- **KEPUTUSAN open question: iframe app-penuh DITERIMA, nol tugas backend.** `terminal.js:503/582` WebSocket hanya
+  hidup saat tab terminal dibuat (iframe buka view awal → nol PTY); `applyDevice` cuma sentuh `body` dokumennya sendiri
+  + tak ada listener `storage` → nol umpan-balik; 404 API di static server = expected. Konsekuensi diterima: polling GET
+  terulang selama modal terbuka. Follow-up opsional dicatat, TIDAK didelegasikan: `?preview=1` mode ringan non-interaktif.
+- COMMIT per fitur (H1–H3, staging eksplisit): `161bcaf` feat(ui) 13 berkas; menyusul docs(pm) utk Memory Bank/state/
+  `CODE_CHANGES.md`/laporan. **BELUM push / BELUM PR** — nunggu perintah user.
+- LAPORAN (PM-only, aturan task-report): `.opencode/reports/20260913/frontend/1205_settings-responsif-dan-device-sim-modal.md`.
+- SISA: uji mata + sentuhan layar HP oleh user · terjemahan `common.close` 6 bahasa belum ditinjau penutur · opsi mode
+  preview ringan (belum disetujui user).
+
+## 20260913-10zz — PM-POSTMORTEM: diagnosis "lemot" dipabrikasi (ProjectManager)
+- INCIDENT: Di task device-sim, PM mendiagnosis settings "lemot/laggy" (26 CSS rule re-render + terminal reflow) dan tulis balik ke user "terasa lemot". USER TIDAK PERNAH bilang "lemot". Kata user: "halaman setting kok gak responsif ya, dan desain ui nya juga terasa aneh" + "berantakan". Di UI-web id, "gak responsif" = layout tak adaptif ke ukuran layar (responsive-design), BUKAN performa/lag. "aneh/berantakan" = layout berantakan / hierarki visual jelek. Teori re-render-performance = REKAAN dari gejala yang tak pernah user sebut. Ini pelanggaran F3 (bukti wajib `file:line`) + akar salah-arti symptom.
+- RULE BARU (tercatat permanen): **F5** di `OPERATING_RULES.md` — PM dilarang memaknai ulang gejala user dgn arti teknis lain & dilarang mengarang akar masalah yang user tak sebut; istilah UI kolokial id/msa ambigu ("responsif","lemot","aneh","berantakan") wajib diklarikasi 1 kalimat sebelum diagnose. Gate `rules-index.py` LOLOS (55 rule/10 tema, exit 0).
+- KOREKSI: buang teori performa. Re-diagnosis ulang dengan keluhan ASLI user (responsive + layout berantakan); lihat entri `20260913-10yy` di bawah untuk peta `file:line` yang benar. Opsi A (device-sim → modal di atas link GitHub) tetap dijalankan oleh fe-dev. PM TIDAK berdebat.
+
+## 20260913-10yy — RE-DIAGNOSA BENAR: settings "gak responsif" + "berantakan" = responsive + layout (fe-dev) (ProjectManager)
+- Keluhan ASLI user: (1) "gak responsif" = layout tidak adaptif (breakpoint/media-query/fixed-width/overflow); (2) "aneh/berantakan" = spacing/alignment/hierarki visual tak konsisten dgn design token. BUKAN lag.
+- INVESTIGASI TERARAH (no broad grep): baca `index.html` kartu settings + `styles.css` blok settings. Peta masalah lihat handover `handover-20260913-settings-responsif-rapi.md` (baru).
+- TUGAS fe-dev (scope murni `src/frontend/**`): (A) pindahkan kontrol device-sim ke atas link GitHub — desktop `.sidebar-footer` (`index.html:162`), mobile `.bottom-nav` di atas item Repo (`index.html:1381`); pilih mode → modal reuse `.modal-overlay`+`.modal` (`index.html:917`) + focus-trap + ESC + aria; modal preview iframe same-origin 375×667 / 768×1024 / 1280×800. (B) rapihin settings: fix responsive-breakpoint + layout berantakan pakai existing token, jangan sentuh luar scope settings.
+- DoD: fitur di-exercise di browser NYATA (G3), before/after per-ruang dicatat; vitest hijau; `git diff --check` bersih; cache-buster `?v=` di-bump.
+- NEXT: spawn fe-dev (reuse, sudah ada) → gate PM → commit (D1: tahan sampai user perintah).
+
 ## 20260913-09bb — User "push + PR": redesign CLI Tools DI-COMMIT (2) → PUSH → **PR #22 TERBUKA** (ProjectManager)
 - FAKTA DICEK KE SUMBER (A12): `gh pr view 21` → **MERGED** (`mergedAt 2026-09-13T01:58:13Z`); `gh pr list --open` → `[]`; `refactor/ui` == `origin/refactor/ui` (even, 0/0) → delta baru = **PR baru** (bukan update #21).
 - COMMIT `59c570d` feat(ui): redesign CLI Tools (clitools.js + styles.css + index.html cache-buster `?v=`). COMMIT `fd769a4` docs(pm): status + memory-bank + handover + `CODE_CHANGES.md` (H3 per-file).
@@ -792,3 +829,24 @@ Aksi: PR #15 di-tag **`bug`** via API. PR #14 (sudah merged) TIDAK di-retro-tag 
 PR #15 di-MERGE ke main (merge commit; label `bug` ikut ke log). Catatan governance R49 di-
 COMMIT ke branch `fix/fe-test-env` supaya ikut ke-main lewat merge PR ini (sebelumnya PR #15
 tanpa label — pelajaran).
+
+## 20260913-0935 — Device-Sim → Modal + Settings UX fix (PM: dekomposisi + diagnosis, GATE D6 nunggu ACC)
+User: "halaman setting gak responsif + desain aneh; pindahkan device-sim di atas icon github; pilih
+mode → modal dialog preview tampilan di ponsel/tablet/desktop."
+**Owner = fe-dev** (satu agen; file overlap index.html/app.js/styles.css → sekvential otomatis,
+E1/R16 gak applicable). Gak generate agen/skill (fe-dev sudah ada + skill ada → reuse).
+**Diagnosis (bukti `file:line`):** `applyDevice()` (`app.js:63-74`) nulis `body.dataset.device` →
+picu 26 rule `body[data-device=...]` (`styles.css:718-741` + override phone di 1084/1241/1269/1705/
+1730/1975/2155) me-restyle SELURUH shell tiap ganti device; terminal `ResizeObserver` `.term-stage`
+(`terminal.js:239` "BUG2", `:1410-1414`) ikut refit xterm → reflow/repaint global = "gak responsif"
+di CPU HP; swap shell utuh = "aneh". Modal preview terisolasi (iframe same-origin) mencabut penyebab.
+**Fakta pendukung:** mode = phone/tablet/desktop (`device.js:9`), belum ada angka viewport eksplisit
+(sim = CSS-shell bukan ukuran) → fe-dev tetapkan (375×667 / 768×1024 / 1280×800). Primitive modal
+ADA (`.modal-overlay`+`.modal role=dialog aria-modal`, `index.html:917` dst, `styles.css:1089-1120`)
+→ WAJIB reuse; TAPI modal lama TIDAK punya focus-trap/ESC-global → fe-dev tambah (aksesibilitas).
+i18n key `settings.device_sim/phone/tablet/desktop/note` sudah ada ×7 dict.
+**Lembar desain:** `documents/pm/handovers/handover-20260913-device-sim-modal.md` (denah + alternatif
++ alasan + DoD + G3). **STATUS: BELUM spawn — nunggu ACC user (D6)** + klarifikasi 1 ambigu: letak
+kontrol device-sim = sidebar-footer di atas link github (desktop `index.html:162`) / bottom-nav di
+atas item Repo (HP `:1381`), ATAU tetap di form settings? Default PM = pindah ke footer/sidebar atas
+github. Working tree: branch `refactor/ui`, bersih (pretask). Gate rules-index exit 0.

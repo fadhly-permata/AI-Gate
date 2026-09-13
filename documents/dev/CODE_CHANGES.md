@@ -1,5 +1,76 @@
 # Code Changes Register (code ↔ docs alignment)
 
+## 2026-09-13 — Settings responsif + rapi + device-sim → modal (Opsi A) (PM → fe-dev) — DONE (DI-COMMIT, refactor/ui, BELUM push)
+
+**Asal:** user: "halaman setting kok gak responsif ya, dan desain ui nya juga terasa aneh" + "berantakan";
+kontrol device-sim dipindah ke atas link GitHub, pilih mode → modal preview tampilan.
+**Lembar handover:** `documents/pm/handovers/handover-20260913-settings-responsif-rapi.md` (pengganti
+`handover-20260913-device-sim-modal.md` yang diagnosisnya FABRIKASI → aturan baru **F5**).
+**Catatan penting:** keluhan "gak responsif" = responsive-design (layout tak adaptif), BUKAN performa. Teori
+"lemot / 26 CSS rule re-render / terminal reflow" ditarik dan dilarang diulang (F5).
+
+### Perubahan per berkas (semua `src/frontend/**`; 0 backend; 0 tes dihapus)
+- `static/index.html`: kontrol device-sim BARU dua tempat — `:166` `<button class="device-trigger" id="deviceTriggerDesktop">`
+  di `.sidebar-footer` (di atas link Repo `:173`), dan `:1423` `<button class="bn-device" id="deviceTriggerMobile">` di
+  `.bottom-nav` (di atas item Repo; SENGAJA bukan `.bn-item` supaya paritas 10 item tetap). Modal BARU `:1355`
+  `#deviceModal` reuse `.modal-overlay`+`.modal`, `role=dialog aria-modal=true aria-labelledby=deviceModalTitle`,
+  tiga tombol mode `[data-device-mode]` (phone 375×667 / tablet 768×1024 / desktop 1280×800) + `:1378` `.device-preview`
+  + `:1380` `<iframe id="deviceFrame">` + tombol `#deviceModalClose`. DIHAPUS: blok `#setDevice <select>` + `#setDeviceNote`
+  (dulu `:227-238`) dan baris Export lama (dulu `:259-264`); Export masuk satu action bar `:274` `.form-actions.backup-actions`
+  bareng Import. Cache-buster `?v=` di-bump → `20260922` (V inline `:20`, styles.css `:61`, i18n.js `:1436`, device.js `:1439`, app.js `:1446`).
+- `static/styles.css`: `:684` `.backup-actions` (satu ritme, wrap penuh di phone) · `:693` `.device-trigger` +
+  `:711` state `sidebar-collapsed` · `:715` `.bn-device` · `:731` `.device-modal`/`.device-modes`/`.device-mode`
+  (+ `.is-active` pakai token `--accent`/`--accent-contrast`) · `:761-782` `.device-preview`/`.device-frame-wrap`/`.device-frame`
+  (transform-scale, wrap menyimpan area TERSCALE) · **fix inti "gak responsif"**: `:822` di `@media (max-width:600px)` dan
+  `:854` di `body[data-device="phone"]` → `.settings-card .form-row { flex-direction:column; align-items:stretch }` +
+  `.form-input { width:100%; max-width:100% }` + `.switch { align-self:flex-start }`. Nol hex baru (verified: diff `+` tak
+  ada satu pun `#rrggbb`; hover pakai pola `rgba(255,255,255,.06)` yang sudah ada di `:351`).
+- `static/app.js`: `:94` `DEVICE_SIZES` · `:104-145` `deviceFocusables`/`deviceRenderPreview` (scale = min(1, box/device))
+  · `:149` `setDevicePreference(mode)` (satu titik set+persist `aigate.device`) · `:160-210` `openDeviceModal`/`closeDeviceModal`
+  dengan focus-trap Tab & Shift+Tab, ESC tutup, restore fokus ke trigger · `:212` `setupDeviceModal()` (trigger via
+  `[data-device-trigger]`, close via click-overlay + `#deviceModalClose`) dipanggil di boot `:2398`. DIHAPUS: listener
+  `#setDevice change` (dulu `:2244-2251`) dan `sel.value` di `applyDevice` (dulu `:66-67`); `applyDevice` tetap set
+  `body[data-device]` (`:65`). Test hook `:436-440`: `setDevice`/`applyDevice`/`setupDeviceModal`.
+- `static/i18n/{en,id,ja,nl,ru,zh-tw,zh}.js`: +1 kunci `common.close` per kamus → paritas 443 kunci × 7 (terukur `grep -c`).
+- `tests/device_modal.test.js` (BARU, 9 tes): letak kontrol di atas Repo dua shell + `aria-haspopup=dialog`/`aria-controls`,
+  `#setDevice` benar-benar hilang, buka modal → fokus masuk, pilih mode → apply+persist+`aria-pressed`, focus-trap dua arah,
+  ESC tutup + restore fokus, click-overlay tutup, klik isi modal TIDAK menutup.
+- `tests/views.test.js`: `:295` paritas `.bn-item` TETAP 10 (kontrol baru bukan `.bn-item`) + `:444-452` batas separator
+  terakhir kini System → `settings.device_sim` (Repo mengikuti setelah kontrol) dengan komentar paritas.
+- `tests/provider_detail.test.js`: `:257-258` tak lagi rekayasa `#setDevice`, kini `window.aigate.setDevice("phone")` +
+  assert `body.dataset.device`.
+
+### Verifikasi PM MANDIRI (bukan menelan receipt)
+- `node node_modules/.bin/vitest run` (src/frontend) = **27 berkas / 681 tes LOLOS** · run tanpa berkas baru
+  (`--exclude tests/device_modal.test.js`) = **26/672** → delta **+9** persis klaim.
+- `git diff --check` bersih (exit 0); `git status` = nol file liar di luar `src/frontend/**` + `documents/pm/**`.
+- Scope: 13 berkas src/frontend = 100% write-root fe-dev; `device.js` TIDAK berubah (cache-buster-nya di-bump → tanpa dampak, tak ada isi baru).
+- Rujukan usang `#setDevice` di `static/` + `src/backend/` = **NONE**.
+- **Browser NYATA (Chromium 149 headless, static server ad-hoc di TMPDIR — proses user `:8080` tidak disentuh):**
+  35 pemeriksaan DOM/layout terukur, **34 PASS**. Sampel: 1280px `.form-row` tetap `row` (input 240px); 360px `column` +
+  input 298/298px = lebar baris + `scrollWidth-clientWidth = 0` (nol overflow); backup buttons tinggi sama (34px) &
+  tumpuk lebar penuh di 360 (298/298); modal terbuka `role=dialog aria-modal=true`, focus masuk ke kontrol pertama,
+  Tab wrap last→first & Shift+Tab first→last (n=4 focusable), ESC tutup + `document.activeElement` = trigger,
+  pilih phone → `body[data-device]=phone` + `localStorage aigate.device=phone` + preview di-resize 375px, pilih tablet
+  di shell phone → `768px` + `aria-pressed=true`, reopen memulihkan penanda mode; `contentDocument` iframe = app asli
+  (`.layout` ada). 1 FAIL awal = artefak sequencing skrip PM (setelah pilih "phone", sidebar jadi `display:none` sehingga
+  fokus ke trigger desktop memang mustahil) → diulang berurutan bersih di dua shell: **PASS 11/11**, termasuk
+  "ESC tidak mengubah device".
+- Gate governance: `python3 .opencode/tools/governance/rules-index.py` = **LOLOS** (55 rule / 10 tema; F5 tercatat).
+
+### Keputusan PM atas open question fe-dev (iframe = app penuh)
+DITERIMA tanpa backend baru. Alasan: (a) handover §1.C memang mensyaratkan preview = app sendiri di 3 ukuran — bukan
+rute terpisah; (b) diverifikasi aman: `terminal.js:503/582` (`WebSocket`) baru jalan kalau tab terminal DIBUKA, dan
+iframe membuka view welcome → nol PTY; (c) `applyDevice` hanya menyentuh `body` dokumen masing-masing (iframe ≠ parent),
+dan tidak ada listener `storage` di `app.js` → nol loop balik antar-dokumen. Konsekuensi yang diterima: selama modal
+terbuka, iframe mengulang polling GET aplikasi (biaya trafik, bukan bug) dan `GET /api/...` 404 di static server ad-hoc
+(expected — di `:8080` asli API ada). **Follow-up opsional (bukan scope fe-dev, belum disetujui user):** rute/mode
+preview ringan (`?preview=1` non-interaktif, nol fetch) kalau preview ini nanti jadi fitur tetap.
+
+### Status
+SELESAI + terverifikasi browser nyata. Push / PR: **BELUM** (tunggu perintah user). Sisa: sentuhan layar asli di HP
+user (jsdom/headless ≠ touch), terjemahan `common.close` 6 bahasa belum ditinjau penutur.
+
 ## 2026-09-13 — Redesign CLI Tools: kartu responsif + logo platform (PM → fe-dev) — DONE (DI-COMMIT 59c570d, refactor/ui, BELUM push)
 
 **Asal:** user: "daftar cli-tools masing-masing jadi card, platform pakai logo aja, desain jelek → redesign bagus + responsif" (branch `refactor/ui`).
