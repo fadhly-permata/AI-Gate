@@ -15,7 +15,22 @@
   (A) `.form-row` (`styles.css:503`) tak pernah stacking di HP (`@media max-600px :692` + `body[data-device=phone]
   :718` hanya melebarin card) → label+input terhimpit = inti "gak responsif"; helper `.form-row-stack` (`:867`)
   tak dipakai; (B) baris Backup/Export (`index.html:259`) campur `<span>` label + `<a class=btn>` ≠ ritme baris
-  input = "berantakan/aneh". Opsi A tetap: device-sim keluar dari settings → modal + kontrol di sidebar/bottom-nav.
+  input = "berantakan/aneh".   Opsi A tetap: device-sim keluar dari settings → modal + kontrol di sidebar/bottom-nav.
+
+- 2026-09-13 (aturan **F6** — preview simulasi perangkat wajib terisolasi di iframe): user tegur keras karena
+  modal yang dinamai "preview" ternyata mengubah halaman ASLI. Bukti kode (PM cek ulang sesi ini): memilih mode
+  di modal → `deviceSelectMode app.js:156` → `setDevicePreference app.js:149` → `applyDevice app.js:151` menulis
+  `document.body.dataset.device` pada **dokumen luar** (halaman nyata ikut berubah) + `write(DEVICE_KEY) app.js:152`
+  → `init app.js:2334` re-apply tiap reload; dan `deviceRenderPreview app.js:126` `transform:scale` ~0.48 di kotak
+  fixa `.device-preview{height:340px}`/`styles.css:765` + `.device-modal max-width:620px`/`styles.css:731` →
+  konten "kecil + berantakan". User: "yang berubah bukan yang asli" + modal harus seukuran perangkat. Aturan F6
+  (tema F, ditulis permanen di `OPERATING_RULES.md`, gate rules-index LOLOS 56 rule exit 0): "preview" simulasi
+  perangkat WAJIB 100% di dalam iframe; memilih mode DILARANG menyentuh dokumen luar (no applyDevice luar / no
+  `body[data-device]` luar / no scale halaman luar); viewport cukup dari lebar iframe (media-query + `body[data-device]`
+  DALAM dokumen iframe nyala sendiri). Handover rework siap: `documents/pm/handovers/handover-20260913-device-preview-isolasi.md`
+  (owner fe-dev, scope `src/frontend/**`). Default (user: jangan tanya): modal = dimensi perangkat di-cap ke viewport +
+  internal scroll (bukan shrink 48%), kotak polos bersih, halaman asli utuh buka&tutup, aksesibilitas+placement jangan
+  regresi. Test `device_modal.test.js:84` di-INVERT (bukti isolasi); `setDevice`/`applyDevice`/boot DIBIARKAN (test+boot).
 
 - 2026-09-13 (aturan I8 — cara PM bicara ke user): user mengoreksi dua kali ("usulan kecil? usulan apaan?" lalu
   "jangan disebut usulan dong... PR aja"). Sebab akarnya bukan salah ketik, tapi tafsir rule "non-IT clear" di
@@ -542,3 +557,46 @@ Blok di atas = titik-waktu (diagnosis "lemot" sudah DITARIK oleh F5; jangan diba
   docs(pm) untuk Memory Bank/status/state/`CODE_CHANGES.md`/laporan. **BELUM push, BELUM PR** (nunggu perintah user).
 - Utang terbuka: (1) uji mata + sentuhan layar asli di HP user; (2) terjemahan `common.close` 6 bahasa belum ditinjau
   penutur; (3) opsi mode preview ringan.
+
+## Device-Sim Modal — FOLLOW-UP koreksi user (2026-09-13, pasca-`161bcaf`) — PM diagnosis, TUNGGU klarifikasi
+**Keluhan user:** (1) mode ponsel preview "berantakan, halaman + bottom/side menu jadi kecil"; (2) minta "modal
+seukuran perangkat (hape/tablet/desktop), bukan innernya doang yang di-resize".
+
+**Akar masalah (dibuktikan, bukan asumsi):** SCALE-DOWN transform, bukan lebar iframe, bukan device-CSS salah.
+- Preview = iframe diberi ukuran perangkat ASLI (`app.js:94` phone 375×667) lalu di-`transform:scale()` biar muat
+  kotak fixa `.device-preview{height:340px}` (`styles.css:769`; modal `max-width:620px` `:731`). Rumus
+  `deviceRenderPreview app.js:116-132`: `scale=min(1, availW/dimW, availH/dimH)`; availH≈318px → phone 0.477,
+  tablet 0.311, desktop 0.398. Jadi SELURUH UI HP (termasuk bottom-nav) dirender ~48% = persis "kecil/berantakan".
+- Isi iframe sudah TEPAT (G3 161bcaf: `body[data-device=phone]` = viewport asli). Jangan salah tafsir ke device-CSS (F5).
+- Cacat sekunder: tak ada window-resize refit utk `deviceRenderPreview`; chrome modal (title+note+3 tombol+close)
+  makan tinggi → inner tambah kecil = "cuma inner di-resize".
+
+**Status: BELUM eksekusi src / BELUM spawn.** Permintaan #2 punya >1 cara penuhi (modal-resize-ke-dimensi vs
+device-frame-konten-100%; device>viewer: zoom-out vs scroll; konteks viewer user HP/desktop) → PM klarifikasi dulu
+(D1 + F5 + instruksi task). Owner = fe-dev (scope `src/frontend/**`: `app.js`+`styles.css`, mungkin `index.html`;
+tak ubah kontrak). Handover siap-eksekusi disusun SETELAH user jawab. DoD: G3 Chromium before/after tiap mode ×
+lebar viewer, vitest hijau, `git diff --check` bersih, bump cache-buster (kini `?v=20260922`).
+
+## Device-Sim Preview ISOLASI iframe + modal device-sized — SELESAI & TERVERIFIKASI (2026-09-13 16:25, PM integrate&verify)
+- Follow-up koreksi user di atas = **SELESAI** via fe-dev per `handover-20260913-device-preview-isolasi.md`.
+  Inti: `deviceSelectMode` tak lagi manggil `setDevicePreference` → mode di-apply HANYA ke dalam iframe
+  (`deviceApplyInFrame` via `contentWindow.aigate.applyDevice`, try/catch); `deviceRenderPreview` HAPUS
+  `transform:scale` → set `--dev-w/--dev-h` px; `.modal.device-modal` device-sized di-cap `92vw/80vh` + scroll
+  internal; default buka = `devicePreviewMode||DEFAULT_DEVICE` (bukan body luar); + iframe `load` + window
+  `resize` refit; test device_modal DI-INVERT (mode gak boleh ubah body luar / localStorage).
+- Gate PM MANDIRI: audit diff = 5 berkas `src/frontend/**` saja, nol hex, `git diff --check` bersih; vitest
+  **27 berkas/681 LOLOS**; harness Chromium fe-dev DI-RERUN PM = **22/22 PASS** (body luar `desktop` konstan
+  open→phone→tablet→desktop→close→reload, `localStorage.aigate.device` null; frame 375/768/1280 px nyata,
+  transform none; bottom-nav 56px; cap 92vw + scroll internal di viewer 820px). `:8080` user (`python run.py`
+  PID 25956) tak disentuh (J6).
+- **Keputusan OQ#1 (boot-default): CUKUP.** Keluhan inti (preview mengubah halaman asli) MATI — halaman asli
+  identik sebelum & sesudah modal + reload. `body[data-device="desktop"]` stempel boot = no-op styling (nol rule
+  CSS utk nilai desktop; responsif HP nyata dari `@media`). FOLLOW-UP OPSIONAL (tanya user, tak dipaksa): hapus
+  stempel boot kalau user mau atribut nol sama sekali.
+- **Keputusan OQ#2 (cache-buster ekstra): SAH & PERLU.** Invarian `i18n.test.js:307-315` memaksa
+  `I18N_VER == app.js?v == i18n.js?v` → bump i18n.js+V ke 20260923 bukan scope-creep. `device.js` tetap 20260922.
+- Commit `refactor/ui`: **`735d9e2`** feat fix(ui) (staging eksplisit 5 berkas) + docs(pm) terpisah.
+  **BELUM push, BELUM PR** (nunggu perintah user). Laporan:
+  `.opencode/reports/20260913/frontend/1625_device-preview-isolasi-iframe.md`.
+- Utang terbuka: uji mata + sentuhan layar HP user; terjemahan `common.close` 6 bahasa; follow-up opsional
+  (stempel boot, mode preview ringan `?preview=1`).

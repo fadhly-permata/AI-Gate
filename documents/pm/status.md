@@ -2,6 +2,39 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260913-1625 — PM INTEGRATE & VERIFY: device-sim preview ISOLASI iframe + modal device-sized SELESAI, DI-COMMIT (ProjectManager)
+- Audit diff: HANYA 5 berkas `src/frontend/**` (app.js, styles.css, index.html, tests/device_modal.test.js, tests/provider_detail.test.js komentar). Nol file nyasar, nol hex baru (`git diff --check` exit 0). Spot-check klaim: `deviceSelectMode app.js:171-178` tak panggil `setDevicePreference`; `deviceRenderPreview app.js:123-131` hapus `transform:scale`, set `--dev-w/--dev-h`; `deviceApplyInFrame app.js:134-145` try/catch + guard `contentWindow.aigate`; `.modal.device-modal` styles.css:738-746 pakai selector `.modal.device-modal` (outrank `.modal{max-width:540px}` :1235-1245); cache-buster `?v=20260923` (app.js+i18n.js+V) + styles.css; `device.js?v` tetap `20260922`.
+- Verifikasi MANDIRI PM: `node node_modules/.bin/vitest run` = **27 berkas / 681 tes LOLOS**. Re-run harness Chromium fe-dev `verify_device_preview.mjs` (instance terisolasi, port random, DB tmp, PID sendiri) = **22/22 PASS, exit 0**: body luar `desktop` konstan sejak boot → buka modal → phone → tablet → desktop → tutup → reload; `localStorage.aigate.device` null terus; iframe ukuran ASLI (375/768/1280, transform none); bottom-nav 56px proporsional; modal di-cap 92vw + scroll internal saat viewer kecil (820px → box 754, iframe tetap 1280, scroll internal). Proses user `:8080` (`python run.py` PID 25956) TAK disentuh (aturan J6); sisa PID 31592 tadi = leftover server terisolasi fe-dev (bukan app user).
+- Keputusan PM OQ#1 (boot-default): klaim user "preview gak ngubah halaman asli" = **TERPENUHI & terbukti**. Body luar sebelum DAN sesudah pakai modal = identik (tetap boot `desktop` dari `init applyDevice(read(DEVICE_KEY,DEFAULT_DEVICE))`); reload tak berubah. Nuansa: `body[data-device="desktop"]` selalu distempel boot — TAPI `grep` → 0 rule CSS `data-device="desktop"`, jadi no-op styling; responsif HP nyata digerakkan `@media` viewport (bukan `data-device`). Tidak perlu tindakan kode. **Follow-up opsional (TANYA user, TAK dipaksa ke scope):** kalau user mau halaman asli NOL `data-device` sama sekali (pure no-device-mode), itu perubahan terpisah.
+- Keputusan PM OQ#2 (cache-buster ekstra): bump `I18N_VER`/i18n.js/app.js/styles.css ke `20260923` = **PERLU & SAH**, bukan scope-creep. Bukti: invarian `i18n.test.js:307-315` wajib `I18N_VER == i18n.js?v == app.js?v`; suite i18n hijau = pembuktian. `device.js?v` tetap `20260922` (tak diubah, tak dicakup invarian).
+- Commit `refactor/ui`: **`735d9e2`** `fix(ui): isolate device-sim preview ke iframe + modal device-sized` (staging eksplisit 5 berkas fitur, BUKAN `git add -A`) + docs(pm) terpisah. **BELUM push, BELUM PR** (nunggu perintah user).
+- Utang terbuka: (1) uji mata + sentuhan layar asli di HP user (Chromium desktop-headless belum wakili WebView/sentuhan); (2) terjemahan `common.close` 6 bahasa belum ditinjau penutur.
+
+## 20260913-1535 — PM-POSTMORTEM F6 + HANDOVER rework device-sim PREVIEW-isolasi (ProjectManager; spawn fe-dev = main-thread)
+- INCIDENT (user tegur): modal bernama "preview" TERNYATA mengubah halaman ASLI. User: "judulnya preview tapi
+  kenapa malah dibuat efeknya ke halaman asli? ... yang berubah bukan yang asli." + minta modal seukuran perangkat.
+- DIAGNOSIS PM (bukti `file:line`, BUKAN karangan — cek ulang kode sesi ini):
+  - (A) `deviceSelectMode app.js:156-160` → `setDevicePreference app.js:149-154` → `applyDevice app.js:151` menulis
+    `document.body.dataset.device` pada DOKUMEN LUAR = halaman nyata berubah; `app.js:152 write(DEVICE_KEY)` →
+    `init app.js:2330/2334` re-apply tiap reload.
+  - (B) `deviceRenderPreview app.js:116-132` `transform:scale` (`app.js:126`) + kotak fixa `.device-preview height:340px`
+    (`styles.css:765-775`) + `.device-modal max-width:620px` (`styles.css:731`) → phone scale~0.48 = kecil/berantakan.
+  - Fakta pendukung: 31 rule `body[data-device="phone"]` (`styles.css:831+`) harus nyala DI DALAM iframe; media-query
+    `@media max-600px :796` / `max-960px :785` sudah memicu dari lebar iframe → dokumen luar tak perlu disentuh.
+- RULE BARU **F6** (tema F) ditulis permanen di `OPERATING_RULES.md`: "preview" simulasi perangkat WAJIB terisolasi di
+  iframe; pilih mode dilarang sentuh dokumen luar (no applyDevice luar / no data-device luar / no scale halaman luar);
+  desain yang bikin preview ubah halaman nyata = cacat, DITOLAK sebelum spawn. Gate `rules-index.py` **LOLOS (56 rule, exit 0)**.
+- HANDOVER siap-eksekusi: `documents/pm/handovers/handover-20260913-device-preview-isolasi.md` — exact map §2,
+  default PM §3 (cap-to-viewport + internal scroll, bukan shrink 48%; kotak polos; halaman asli utuh; aksesibilitas+
+  placement jangan regresi), DoD G3 §4 (Chromium nyata per-mode sebelum/sesudah + body[] tanpa data-device + vitest +
+  cache-buster 20260922→20260923), out-of-scope §5. Test `device_modal.test.js:84` DIINVERT (bukti isolasi), komentar
+  `provider_detail.test.js:258` dibetulkan; `setDevice`/`applyDevice`/boot DIBIARKAN (dipakai test+boot).
+- OWNER fe-dev (scope `src/frontend/**`: app.js + styles.css + index.html + device_modal.test.js + komentar provider_detail).
+- SPAWN: PM TIDAK punya Task tool sesi ini → MAIN-THREAD yang spawn fe-dev pakai handover ini (sesuai pembagian kerja user).
+  PM akan audit receipt + gerbang (vitest, git diff --check, exercise Chromium) + commit SETELAH fe-dev balik.
+- STATUS: rule + handover landed; BELUM spawn/eksekusi src (nunggu main-thread spawn fe-dev). Memory Bank state.md
+  (checkpoint F6 + updated 15:35 + rules_ref 56 rule) + memory-bank.md ikut diperbarui.
+
 ## 20260913-1210 — PM INTEGRATE & VERIFY: settings responsif + device-sim→modal SELESAI, DI-COMMIT `161bcaf` (ProjectManager)
 - RECEIPT fe-dev diaudit (bukan ditelan): `git status`/`git diff` = 13 berkas `src/frontend/**` (+ tes baru
   `tests/device_modal.test.js` 9 tes) — 100% dalam write-root-nya, NOL berkas luar scope, NOL artefak uji sisa.
@@ -850,3 +883,22 @@ i18n key `settings.device_sim/phone/tablet/desktop/note` sudah ada ×7 dict.
 kontrol device-sim = sidebar-footer di atas link github (desktop `index.html:162`) / bottom-nav di
 atas item Repo (HP `:1381`), ATAU tetap di form settings? Default PM = pindah ke footer/sidebar atas
 github. Working tree: branch `refactor/ui`, bersih (pretask). Gate rules-index exit 0.
+
+## 20260913-1430 — Device-Sim Modal: FOLLOW-UP koreksi user (PM diagnosis, BELUM eksekusi)
+User pasca-merge `161bcaf`: mode ponsel preview "berantakan, halaman+bottom menu jadi kecil"; minta modal
+seukuran perangkat (bukan inner doang), tablet & desktop juga.
+**Diagnosis (bukti terukur, bukan asumsi F5):** AKAR = scale-down, BUKAN lebar iframe, BUKAN device-CSS.
+- `app.js:94` `DEVICE_SIZES phone=[375,667]`. `styles.css:769` `.device-preview{height:340px}` (fix).
+  `styles.css:731` `.device-modal{max-width:620px}`. `deviceRenderPreview app.js:116-132`: iframe diberi ukuran
+  perangkat ASLI lalu `transform:scale(min(1, availW/dimW, availH/dimH))`. availH=340-2*10pad-2*border=318.
+  phone scale=min(1,598/375,318/667)=0.477 → SELURUH UI HP (termasuk bottom-nav 56px→~26px) dirender ~48%.
+  tablet 0.311, desktop 0.398. INI "kecil/berantakan".
+- Layout DALAM iframe sudah jujur (dibuktikan G3 161bcaf: `body[data-device=phone]` identik viewport asli) →
+  gejala murni transform-scale, bukan CSS/device-mode salah niru viewport. JANGAN salah tafsir (F5).
+- Cacat sekunder: `deviceRenderPreview` TIDAK di-register ke window `resize` (hanya closeRowMenu :911,
+  closeIconPopover :2321) → rotasi/resize jendela tak refit. Modal fixa 620×(340+chrome): title+note+3 tombol+
+  close makan tinggi → inner makin kecil = "cuma inner di-resize", persis keluhan #2.
+**Keputusan: AMBIGU >1 cara utk permintaan #2 → KLARIFIKASI user dulu (D1+F5+instruksi task), BELUM sentuh
+src/, BELUM spawn.** fork: (i) modal-resize ke dimensi perangkat vs (ii) device-frame konten-100%; (iii) device>
+viewer (desktop1280 di layarHP) → zoom-out vs scroll; (iv) viewer utama user HP apa desktop. Owner tetap fe-dev
+(src/frontend/**: app.js+styles.css, mungkin index.html). Handover siap-eksekusi + fix disusun SETELAH user jawab.
