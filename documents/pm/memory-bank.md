@@ -4,6 +4,31 @@
 (empty — diisi PM saat task pertama)
 
 ## Decisions
+- 2026-09-13 (SETTINGS DUA PANEL SEJAJAR — diagnosis + handover, BELUM eksekusi): user lapor "panel-panel pada
+  halaman setting banyak yang gak responsif... kenapa gak dibuat jadi sejajar kesamping aja pas mode layar besar.
+  Baru dibuat sejajar kebawah ketika menggunakan layar kecil". Sesuai F5, "gak responsif" = layout tak adaptif
+  (BUKAN performa). PM investigasi read-only berbukti `file:line` (nol broad grep, C4): **"2 panel" = dua
+  `.card.settings-card`** di `<section data-view="settings">` (`index.html:195`) — Panel1 form Settings
+  (`index.html:201-244`: Port/DevMode/Theme/Language/Save), Panel2 Backup&Restore (`index.html:250-284`).
+  **AKAR gak responsif di layar besar:** `.view.is-active{display:block}` (`styles.css:422`) → anak mengalir
+  VERTIKAL → dua panel MENUMPUK; `.settings-card{max-width:540px}` (`styles.css:493`) cap tiap panel 540px
+  rata-kiri → ruang kosong lebar di kanan pada 1280/1440. **FIX (desktop-first, reuse breakpoint repo):** grid
+  2 kolom di base `.view[data-view="settings"].is-active{display:grid;grid-template-columns:repeat(2,
+  minmax(0,1fr));column-gap:18px;align-items:start}` + banner `grid-column:1/-1` + backup-card `margin-top:0`;
+  collapse ke numpuk di `@media (max-width:960px)` yang SUDAH ADA (`styles.css:822-828`, kembalikan block +
+  `grid-column:auto` + `margin-top:18px`) → JANGAN angka breakpoint baru (repo tanpa `min-width`; 960 = garis
+  desktop/tablet yang dipakai). Preseden pola: grid aman `.combo-member-fields` (`styles.css:1062`), override
+  display per-view terminal (`styles.css:1441`), ritme gap 18px (banner/backup). **NO-REGRESSION dijaga:**
+  `.form-row` stacking ≤600 (`:860-863`) + `body[data-device=phone]` (`:892-895`), modal clip fix `430f33b`,
+  F6 (murni CSS → nol JS → halaman asli utuh), aksesibilitas. Scope: `styles.css` + cache-buster `index.html:61`
+  `20260924→20260925` (styles.css independen; invarian i18n app/i18n/I18N_VER tetap `20260923`). Handover:
+  `documents/pm/handovers/handover-20260913-settings-2panel-sidebyside.md`. Owner fe-dev (PM tak punya Task tool).
+  DoD G3: Chromium nyata ukur before/after di 1440/1280/1100/961/960/768/600/375 (assert offsetTop≈ & offsetLeft
+  beda = sejajar ≥961; offsetTop naik & offsetLeft sama = numpuk ≤960; nol overflow) + vitest hijau. **Catatan
+  jujur "panel lain banyak gak responsif":** view Settings HANYA punya 2 panel ini; kalau user maksud panel view
+  LAIN (providers/combos/usage/dll) = task terpisah (lapor ke PM). STATUS: diagnosis + handover landed; BELUM
+  spawn/eksekusi src.
+
 - 2026-09-13 (AUDIT kepemilikan edit clip-lr — A2 TIDAK dilanggar): user curiga PM yang nulis `src/` (karena receipt
   fe-dev bilang "edit sudah ada di working tree, saya cuma verifikasi"). PM telusuri session DB `opencode.db` (tabel
   `part`): sesi fe-dev `ses_f6384…` yang menulis styles.css/index.html/device_modal.test.js (tool-call `edit`
@@ -12,6 +37,8 @@
   (staging 3 berkas fitur eksplisit) + push → PR #23 diperbarui; NOL postmortem "PM tulis src" krn tak terjadi (nol
   pengakuan palsu). TEMUAN: receipt fe-dev tidak akurat ttg penulis → pola claim-vs-fact (F5/F6) kini di sisi sub-agent;
   kandidat rule akurasi-receipt utk user putuskan. Gerbang PM: vitest 27/685 LOLOS, `git diff --check` bersih.
+
+- 2026-09-13 (SETTINGS DUA PANEL SEJAJAR — AUDIT + VERIFIKASI MANDIRI + COMMIT `c495d68` + PUSH → PR #23, SELESAI): fe-dev selesai handover-20260913-settings-2panel-sidebyside (receipt: 2 berkas, 8 lebar terukur, vitest hijau, BELUM commit). PM AUDIT: `git diff` src/frontend/** = HANYA styles.css (+26 baris) + index.html 1 baris cache-buster :61 (20260924→20260925); NOL hex baru; NOL file nyasar; NOL sisa task ke-abort. `git diff --check` exit 0. GATE PM DIJALANKAN SENDIRI: vitest 27 berkas/685 tes LOLOS. VERIFIKASI MANDIRI PM (G3 — tidak menelan receipt; Chromium 149 headless CDP, instance terisolasi port 58981 + AIGATE_DB_PATH tmp + chromium CDP 36349, PID sendiri; `:8080` user PID 25956 tak disentuh — J6) di 8 lebar: ≥961px `display:grid` SIDE-BY-SIDE (offsetTop≈, offsetLeft beda: 1440→top143/143 left248/844, 1280→248/764, 1100→248/674, 961→248/604); ≤960px `display:block` NUMPUK (960→top160/518, 768→160/518, 600→176/630, 375→197/651); NOL horizontal overflow 8/8; banner full-width; `.form-row` stacking ≤600 tetap; device-sim iframe desktop→grid / tablet+phone→block. BEFORE (CSS HEAD) di 1440 = NUMPUK (bukti keluhan ruang kosong). Fix `430f33b` clip UTUH (device_modal.test.js 13 tes hijau; app.js:133-145 hanya tulis body[data-device] DI DALAM frame → F6 aman). COMMIT `c495d68` fix(ui) (staging EKSPLISIT 2 berkas, BUKAN git add -A); commit docs(pm) TERPISAH; PUSH refactor/ui fast-forward → PR #23 auto-update (OPEN/MERGEABLE, label bug). Kepemilikan src = fe-dev (scope sah src/frontend/**); PM nol tulis src/ → A2/A3 dihormati. EDGE CASE follow-up TERPISAH (TIDAK dikerjakan): stale `localStorage["aigate.device"]="phone"` (era pre-F6) di window lebar → shell phone tapi settings tetap grid (ganjil, nol overflow); hanya reachable dari nilai jadul krn modal tak pernah tulis outer page. Laporan: .opencode/reports/20260913/frontend/0441_settings-2panel-sidebyside.md + documents/dev/CODE_CHANGES.md.
 
 - 2026-09-13 (diagnosis BERBUKTI device-preview kepotong kiri-kanan = flexbox centering overflow): user lapor bug
   BARU di PR #23 / commit `735d9e2`. PM ukur pakai Chromium 149 NYATA (CDP + Node24 global WebSocket, tanpa npm;
