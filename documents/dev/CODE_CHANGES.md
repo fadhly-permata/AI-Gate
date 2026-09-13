@@ -1,5 +1,24 @@
 # Code Changes Register (code ↔ docs alignment)
 
+## 2026-09-13 — Redesign CLI Tools: kartu responsif + logo platform (PM → fe-dev) — DONE (DI-COMMIT 59c570d, refactor/ui, BELUM push)
+
+**Asal:** user: "daftar cli-tools masing-masing jadi card, platform pakai logo aja, desain jelek → redesign bagus + responsif" (branch `refactor/ui`).
+
+**Lembar handover:** `documents/pm/handovers/handover-20260913-cli-tools-card-redesign.md`.
+
+### Perubahan (semua `src/frontend/**`; 0 backend; 0 tes dihapus/dilemahkan)
+- `static/clitools.js`: `platformTile()` baru — logo `fa-brands` per platform (termux→fa-android, linux, windows, macos→fa-apple), glyph `aria-hidden`, tile `role=img` + `aria-label`=nama platform lokal + `title`="<Platform>: <status> — <note>", status via `.cli-status-*`, current→`.cli-plat-current` ring, unknown→`.cli-plat-dim`. `renderGroups`: tiap tool = SATU `<button class="btn cli-tool">` (head: nama bold + marker state; baris logo platform; warn opsional). `renderStateMarker` baru (badge-ok `fa-circle-check` / badge-off `fa-circle-info`, ikon-only → nol kunci i18n baru). `renderCompatLegend` jadi legenda ikon. Perilaku klik TETAP (verified→`openLaunchModal`, else `setCliMsg` warn; fail-closed, `aria-disabled`), `title` + `cli-tool-disabled` dipertahankan. Class `cli-tool-unsupported` ditahan sbg hook stabil (tanpa line-through) + `cli-tool-soon`/`cli-tool-ready` baru.
+- `static/styles.css`: `.cli-tool` = kartu (radius 12, border `--panel-border`, bg `--panel`, `--shadow`, hover/focus `translateY(-2px)`+shadow, focus-visible ring); non-verified muted opacity .66 (BUKAN coret); `.cli-compat` flex wrap gap; `.cli-plat` tile 26px + status color (light+dark) + current ring + dim; grid `repeat(auto-fill,minmax(220px,1fr))` → phone `150px` (`@media max-width:600px` + `body[data-device="phone"]`); `.cli-compat-warn` halus dalam card.
+- `static/index.html`: HANYA cache-buster `?v=` — styles.css `20260913→20260921` (:61), clitools.js `20260920→20260921` (:1418).
+
+### Verifikasi (PM mandiri)
+- `node --check clitools.js` OK; `git diff` scope = 3 berkas frontend (index.html cuma 2 baris `?v=`); grep class usang (`cli-tool-cell`/`cli-compat-chip`/`cli-compat-current`) di `static/` = NONE.
+- `node node_modules/.bin/vitest run` (src/frontend) `tests/clitools.test.js`(19) + `tests/views.test.js`(30) = **49 passed / 0 fail** (views ikut jaga cache-buster yang di-bump).
+- CAVEAT (G3): uji mata browser milik user — reload view CLI Tools + cek phone/tablet/desktop, dark+light.
+
+### Flag minor (bukan bug)
+- `tests/clitools.test.js:137,166-192` masih tulis "struck/strike-through" padahal styling kini muted. Assertion cuma cek class `cli-tool-unsupported` (masih ada) → HIJAU, tapi WORDING usang. Scope tests = qa-engineer; reword diserahkan ke QA bila user mau.
+
 ## 2026-09-13 — Urutan manual anggota kombo: ▲▼ + drag handle (audit PM + fe-dev) — DONE (DI-COMMIT 00e2d08, refactor/ui, BELUM push)
 
 **Asal:** user minta urutan anggota kombo bisa di-atur naik/turun ATAU drag; kolom & field Priority disembunyikan,
