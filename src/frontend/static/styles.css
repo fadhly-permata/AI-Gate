@@ -492,6 +492,26 @@ body.sidebar-collapsed .nav-item {
 /* ===== Settings panel (B1.3) ===== */
 .settings-card { max-width: 540px; }
 
+/* Settings: the two panels (main form + Backup & Restore) sit SIDE BY SIDE on a
+   large screen and stack only when the screen gets small (user 2026-09-13).
+   Base = desktop-first, so the grid is the > 960px state and the EXISTING
+   `@media (max-width: 960px)` block below reverts it to the stacked layout.
+   Reuses the repo's own 960px tablet breakpoint (no new breakpoint) and mirrors
+   the safe two-column grid pattern of .combo-member-fields (styles.css:1062) —
+   minmax(0, 1fr) so a fixed-width .form-input can never blow a column out.
+   18px column-gap = the repo's existing panel rhythm (.page-banner margin-bottom
+   / .backup-card margin-top); align-items:start keeps the short Backup card from
+   stretching to the form's height. Tokens only, no new colors. */
+.view[data-view="settings"].is-active {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 18px;
+  row-gap: 0;
+  align-items: start;
+}
+.view[data-view="settings"] .page-banner { grid-column: 1 / -1; }
+.view[data-view="settings"] .backup-card { margin-top: 0; }
+
 .settings-title {
   margin: 0 0 18px;
   color: var(--accent);
@@ -825,6 +845,12 @@ body.sidebar-collapsed .device-trigger { justify-content: center; padding: 12px 
   .card { padding: 18px; }
   .form-input { width: 200px; max-width: 100%; }
   .welcome-card { margin-top: 4vh; }
+  /* Small screen: undo the side-by-side grid so the two Settings panels go back
+     to stacking vertically (exactly the pre-2026-09-13 layout — no regression).
+     .backup-card's 18px vertical rhythm returns now that column-gap is gone. */
+  .view[data-view="settings"].is-active { display: block; }
+  .view[data-view="settings"] .page-banner { grid-column: auto; }
+  .view[data-view="settings"] .backup-card { margin-top: 18px; }
 }
 
 /* Phone — real narrow viewport OR device simulation = phone: NON-AdminLTE shell.
