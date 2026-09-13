@@ -78,7 +78,7 @@ describe("kebab action menu + lang dropdown", () => {
     // The dropdown is data-driven: one row per registry entry, so adding a
     // language never means editing index.html. The registry is the pin here.
     expect(window.LANGS.map((l) => l.code))
-      .toEqual(["en", "id", "ru", "nl", "ja", "zh", "zh-tw"]);
+      .toEqual(["en", "id", "ru", "nl", "ja", "zh", "zh-tw", "hi"]);
     window.LANGS.forEach((l) => {
       expect(window.I18N.id[l.nameKey], l.code).toBeTruthy();
       expect(window.I18N.en[l.nameKey], l.code).toBeTruthy();

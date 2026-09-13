@@ -206,6 +206,7 @@ window.I18N.id = {
     "lang.ja": "日本語",
     "lang.zh": "简体中文",
     "lang.zh-tw": "繁體中文",
+    "lang.hi": "हिन्दी",
     "providers.header_key_ph": "Kunci",
     "providers.header_val_ph": "Nilai",
     "combos.title": "Kombo",

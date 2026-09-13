@@ -1013,3 +1013,17 @@ state OPEN, 4 commit, +1310 −45, 23 berkas). `:8080` milik user tidak disentuh
 dihentikan/di-restart; nol `git add -A`; nol commit baru dibuat.
 **SISA (tunggu user):** review mata + sentuhan layar HP untuk preview device; merge PR #23; folow-up opsional
 `?preview=1` (mode ringan) dan hapus stempel `data-device=desktop` saat boot — dua-duanya dicatat, TIDAK dikerjakan.
+
+## 2026-09-13 — spawn fe-dev: FEAT bahasa Hindi (hi) → SELESAI, commit `808d04e`
+- Handover: `documents/pm/handovers/handover-20260913-bahasa-hindi.md`. Owner fe-dev (reuse, sudah ada), scope `src/frontend/**`.
+- Hasil (receipt): hi.js 445 kunci Devanagari + registry LANGS +1 + `lang.hi` di 8 kamus + test registry/row-actions + cache-buster 20260924.
+- AUDIT+GATE PM mandiri: `vitest run tests/i18n.test.js` 36/36; `vitest run` penuh 27 berkas/686 hijau (nol regresi); `git diff --check` exit 0; scope bersih (hanya src/frontend/** + handover PM). PM nol tulis src/ (A2).
+- Diverifikasi kualitas: nilai ASCII-murni di hi.js = hanya nama OS (Linux/Windows/macOS) + endonim bahasa (English/Bahasa Indonesia/Nederlands) → tak ada kunci terlewat.
+- Commit `808d04e` feat(i18n) di branch baru `feat/i18n-hindi` (PR#23 sudah merged, tak nebeng). Docs commit terpisah (CODE_CHANGES + memory-bank + status).
+- BELUM push/PR (nunggu user). Utang: review penutur asli utk akurasi Hindi.
+
+## 2026-09-13 — PUSH + PR #24 bahasa Hindi (hi) TERBUKA
+- `git push -u origin feat/i18n-hindi` sukses (nol force, clean). `gh pr create --base main --head feat/i18n-hindi --label enhancement` → **PR #24** https://github.com/fadhly-permata/AI-Gate/pull/24
+- Verifikasi API: state OPEN, labels=[enhancement], mergeable MERGEABLE, 17 berkas +538/-8. Aturan H5 (label wajib) lolos.
+- Body PR: ringkasan perubahan + bukti verifikasi PM (vitest 27/686 hijau, git diff --check bersih, scope frontend-only) + catatan utang review penutur asli.
+- SISA user: review+merge PR #24; uji mata; (opsional) review penutur asli.

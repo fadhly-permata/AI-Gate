@@ -675,3 +675,20 @@ lebar viewer, vitest hijau, `git diff --check` bersih, bump cache-buster (kini `
 - **COMMIT `52f4a50`** `fix(ui): panel settings isi kolom — 50% layar besar, 100% layar kecil` (staging EKSPLISIT 2 berkas fitur, BUKAN `git add -A`) + commit `docs(pm)` TERPISAH. PUSH `origin refactor/ui` fast-forward NOL force → PR #23 auto-update.
 - **Kepemilikan (A2/A3 sah):** penulis `src/frontend/**` = fe-dev (write-root-nya); PM hanya `documents/pm/**` + `documents/dev/CODE_CHANGES.md` + `.opencode/reports/**` + skrip scratch tmp → nol tulis src/.
 - Catatan jujur (tetap dari diagnosis): ponsel ≤600 FAKTANYA SUDAH 100% sebelum fix; yang tertutup fix = **band 781–960** + layar besar ≥~1364. Kalau di HP masih terlihat sempit: hard-refresh (statis tanpa `Cache-Control`, cache-buster `20260926` paksakan URL CSS baru). SISA user: uji mata layar asli + sentuhan HP; device-sim desktop modal tak PM re-drive lewat UI (diuji via lebar outer setara + `device_modal.test.js` hijau).
+
+## Bahasa Hindi (`hi`) di aplikasi — SELESAI & DI-COMMIT `808d04e` (2026-09-13, PM)
+- Asal: user "butuh bahasa Hindi". Perintah (D2) → PM kerjakan tanpa tanya. Default ambigu dicatat: kode `hi`, endonim `हिन्दी`, bendera `🇮🇳` (Hindi Devanagari standar, bukan romanisasi/Hinglish).
+- Owner fe-dev (scope `src/frontend/**`). Handover `documents/pm/handovers/handover-20260913-bahasa-hindi.md`.
+- Kerja: berkas baru `i18n/hi.js` (445 kunci Devanagari) + registry `window.LANGS` +1 baris + kunci `lang.hi` di 8 kamus (paritas) + test registry/row-actions pin 8 bahasa + cache-buster `20260923→20260924`.
+- fe-dev nemu & benerin `row-actions.test.js:81` (pin LANGS hardcoded, di luar handover) — inisiatif sah, tetap scope FE test.
+- **Verifikasi PM mandiri (G3/F3):** `vitest run tests/i18n.test.js` = 36/36 hijau; `vitest run` penuh = **27 berkas / 686 tes hijau** (baseline 685 +1 paritas `hi`, nol regresi); `git diff --check` exit 0; 8 kamus = 445 kunci; ASCII-murni di hi.js hanya nama-OS/endonim bahasa (tak ada kunci kelewat); scope HANYA src/frontend/** (A2 utuh, PM nol tulis src/).
+- **COMMIT `808d04e`** `feat(i18n): tambah bahasa Hindi (hi)` di branch BARU `feat/i18n-hindi` (PR #23 sudah MERGED → kerja baru, nggak nebeng). Staging eksplisit 12 berkas fitur + commit docs(CODE_CHANGES) terpisah.
+- Utang kualitas (sama spt 6 bahasa lain): terjemahan Hindi = generate, BELUM ditinjau penutur asli.
+- **BELUM push / BELUM PR** (nunggu perintah user). Sisa: uji mata user (pilih Hindi di Settings → seluruh UI Devanagari).
+
+## Bahasa Hindi (hi) — PUSH + PR #24 TERBUKA (2026-09-13, PM)
+- `git push -u origin feat/i18n-hindi` → branch baru di remote, nol force, fast-forward bersih, working tree bersih.
+- `gh pr create --base main --head feat/i18n-hindi --label enhancement` → **PR #24 TERBUKA**: https://github.com/fadhly-permata/AI-Gate/pull/24
+- Verifikasi mandiri via API (bukan output create): state=OPEN, labels=[enhancement] (nempel), mergeable=MERGEABLE, base=main, head=feat/i18n-hindi, 17 berkas +538/-8. H5 (PR wajib ≥1 label) terpenuhi.
+- Co-author catatan di body: fe-dev (implementasi) + PM (audit & verifikasi).
+- SISA user: review + merge PR #24; uji mata pilih Hindi di Settings; (opsional) review penutur asli utk akurasi.

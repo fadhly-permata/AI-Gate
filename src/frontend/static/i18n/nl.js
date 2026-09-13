@@ -198,6 +198,7 @@ window.I18N.nl = {
     "lang.ja": "日本語",
     "lang.zh": "简体中文",
     "lang.zh-tw": "繁體中文",
+    "lang.hi": "हिन्दी",
     "providers.header_key_ph": "Sleutel",
     "providers.header_val_ph": "Waarde",
     "combos.title": "Combo's",

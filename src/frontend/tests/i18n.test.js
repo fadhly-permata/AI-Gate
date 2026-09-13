@@ -104,10 +104,10 @@ describe("i18n locale files — key parity with English", () => {
 describe("i18n registry (window.LANGS)", () => {
   const EXPECTED = [
     ["en", "🇺🇸"], ["id", "🇮🇩"], ["ru", "🇷🇺"], ["nl", "🇳🇱"],
-    ["ja", "🇯🇵"], ["zh", "🇨🇳"], ["zh-tw", "🇹🇼"]
+    ["ja", "🇯🇵"], ["zh", "🇨🇳"], ["zh-tw", "🇹🇼"], ["hi", "🇮🇳"]
   ];
 
-  it("lists all seven locales, in order, with their flags", () => {
+  it("lists all eight locales, in order, with their flags", () => {
     expect(window.LANGS.map((l) => [l.code, l.flag])).toEqual(EXPECTED);
   });
 
