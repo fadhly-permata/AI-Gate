@@ -12,6 +12,7 @@ window.I18N.zh = {
     "common.edit": "编辑",
     "common.delete": "删除",
     "common.remove": "移除",
+    "common.close": "关闭",
     "nav.group.gateway": "网关配置",
     "nav.group.operations": "运维",
     "nav.group.insights": "洞察",

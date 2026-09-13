@@ -1,5 +1,76 @@
 # Code Changes Register (code ↔ docs alignment)
 
+## 2026-09-13 — Settings responsif + rapi + device-sim → modal (Opsi A) (PM → fe-dev) — DONE (DI-COMMIT, refactor/ui, BELUM push)
+
+**Asal:** user: "halaman setting kok gak responsif ya, dan desain ui nya juga terasa aneh" + "berantakan";
+kontrol device-sim dipindah ke atas link GitHub, pilih mode → modal preview tampilan.
+**Lembar handover:** `documents/pm/handovers/handover-20260913-settings-responsif-rapi.md` (pengganti
+`handover-20260913-device-sim-modal.md` yang diagnosisnya FABRIKASI → aturan baru **F5**).
+**Catatan penting:** keluhan "gak responsif" = responsive-design (layout tak adaptif), BUKAN performa. Teori
+"lemot / 26 CSS rule re-render / terminal reflow" ditarik dan dilarang diulang (F5).
+
+### Perubahan per berkas (semua `src/frontend/**`; 0 backend; 0 tes dihapus)
+- `static/index.html`: kontrol device-sim BARU dua tempat — `:166` `<button class="device-trigger" id="deviceTriggerDesktop">`
+  di `.sidebar-footer` (di atas link Repo `:173`), dan `:1423` `<button class="bn-device" id="deviceTriggerMobile">` di
+  `.bottom-nav` (di atas item Repo; SENGAJA bukan `.bn-item` supaya paritas 10 item tetap). Modal BARU `:1355`
+  `#deviceModal` reuse `.modal-overlay`+`.modal`, `role=dialog aria-modal=true aria-labelledby=deviceModalTitle`,
+  tiga tombol mode `[data-device-mode]` (phone 375×667 / tablet 768×1024 / desktop 1280×800) + `:1378` `.device-preview`
+  + `:1380` `<iframe id="deviceFrame">` + tombol `#deviceModalClose`. DIHAPUS: blok `#setDevice <select>` + `#setDeviceNote`
+  (dulu `:227-238`) dan baris Export lama (dulu `:259-264`); Export masuk satu action bar `:274` `.form-actions.backup-actions`
+  bareng Import. Cache-buster `?v=` di-bump → `20260922` (V inline `:20`, styles.css `:61`, i18n.js `:1436`, device.js `:1439`, app.js `:1446`).
+- `static/styles.css`: `:684` `.backup-actions` (satu ritme, wrap penuh di phone) · `:693` `.device-trigger` +
+  `:711` state `sidebar-collapsed` · `:715` `.bn-device` · `:731` `.device-modal`/`.device-modes`/`.device-mode`
+  (+ `.is-active` pakai token `--accent`/`--accent-contrast`) · `:761-782` `.device-preview`/`.device-frame-wrap`/`.device-frame`
+  (transform-scale, wrap menyimpan area TERSCALE) · **fix inti "gak responsif"**: `:822` di `@media (max-width:600px)` dan
+  `:854` di `body[data-device="phone"]` → `.settings-card .form-row { flex-direction:column; align-items:stretch }` +
+  `.form-input { width:100%; max-width:100% }` + `.switch { align-self:flex-start }`. Nol hex baru (verified: diff `+` tak
+  ada satu pun `#rrggbb`; hover pakai pola `rgba(255,255,255,.06)` yang sudah ada di `:351`).
+- `static/app.js`: `:94` `DEVICE_SIZES` · `:104-145` `deviceFocusables`/`deviceRenderPreview` (scale = min(1, box/device))
+  · `:149` `setDevicePreference(mode)` (satu titik set+persist `aigate.device`) · `:160-210` `openDeviceModal`/`closeDeviceModal`
+  dengan focus-trap Tab & Shift+Tab, ESC tutup, restore fokus ke trigger · `:212` `setupDeviceModal()` (trigger via
+  `[data-device-trigger]`, close via click-overlay + `#deviceModalClose`) dipanggil di boot `:2398`. DIHAPUS: listener
+  `#setDevice change` (dulu `:2244-2251`) dan `sel.value` di `applyDevice` (dulu `:66-67`); `applyDevice` tetap set
+  `body[data-device]` (`:65`). Test hook `:436-440`: `setDevice`/`applyDevice`/`setupDeviceModal`.
+- `static/i18n/{en,id,ja,nl,ru,zh-tw,zh}.js`: +1 kunci `common.close` per kamus → paritas 443 kunci × 7 (terukur `grep -c`).
+- `tests/device_modal.test.js` (BARU, 9 tes): letak kontrol di atas Repo dua shell + `aria-haspopup=dialog`/`aria-controls`,
+  `#setDevice` benar-benar hilang, buka modal → fokus masuk, pilih mode → apply+persist+`aria-pressed`, focus-trap dua arah,
+  ESC tutup + restore fokus, click-overlay tutup, klik isi modal TIDAK menutup.
+- `tests/views.test.js`: `:295` paritas `.bn-item` TETAP 10 (kontrol baru bukan `.bn-item`) + `:444-452` batas separator
+  terakhir kini System → `settings.device_sim` (Repo mengikuti setelah kontrol) dengan komentar paritas.
+- `tests/provider_detail.test.js`: `:257-258` tak lagi rekayasa `#setDevice`, kini `window.aigate.setDevice("phone")` +
+  assert `body.dataset.device`.
+
+### Verifikasi PM MANDIRI (bukan menelan receipt)
+- `node node_modules/.bin/vitest run` (src/frontend) = **27 berkas / 681 tes LOLOS** · run tanpa berkas baru
+  (`--exclude tests/device_modal.test.js`) = **26/672** → delta **+9** persis klaim.
+- `git diff --check` bersih (exit 0); `git status` = nol file liar di luar `src/frontend/**` + `documents/pm/**`.
+- Scope: 13 berkas src/frontend = 100% write-root fe-dev; `device.js` TIDAK berubah (cache-buster-nya di-bump → tanpa dampak, tak ada isi baru).
+- Rujukan usang `#setDevice` di `static/` + `src/backend/` = **NONE**.
+- **Browser NYATA (Chromium 149 headless, static server ad-hoc di TMPDIR — proses user `:8080` tidak disentuh):**
+  35 pemeriksaan DOM/layout terukur, **34 PASS**. Sampel: 1280px `.form-row` tetap `row` (input 240px); 360px `column` +
+  input 298/298px = lebar baris + `scrollWidth-clientWidth = 0` (nol overflow); backup buttons tinggi sama (34px) &
+  tumpuk lebar penuh di 360 (298/298); modal terbuka `role=dialog aria-modal=true`, focus masuk ke kontrol pertama,
+  Tab wrap last→first & Shift+Tab first→last (n=4 focusable), ESC tutup + `document.activeElement` = trigger,
+  pilih phone → `body[data-device]=phone` + `localStorage aigate.device=phone` + preview di-resize 375px, pilih tablet
+  di shell phone → `768px` + `aria-pressed=true`, reopen memulihkan penanda mode; `contentDocument` iframe = app asli
+  (`.layout` ada). 1 FAIL awal = artefak sequencing skrip PM (setelah pilih "phone", sidebar jadi `display:none` sehingga
+  fokus ke trigger desktop memang mustahil) → diulang berurutan bersih di dua shell: **PASS 11/11**, termasuk
+  "ESC tidak mengubah device".
+- Gate governance: `python3 .opencode/tools/governance/rules-index.py` = **LOLOS** (55 rule / 10 tema; F5 tercatat).
+
+### Keputusan PM atas open question fe-dev (iframe = app penuh)
+DITERIMA tanpa backend baru. Alasan: (a) handover §1.C memang mensyaratkan preview = app sendiri di 3 ukuran — bukan
+rute terpisah; (b) diverifikasi aman: `terminal.js:503/582` (`WebSocket`) baru jalan kalau tab terminal DIBUKA, dan
+iframe membuka view welcome → nol PTY; (c) `applyDevice` hanya menyentuh `body` dokumen masing-masing (iframe ≠ parent),
+dan tidak ada listener `storage` di `app.js` → nol loop balik antar-dokumen. Konsekuensi yang diterima: selama modal
+terbuka, iframe mengulang polling GET aplikasi (biaya trafik, bukan bug) dan `GET /api/...` 404 di static server ad-hoc
+(expected — di `:8080` asli API ada). **Follow-up opsional (bukan scope fe-dev, belum disetujui user):** rute/mode
+preview ringan (`?preview=1` non-interaktif, nol fetch) kalau preview ini nanti jadi fitur tetap.
+
+### Status
+SELESAI + terverifikasi browser nyata. Push / PR: **BELUM** (tunggu perintah user). Sisa: sentuhan layar asli di HP
+user (jsdom/headless ≠ touch), terjemahan `common.close` 6 bahasa belum ditinjau penutur.
+
 ## 2026-09-13 — Redesign CLI Tools: kartu responsif + logo platform (PM → fe-dev) — DONE (DI-COMMIT 59c570d, refactor/ui, BELUM push)
 
 **Asal:** user: "daftar cli-tools masing-masing jadi card, platform pakai logo aja, desain jelek → redesign bagus + responsif" (branch `refactor/ui`).
@@ -1812,3 +1883,59 @@ bentuk favicon menunggu selera user · `trace/screenshot on-failure` masih menul
 - `src/backend/combo_routing.py`: `resolve_combo_stream_target` direstrukturisasi — seluruh pemilihan anggota DIPINDAH ke dalam `with SessionLocal() as session:`; untuk strategi `round_robin` delegasi ke `select_member("round_robin", openai_candidates, session, combo=combo)` (naikkan + commit cursor `combo.last_used_index`); `fallback`/`three_tier`/lain → `openai_candidates[0]` (perilaku lama). Rotasi streaming kini sama dengan non-streaming untuk kombo all-OpenAI.
 - `tests/backend/test_combo_round_robin_stream.py` (BARU): 4 tes — rotasi streaming 2 anggota (cursor 0→1→0, model beda tiap panggilan), rotasi by-id, fallback/three_tier tetap anggota pertama (tanpa rotasi, cursor tetap 0).
 - Nol skema/DB berubah, nol frontend. Pytest: **557 passed / 1 skipped** (+4 tes baru).
+
+### 2026-09-13 — FIX: device-sim preview TERISOLASI di iframe + modal seukuran perangkat (fe-dev; verifikasi PM)
+- `src/frontend/static/app.js`:
+  - `deviceSelectMode` (:171-178): HAPUS panggilan `setDevicePreference(mode)` → kini `deviceAttr` + variabel sesi lokal `devicePreviewMode` (:102) + `deviceSetActiveMode` + `deviceRenderPreview` + `deviceApplyInFrame`. Jalur mutasi halaman luar + tulis localStorage dari modal MATI.
+  - `deviceRenderPreview` (:123-131): HAPUS `transform:scale` + reserve-wrap; kini set `--dev-w`/`--dev-h` (px, dari `DEVICE_SIZES`) di `.device-modal` → cascade ke box + iframe. Nol shrink.
+  - BARU `deviceApplyInFrame(mode)` (:134-145): apply device HANYA di dokumen iframe via `contentWindow.aigate.applyDevice`, try/catch + guard `w.aigate` (belum load = no-op).
+  - `openDeviceModal` (:181-194): mode awal = `devicePreviewMode || DEFAULT_DEVICE` — BUKAN `document.body.dataset.device` luar, BUKAN localStorage.
+  - `setupDeviceModal` (:251-263): + listener `load` iframe → apply mode ke dalam frame; + `window resize` → refit (cacat sekunder lama).
+  - Komentar salah fakta diperbaiki di blok header (:87-92), `setDevicePreference` (:157-162), dan blok init (:2427-2431) → "preview scoped to the iframe; the live page is never touched".
+- `src/frontend/static/styles.css`:
+  - `.device-modal{max-width:620px}` → `.modal.device-modal{width:var(--dev-w,620px);max-width:92vw;max-height:80vh;overflow:auto}` (:738-746). Selector dua-kelas WAJIB: `.modal{max-width:540px}` (:1235-1245) belakangan + spesifisitas sama akan pin box ke 540px.
+  - `.device-preview` (:770-779): `height:340px;overflow:hidden` → `overflow:auto` (scroll container; tinggi seret konten). `.device-frame-wrap` → `flex:0 0 auto` (gak squeezes device).
+  - `.device-frame` (:780-786): `transform-origin` → `transform:none; width:var(--dev-w); height:var(--dev-h)` (iframe = px perangkat asli).
+- `src/frontend/static/index.html`: cache-buster `20260922`→`20260923` untuk `I18N_VER` (:20) + `styles.css` (:61) + `i18n.js` (:1436) + `app.js` (:1446). i18n.js+V DIBUMP BERSAMAAN karena invarian `tests/i18n.test.js:307-315` (`app.js?v == i18n.js?v == I18N_VER`); `device.js?v` TETAP 20260922 (berkas tak berubah, tak terikat invarian).
+- `src/frontend/tests/device_modal.test.js`: kontrak DI-INVERT — pilih mode HARUS TIDAK menyentuh `document.body.dataset.device` luar & TIDAK menulis `localStorage.aigate.device`; assertion baru cek `--dev-w=375px`/`--dev-h=667px` + tombol aktif. Komentar header + precondition `beforeEach` disesuaikan.
+- `src/frontend/tests/provider_detail.test.js`: KOMENTAR saja (:255-265) — jalur `window.aigate.setDevice` langsung (boot/test hook halaman luar) tetap sah; modal sudah TAK share path itu. Assertion tetap hijau.
+- Nol backend, nol hex baru, nol perubahan markup `#deviceModal`/trigger. Vitest: **27 berkas / 681 tes LOLOS** (sama 681; device_modal 9 tes kontrak baru). Chromium nyata (headless, instance terisolasi port 43669 + DB di tmp, PID sendiri — `:8080` user tak disentuh): **22/22 PASS** — body luar `desktop` konstan across open→phone→tablet→desktop→close→reload; `localStorage.aigate.device` null terus; frame 375/768/1280 px nyata `transform:none`; bottom-nav dalam frame 56px (proporsional, bukan 26px); desktop di viewer 820px → box 754px (cap 92vw) + scroll INTERNAL, iframe tetap 1280px.
+
+### 2026-09-13 — FIX device-sim preview kepotong KIRI & KANAN (fe-dev; audit+gerbang+commit PM) — commit `430f33b`
+**Asal:** bug BARU di PR #23 / commit `735d9e2`. Handover `documents/pm/handovers/handover-20260913-device-preview-clip-lr.md`.
+**Akar (terukur Chromium, bukan hipotesis — aturan F5/F3):** `.device-preview{ display:flex; justify-content:center; overflow:auto }`
+di-overflow child `.device-frame-wrap` (lebar = `--dev-w`) yang lebih lebar dari kontainer → `justify-content:center` menumpuk
+overflow SIMETRIS + `scrollLeft` tak bisa negatif → sisi KIRI permanen tak tercapai (`leftUnreach>0` 9/9 sel). Cacat sekunder:
+`.modal.device-modal{ overflow:auto }` bikin SELURUH modal scroll → Close ke-dorong keluar viewport di viewer pendek.
+**Catatan kepemilikan (audit session DB `opencode.db`):** edit `src/**` DI-BUAT oleh sesi **fe-dev** (tool-call `edit` 03:36:39/
+03:36:44 styles.css, 03:36:56 index.html, 03:37:20/03:37:33 device_modal.test.js) — BUKAN oleh PM. Sesi PM (`ProjectManager`)
+hanya menulis `documents/pm/**` + skrip scratch tmp; validasi "after" PM dilakukan lewat injeksi `<style>` runtime
+(`dp_target.mjs`, berkomentar eksplisit "NO file write") → **rule A2 TIDAK dilanggar** (PM nol tulis `src/`). Receipt fe-dev
+yang menyebut "edit sudah ada di working tree, saya cuma verifikasi" TIDAK cocok log: fe-dev sendiri yang menulisnya.
+- `src/frontend/static/styles.css`:
+  - `.modal.device-modal` (:738-): `width:var(--dev-w,620px)`→`fit-content`; `overflow:auto`→`hidden`; + `display:flex; flex-direction:column` → modal TIDAK scroll, kotak hug perangkat, tetap di-cap `max-width:92vw/max-height:80vh`.
+  - BARU anak modal `> .modal-title, > .settings-dev-note, > .device-modes, > .form-actions { flex:0 0 auto }` → header/mode-buttons/footer tak ikut menyusut, Close selalu in-view.
+  - `.device-preview` (:789-): + `flex:0 1 auto; min-height:0`; `justify-content:center`→`flex-start` (INTI FIX — buang tumpukan overflow simetris) → satu-satunya area scroll.
+  - `.device-frame-wrap`: + `margin-inline:auto` (safe-center: ter-center saat ada ruang, runtuh ke 0 saat overflow → tepi kiri di `scrollLeft=0`, tercapai).
+- `src/frontend/static/index.html`: cache-buster `styles.css?v=20260923`→`20260924` (:61) SAJA; `app.js`/`i18n.js`/`I18N_VER` TETAP `20260923` → invarian `tests/i18n.test.js:307-315` utuh. `app.js` tak disentuh (fix murni CSS).
+- `src/frontend/tests/device_modal.test.js`: + penjaga regresi STATIS (helper `cssRuleBody` baca `styles.css`): `.device-preview` tak boleh `justify-content:center` (harus `flex-start`) + ada `min-height:0`; `.modal.device-modal` `width:fit-content` + `overflow:hidden` (bukan `auto`); `.device-frame-wrap` `margin-inline:auto`+`flex:0 0 auto`. +4 tes (device_modal 9→13).
+- Nol backend, nol hex, nol ubah markup `#deviceModal`/trigger. **Gerbang PM (jalankan sendiri, sesi ini):** `vitest run` = **27 berkas / 685 tes LOLOS** (681 +4 penjaga); `git diff --check` exit 0; diff src = persis §2.1–2.5 handover + §5, NOL perubahan nyasar.
+
+### 2026-09-13 — FIX settings dua panel SEJAJAR (kiri-kanan) di layar besar, NUMPUK di layar kecil (fe-dev; audit+verifikasi mandiri+commit PM) — commit `c495d68`
+**Asal:** user: "panel setting gak responsif... pas mode layar besar dibuat sejajar kesamping, baru kebawah pas layar kecil". Handover `documents/pm/handovers/handover-20260913-settings-2panel-sidebyside.md`.
+**Akar (terukur, confirmed PM mandiri di Chromium nyata):** `.view[data-view="settings"].is-active{display:block}` (styles.css:422) + `.settings-card{max-width:540px}` (styles.css:493) → dua `.card.settings-card` (form Settings `index.html:201-244` + Backup&Restore `index.html:250-284`) SELALU numpuk atas-bawah & cap 540px rata kiri → di 1280/1440 ruang kosong lebar di kanan (keluhan "gak responsif"). BEFORE (CSS HEAD) di 1440: c1(top143,left248,w540) c2(top509,left248,w540) = STACKED.
+**Fix (desktop-first, reuse breakpoint 960 repo — TANPA breakpoint baru):**
+- `src/frontend/static/styles.css` (base, setelah :493): `.view[data-view="settings"].is-active{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); column-gap:18px; row-gap:0; align-items:start}` + `.view[data-view="settings"] .page-banner{grid-column:1/-1}` + `.view[data-view="settings"] .backup-card{margin-top:0}`. Mirror pola grid aman `.combo-member-fields` (minmax(0,1fr) cegah blowout).
+- TAMBAHAN ke `@media(max-width:960px)` yang SUDAH ADA (:823-828): `.view[data-view="settings"].is-active{display:block}` + `grid-column:auto` + `.backup-card{margin-top:18px}` → revert persis layout pre-fix (numpuk), nol regresi. Token only, NOL hex baru, nol ubah `.form-row`/modal/aksesibilitas.
+- `src/frontend/static/index.html`: cache-buster `styles.css?v=20260924`→`20260925` (:61) SAJA; `app.js`/`i18n.js`/`I18N_VER` TETAP `20260923` → invarian `tests/i18n.test.js:307-315` utuh. `app.js` tak disentuh (fix murni CSS → F6 halaman asli utuh saat preview).
+- Nol backend, nol tes diubah/ditambah. **Verifikasi PM mandiri (Chromium 149 headless, instance terisolasi port 58981 + DB tmp + CDP 36349, PID sendiri; `:8080` user TIDAK disentuh, J6):** AFTER di 8 lebar — ≥961 grid SIDE-BY-SIDE (offsetTop≈, offsetLeft beda: w1440 c1top143/c2top143 c1left248/c2left844; w961 c1top164/c2top164 c1left248/c2left604); ≤960 block STACKED (w960 c1top160/c2top518; w375 c1top197/c2top651); **NOL horizontal overflow** semua lebar (scrollWidth==clientWidth); banner full-width; `.form-row` stacking ≤600 tetap (`stacked:true`); device-sim iframe desktop→grid / tablet+phone→block. `vitest run` = **27 berkas / 685 tes LOLOS**; `git diff --check` exit 0; diff src = hanya 2 berkas tsb, NOL nyasar. Fix clip `430f33b` utuh (device_modal.test.js 13 tes hijau; app.js:133–145 hanya tulis body[data-device] DI DALAM frame).
+**Catatan follow-up (TIDAK dikerjakan sekarang):** stale `localStorage["aigate.device"]="phone"` (era pre-F6) di window lebar → `body[data-device="phone"]` aktif → shell phone tapi settings tetap grid (ganjil, nol overflow). Hanya reachable dari nilai localStorage jadul (modal sekarang tak tulis outer page). Task terpisah.
+
+### 2026-09-14 — FIX lebar panel Settings dalam PERSEN (50% layar besar / 100% layar kecil) (fe-dev; audit+verifikasi mandiri+commit PM) — commit `52f4a50`
+**Asal:** lanjutan `c495d68`. User: "kok width panelnya gak kayak 50% yak waktu di layar besar. dan gak kayak 100% waktu di layar kecil (ponsel)". Handover `documents/pm/handovers/handover-20260913-settings-panel-width-persen.md`.
+**Akar (terukur, confirmed PM mandiri Chromium nyata):** cap `.settings-card{max-width:540px}` (styles.css:493, warisan era satu-kolom) masih menjepit tiap kartu DI DALAM kolom grid yang lebih lebar → layar besar kartu tak isi kolom (1440 46% / 1920 32.6%); band 781–960 numpuk kartu 540 < container → 75–97% (bukan 100%). Ponsel ≤600 FAKTANYA SUDAH 100% (rule `@media(max-width:600px){.settings-card,.welcome-card{max-width:100%}}` menang) — keluhan "ponsel gak 100%" TIDAK terbukti di ≤600, dilapor jujur (F5/F3).
+**Fix (scoped override, TANPA breakpoint baru, TANPA hex baru):**
+- `src/frontend/static/styles.css` (tambah 1 rule stlh :513, di blok settings): `.view[data-view="settings"] .settings-card { max-width: none; }` (komentar 9 baris jelaskan akar+no-regression). Spesifisitas (0,2,0) outrank cap :493 (0,1,0) & rule ≤600 :880 (0,1,0); `none` ≡ `100%` di HP → tak regresi. Global cap :493 **DIBIARKAN UTUH** (override scoped, bukan cabut) agar dipakai view lain `.welcome-card` tetap. Nol ubah grid block `c495d68` (:505–513), collapse `@media(max-width:960px)`, `@media(max-width:600px)` + `.form-row` stacking, fix clip `430f33b`.
+- `src/frontend/static/index.html`: cache-buster `styles.css?v=20260925`→`20260926` (:61) SAJA; `app.js`/`i18n.js`/`I18N_VER` TETAP `20260923` → invarian `tests/i18n.test.js:307-315` utuh. `app.js` tak disentuh (fix murni CSS → F6 halaman asli utuh saat preview).
+- Nol backend, nol tes diubah/ditambah. **Verifikasi PM mandiri (G3, tak telan receipt; harness CDP `pm_spw/` MILIK PM, server own-port 58585 + AIGATE_DB_PATH tmp + chromium user-data-dir tmp + CDP 34209, PID sendiri; `:8080` user TIDAK disentuh — J6, tetap 200):** AFTER working-tree 8 lebar → 1920 **49.5%** (bkn 32.6) · 1440 **49.2%** (bkn 46) · 1100 48.9% · 961 48.8% (grid `818/578/408/338.5px`, kartu==kolom, ruang mati 0 [−0.5 subpixel 961]) · 960/800/600/375 **100%** (block, kartu==section clientWidth) · `max-width` computed `none` · **NOL horizontal overflow 8/8**. Cocok persis klaim receipt. **Gerbang PM (mata sendiri):** `vitest run` = **27 berkas / 685 tes LOLOS** (device_modal.test.js 13 tes hijau → clip `430f33b` utuh); `git diff --check` exit 0; diff src = hanya 2 berkas tsb, NOL nyasar. Kepemilikan: penulis `src/frontend/**` = fe-dev (write-root sah); PM nol tulis src/ (A2), cuma documents/pm|dev + reports + scratch tmp.
+**Jujur / cacat tak dikarang:** ponsel ≤600 SUDAH 100% sejak HEAD; fix nutup band 781–960 + layar besar ≥~1364. Kalau di HP masih sempit setelah ini: hard-refresh (statis tanpa `Cache-Control`; cache-buster `20260926` paksa URL CSS baru). Sisa user: uji mata layar asli + sentuhan HP.

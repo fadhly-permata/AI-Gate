@@ -492,6 +492,36 @@ body.sidebar-collapsed .nav-item {
 /* ===== Settings panel (B1.3) ===== */
 .settings-card { max-width: 540px; }
 
+/* Settings: the two panels (main form + Backup & Restore) sit SIDE BY SIDE on a
+   large screen and stack only when the screen gets small (user 2026-09-13).
+   Base = desktop-first, so the grid is the > 960px state and the EXISTING
+   `@media (max-width: 960px)` block below reverts it to the stacked layout.
+   Reuses the repo's own 960px tablet breakpoint (no new breakpoint) and mirrors
+   the safe two-column grid pattern of .combo-member-fields (styles.css:1062) —
+   minmax(0, 1fr) so a fixed-width .form-input can never blow a column out.
+   18px column-gap = the repo's existing panel rhythm (.page-banner margin-bottom
+   / .backup-card margin-top); align-items:start keeps the short Backup card from
+   stretching to the form's height. Tokens only, no new colors. */
+.view[data-view="settings"].is-active {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 18px;
+  row-gap: 0;
+  align-items: start;
+}
+.view[data-view="settings"] .page-banner { grid-column: 1 / -1; }
+.view[data-view="settings"] .backup-card { margin-top: 0; }
+
+/* The 540px cap (line 493, warisan era satu-kolom) still clamps each card INSIDE
+   the wider grid columns → 46% @1440, 32.6% @1920 (user: "gak kayak 50%"), and
+   75–97% in the 781–960 stacked band (user: "gak 100% di layar kecil"). Inside the
+   Settings view only, drop the cap: grid items then fill their column (≈50% minus
+   half the 18px gap) and stacked cards fill the container (100%). Specificity
+   (0,2,0) beats `.settings-card` :493 (0,1,0) and the ≤600 `max-width:100%` rule
+   (:880) — `none` there is equivalent, so phones keep the proven 100%. No new
+   breakpoint, no colors, no other view touched (.welcome-card cap stays). */
+.view[data-view="settings"] .settings-card { max-width: none; }
+
 .settings-title {
   margin: 0 0 18px;
   color: var(--accent);
@@ -677,12 +707,160 @@ input.form-input[type="file"] {
 }
 a.btn { text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
 
+/* Both backup actions now live in ONE action bar (Export was moved out of its
+   own .form-row, where a <a.btn> sat taller/wider than the field rows above it
+   and broke the rhythm — handover §1.B). Same .btn.btn-primary footprint -> equal
+   height; they wrap to a full-width stack on phone so the card keeps one edge. */
+.backup-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.backup-actions > .btn { display: inline-flex; align-items: center; justify-content: center; }
+@media (max-width: 600px) { .backup-actions > .btn { flex: 1 1 auto; } }
+body[data-device="phone"] .backup-actions > .btn { flex: 1 1 auto; }
+
+/* ===== Device-view simulation control + modal (Opsi A) =====
+   The control was moved OUT of the Settings form into a small trigger row above
+   the Repo link — .device-trigger in the sticky sidebar footer (tablet/desktop),
+   .bn-device in the bottom nav (phone). Tokens only, no new hex. */
+.device-trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  color: var(--sidebar-fg);
+  white-space: nowrap;
+  background: none;
+  border: none;
+  border-left: 3px solid transparent;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition), color var(--transition),
+              border-color var(--transition);
+}
+.device-trigger:hover { background: rgba(255, 255, 255, 0.06); color: var(--sidebar-fg-hover); }
+body.sidebar-collapsed .device-trigger { justify-content: center; padding: 12px 0; }
+
+/* Bottom-nav sibling of the Repo item (a <button>, NOT a .bn-item: the
+   nav-parity test counts .bn-item = 10, and this is a control, not a view). */
+.bn-device {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 0;
+  min-width: 60px;
+  height: 100%;
+  color: var(--sidebar-fg);
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  transition: color var(--transition), background var(--transition);
+}
+.bn-device:hover { color: var(--sidebar-fg-hover); }
+
+/* Device-sized dialog. --dev-w / --dev-h are set per mode by JS on this box and
+   cascade into .device-frame. The box auto-sizes to the device but is clamped to
+   the viewer (max-width/height); anything larger scrolls INSIDE it (overflow:auto)
+   instead of being scaled down. The live page behind is never resized.
+   Selector is `.modal.device-modal` (not just `.device-modal`) so it outranks the
+   base `.modal{width:100%;max-width:540px;max-height:90vh}` rule further down —
+   equal specificity + later source order would otherwise pin the box to 540px. */
+.modal.device-modal {
+  /* Hug the device instead of forcing the box to --dev-w; the modal itself must
+     NOT scroll — only .device-preview scrolls. fit-content lets the box shrink to
+     the device yet stay clamped by max-width/height to the viewer. */
+  width: fit-content;
+  max-width: 92vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* Direct children must not shrink — they carry their own height (title, note,
+   mode buttons, footer) so they always stay in the viewport; only the preview
+   area between them is allowed to shrink and scroll internally. */
+.modal.device-modal > .modal-title,
+.modal.device-modal > .settings-dev-note,
+.modal.device-modal > .device-modes,
+.modal.device-modal > .form-actions { flex: 0 0 auto; }
+.device-modes { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 16px; }
+.device-mode {
+  flex: 1 1 0;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 8px;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition),
+              color var(--transition);
+}
+.device-mode i { font-size: 20px; }
+.device-mode small { font-weight: 400; color: var(--muted); font-size: 12px; }
+.device-mode:hover { border-color: var(--accent); }
+.device-mode.is-active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+}
+.device-mode.is-active small { color: var(--accent-contrast); }
+
+/* Live preview of the app itself, rendered at REAL device size inside the iframe.
+   No scale transform: .device-frame keeps its exact device px (--dev-w/--dev-h) so
+   the iframe's own media queries + body[data-device] rules fire INSIDE the frame.
+   The .device-frame-wrap is a non-shrinking flex child (flex:0 0 auto) so the box
+   never squeezes the device; anything wider/taller than the viewer scrolls inside
+   .device-preview (overflow:auto), content stays full size. */
+.device-preview {
+  /* flex:0 1 auto + min-height:0 = the ONE scrollable area: it may shrink so the
+     footer (Close) stays in view, and it scrolls internally instead of pushing the
+     Close button out of a short viewport. justify-content:flex-start (NOT center)
+     is the core fix: centering splits overflow symmetrically and scrollLeft can't
+     go negative, so the LEFT edge was permanently unreachable. With flex-start the
+     content starts at scrollLeft=0; the child's margin-inline:auto below re-centers
+     it only when there is free space (safe-center). */
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  padding: 10px;
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  overflow: auto;
+}
+/* margin-inline:auto centers the device when it fits, and collapses to 0 on
+   overflow so the left edge sits at scrollLeft=0 — both edges stay reachable. */
+.device-frame-wrap { flex: 0 0 auto; margin-inline: auto; }
+.device-frame {
+  display: block;
+  width: var(--dev-w, 100%);
+  height: var(--dev-h, 500px);
+  transform: none;
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+}
+
 /* Tablet: keep the AdminLTE-like layout, just tighten spacing/widths. */
 @media (max-width: 960px) {
   :root { --sidebar-w: 200px; --ws-pad: 14px; }
   .card { padding: 18px; }
   .form-input { width: 200px; max-width: 100%; }
   .welcome-card { margin-top: 4vh; }
+  /* Small screen: undo the side-by-side grid so the two Settings panels go back
+     to stacking vertically (exactly the pre-2026-09-13 layout — no regression).
+     .backup-card's 18px vertical rhythm returns now that column-gap is gone. */
+  .view[data-view="settings"].is-active { display: block; }
+  .view[data-view="settings"] .page-banner { grid-column: auto; }
+  .view[data-view="settings"] .backup-card { margin-top: 18px; }
 }
 
 /* Phone — real narrow viewport OR device simulation = phone: NON-AdminLTE shell.
@@ -710,6 +888,15 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; gap: 6
   }
   #sidebarToggle { display: none; }
   .settings-card, .welcome-card { max-width: 100%; }
+  /* Fix "gak responsif": the two-column .form-row (label | input) must stack
+     label-above-input once there is no room for both side by side, or a 375px
+     phone squeezes the label to ~40% and clips the input. Reuse .form-row-stack
+     behaviour here (column + stretch) and let the control fill the row. Tokens
+     only — no new colors. */
+  .settings-card .form-row { flex-direction: column; align-items: stretch; gap: 8px; }
+  .settings-card .form-row > .form-label { margin: 0; }
+  .settings-card .form-input { width: 100%; max-width: 100%; }
+  .settings-card .switch { align-self: flex-start; }
   .cli-tools { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
   .data-table { display: block; overflow-x: auto; white-space: nowrap; }
   .modal { width: 100%; }
@@ -736,6 +923,12 @@ body[data-device="phone"] .bottom-nav {
 body[data-device="phone"] #sidebarToggle { display: none; }
 body[data-device="phone"] .settings-card,
 body[data-device="phone"] .welcome-card { max-width: 100%; }
+/* Device-simulation = phone mirrors the real narrow viewport above (same
+   stacking contract, so the preview iframe shows what a phone user sees). */
+body[data-device="phone"] .settings-card .form-row { flex-direction: column; align-items: stretch; gap: 8px; }
+body[data-device="phone"] .settings-card .form-row > .form-label { margin: 0; }
+body[data-device="phone"] .settings-card .form-input { width: 100%; max-width: 100%; }
+body[data-device="phone"] .settings-card .switch { align-self: flex-start; }
 body[data-device="phone"] .cli-tools { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
 body[data-device="phone"] .data-table { display: block; overflow-x: auto; white-space: nowrap; }
 body[data-device="phone"] .modal { width: 100%; }

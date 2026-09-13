@@ -4,6 +4,88 @@
 (empty — diisi PM saat task pertama)
 
 ## Decisions
+- 2026-09-13 (SETTINGS DUA PANEL SEJAJAR — diagnosis + handover, BELUM eksekusi): user lapor "panel-panel pada
+  halaman setting banyak yang gak responsif... kenapa gak dibuat jadi sejajar kesamping aja pas mode layar besar.
+  Baru dibuat sejajar kebawah ketika menggunakan layar kecil". Sesuai F5, "gak responsif" = layout tak adaptif
+  (BUKAN performa). PM investigasi read-only berbukti `file:line` (nol broad grep, C4): **"2 panel" = dua
+  `.card.settings-card`** di `<section data-view="settings">` (`index.html:195`) — Panel1 form Settings
+  (`index.html:201-244`: Port/DevMode/Theme/Language/Save), Panel2 Backup&Restore (`index.html:250-284`).
+  **AKAR gak responsif di layar besar:** `.view.is-active{display:block}` (`styles.css:422`) → anak mengalir
+  VERTIKAL → dua panel MENUMPUK; `.settings-card{max-width:540px}` (`styles.css:493`) cap tiap panel 540px
+  rata-kiri → ruang kosong lebar di kanan pada 1280/1440. **FIX (desktop-first, reuse breakpoint repo):** grid
+  2 kolom di base `.view[data-view="settings"].is-active{display:grid;grid-template-columns:repeat(2,
+  minmax(0,1fr));column-gap:18px;align-items:start}` + banner `grid-column:1/-1` + backup-card `margin-top:0`;
+  collapse ke numpuk di `@media (max-width:960px)` yang SUDAH ADA (`styles.css:822-828`, kembalikan block +
+  `grid-column:auto` + `margin-top:18px`) → JANGAN angka breakpoint baru (repo tanpa `min-width`; 960 = garis
+  desktop/tablet yang dipakai). Preseden pola: grid aman `.combo-member-fields` (`styles.css:1062`), override
+  display per-view terminal (`styles.css:1441`), ritme gap 18px (banner/backup). **NO-REGRESSION dijaga:**
+  `.form-row` stacking ≤600 (`:860-863`) + `body[data-device=phone]` (`:892-895`), modal clip fix `430f33b`,
+  F6 (murni CSS → nol JS → halaman asli utuh), aksesibilitas. Scope: `styles.css` + cache-buster `index.html:61`
+  `20260924→20260925` (styles.css independen; invarian i18n app/i18n/I18N_VER tetap `20260923`). Handover:
+  `documents/pm/handovers/handover-20260913-settings-2panel-sidebyside.md`. Owner fe-dev (PM tak punya Task tool).
+  DoD G3: Chromium nyata ukur before/after di 1440/1280/1100/961/960/768/600/375 (assert offsetTop≈ & offsetLeft
+  beda = sejajar ≥961; offsetTop naik & offsetLeft sama = numpuk ≤960; nol overflow) + vitest hijau. **Catatan
+  jujur "panel lain banyak gak responsif":** view Settings HANYA punya 2 panel ini; kalau user maksud panel view
+  LAIN (providers/combos/usage/dll) = task terpisah (lapor ke PM). STATUS: diagnosis + handover landed; BELUM
+  spawn/eksekusi src.
+
+- 2026-09-13 (AUDIT kepemilikan edit clip-lr — A2 TIDAK dilanggar): user curiga PM yang nulis `src/` (karena receipt
+  fe-dev bilang "edit sudah ada di working tree, saya cuma verifikasi"). PM telusuri session DB `opencode.db` (tabel
+  `part`): sesi fe-dev `ses_f6384…` yang menulis styles.css/index.html/device_modal.test.js (tool-call `edit`
+  03:36:39–03:37:33); sesi PM `ses_f63a…` HANYA `documents/pm/**` + skrip scratch tmp, dan skrip validasi `dp_target.mjs`
+  berkomentar "NO file write" (after-state diukur lewat injeksi `<style>` runtime). KEPUTUSAN: commit fix `430f33b`
+  (staging 3 berkas fitur eksplisit) + push → PR #23 diperbarui; NOL postmortem "PM tulis src" krn tak terjadi (nol
+  pengakuan palsu). TEMUAN: receipt fe-dev tidak akurat ttg penulis → pola claim-vs-fact (F5/F6) kini di sisi sub-agent;
+  kandidat rule akurasi-receipt utk user putuskan. Gerbang PM: vitest 27/685 LOLOS, `git diff --check` bersih.
+
+- 2026-09-13 (SETTINGS DUA PANEL SEJAJAR — AUDIT + VERIFIKASI MANDIRI + COMMIT `c495d68` + PUSH → PR #23, SELESAI): fe-dev selesai handover-20260913-settings-2panel-sidebyside (receipt: 2 berkas, 8 lebar terukur, vitest hijau, BELUM commit). PM AUDIT: `git diff` src/frontend/** = HANYA styles.css (+26 baris) + index.html 1 baris cache-buster :61 (20260924→20260925); NOL hex baru; NOL file nyasar; NOL sisa task ke-abort. `git diff --check` exit 0. GATE PM DIJALANKAN SENDIRI: vitest 27 berkas/685 tes LOLOS. VERIFIKASI MANDIRI PM (G3 — tidak menelan receipt; Chromium 149 headless CDP, instance terisolasi port 58981 + AIGATE_DB_PATH tmp + chromium CDP 36349, PID sendiri; `:8080` user PID 25956 tak disentuh — J6) di 8 lebar: ≥961px `display:grid` SIDE-BY-SIDE (offsetTop≈, offsetLeft beda: 1440→top143/143 left248/844, 1280→248/764, 1100→248/674, 961→248/604); ≤960px `display:block` NUMPUK (960→top160/518, 768→160/518, 600→176/630, 375→197/651); NOL horizontal overflow 8/8; banner full-width; `.form-row` stacking ≤600 tetap; device-sim iframe desktop→grid / tablet+phone→block. BEFORE (CSS HEAD) di 1440 = NUMPUK (bukti keluhan ruang kosong). Fix `430f33b` clip UTUH (device_modal.test.js 13 tes hijau; app.js:133-145 hanya tulis body[data-device] DI DALAM frame → F6 aman). COMMIT `c495d68` fix(ui) (staging EKSPLISIT 2 berkas, BUKAN git add -A); commit docs(pm) TERPISAH; PUSH refactor/ui fast-forward → PR #23 auto-update (OPEN/MERGEABLE, label bug). Kepemilikan src = fe-dev (scope sah src/frontend/**); PM nol tulis src/ → A2/A3 dihormati. EDGE CASE follow-up TERPISAH (TIDAK dikerjakan): stale `localStorage["aigate.device"]="phone"` (era pre-F6) di window lebar → shell phone tapi settings tetap grid (ganjil, nol overflow); hanya reachable dari nilai jadul krn modal tak pernah tulis outer page. Laporan: .opencode/reports/20260913/frontend/0441_settings-2panel-sidebyside.md + documents/dev/CODE_CHANGES.md.
+
+- 2026-09-13 (diagnosis BERBUKTI device-preview kepotong kiri-kanan = flexbox centering overflow): user lapor bug
+  BARU di PR #23 / commit `735d9e2`. PM ukur pakai Chromium 149 NYATA (CDP + Node24 global WebSocket, tanpa npm;
+  instance terisolasi port-acak + `AIGATE_DB_PATH` tmp luar repo + PID sendiri; `:8080` user tak disentuh — J6,
+  diverifikasi `:8080`=200 + port sendiri down sesudahnya). AKAR: `.device-preview{ display:flex; justify-content:center;
+  overflow:auto }` (`styles.css:779-788`) + `.modal.device-modal{ width:var(--dev-w) }` (`styles.css:738-743`) +
+  `box-sizing:border-box` (`styles.css:77`); iframe `.device-frame{ width:var(--dev-w) }` (`styles.css:790-793`) lebih lebar
+  dari scroll-viewport kontainer → overflow dipusatkan simetris → setengah-kiri di `scrollLeft` negatif (tak tercapai).
+  **leftUnreach>0 di 9/9 sel** (mis. desktop@360=506.5px, bahkan phone@1280=30.5px); `transform:none` semua = BUKAN isu
+  scale 48% lama. Hipotesis user `overflow:hidden`/`92vw`/`scale` DITOLAK angka (overflow auto, cap tepat, transform none) —
+  yang benar cuma "flexbox centering overflow". Cacat sekunder: modal `overflow:auto` → Close terdorong keluar viewport di
+  viewer pendek. FIX divalidasi PM 12/12 sel: modal `width:fit-content; overflow:hidden; flex-direction:column`;
+  `.device-preview{ flex:0 1 auto; min-height:0; justify-content:flex-start }`; `.device-frame-wrap{ margin-inline:auto }`
+  (safe-center) → leftUnreach=0, rightUnreach=0, header/modes/Close selalu in-view, perangkat-muat nol-scroll, transform none.
+  MURNI CSS (`app.js` tak diubah → invarian i18n.test.js:307-315 utuh; cuma `styles.css?v`→20260924). Handover:
+  `documents/pm/handovers/handover-20260913-device-preview-clip-lr.md`. Owner fe-dev; user yang spawn (PM tak punya Task tool).
+  BELUM eksekusi src / commit. Pelajaran pola: keluhan "kepotong kiri-kanan" = centering overflow klasik, TAPI tetap diukur
+  dulu sebelum tulis fix (F5), dan fix-nya pun diukur before/after sebelum ditanam ke handover (F3).
+
+- 2026-09-13 (ATURAN F5 — PM dilarang salah-arti gejala + karang akar masalah): user menegur keras. Di task
+  device-sim gua mendiagnosis settings "lemot/laggy" (teori re-render 26 CSS rule + terminal reflow) bahkan tulis
+  balik "terasa lemot" ke user. user TIDAK PERNAH bilang lemot. Kata aslinya: "gak responsif" + "desain aneh" +
+  "berantakan". Di UI-web Indonesia, "gak responsif" = layout tak adaptif ke ukuran layar (responsive-design),
+  bukan performa. Jadi akar "lemot" = gua PABRIKASI dari gejala yang tak ada. Ditulis permanen sebagai **F5** di
+  `OPERATING_RULES.md`: jangan maknai ulang gejala user dgn arti teknis lain, jangan karang akar yang user tak
+  sebut; istilah UI kolokial ambigu ("responsif","lemot","aneh","berantakan") wajib diklarifikasi sebelum
+  diagnose. Re-diagnosis benar (bukti `file:line`, lihat handover `handover-20260913-settings-responsif-rapi.md`):
+  (A) `.form-row` (`styles.css:503`) tak pernah stacking di HP (`@media max-600px :692` + `body[data-device=phone]
+  :718` hanya melebarin card) → label+input terhimpit = inti "gak responsif"; helper `.form-row-stack` (`:867`)
+  tak dipakai; (B) baris Backup/Export (`index.html:259`) campur `<span>` label + `<a class=btn>` ≠ ritme baris
+  input = "berantakan/aneh".   Opsi A tetap: device-sim keluar dari settings → modal + kontrol di sidebar/bottom-nav.
+
+- 2026-09-13 (aturan **F6** — preview simulasi perangkat wajib terisolasi di iframe): user tegur keras karena
+  modal yang dinamai "preview" ternyata mengubah halaman ASLI. Bukti kode (PM cek ulang sesi ini): memilih mode
+  di modal → `deviceSelectMode app.js:156` → `setDevicePreference app.js:149` → `applyDevice app.js:151` menulis
+  `document.body.dataset.device` pada **dokumen luar** (halaman nyata ikut berubah) + `write(DEVICE_KEY) app.js:152`
+  → `init app.js:2334` re-apply tiap reload; dan `deviceRenderPreview app.js:126` `transform:scale` ~0.48 di kotak
+  fixa `.device-preview{height:340px}`/`styles.css:765` + `.device-modal max-width:620px`/`styles.css:731` →
+  konten "kecil + berantakan". User: "yang berubah bukan yang asli" + modal harus seukuran perangkat. Aturan F6
+  (tema F, ditulis permanen di `OPERATING_RULES.md`, gate rules-index LOLOS 56 rule exit 0): "preview" simulasi
+  perangkat WAJIB 100% di dalam iframe; memilih mode DILARANG menyentuh dokumen luar (no applyDevice luar / no
+  `body[data-device]` luar / no scale halaman luar); viewport cukup dari lebar iframe (media-query + `body[data-device]`
+  DALAM dokumen iframe nyala sendiri). Handover rework siap: `documents/pm/handovers/handover-20260913-device-preview-isolasi.md`
+  (owner fe-dev, scope `src/frontend/**`). Default (user: jangan tanya): modal = dimensi perangkat di-cap ke viewport +
+  internal scroll (bukan shrink 48%), kotak polos bersih, halaman asli utuh buka&tutup, aksesibilitas+placement jangan
+  regresi. Test `device_modal.test.js:84` di-INVERT (bukti isolasi); `setDevice`/`applyDevice`/boot DIBIARKAN (test+boot).
+
 - 2026-09-13 (aturan I8 — cara PM bicara ke user): user mengoreksi dua kali ("usulan kecil? usulan apaan?" lalu
   "jangan disebut usulan dong... PR aja"). Sebab akarnya bukan salah ketik, tapi tafsir rule "non-IT clear" di
   `language.md`/I7 yang gua pakai untuk MENERJEMHKAN istilah (PR → "usulan", merge commit → "titik penggabungan").
@@ -264,6 +346,7 @@
 
 ## Progress
 [entri lama dipindah ke `documents/pm/archive/memory-bank-progress-lama.md` — tidak dihapus]
+- 2026-09-14 (04:55): **SETTINGS DUA PANEL SEJAJAR — SELESAI, TER-COMMIT `c495d68` + TER-PUSH → PR #23 diperbarui.** Audit diff bersih (hanya `styles.css` +26 & cache-buster `index.html:61` `20260924→20260925`; nol hex baru; nol file nyasar). Gate PM sendiri: vitest 27 berkas/685 LOLOS + `git diff --check` exit 0. Verifikasi MANDIRI PM di Chromium 149 nyata (instance terisolasi, `:8080` user tak disentuh): ≥961px grid SIDE-BY-SIDE, ≤960px NUMPUK, nol horizontal overflow 8/8 lebar, banner full-width, `.form-row` stacking ≤600 tetap jalan, device-sim iframe desktop→grid / tablet+phone→block, fix clip `430f33b` + F6 utuh. Laporan `.opencode/reports/20260913/frontend/0441_settings-2panel-sidebyside.md`. FOLLOW-UP TERPISAH (belum disetujui user): stale `localStorage["aigate.device"]="phone"` era pre-F6 di window lebar → shell phone tapi panel tetap sejajar (ganjil kosmetik, nol overflow). Menunggu user: uji mata + sentuhan HP asli, review + merge PR #23.
 - 2026-09-13: **TERMINAL FIX DI-PUSH + PR #21 TERBUKA** (koreksi baris "BELUM di-commit" di bawah — user sudah perintahkan push+PR). Cek sumber: PR #20 sudah MERGED (merge-commit `608766e`), delta baru. `refactor/ui` di-ff ke `origin/main` → 2 commit: `b4e25a3` (kode: index.html cache-buster + terminal.js + styles.css + 4 test) & `f830787` (docs PM + laporan). Push `300005e..f830787`. **PR #21** `refactor/ui → main` (OPEN, label `bug`, diverifikasi via `gh pr view`): https://github.com/fadhly-permata/AI-Gate/pull/21. Menunggu user: refresh + uji mata nyata (G3), review + merge PR #21.
 - 2026-09-13: **BUG terminal SELESAI (tingkat tes) — (1) X di tab terakhir kini TUTUP ke empty state, (2) teks Reconnect jadi banner DOM, bukan di dalam buffer TUI.** fe-dev (frontend) 2 putaran. Akar: `closeTab` cabang last-tab `openTab()` (terminal.js:701-703) vs `exit` (698-700); `writeStatus` nulis langsung ke `term.write` (300-304). Fix: cabang last-tab tanpa `openTab()` → `activeId=null` + kill frame tetap; status → `.term-status-banner` overlay + `clearStatus` di `onopen` (flash "Reconnected" auto-clear 1800ms) + "Connecting" ikut banner. 4 test lama di `terminal_discard`/`terminal_layout` yang mengasumsi "tutup terakhir = respawn" disesuaikan ke kontrak baru. Gate PM mandiri: **6 berkas / 171 tes LOLOS, 0 gagal**; 6 berkas semua `src/frontend/**`. BELUM di-commit (D1, tunggu perintah). Sisa user: uji mata nyata (G3) + keputusan commit/push/PR. Laporan: `.opencode/reports/20260913/frontend/0835_terminal-last-tab-close-dan-reconnect-banner.md`.
 - 2026-09-11: **PUSH SELESAI + PR #18 TERBUKA (refactor/ui -> main).** "rapikan, commit, push, & pr": 6 rujukan path mati
@@ -478,3 +561,117 @@ Arsip: `documents/pm/archive/memory-bank-decisions-lama.md`.
 - 4 bug nyata di `scripts/cli-tools/` diverifikasi & dibenerin: aichat.sh (`pkg install -y`, `export AICHAT_CONFIG_FILE` + `exec $BIN $@`), codex.sh (`pkg install -y`), oterm.sh (`export OTERM_DATA_DIR` + `exec $BIN $@`). Kelas bug: (a) `pkg install` tanpa `-y` abort di non-interaktif; (b) `exec VAR=val $BIN` → quoted assignment dibaca sebagai command name (exit 127).
 - Re-test aichat sukses (EXIT 0). Env Termux read-only `/etc/apt` (hope2333-mirrorlist) blokir install/uninstall via pkg — di luar script.
 - Commit: `61d64337b686a8b5ee0f58d17d52807119922d0a`.
+
+## Device-Simulation → Modal + Settings UX (2026-09-13) — PM, sesi ini
+- User report: settings page "gak responsif" + UI "aneh"; pindahkan device-sim di atas icon github;
+  select mode → buka modal dialog isi preview live di viewport device (phone/tablet/desktop).
+- Diagnosis (targeted read, perlu konfirmasi browser): `applyDevice()` (`app.js:63-74`) set
+  `body.dataset.device` → 26 rule `body[data-device=...]` (`styles.css:718-741` + override phone)
+  restyle SELURUH shell tiap ganti device; terminal punya `ResizeObserver` `.term-stage`
+  (`terminal.js:239` "BUG2", `:1410-1414`) yang refit xterm tiap layout berubah → reflow global
+  di CPU HP = jank ("gak responsif") + swap shell utuh = "aneh". Fix: pindah sim ke modal preview
+  terisolasi (iframe same-origin) → live app gak restyle lagi.
+- Modes ada: phone/tablet/desktop (`device.js:9`); DEFAULT desktop. Viewport device BELUM ada angka
+  eksplisit (sim = CSS-shell, bukan ukuran fixed) → fe-dev tetapkan (phone 375×667, tablet 768×1024,
+  desktop 1280×800).
+- GitHub icon link: `.sidebar-footer` (`index.html:162-169`, desktop) + `.bottom-nav` (`:1381`, HP).
+  Device-sim sekarang `<select id="setDevice">` di form settings (`:228-238`).
+- Primitive modal ADA & wajib reuse: `.modal-overlay`+`.modal role=dialog aria-modal` (`index.html:917`
+  dst, `styles.css:1089-1120`); toggle via `hidden`. Sayangnya modal sekarang TIDAK punya focus-trap
+  & ESC-global → fe-dev tambah untuk modal baru (aksesibilitas wajib).
+- Keputusan PM: owner = **fe-dev** (scope `src/frontend/**`, sudah ada, reuse tak generate). 1 agen,
+  file overlap (index.html/app.js/styles.css) → sekvential otomatis (E1/R16 gak perlu tanya).
+- GATE **D6**: fitur UI baru wajib lembar desain + ACC user SEBELUM spawn fe-dev. Lembar desain =
+  `documents/pm/handovers/handover-20260913-device-sim-modal.md`. STATUS: BELUM spawn — nunggu ACC
+  user. (i18n key `settings.device_sim/phone/tablet/desktop/note` sudah ada ×7 dict.)
+
+## Device-Sim → Modal + Settings Responsif — SELESAI + TERVERIFIKASI BROWSER (2026-09-13 12:10) — PM integrate & verify
+Blok di atas = titik-waktu (diagnosis "lemot" sudah DITARIK oleh F5; jangan dibaca sebagai fakta aktif). Hasil akhir:
+- fe-dev mengerjakan sesuai `handover-20260913-settings-responsif-rapi.md` (bukan lembar device-sim-modal lama).
+  Receipt: 13 berkas `src/frontend/**` (10 static + 2 tes diubah) + tes baru `device_modal.test.js` (9 tes).
+- **Klaim diukur ulang PM, bukan ditelan:** vitest **27 berkas / 681 LOLOS**; run `--exclude device_modal.test.js`
+  = 26/672 → delta **+9 persis** klaim. `git diff --check` bersih. Nol file luar scope. Nol hex baru (grep baris `+`).
+  Rujukan `#setDevice` = NONE. `.bn-item` tetap 10. Paritas i18n 443 kunci × 7 (+1 `common.close`).
+- **G3 tertutup (pertama kali untuk fitur ini):** Chromium 149 headless + static server ad-hoc di TMPDIR, port acak,
+  `:8080` user tidak disentuh (J6). 35 cek terukur → 34 PASS + 11/11 PASS di run ulang. Angka kunci: 360px
+  `.form-row` = `column`, input **298/298px** = selebar baris, `scrollWidth-clientWidth = 0` (nol overflow);
+  `body[data-device=phone]` identik (preview jujur); desktop 1280 tetap `row` (nol regresi); dua tombol backup tinggi
+  sama 34px & tumpuk 298/298 di phone; modal `role=dialog aria-modal` + fokus masuk + Tab/Shift+Tab melingkar (4
+  focusable) + ESC tutup DAN `activeElement` balik ke trigger (diuji dua shell, urutan bersih); pilih phone →
+  `body[data-device]=phone` + `localStorage aigate.device=phone` + iframe di-resize 375px; tablet di shell phone →
+  768px; `contentDocument` iframe = app asli (`.layout` ada).
+  1 FAIL awal = **artefak skrip PM sendiri** (memilih "phone" dulu → sidebar `display:none` → fokus ke trigger desktop
+  memang mustahil), BUKAN cacat fitur; dibuktikan lewat run ulang berurutan bersih.
+- **Keputusan PM atas open question fe-dev: iframe aplikasi-penuh DITERIMA, nol kerja backend.** Alasan: handover §1.C
+  memang mensyaratkan preview = app sendiri di 3 ukuran; nol risiko PTY (`terminal.js:503/582` buka `WebSocket` hanya
+  saat tab terminal dibuat, iframe buka view awal); nol umpan-balik antar-dokumen (`applyDevice` cuma sentuh `body`
+  dokumen masing-masing + TIDAK ada listener `storage` di `app.js`); 404 API di static server = expected. Konsekuensi
+  diterima: iframe mengulang polling GET selama modal terbuka (biaya trafik, bukan bug). **Follow-up opsional (belum
+  disetujui user, TIDAK dipaksakan ke fe-dev):** mode preview ringan `?preview=1` non-interaktif/nol-fetch.
+- Commit `refactor/ui`: **`161bcaf`** feat(ui) (per fitur, staging eksplisit 13 berkas — BUKAN `git add -A`) +
+  docs(pm) untuk Memory Bank/status/state/`CODE_CHANGES.md`/laporan. **BELUM push, BELUM PR** (nunggu perintah user).
+- Utang terbuka: (1) uji mata + sentuhan layar asli di HP user; (2) terjemahan `common.close` 6 bahasa belum ditinjau
+  penutur; (3) opsi mode preview ringan.
+
+## Device-Sim Modal — FOLLOW-UP koreksi user (2026-09-13, pasca-`161bcaf`) — PM diagnosis, TUNGGU klarifikasi
+**Keluhan user:** (1) mode ponsel preview "berantakan, halaman + bottom/side menu jadi kecil"; (2) minta "modal
+seukuran perangkat (hape/tablet/desktop), bukan innernya doang yang di-resize".
+
+**Akar masalah (dibuktikan, bukan asumsi):** SCALE-DOWN transform, bukan lebar iframe, bukan device-CSS salah.
+- Preview = iframe diberi ukuran perangkat ASLI (`app.js:94` phone 375×667) lalu di-`transform:scale()` biar muat
+  kotak fixa `.device-preview{height:340px}` (`styles.css:769`; modal `max-width:620px` `:731`). Rumus
+  `deviceRenderPreview app.js:116-132`: `scale=min(1, availW/dimW, availH/dimH)`; availH≈318px → phone 0.477,
+  tablet 0.311, desktop 0.398. Jadi SELURUH UI HP (termasuk bottom-nav) dirender ~48% = persis "kecil/berantakan".
+- Isi iframe sudah TEPAT (G3 161bcaf: `body[data-device=phone]` = viewport asli). Jangan salah tafsir ke device-CSS (F5).
+- Cacat sekunder: tak ada window-resize refit utk `deviceRenderPreview`; chrome modal (title+note+3 tombol+close)
+  makan tinggi → inner tambah kecil = "cuma inner di-resize".
+
+**Status: BELUM eksekusi src / BELUM spawn.** Permintaan #2 punya >1 cara penuhi (modal-resize-ke-dimensi vs
+device-frame-konten-100%; device>viewer: zoom-out vs scroll; konteks viewer user HP/desktop) → PM klarifikasi dulu
+(D1 + F5 + instruksi task). Owner = fe-dev (scope `src/frontend/**`: `app.js`+`styles.css`, mungkin `index.html`;
+tak ubah kontrak). Handover siap-eksekusi disusun SETELAH user jawab. DoD: G3 Chromium before/after tiap mode ×
+lebar viewer, vitest hijau, `git diff --check` bersih, bump cache-buster (kini `?v=20260922`).
+
+## Device-Sim Preview ISOLASI iframe + modal device-sized — SELESAI & TERVERIFIKASI (2026-09-13 16:25, PM integrate&verify)
+- Follow-up koreksi user di atas = **SELESAI** via fe-dev per `handover-20260913-device-preview-isolasi.md`.
+  Inti: `deviceSelectMode` tak lagi manggil `setDevicePreference` → mode di-apply HANYA ke dalam iframe
+  (`deviceApplyInFrame` via `contentWindow.aigate.applyDevice`, try/catch); `deviceRenderPreview` HAPUS
+  `transform:scale` → set `--dev-w/--dev-h` px; `.modal.device-modal` device-sized di-cap `92vw/80vh` + scroll
+  internal; default buka = `devicePreviewMode||DEFAULT_DEVICE` (bukan body luar); + iframe `load` + window
+  `resize` refit; test device_modal DI-INVERT (mode gak boleh ubah body luar / localStorage).
+- Gate PM MANDIRI: audit diff = 5 berkas `src/frontend/**` saja, nol hex, `git diff --check` bersih; vitest
+  **27 berkas/681 LOLOS**; harness Chromium fe-dev DI-RERUN PM = **22/22 PASS** (body luar `desktop` konstan
+  open→phone→tablet→desktop→close→reload, `localStorage.aigate.device` null; frame 375/768/1280 px nyata,
+  transform none; bottom-nav 56px; cap 92vw + scroll internal di viewer 820px). `:8080` user (`python run.py`
+  PID 25956) tak disentuh (J6).
+- **Keputusan OQ#1 (boot-default): CUKUP.** Keluhan inti (preview mengubah halaman asli) MATI — halaman asli
+  identik sebelum & sesudah modal + reload. `body[data-device="desktop"]` stempel boot = no-op styling (nol rule
+  CSS utk nilai desktop; responsif HP nyata dari `@media`). FOLLOW-UP OPSIONAL (tanya user, tak dipaksa): hapus
+  stempel boot kalau user mau atribut nol sama sekali.
+- **Keputusan OQ#2 (cache-buster ekstra): SAH & PERLU.** Invarian `i18n.test.js:307-315` memaksa
+  `I18N_VER == app.js?v == i18n.js?v` → bump i18n.js+V ke 20260923 bukan scope-creep. `device.js` tetap 20260922.
+- Commit `refactor/ui`: **`735d9e2`** feat fix(ui) (staging eksplisit 5 berkas) + docs(pm) terpisah.
+  **BELUM push, BELUM PR** (nunggu perintah user). Laporan:
+  `.opencode/reports/20260913/frontend/1625_device-preview-isolasi-iframe.md`.
+- Utang terbuka: uji mata + sentuhan layar HP user; terjemahan `common.close` 6 bahasa; follow-up opsional
+  (stempel boot, mode preview ringan `?preview=1`).
+
+## Lebar Panel Settings dalam Persen (50% besar / 100% kecil) — DIAGNOSIS BERBUKTI + HANDOVER (2026-09-14 05:20, PM)
+- Kelanjutan `c495d68`. User: "kok width panel gak kayak 50% di layar besar, dan gak kayak 100% di layar kecil (ponsel)". D2: kerjakan, PM ukur (nol tulis src/, A2), user yang spawn fe-dev.
+- UKUR Chromium 149 NYATA (CDP + Node24 WebSocket; server isolated port 51783 + DB tmp luar repo + chromium CDP 51784 + user-data-dir tmp, PID sendiri; `:8080` user TIDAK disentuh/J6, tetap 200).
+- **Layar besar BENAR rusak**: grid resolved benar (`repeat(2,minmax(0,1fr))`, gap 18) TAPI kartu mentok cap 540px → 1440 rasio 46% (ruang mati 38px/kolom), 1920 rasio 32.6% (278px/kolom). Cap mulai makan kolom sejak kolom>540 ⟺ viewport ≳1364px. 961–1360 sudah ≈49% (tidak rusak).
+- **Akar tunggal = `.settings-card{max-width:540px}` styles.css:493** (warisan era satu-kolom, tak dinetralkan c495d68). Bukti CDP `getMatchedStylesForNode` @1440: selector menang `.settings-card` `540px`, startLine 492 (0-based)=baris 493, tanpa media.
+- **Keluhan ponsel TIDAK terbukti (≤600)**: 375 & 600 FAKTANYA SUDAH 100% (rule `@media(max-width:600px){.settings-card{max-width:100%}}` styles.css:880 menang, diverifikasi computed+matched). Device-sim phone(373)+tablet(766) juga 100% dari area konten. Yang nyata bolong = **band 781–960** (HP landscape ~932 / jendela desktop sempit): kartu 540 < container 553–732 → 75–97% (960=75.3%, 900=82.2%, 800=96.9%). Kemungkinan besar ini yang user lihat, atau cache versi lama. Dilaporkan jujur (F5/F3), tak ngarang cacat 375.
+- **FIX**: 1 rule scoped `.view[data-view="settings"] .settings-card { max-width: none; }` di blok settings stlh :513 (spesifisitas (0,2,0) outrank :493 & :880; `none`≡100% di HP jadi tak regresi) + cache-buster styles.css `?v=20260925→20260926` (index.html:61). Nol breakpoint baru, nol hex, `.welcome-card` cap utuh, app.js/i18n tak sentuh (F6/invarian aman).
+- **DoD terukur**: ≥961 kartu==kolom (ruang mati 0±1px, rasio 49.2%@1440/49.5%@1920, ≥48.5%); ≤960 kartu==section (100% ±1px, termasuk band 781–960); nol overflow; device-sim phone/tablet 100% + desktop 49.1%; vitest 685 hijau; jangan commit (PM audit+commit).
+- HANDOVER: `documents/pm/handovers/handover-20260913-settings-panel-width-persen.md`. Owner fe-dev (scope `src/frontend/**`). PM BELUM spawn (nol Task tool); user yang spawn. Nanti PM verifikasi mandiri + commit + push.
+- STATUS: diagnosis+handover landed; BELUM eksekusi src, BELUM commit. Scratch harness di tmp luar repo (dihapus setelah fe-dev balik).
+
+## Lebar Panel Settings dalam Persen — SELESAI, DI-COMMIT `52f4a50` + DI-PUSH (PR #23 diperbarui) (2026-09-14 05:40, PM)
+- fe-dev selesai handover (receipt: 2 berkas berubah `styles.css` +10 [comment+1 rule] + `index.html:61` cache-buster `20260925→20260926`; BEFORE/AFTER terukur 13 viewport; vitest 27/685 hijau; `git diff --check` bersih; BELUM commit; fe-dev JUJUR sebut apa ditulis vs diverifikasi).
+- **AUDIT PM (permintaan user, poin 1):** `git status`/`git diff` scope ini HANYA `src/frontend/static/styles.css` + `src/frontend/static/index.html:61` — persis §2.1–2.2 handover. Rule baru **persis** `.view[data-view="settings"] .settings-card { max-width: none; }`; global cap `.settings-card{max-width:540px}` **:493 TETAP ADA** (override scoped, bukan cabut); NOL hex baru (added-line scan=0); NOL `@media` baru (scan=0); `.welcome-card` cap utuh (:432 base + :890/:925); `settings-card` di index.html hanya :201/:250 (dua anak section settings). NOL file nyasar; NOL sisa task kepotong. `git diff --check` exit 0.
+- **GATE PM dijalankan sendiri (mata sendiri):** `vitest run` = **27 berkas / 685 tes LOLOS** (device_modal 13 tes hijau → fix clip `430f33b` utuh); `git diff --check` bersih.
+- **VERIFIKASI MANDIRI PM (G3, tak telan kwitansi; harness CDP MILIK PM sendiri `pm_spw/`, bukan pakai script fe-dev):** Chromium terisolasi (server own-port 58585 + `AIGATE_DB_PATH` tmp luar repo + chromium `--user-data-dir` tmp + CDP 34209, PID sendiri; **`:8080` user TIDAK disentuh — J6, tetap 200 sebelum & sesudah**). Diukur AFTER working-tree, 8 lebar: **1920 → 49.5%** (bukan 32.6), 1440 → 49.2%, 1100 → 48.9%, 961 → 48.8% (semua `display:grid`, kartu==kolom, ruang mati/kolom 0 [−0.5 subpixel di 961]), **960/800/600/375 → 100.0%** (`display:block`, kartu==section), `max-width` computed `none` semua, **NOL overflow horizontal 8/8**. Cocok persis dgn klaim receipt.
+- **COMMIT `52f4a50`** `fix(ui): panel settings isi kolom — 50% layar besar, 100% layar kecil` (staging EKSPLISIT 2 berkas fitur, BUKAN `git add -A`) + commit `docs(pm)` TERPISAH. PUSH `origin refactor/ui` fast-forward NOL force → PR #23 auto-update.
+- **Kepemilikan (A2/A3 sah):** penulis `src/frontend/**` = fe-dev (write-root-nya); PM hanya `documents/pm/**` + `documents/dev/CODE_CHANGES.md` + `.opencode/reports/**` + skrip scratch tmp → nol tulis src/.
+- Catatan jujur (tetap dari diagnosis): ponsel ≤600 FAKTANYA SUDAH 100% sebelum fix; yang tertutup fix = **band 781–960** + layar besar ≥~1364. Kalau di HP masih terlihat sempit: hard-refresh (statis tanpa `Cache-Control`, cache-buster `20260926` paksakan URL CSS baru). SISA user: uji mata layar asli + sentuhan HP; device-sim desktop modal tak PM re-drive lewat UI (diuji via lebar outer setara + `device_modal.test.js` hijau).

@@ -13,6 +13,7 @@ window.I18N.ja = {
     "common.edit": "編集",
     "common.delete": "削除",
     "common.remove": "削除",
+    "common.close": "閉じる",
     "nav.group.gateway": "ゲートウェイ設定",
     "nav.group.operations": "運用",
     "nav.group.insights": "インサイト",

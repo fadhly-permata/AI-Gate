@@ -6,6 +6,7 @@ window.I18N.nl = {
     "common.edit": "Bewerken",
     "common.delete": "Verwijderen",
     "common.remove": "Verwijderen",
+    "common.close": "Sluiten",
     "nav.group.gateway": "Gateway instellen",
     "nav.group.operations": "Exploitatie",
     "nav.group.insights": "Inzichten",

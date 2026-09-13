@@ -63,8 +63,6 @@
   function applyDevice(device) {
     var norm = deviceAttr(device);
     document.body.dataset.device = norm;
-    var sel = document.getElementById("setDevice");
-    if (sel) sel.value = norm;
     // Keep the bottom-nav active highlight in sync with the current view.
     var active = document.querySelector(".view.is-active");
     var view = active ? active.getAttribute("data-view") : null;
@@ -83,6 +81,185 @@
     var target = navViewFor(view);
     document.querySelectorAll(".bn-item").forEach(function (n) {
       n.classList.toggle("active", !!target && n.getAttribute("data-view") === target);
+    });
+  }
+
+  /* ---- Device-simulation modal (Opsi A — moved out of the Settings form) ----
+     A small device-sim control (sidebar-footer on desktop, bottom-nav on mobile)
+     opens an accessible dialog that previews THIS app in an iframe at the chosen
+     device size. The preview is scoped to the iframe only — selecting a mode
+     applies the device INSIDE the frame (contentWindow.aigate.applyDevice), so
+     the live page (the outer document) is never touched. The focus-trap / ESC /
+     click-outside / restore-focus behaviour lives here, scoped to this dialog. */
+  var DEVICE_SIZES = { phone: [375, 667], tablet: [768, 1024], desktop: [1280, 800] };
+
+  var deviceModal = null;
+  var deviceFrame = null;
+  var deviceLastTrigger = null;
+  var deviceKeyHandler = null;
+  // Session-local preview mode. NOT localStorage, NOT the outer body — the modal
+  // never reads or writes the live page's device view (see deviceSelectMode).
+  var devicePreviewMode = null;
+
+  function deviceFocusables() {
+    if (!deviceModal) return [];
+    // Everything inside this dialog is always visible (no conditionally-hidden
+    // controls), so a plain focusable selector is enough — and it stays correct
+    // under jsdom, where offsetParent is always null (no layout engine).
+    return Array.prototype.slice.call(
+      deviceModal.querySelectorAll(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+    );
+  }
+
+  /* Size the device box to the chosen device's REAL pixels. The box is clamped
+     to the viewer in CSS (max-width:92vw / max-height:80vh) and scrolls
+     internally — the content is NEVER scaled down. --dev-w / --dev-h are set per
+     mode on .device-modal and cascade into the box + iframe, so the frame keeps
+     its exact device px and the iframe's own media queries + body[data-device]
+     rules fire INSIDE the frame. Returns the dims so callers (and tests) can read
+     what was applied. */
+  function deviceRenderPreview(mode) {
+    if (!deviceModal) return null;
+    var dims = DEVICE_SIZES[mode] || DEVICE_SIZES.desktop;
+    deviceModal.style.setProperty("--dev-w", dims[0] + "px");
+    deviceModal.style.setProperty("--dev-h", dims[1] + "px");
+    return dims;
+  }
+
+  /* Apply the device mode INSIDE the iframe only. The frame loads the app
+     itself, so its contentWindow exposes aigate.applyDevice; calling it there
+     writes body[data-device] on the FRAME's document, never the outer one. */
+  function deviceApplyInFrame(mode) {
+    if (!deviceFrame || !deviceFrame.contentWindow) return;
+    try {
+      var w = deviceFrame.contentWindow;
+      if (w.aigate && typeof w.aigate.applyDevice === "function") {
+        w.aigate.applyDevice(mode);
+      }
+    } catch (e) {
+      /* not loaded yet / inaccessible — nothing to apply */
+    }
+  }
+
+  function deviceSetActiveMode(mode) {
+    if (!deviceModal) return;
+    Array.prototype.forEach.call(
+      deviceModal.querySelectorAll("[data-device-mode]"),
+      function (btn) {
+        var on = btn.getAttribute("data-device-mode") === mode;
+        btn.classList.toggle("is-active", on);
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
+      }
+    );
+  }
+
+  /* Set + persist the device-view preference (B4.2, client-only) on the LIVE
+     page. Entry point for the boot re-apply and the test-facing
+     window.aigate.setDevice hook; returns the canonical token. NOTE: the
+     device-sim modal no longer calls this — its preview is scoped to the iframe
+     (deviceApplyInFrame), so it never mutates the outer page or localStorage. */
+  function setDevicePreference(mode) {
+    var norm = deviceAttr(mode);
+    applyDevice(norm);
+    write(DEVICE_KEY, norm);
+    return norm;
+  }
+
+  /* Preview-only mode switch. Marks the active button, sizes the device box, and
+     applies the device INSIDE the iframe. It never calls setDevicePreference, so
+     the outer page is never mutated and localStorage is never written here. */
+  function deviceSelectMode(mode) {
+    var norm = deviceAttr(mode);
+    devicePreviewMode = norm;
+    deviceSetActiveMode(norm);
+    deviceRenderPreview(norm);
+    deviceApplyInFrame(norm);
+  }
+
+  function openDeviceModal(trigger) {
+    if (!deviceModal) return;
+    deviceLastTrigger = trigger || null;
+    deviceModal.hidden = false;
+    // Default to the last previewed mode this session — NOT the outer page's
+    // body[data-device] and NOT localStorage (the modal never reads the live view).
+    var cur = devicePreviewMode || DEFAULT_DEVICE;
+    deviceSetActiveMode(cur);
+    deviceRenderPreview(cur);
+    // Load the preview once (same origin -> the app itself). Skip in non-DOM
+    // test envs where the frame has no real layout.
+    if (deviceFrame && !deviceFrame.getAttribute("src")) {
+      deviceFrame.setAttribute("src", location.pathname || "/");
+    }
+    var f = deviceFocusables();
+    if (f.length) f[0].focus();
+    deviceKeyHandler = function (e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeDeviceModal();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      var list = deviceFocusables();
+      if (!list.length) return;
+      var first = list[0], last = list[list.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first || !deviceModal.contains(document.activeElement)) {
+          e.preventDefault(); last.focus();
+        }
+      } else {
+        if (document.activeElement === last || !deviceModal.contains(document.activeElement)) {
+          e.preventDefault(); first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", deviceKeyHandler, true);
+  }
+
+  function closeDeviceModal() {
+    if (!deviceModal || deviceModal.hidden) return;
+    deviceModal.hidden = true;
+    if (deviceKeyHandler) {
+      document.removeEventListener("keydown", deviceKeyHandler, true);
+      deviceKeyHandler = null;
+    }
+    if (deviceLastTrigger && typeof deviceLastTrigger.focus === "function") {
+      deviceLastTrigger.focus(); // restore focus to the trigger
+    }
+    deviceLastTrigger = null;
+  }
+
+  function setupDeviceModal() {
+    deviceModal = document.getElementById("deviceModal");
+    if (!deviceModal) return;
+    deviceFrame = document.getElementById("deviceFrame");
+    // Triggers (desktop sidebar-footer + mobile bottom-nav share the attribute).
+    Array.prototype.forEach.call(
+      document.querySelectorAll("[data-device-trigger]"),
+      function (t) {
+        t.addEventListener("click", function () { openDeviceModal(t); });
+      }
+    );
+    // Mode buttons (delegated — they exist at load, but keep it cheap).
+    deviceModal.addEventListener("click", function (e) {
+      if (e.target === deviceModal) { closeDeviceModal(); return; } // click backdrop
+      var btn = e.target.closest ? e.target.closest("[data-device-mode]") : null;
+      if (btn) { deviceSelectMode(btn.getAttribute("data-device-mode")); return; }
+      if (e.target.closest && e.target.closest("#deviceModalClose")) closeDeviceModal();
+    });
+    // Once the iframe loads the app, apply the current preview mode INSIDE it.
+    if (deviceFrame) {
+      deviceFrame.addEventListener("load", function () {
+        deviceApplyInFrame(devicePreviewMode || DEFAULT_DEVICE);
+      });
+    }
+    // Refit the open modal when the viewport changes / rotates. CSS clamps (92vw /
+    // 80vh) already size the box; re-rendering keeps the per-mode vars current.
+    window.addEventListener("resize", function () {
+      if (deviceModal && !deviceModal.hidden) {
+        deviceRenderPreview(devicePreviewMode || DEFAULT_DEVICE);
+      }
     });
   }
 
@@ -288,6 +465,13 @@
   /* Test hook: lets vitest assert the PUT body stringifies values. */
   window.aigate = window.aigate || {};
   window.aigate.buildSettingsBody = buildSettingsBody;
+  // Device-view simulation (Opsi A): exposed so tests drive the same entry point
+  // the modal's mode buttons use; the shipped control is the modal trigger.
+  window.aigate.setDevice = setDevicePreference;
+  window.aigate.applyDevice = applyDevice;
+  // Wiring the device-sim modal is exposed like wireProviderUi so a test that
+  // re-mounts the shipped body can bind the triggers + focus trap in isolation.
+  window.aigate.setupDeviceModal = setupDeviceModal;
 
   /* ===== Backup & Restore (B5.7, PRD §2.4.4) ===== */
   /* Export/import the whole local config as one JSON file (no cloud). The export
@@ -2240,15 +2424,13 @@
       });
     }
 
-    // --- Device simulation toggle (B4.2): client-only, persisted. ---
-    var devSel = document.getElementById("setDevice");
-    if (devSel) {
-      devSel.addEventListener("change", function () {
-        var d = devSel.value;
-        applyDevice(d);
-        write(DEVICE_KEY, d);
-      });
-    }
+    // --- Device simulation (B4.2, Opsi A): the control moved OUT of the Settings
+    //     form into a small trigger above the Repo link (sidebar-footer on desktop,
+    //     .bn-device in the bottom-nav on phone). Clicking it opens an accessible
+    //     modal with a live iframe preview. The preview is scoped to the iframe
+    //     only — selecting a mode never touches the live page. The #setDevice
+    //     <select> + its change listener are gone.
+    setupDeviceModal();
 
     // --- Nav / view switching (top sidebar + mobile bottom-nav share logic) ---
     function handleNav(item) {
