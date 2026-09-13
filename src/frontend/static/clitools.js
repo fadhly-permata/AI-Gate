@@ -183,8 +183,15 @@
     });
   }
 
-  /* Platform order shown as compatibility badges (must match backend PLATFORMS). */
+  /* Platform order shown as compatibility logos (must match backend PLATFORMS). */
   var COMPAT_PLATFORMS = ["termux", "linux", "windows", "macos"];
+  /* Platform -> vendored Font Awesome BRAND glyph (all confirmed present in
+     vendor/font-awesome/css/all.min.css: fa-android \f17b, fa-linux \f17c,
+     fa-windows \f17a, fa-apple \f179). Brand glyphs REQUIRE the `fa-brands`
+     prefix. Local only — no CDN. termux is Android-based so it uses fa-android. */
+  var COMPAT_GLYPHS = {
+    termux: "fa-android", linux: "fa-linux", windows: "fa-windows", macos: "fa-apple"
+  };
   /* Statuses that warrant a visible warning on the CURRENT platform. */
   var COMPAT_WARN = { broken: 1, no_install: 1, not_a_cli: 1, not_wired: 1 };
 
@@ -196,49 +203,70 @@
     return getStr("cli.status." + (status || "unknown"));
   }
 
-  /* One badge per platform, colored by status; the current platform is outlined. */
+  /* One logo tile per platform: brand glyph only (no text label — per user
+     request), colored by status via the existing .cli-status-* palette, dimmed
+     when unknown, outlined when it is the current platform. The visible glyph is
+     decorative (aria-hidden); the wrapper <span> carries role=img + aria-label
+     (localized platform name) + a title ("<Platform>: <status> — <note>"). The
+     accessible name is built by the caller (renderGroups) so the whole card
+     stays one clean announcement. */
+  function platformTile(code, status, currentPlatform, note) {
+    var tile = document.createElement("span");
+    tile.className = "cli-plat cli-status-" + status +
+      (code === currentPlatform ? " cli-plat-current" : "") +
+      (status === "unknown" ? " cli-plat-dim" : "");
+    tile.setAttribute("role", "img");
+    tile.setAttribute("aria-label", platformLabel(code));
+    tile.title = platformLabel(code) + ": " + statusLabel(status) + (note ? " — " + note : "");
+    var icon = document.createElement("i");
+    icon.className = "fa-brands " + COMPAT_GLYPHS[code];
+    icon.setAttribute("aria-hidden", "true");
+    tile.appendChild(icon);
+    return tile;
+  }
+
   function renderCompatStrip(tool, currentPlatform) {
     var compat = tool.compat || {};
-    var strip = document.createElement("div");
+    var strip = document.createElement("span");
     strip.className = "cli-compat";
     COMPAT_PLATFORMS.forEach(function (p) {
       var info = compat[p] || { status: "unknown", note: "", source: "unknown" };
-      var status = info.status || "unknown";
-      var chip = document.createElement("span");
-      chip.className = "cli-compat-chip cli-status-" + status +
-        (p === currentPlatform ? " cli-compat-current" : "");
-      chip.textContent = platformLabel(p);
-      chip.title = platformLabel(p) + ": " + statusLabel(status) +
-        (info.note ? " — " + info.note : "");
-      strip.appendChild(chip);
+      strip.appendChild(platformTile(p, info.status || "unknown", currentPlatform, info.note));
     });
     return strip;
   }
 
-  /* Red warning line when the tool is not usable on the current platform. */
+  /* Subtle in-card warning when the tool is not usable on the current platform. */
   function renderCompatWarn(tool, currentPlatform) {
     var compat = tool.compat || {};
     var info = compat[currentPlatform] || { status: "unknown", note: "" };
     var status = info.status || "unknown";
     if (!COMPAT_WARN[status]) return null;
-    var warn = document.createElement("div");
+    var warn = document.createElement("span");
     warn.className = "cli-compat-warn";
     warn.textContent = "⚠ " + getStr("cli.compat.warn_label") + " " + (info.note || statusLabel(status));
     return warn;
   }
 
-  /* Legend shown once above the groups (mirrors the per-tool badge styling). */
+  /* Icon legend shown once above the groups: the 4 platform logos (current one
+     ringed) + a one-line note — teaches "which logo is which / which is current". */
   function renderCompatLegend(currentPlatform) {
     var legend = document.createElement("div");
     legend.className = "cli-compat-legend";
     var txt = document.createElement("span");
-    txt.textContent = getStr("cli.compat.legend") + " ";
+    txt.textContent = getStr("cli.compat.legend");
     legend.appendChild(txt);
     COMPAT_PLATFORMS.forEach(function (p) {
-      var chip = document.createElement("span");
-      chip.className = "cli-compat-chip" + (p === currentPlatform ? " cli-compat-current" : "");
-      chip.textContent = platformLabel(p);
-      legend.appendChild(chip);
+      var tile = document.createElement("span");
+      tile.className = "cli-plat cli-plat-legend" + (p === currentPlatform ? " cli-plat-current" : "");
+      tile.setAttribute("role", "img");
+      tile.setAttribute("aria-label", platformLabel(p));
+      tile.title = platformLabel(p);
+      var icon = document.createElement("i");
+      icon.className = "fa-brands " + COMPAT_GLYPHS[p];
+      icon.setAttribute("aria-hidden", "true");
+      tile.appendChild(icon);
+      legend.appendChild(tile);
     });
     return legend;
   }
@@ -254,6 +282,22 @@
     return note === key ? getStr("cli.unsupported") : note;
   }
 
+  /* A small launch-state marker shown next to the tool name. Icon-only (no text
+     label) so it stays language-neutral and needs no new i18n key: a green check
+     for a verified/launchable tool, a muted info glyph for one that is not ready
+     yet. Decorative for AT (aria-hidden) — the real state is in the card's
+     aria-label (verified) or aria-disabled + title (not-ready). */
+  function renderStateMarker(launchable) {
+    var m = document.createElement("span");
+    m.className = "cli-tool-state " + (launchable ? "badge badge-ok" : "badge badge-off");
+    m.setAttribute("aria-hidden", "true");
+    var icon = document.createElement("i");
+    icon.className = "fa-solid " + (launchable ? "fa-circle-check" : "fa-circle-info");
+    icon.setAttribute("aria-hidden", "true");
+    m.appendChild(icon);
+    return m;
+  }
+
   function renderGroups(groups, currentPlatform) {
     var wrap = el("cliGroups");
     if (!wrap) return;
@@ -262,7 +306,7 @@
       return;
     }
     wrap.innerHTML = "";
-    // Legend explaining the per-platform badges (once, above all groups).
+    // Icon legend explaining the platform logos (once, above all groups).
     if (currentPlatform && currentPlatform !== "unknown") {
       wrap.appendChild(renderCompatLegend(currentPlatform));
     }
@@ -279,43 +323,56 @@
       grid.className = "cli-tools";
 
       (g.tools || []).forEach(function (tool) {
-        // Cell = launch button + compatibility badges + optional warning.
-        var cell = document.createElement("div");
-        cell.className = "cli-tool-cell";
+        // Whole card = one <button>: name + state marker, a platform-logo row,
+        // and an optional in-card warning. A button gives free keyboard focus +
+        // Enter/Space activation, preserving the old click behavior.
+        //
+        // Fail CLOSED on a missing mode (an old server that never sends the
+        // field must not be treated as "everything is verified"): a non-verified
+        // card never opens the modal, so no guessed command is ever run. The
+        // tool stays visible (a muted to-do marker), NOT struck through.
+        var launchable = tool.launch_mode === "verified";
 
         var card = document.createElement("button");
         card.type = "button";
-        card.className = "btn cli-tool";
-        card.textContent = tool.name;
+        // cli-tool-soon = visual muted treatment; cli-tool-unsupported kept as a
+        // stable hook (no line-through — see styles.css) for tests + theming.
+        card.className = launchable
+          ? "btn cli-tool cli-tool-ready"
+          : "btn cli-tool cli-tool-soon cli-tool-unsupported";
         if (tool.enabled === false) card.classList.add("cli-tool-disabled");
-        // Struck through = NOT launchable yet: either no verified launch command
-        // (pending) or a wire format the gateway does not serve (unsupported).
-        // The strike is deliberate — the tool stays visible as the to-do list —
-        // but the card never opens the modal, so no guessed command is run.
-        // Fail CLOSED on a missing mode (an old server that never sends the
-        // field must not be treated as "everything is verified").
-        var launchable = tool.launch_mode === "verified";
-        if (!launchable) {
-          card.classList.add("cli-tool-unsupported");
-          card.setAttribute("aria-disabled", "true");
-        }
-        card.title = launchable
-          ? (tool.binary_name || tool.name)
-          : unsupportedNote(tool);
+        if (!launchable) card.setAttribute("aria-disabled", "true");
+
+        // Tooltip: binary name (ready) or the reason it is not launchable (soon).
+        card.title = launchable ? (tool.binary_name || tool.name) : unsupportedNote(tool);
+        // Clean accessible name; the per-platform detail lives in the logo tiles'
+        // own aria-label/title so the button announcement stays short.
+        card.setAttribute("aria-label",
+          launchable ? tool.name : (tool.name + " — " + unsupportedNote(tool)));
+
         card.addEventListener("click", function () {
           if (!launchable) { setCliMsg(unsupportedNote(tool), "warn"); return; }
           openLaunchModal(g, tool);
         });
-        cell.appendChild(card);
 
-        // Per-platform compatibility badges (current platform highlighted).
-        cell.appendChild(renderCompatStrip(tool, currentPlatform));
+        // Header row: bold name + launch-state marker.
+        var head = document.createElement("span");
+        head.className = "cli-tool-head";
+        var name = document.createElement("span");
+        name.className = "cli-tool-name";
+        name.textContent = tool.name;
+        head.appendChild(name);
+        head.appendChild(renderStateMarker(launchable));
+        card.appendChild(head);
 
-        // Red warning when the tool is not usable on the current platform.
+        // Platform logo row (brand icons only; status via color/opacity).
+        card.appendChild(renderCompatStrip(tool, currentPlatform));
+
+        // Subtle in-card warning when the current platform cannot use the tool.
         var warn = renderCompatWarn(tool, currentPlatform);
-        if (warn) cell.appendChild(warn);
+        if (warn) card.appendChild(warn);
 
-        grid.appendChild(cell);
+        grid.appendChild(card);
       });
 
       section.appendChild(grid);
