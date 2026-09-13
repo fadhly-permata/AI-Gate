@@ -2,6 +2,19 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260913-08xx — User lapor error round_robin + klarifikasi enable/disable per-model (ProjectManager)
+- User: ganti strategy ke round_robin → error `invalid strategy 'round_robin' (expected one of ['fallback','latency_cost','load_balance','three_tier'])`;
+  + klarifikasi "bukan enable/disable kombo, tapi model di dalam combo".
+- DIAGNOSA (PM baca kode + git, tidak percaya receipt): BUKAN bug kode. `ALLOWED_STRATEGIES` (`combos_router.py:31`)
+  SUDAH berisi `round_robin` (sejak commit 4c5d3fa); validator cuma di `:166` (create) + `:231` (update), tak ada validasi lain.
+  Pesan error cuma 4 strategi = proses server yang JALAN masih pakai kode LAMA di memori (belum di-restart sejak commit
+  round_robin + per-member-enabled). Sama persis pola "Ubah akun" (status 20260911): proses lama di memori, statis dibaca tiap permintaan.
+- FIX: user wajib RESTART aigate (aturan J6 = hak user, PM tak boleh bunuh proses). Setelah restart, round_robin + toggle
+  per-model (ComboMember.enabled) jadi hidup; sebelum itu backend tolak strategy & PUT {enabled}.
+- KLARIFIKASI enable/disable: yang gua bangun = per-MODEL (checkbox tiap baris di tabel anggota, kolom-1 setelah grip),
+  BUKAN on/off kombo utuh. Toggle level kombo di daftar kombo adalah fitur terpisah yg sudah ada sejak awal. Cocok dgn maksud user.
+- TIDAK ada perubahan kode. NEXT: user restart → uji mata (G3+J6); kalau masih error setelah restart, PM selidiki lebih dalem.
+
 ## 20260913-07zz — SELESAI: hapus nama provider + switch enable/disable per-model kombo DI-COMMIT (ProjectManager)
 - be-dev (backend) + fe-dev (frontend) SELESAI, diaudit PM mandiri: vitest **26 file / 664 tes LOLOS**; pytest
   **553 passed / 1 skipped**.
