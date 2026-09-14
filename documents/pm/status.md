@@ -1366,3 +1366,10 @@ User: "gua gak ekspek user pake aigate offline... ya udah kita bikin bisa full o
 - 3 PELANGGARAN ronde token-saver (dicatat): (1) nulis harness puppeteer sendiri; (2) tes pakai model gak-terdaftar; (3) probe HTTP server hidup buat re-verifikasi. Rule A14/G6/G7 + gate exit 0 (63 rule, 20424 byte) = penahannya.
 - SIKAP: exercise token-saver SUDAH SELESAI & lolos (RTK terbukti -86% via qa-engineer). PM berhenti; gak re-run/re-probe. File `tests/e2e/test_token_saver_e2e.py` (buatan qa-engineer, untracked) BELUM di-commit — nunggu keputusan user (dia manggil :8080 hidup + makan credit, bukan buat CI otomatis).
 
+## 20260914-PUSH-PR27 — Branch `feat/provider-token-saver` PUSH + PR #27 TERBUKA (ProjectManager)
+- PERINTAH user: "push & PR dulu dong". VERIFIKASI dulu (A12): `git fetch` → 19 commit ahead / 0 behind vs `origin/main`; branch BELUM ada di remote. Isi branch = 4 fitur numpuk: (1) WP.1 gate Python `run.py` `1fe592d`; (2) Wiki nav/publisher/README `d415855`+`3a3dfb3`; (3) B7 streaming Anthropic `79317a7`…`02b6bf3`; (4) Token Saver + rule + e2e `6d24deb`…`192b0bf`.
+- AKSI: `git push -u origin feat/provider-token-saver` (berhasil, new branch). `gh pr create --base main --head feat/provider-token-saver --label enhancement --label documentation`.
+- VERIFIKASI MANDIRI (H5, bukan telan output create): `gh pr view 27` → state=OPEN, isDraft=false, mergeable=MERGEABLE, baseRefName=main, headRefName=feat/provider-token-saver, labels=[enhancement, documentation] (DUA NEMPEL), changedFiles=51, +3754/−152. PR: https://github.com/fadhly-permata/AI-Gate/pull/27.
+- CATATAN: gak sengaja bundle 4 fitur dalam 1 PR (H2 prefers per-fitur, tapi user minta 1 PR). Draf wiki TETAP di luar repo (gak ikut PR). Working tree lain (wiki-drafts + B8 design) tetap untracked/modified, gak ke-push.
+- OPSI user: kalau mau dipecah per-fitur jadi stacked PR (WP.1 / wiki / B7 / token-saver), bilang — gw split via branch dari main + cherry-pick.
+
