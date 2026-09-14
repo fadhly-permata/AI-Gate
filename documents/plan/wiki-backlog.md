@@ -31,7 +31,7 @@ Legenda: `[ ]` antre · `[~]` dikerjakan · `[!]` draft siap, **nunggu review us
          `ja:42` 8 · `ru:48` восемь · `nl:44` acht · `hi:43` आठ. Verifikasi grep: 0 sisa "7",
          9 baris baru (8 README + Home) = 8. (Catatan: `семь`=7 adalah sub-string dari
          `восемь`=8 → jangan grep mentah "семь", bikin false positive.)
-- [ ] **W1.2** `Quick-Start.md` — pasang sampai jalan, 3 platform. Perbaiki 3 bug README.
+- [x] **W1.2** `Quick-Start.md` — pasang sampai jalan, 3 platform. Perbaiki 3 bug README.
       → owner: system-analyst (verifikasi perintah) + business-analyst (nada)
 - [!] **W1.3** `Interfaces.md` — daftar cara memakai aigate + link per halaman.
       → owner: system-analyst · perlu membaca route/menu frontend (read-only)
@@ -50,8 +50,12 @@ Legenda: `[ ]` antre · `[~]` dikerjakan · `[!]` draft siap, **nunggu review us
       perintah, semua perintah diverifikasi PM dari kode).
       → PM menutup 4 keraguan BA dengan verifikasi: cara ambil kode (`git clone` — tidak ada jalur
         lain, tidak ada script pembungkus), cek versi Python, sintaks variabel di PowerShell/cmd.
-      → ⚠️ LUBANG PRODUK Ketemu: `run.py` (46 baris) TIDAK mengecek versi Python → Python lama
-        memuntahkan error yang tidak bisa dibaca orang awam. Usulan perbaikan kecil, lihat WP.1.
+       → ⚠️ LUBANG PRODUK Ketemu: `run.py` (46 baris) TIDAK mengecek versi Python → Python lama
+         memuntahkan error yang tidak bisa dibaca orang awam. Usulan perbaikan kecil, lihat WP.1.
+       → **DI-ACC user 2026-09-14** (review sekuensial, tanpa revisi). Langsung commit + publish ke
+         GitHub wiki (perintah user: "push dan commit dulu, pastikan tampil di halaman wiki").
+         Pembatasan publish (PM ambil default, dicatat): HANYA 2 halaman yang SUDAH DI-ACC = `Home.md`
+         + `Quick-Start.md`; 6 halaman lain (Interfaces cs) TETAP di staging sampai lu review.
 
 ## Tahap 1.9 — Perbaikan produk ketemu dari penulisan wiki
 - [ ] **WP.1** Tambah cek versi Python di awal `run.py`: kalau < 3.10, cetak satu pesan manusiawi
