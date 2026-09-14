@@ -28,7 +28,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 from backend.gateway.errors import GatewayError
 from backend.log import log_warning
@@ -627,22 +627,34 @@ def _openai_finish_to_anthropic(finish: Optional[str]) -> str:
     return mapping.get(finish, "end_turn") if finish else "end_turn"
 
 
-def anthropic_messages_request_to_openai_chat(payload: dict) -> dict:
+def anthropic_messages_request_to_openai_chat(
+    payload: dict, allow_stream: bool = False
+) -> dict:
     """Translate an INBOUND Anthropic Messages request → OpenAI chat payload.
 
     Pure function (raises :class:`GatewayError`). Reuses the SAME pipeline as
     ``/v1/chat/completions`` and ``/v1/responses`` downstream.
 
+    :param allow_stream: when ``True`` (Tahap 2 inbound Anthropic SSE), a
+      ``stream:true`` request is accepted and the returned payload is forced to
+      ``stream:true`` + ``stream_options={"include_usage": true}`` so the gateway
+      can translate the upstream OpenAI SSE into the Anthropic SSE envelope. When
+      ``False`` (default — Stage 1 non-streaming), ``stream:true`` is refused
+      exactly as before (no behaviour change).
     :raises GatewayError: 400 ``anthropic_streaming_unsupported`` for
-      ``stream:true`` (Stage 1 is non-streaming only); 400
+      ``stream:true`` when ``allow_stream`` is ``False``; 400
       ``anthropic_unsupported_field`` for ``thinking`` with ``enabled`` (extended
       thinking is not representable in the OpenAI chat payload). Harmless keys
       (``metadata``) are dropped silently (a stateless gateway never forwards them).
     """
     payload = payload or {}
 
-    # Stage 1 = NON-STREAMING. Refuse stream:true up-front (clear seam for Phase 2).
-    if payload.get("stream") is True:
+    # Stage 1 (allow_stream=False): refuse stream:true (clear seam). Tahap 2
+    # (allow_stream=True, the streaming /v1/messages route): accept it and mark the
+    # chat payload to stream — the final `stream`/`stream_options` are set below
+    # after the sampling params are copied.
+    wants_stream = payload.get("stream") is True
+    if wants_stream and not allow_stream:
         log_warning(
             "anthropic /v1/messages asked for stream:true; Stage 1 is "
             "non-streaming only",
@@ -712,6 +724,13 @@ def anthropic_messages_request_to_openai_chat(payload: dict) -> dict:
 
     # Harmless OpenAI/Anthropic metadata keys are dropped (whitelist decides what
     # reaches upstream; nothing is blindly forwarded).
+
+    # Tahap 2: a streaming inbound request must become an OpenAI stream that also
+    # carries the final usage chunk (so message_delta can report token counts).
+    if allow_stream and wants_stream:
+        chat["stream"] = True
+        chat["stream_options"] = {"include_usage": True}
+
     return chat
 
 
@@ -787,6 +806,275 @@ def openai_chat_response_to_anthropic_messages(
     }
 
 
+class _AnthropicSseEncoder:
+    """Stateful OpenAI-chunk -> Anthropic-SSE encoder (Tahap 2 inbound stream).
+
+    A single encoder instance walks the WHOLE OpenAI chunk sequence so it can
+    emit a correct Anthropic Messages SSE event stream in order:
+    ``message_start`` -> ``content_block_start`` -> ``content_block_delta``*
+    (+ optional ``tool_use`` blocks via ``input_json_delta``) -> ``content_block_stop``
+    -> ``message_delta`` (stop_reason + usage) -> ``message_stop``.
+
+    Exposed through :func:`openai_chunk_stream_to_anthropic_events` (pure, list-in
+    / events-out); the streaming router drives :meth:`feed` per upstream byte frame
+    so it can flush low-latency while keeping one continuous state machine.
+
+    Internal representation = OpenAI chat-completion chunk dicts (the SAME shape
+    ``_streaming_response`` forwards today) — no new stream engine (DRY/KISS).
+    """
+
+    def __init__(self, request_model: str) -> None:
+        self.request_model = request_model
+        self.msg_id: Optional[str] = None
+        self.started = False
+        # Anthropic content-block indices are assigned in first-appearance order
+        # (text first if any, then each tool_call) so a tools-only stream never
+        # leaves a phantom empty text block at index 0.
+        self._next_index = 0
+        self.text_index: Optional[int] = None
+        self.text_open = False
+        self.tool_index: Dict[int, int] = {}  # openai tool_call index -> block idx
+        self.tool_open: Dict[int, bool] = {}  # block idx -> open?
+        self.finish_reason: Optional[str] = None
+        self.usage: Optional[dict] = None
+        self.finalized = False
+
+    @staticmethod
+    def _event(event_type: str, data: dict) -> str:
+        """Format one Anthropic SSE event (``event:`` + ``data:`` + blank line)."""
+        return f"event: {event_type}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+    def _ensure_start(self, chat_id: Any) -> List[str]:
+        """Emit ``message_start`` exactly once, on the first chunk seen."""
+        if self.started:
+            return []
+        self.started = True
+        self.msg_id = _derive_anthropic_id(chat_id, "msg_")
+        return [
+            self._event(
+                "message_start",
+                {
+                    "type": "message_start",
+                    "message": {
+                        "id": self.msg_id,
+                        "type": "message",
+                        "role": "assistant",
+                        "model": self.request_model,
+                        "content": [],
+                        "stop_reason": None,
+                        "stop_sequence": None,
+                        # OpenAI sends no prompt usage up-front; the final value is
+                        # reported in message_delta (design §4.1 / R1).
+                        "usage": {"input_tokens": 0, "output_tokens": 0},
+                    },
+                },
+            )
+        ]
+
+    def _open_text_block(self) -> List[str]:
+        if self.text_index is not None:
+            return []
+        self.text_index = self._next_index
+        self._next_index += 1
+        self.text_open = True
+        return [
+            self._event(
+                "content_block_start",
+                {
+                    "type": "content_block_start",
+                    "index": self.text_index,
+                    "content_block": {"type": "text", "text": ""},
+                },
+            )
+        ]
+
+    def feed(self, chunks: Any) -> List[str]:
+        """Translate one or more OpenAI chunk dicts into Anthropic SSE events."""
+        events: List[str] = []
+        for chunk in chunks:
+            events.extend(self._process(chunk))
+        return events
+
+    def _process(self, chunk: Any) -> List[str]:
+        if not isinstance(chunk, dict):
+            return []
+        events: List[str] = self._ensure_start(chunk.get("id"))
+
+        choices = chunk.get("choices")
+        if isinstance(choices, list):
+            for choice in choices:
+                if not isinstance(choice, dict):
+                    continue
+                delta = choice.get("delta")
+                if isinstance(delta, dict):
+                    content = delta.get("content")
+                    if isinstance(content, str) and content:
+                        events.extend(self._open_text_block())
+                        events.append(
+                            self._event(
+                                "content_block_delta",
+                                {
+                                    "type": "content_block_delta",
+                                    "index": self.text_index,
+                                    "delta": {"type": "text_delta", "text": content},
+                                },
+                            )
+                        )
+                    events.extend(self._process_tool_calls(delta.get("tool_calls")))
+                if choice.get("finish_reason") is not None:
+                    # Save it; message_delta + message_stop wait for usage / end.
+                    self.finish_reason = choice["finish_reason"]
+
+        usage = chunk.get("usage")
+        if isinstance(usage, dict) and usage:
+            self.usage = usage
+            events.extend(self._finalize())
+        return events
+
+    def _process_tool_calls(self, tool_calls: Any) -> List[str]:
+        """Map OpenAI ``delta.tool_calls`` -> Anthropic ``tool_use`` blocks.
+
+        The FIRST fragment for a given tool_call index opens the block (``id`` +
+        ``name`` are known there); each subsequent ``function.arguments`` fragment
+        is streamed as an ``input_json_delta`` (OpenAI already emits partial JSON,
+        so the fragments concatenate into a valid ``input`` — design §4.1 / R2).
+        """
+        events: List[str] = []
+        if not isinstance(tool_calls, list):
+            return events
+        for tc in tool_calls:
+            if not isinstance(tc, dict):
+                continue
+            openai_index = tc.get("index", 0)
+            if not isinstance(openai_index, int):
+                openai_index = 0
+            func = tc.get("function") if isinstance(tc.get("function"), dict) else {}
+            if openai_index not in self.tool_index:
+                block_index = self._next_index
+                self._next_index += 1
+                self.tool_index[openai_index] = block_index
+                self.tool_open[block_index] = True
+                events.append(
+                    self._event(
+                        "content_block_start",
+                        {
+                            "type": "content_block_start",
+                            "index": block_index,
+                            "content_block": {
+                                "type": "tool_use",
+                                "id": tc.get("id", "") or "",
+                                "name": func.get("name", "") or "",
+                                "input": {},
+                            },
+                        },
+                    )
+                )
+            block_index = self.tool_index[openai_index]
+            part = func.get("arguments")
+            if isinstance(part, str) and part:
+                events.append(
+                    self._event(
+                        "content_block_delta",
+                        {
+                            "type": "content_block_delta",
+                            "index": block_index,
+                            "delta": {
+                                "type": "input_json_delta",
+                                "partial_json": part,
+                            },
+                        },
+                    )
+                )
+        return events
+
+    def finish(self) -> List[str]:
+        """Flush the terminal events at end-of-stream (idempotent)."""
+        events: List[str] = []
+        if not self.started:
+            # Degenerate/empty upstream: still emit a well-formed envelope.
+            events.extend(self._ensure_start(None))
+        events.extend(self._finalize())
+        return events
+
+    def _finalize(self) -> List[str]:
+        if self.finalized:
+            return []
+        self.finalized = True
+        events: List[str] = []
+        if self.text_open:
+            events.append(
+                self._event(
+                    "content_block_stop",
+                    {"type": "content_block_stop", "index": self.text_index},
+                )
+            )
+            self.text_open = False
+        for block_index in sorted(self.tool_open):
+            if self.tool_open[block_index]:
+                events.append(
+                    self._event(
+                        "content_block_stop",
+                        {"type": "content_block_stop", "index": block_index},
+                    )
+                )
+                self.tool_open[block_index] = False
+        usage = self.usage if isinstance(self.usage, dict) else {}
+        events.append(
+            self._event(
+                "message_delta",
+                {
+                    "type": "message_delta",
+                    "delta": {
+                        "stop_reason": _openai_finish_to_anthropic(self.finish_reason),
+                        "stop_sequence": None,
+                    },
+                    "usage": {
+                        "input_tokens": int(usage.get("prompt_tokens") or 0),
+                        "output_tokens": int(usage.get("completion_tokens") or 0),
+                    },
+                },
+            )
+        )
+        events.append(self._event("message_stop", {"type": "message_stop"}))
+        return events
+
+
+def openai_chunk_stream_to_anthropic_events(
+    chunks: Any, request_model: str
+) -> Iterator[str]:
+    """Translate an iterable of OpenAI chat-completion CHUNK DICTS into the
+    Anthropic Messages SSE event sequence (Tahap 2 inbound stream).
+
+    Pure (no I/O, no DB). ``[DONE]`` / malformed frames must be stripped by the
+    caller (:func:`backend.gateway.router._iter_openai_sse_chunks`) — only decoded
+    chunk dicts are fed here. ``data: [DONE]`` is ignored because Anthropic closes
+    a stream with ``message_stop`` instead.
+
+    :param chunks: iterable of OpenAI chunk dicts.
+    :param request_model: the client-requested model ref (echoed in
+      ``message_start.message.model``, same as the non-streaming envelope).
+    :yields: SSE event strings (``event: X\\ndata: {json}\\n\\n``).
+    """
+    encoder = _AnthropicSseEncoder(request_model)
+    for event in encoder.feed(chunks):
+        yield event
+    for event in encoder.finish():
+        yield event
+
+
+def anthropic_error_sse_frame(error: dict) -> str:
+    """One Anthropic-shaped ``event: error`` SSE frame (mid-stream failure, §5.2).
+
+    ``error`` is the inner ``{"type","message","code"}`` dict only (never a secret
+    dump — the caller passes the already-safe UpstreamError envelope).
+    """
+    return (
+        "event: error\n"
+        + f"data: {json.dumps({'type': 'error', 'error': error}, ensure_ascii=False)}"
+        + "\n\n"
+    )
+
+
 def translate_error(format: str, status_code: int, raw_body: Any) -> dict:
     """Map an upstream error body to an OpenAI error envelope.
 
@@ -846,6 +1134,8 @@ __all__ = [
     "AnthropicMessagesRequest",
     "anthropic_messages_request_to_openai_chat",
     "openai_chat_response_to_anthropic_messages",
+    "openai_chunk_stream_to_anthropic_events",
+    "anthropic_error_sse_frame",
     "ANTHROPIC_STREAMING_UNSUPPORTED_CODE",
     "ANTHROPIC_UNSUPPORTED_FIELD_CODE",
     "ANTHROPIC_MISSING_MODEL_CODE",
