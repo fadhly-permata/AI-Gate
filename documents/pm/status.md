@@ -2,6 +2,14 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260914-WIKI-PUBLISH — Home + Quick Start TERBIT di GitHub wiki PUBLIK (perintah user "pastikan tampil di halaman wiki") (ProjectManager)
+- PELANGGARAN KEBIJAKAN bidak: rencana awal (wiki-plan.md §6 / backlog W2.4) = TUNGGU 8 halaman ACC lalu publish sekaligus. User override 2026-09-14: publish in-kremental per halaman ACC. PM catat deviasi ini sebagai keputusan user.
+- MEKANISME: clone `AI-Gate.wiki.git` (master; isinya cuma stub "Welcome to the AI-Gate wiki!") → timpa dengan draft ACC persis (`cp`, diff identik) → commit + `git push origin master` (kredensial via `gh auth setup-git`, GH_TOKEN, nilai tak dicetak). Push `4deaf39..1df0d65` exit 0.
+- CAKUPAN (default PM, dicatat): HANYA 2 halaman SUDAH DI-ACC = `Home.md` + `Quick-Start.md`. 6 halaman lain TETAP di staging `documents/pm/wiki-drafts/` sampai user review.
+- VERIFIKASI 3 arah (F3/G3, bukan cuma percaya output): (1) `git ls-remote` wiki master=`1df0d65`; (2) clone FRESH origin → Home.md+Quick-Start.md ada, Home berisi "eight languages"; (3) webfetch `github.com/fadhly-permata/AI-Gate/wiki/Quick-Start` → render publik lengkap, "Wiki pages: 2", "edited Sep 14, 2026".
+- CATATAN: link internal ke halaman belum-terbit (CLI-Tools, Configuration-and-Keys, dll) DIAM sesaat (404 sampai halaman itu dipublish). Temp clone (`/tmp/.../wiki-publish`+`wiki-verify`) SUDAH dihapus.
+- URL: https://github.com/fadhly-permata/AI-Gate/wiki (Home) · /wiki/Quick-Start.
+
 ## 20260914-WIKI-HOME-LANG — Home wiki + 8 README: 7→8 bahasa (DI-COMMIT + PUSH tanpa PR) (ProjectManager; perintah user "push tanpa PR")
 - TASK: revisi draft wiki `Home.md` (line 11 "seven languages"→"eight languages") + tulang punggung user: sebar koreksi ke 8 README (root + 7 varian) karena angka 7 basi setelah Hindi masuk registry.
 - FAKTA TERVERIFIKASI KE KODE (F3, bukan tebakan): `window.LANGS` `src/frontend/static/i18n.js:28-37` = 8 entri (en,id,ru,nl,ja,zh,zh-tw,hi); 8 file kamus `i18n/*.js` (ada `hi.js` baru, 2026-09-13, PR #24). Klaim "8 bahasa" sah.
