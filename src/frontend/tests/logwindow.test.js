@@ -506,3 +506,273 @@ describe("resolve flows (T2)", () => {
   });
 });
 
+/* ===== Task 1: stacktrace open-state survives the 3s re-render =====
+   renderLogs() rebuilds #logTableBody.innerHTML every poll (startLogAutoRefresh
+   -> loadLogs -> renderLogs), so a <details class="log-stack"> the user opened
+   used to collapse on the next tick. The fix keeps a module-level set of open
+   row ids (window.aigate.openStackIds) and re-applies `open` when rendering.
+   openStackIds is shared across files (isolate:false) -> reset before+after. */
+function stackRow() {
+  return { id: "s1", severity: "error", message: "boom", stacktrace: "Traceback..." };
+}
+
+describe("stacktrace open-state preservation (Task 1)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    setupLogDom();
+    window.aigate.openStackIds.clear();
+  });
+
+  afterEach(() => {
+    window.aigate.openStackIds.clear();
+    vi.unstubAllGlobals();
+  });
+
+  it("renders the stacktrace closed by default and tags the row id", () => {
+    window.aigate.renderLogs([stackRow()]);
+    const d = document.querySelector("#logTableBody .log-stack");
+    expect(d, "log-stack present").not.toBeNull();
+    expect(d.getAttribute("data-logid")).toBe("s1");
+    expect(d.hasAttribute("open")).toBe(false);
+  });
+
+  it("keeps an expanded stacktrace open across two renderLogs (poll) calls", () => {
+    window.aigate.openStackIds.add("s1");
+    window.aigate.renderLogs([stackRow()]);
+    // 3s poll #1.
+    window.aigate.renderLogs([stackRow()]);
+    const d = document.querySelector("#logTableBody .log-stack");
+    expect(d.hasAttribute("open")).toBe(true);
+    expect(d.open).toBe(true);
+    // 3s poll #2 — still open (the old bug collapsed it within one tick).
+    window.aigate.renderLogs([stackRow()]);
+    expect(document.querySelector("#logTableBody .log-stack").hasAttribute("open")).toBe(true);
+  });
+
+  it("a collapsed id stays collapsed even after another row was expanded", () => {
+    window.aigate.renderLogs([
+      Object.assign(stackRow(), { id: "a", stacktrace: "T-a" }),
+      Object.assign(stackRow(), { id: "b", stacktrace: "T-b" })
+    ]);
+    window.aigate.openStackIds.add("b");
+    window.aigate.renderLogs([
+      Object.assign(stackRow(), { id: "a", stacktrace: "T-a" }),
+      Object.assign(stackRow(), { id: "b", stacktrace: "T-b" })
+    ]);
+    const rows = Array.from(document.querySelectorAll("#logTableBody .log-stack"));
+    const byId = {};
+    rows.forEach((d) => { byId[d.getAttribute("data-logid")] = d; });
+    expect(byId.a.hasAttribute("open")).toBe(false);
+    expect(byId.b.hasAttribute("open")).toBe(true);
+  });
+
+  // REGRESSION (real-Chromium G3): the API returns LogEntry.id as a NUMBER
+  // (e.g. {"id":4}). The attribute round-trips as the STRING "4", so the stored
+  // key and the render check MUST both normalize to the same type. This test uses
+  // a numeric id end-to-end (delegate stores the key, then a 2nd render re-checks
+  // it) — it FAILS with the old `openStackIds.has(row.id)` (number-vs-string) and
+  // PASSES once both sides compare String(id).
+  it("preserves an expanded stacktrace whose id is a NUMBER (real API type)", () => {
+    window.aigate.wireLogTable();
+    const row = { id: 4, severity: "error", message: "boom", stacktrace: "Traceback..." };
+    window.aigate.renderLogs([row]);
+    const det = document.querySelector("#logTableBody .log-stack");
+    expect(det.getAttribute("data-logid")).toBe("4"); // attribute -> string
+    expect(det.hasAttribute("open")).toBe(false);
+
+    // User expands: capture-phase delegate records the key as seen on the DOM.
+    det.open = true;
+    det.dispatchEvent(new Event("toggle"));
+    expect(window.aigate.openStackIds.has("4")).toBe(true);
+
+    // A 3s poll re-renders and must recreate the <details> still open.
+    window.aigate.renderLogs([row]);
+    const det2 = document.querySelector("#logTableBody .log-stack");
+    expect(det2.getAttribute("data-logid")).toBe("4");
+    expect(det2.hasAttribute("open")).toBe(true);
+  });
+
+  it("the delegated tbody toggle listener tracks expand + collapse into the set", () => {
+    // init() ran against an empty body, so (re)attach the tbody delegates.
+    window.aigate.wireLogTable();
+    window.aigate.renderLogs([stackRow()]);
+    const d = document.querySelector("#logTableBody .log-stack");
+    // User expands the trace (browser sets open, then fires `toggle`).
+    d.open = true;
+    d.dispatchEvent(new Event("toggle"));
+    expect(window.aigate.openStackIds.has("s1")).toBe(true);
+    // A poll re-render now keeps it open.
+    window.aigate.renderLogs([stackRow()]);
+    expect(document.querySelector("#logTableBody .log-stack").hasAttribute("open")).toBe(true);
+    // User collapses it -> removed from the set -> re-render stays closed.
+    const d2 = document.querySelector("#logTableBody .log-stack");
+    d2.open = false;
+    d2.dispatchEvent(new Event("toggle"));
+    expect(window.aigate.openStackIds.has("s1")).toBe(false);
+    window.aigate.renderLogs([stackRow()]);
+    expect(document.querySelector("#logTableBody .log-stack").hasAttribute("open")).toBe(false);
+  });
+});
+
+/* ===== Task 3: Developer Mode gate (frontend only) =====
+   applyDevMode(on) reflects dev_mode on <body data-devmode>; the CSS in
+   styles.css hides the 3 dev surfaces when "off" and app.js only runs the
+   /api/logs poll when "on". jsdom loads no stylesheet, so the display effect
+   itself is a manual/visual check; here we pin the JS contract: the body
+   attribute mirrors the value and the poll start/stop follows it. */
+describe("applyDevMode gate (Task 3)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    setupLogDom();
+    window.aigate.stopLogAutoRefresh();
+  });
+
+  afterEach(() => {
+    window.aigate.stopLogAutoRefresh();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("sets body[data-devmode] to match the flag", () => {
+    window.aigate.applyDevMode(true);
+    expect(document.body.dataset.devmode).toBe("on");
+    window.aigate.applyDevMode(false);
+    expect(document.body.dataset.devmode).toBe("off");
+  });
+
+  it("off -> no /api/logs poll runs", async () => {
+    const calls = stubFetch((method, url) => {
+      if (method === "GET" && url.startsWith("/api/logs")) return { data: [] };
+      return null;
+    });
+    window.aigate.applyDevMode(false);
+    await flush();
+    expect(calls.some((c) => c.method === "GET" && c.url.startsWith("/api/logs"))).toBe(false);
+  });
+
+  it("on -> poll starts (fills immediately, then every 3s)", () => {
+    vi.useFakeTimers();
+    const calls = stubFetch((method, url) => {
+      if (method === "GET" && url.startsWith("/api/logs")) return { data: [] };
+      return null;
+    });
+    window.aigate.applyDevMode(true);
+    // Immediate fill from applyDevMode.
+    expect(calls.some((c) => c.method === "GET" && c.url.startsWith("/api/logs"))).toBe(true);
+    // Timer is armed -> advance one 3s tick to prove it is running.
+    vi.advanceTimersByTime(3000);
+    expect(calls.filter((c) => c.method === "GET" && c.url.startsWith("/api/logs")).length)
+      .toBeGreaterThan(1);
+  });
+
+  it("toggling off stops the running timer", () => {
+    vi.useFakeTimers();
+    const calls = stubFetch((method, url) => {
+      if (method === "GET" && url.startsWith("/api/logs")) return { data: [] };
+      return null;
+    });
+    window.aigate.applyDevMode(true);
+    window.aigate.applyDevMode(false);
+    const before = calls.length;
+    vi.advanceTimersByTime(9000);
+    expect(calls.length).toBe(before); // no ticks leaked after turning it off
+  });
+});
+
+/* ===== Developer Mode switch: instant apply + persist (no Save click) =====
+   The real-Chromium UX check found the toggle only took effect after "Save".
+   wireDevModeToggle() binds a `change` handler on #setDevMode that calls
+   saveSettings() -> PUT /api/settings {dev_mode} -> applyDevMode() on success.
+   init() runs against an empty jsdom body, so the test mounts the Settings form
+   then calls the exported wireDevModeToggle() (same re-wiring pattern the file
+   already uses for wireLogTable / setupDeviceModal), then dispatches `change`. */
+function setupSettingsDom() {
+  document.body.innerHTML =
+    '<div class="logwindow" id="logWindow">' +
+      '<div class="logwindow-body">' +
+        '<table id="logTable"><tbody id="logTableBody"></tbody></table>' +
+      "</div>" +
+    "</div>" +
+    '<form id="settingsForm">' +
+      '<input type="number" id="setPort" value="8080" />' +
+      '<input type="checkbox" id="setDevMode" />' +
+      '<select id="setTheme"><option value="light" selected>Light</option>' +
+        '<option value="dark">Dark</option></select>' +
+      '<select id="setLocale"><option value="en" selected>English</option></select>' +
+      '<p id="settingsMsg"></p>' +
+    "</form>";
+}
+
+describe("Developer Mode instant toggle (wireDevModeToggle)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    setupSettingsDom();
+    window.aigate.stopLogAutoRefresh();
+    window.aigate.wireDevModeToggle();
+  });
+
+  afterEach(() => {
+    window.aigate.stopLogAutoRefresh();
+    vi.unstubAllGlobals();
+  });
+
+  function putSettings(calls) {
+    return calls.find((c) => c.method === "PUT" && c.url === "/api/settings");
+  }
+
+  it("checking the switch PUTs dev_mode:'true' and flips body[data-devmode] live", async () => {
+    const calls = stubFetch((method, url) => {
+      if (method === "GET" && url.startsWith("/api/logs")) return { data: [] };
+      return null;
+    });
+    const dm = document.getElementById("setDevMode");
+    dm.checked = true;
+    dm.dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+    const put = putSettings(calls);
+    expect(put, "saveSettings fired a PUT").toBeTruthy();
+    expect(JSON.parse(put.opts.body).settings.dev_mode).toBe("true");
+    expect(document.body.dataset.devmode).toBe("on");
+  });
+
+  it("unchecking PUTs dev_mode:'false' and flips body[data-devmode] off live", async () => {
+    const calls = stubFetch((method, url) => {
+      if (method === "GET" && url.startsWith("/api/logs")) return { data: [] };
+      return null;
+    });
+    // Start ON (so the reverse transition is observable) via the same gate.
+    window.aigate.applyDevMode(true);
+    const dm = document.getElementById("setDevMode");
+    dm.checked = false;
+    dm.dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+    const put = putSettings(calls);
+    expect(put, "saveSettings fired a PUT").toBeTruthy();
+    expect(JSON.parse(put.opts.body).settings.dev_mode).toBe("false");
+    expect(document.body.dataset.devmode).toBe("off");
+  });
+
+  it("the switch is idempotent: repeated change -> repeated non-destructive PUTs", async () => {
+    // The concern is double-firing. saveSettings() PUTs the whole settings object
+    // (idempotent, non-destructive) so a second toggle just re-persists the same
+    // value. (The explicit Save button calls the SAME saveSettings via the form's
+    // submit listener that init() wires in the real browser; that wiring is inline
+    // in init and not re-run under this empty-body harness, so idempotency is
+    // proven here by firing the exposed change handler twice.)
+    const calls = stubFetch((method, url) => {
+      if (method === "GET" && url.startsWith("/api/logs")) return { data: [] };
+      return null;
+    });
+    const dm = document.getElementById("setDevMode");
+    dm.checked = true;
+    dm.dispatchEvent(new Event("change", { bubbles: true }));
+    dm.dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+    const puts = calls.filter((c) => c.method === "PUT" && c.url === "/api/settings");
+    expect(puts.length).toBe(2); // fired on each change, harmlessly
+    puts.forEach((p) => {
+      expect(JSON.parse(p.opts.body).settings.dev_mode).toBe("true");
+    });
+    expect(document.body.dataset.devmode).toBe("on");
+  });
+});
