@@ -1,9 +1,6 @@
 # OpenAI API 🔌
 
-**You have a script, a notebook, a small app of your own** — and you want it to talk to a model without
-hard-coding one vendor's address and one vendor's key into it forever. That's what this page is for: aigate
-answers on one local address, in the shape OpenAI already made popular, and *which* provider actually
-replies is decided per request by a single field. Nothing to install on the caller's side.
+**You've wired a model into your own script before, and it never ends.** A vendor key in one file, an address in another, a model name hard-coded where you'll forget it. So you point the script at something that won't move: aigate answers on one local address, in the request shapes your code already speaks, and *which* provider replies is just a field you change per call. Nothing to install on the calling side.
 
 ## One address, one port 🚪
 
@@ -11,72 +8,43 @@ replies is decided per request by a single field. Nothing to install on the call
 http://localhost:8080/v1
 ```
 
-Same app, same port as the screen you've been clicking. Move the port with `AIGATE_PORT=9090` and both
-move together — there is only ever one port open. (The host and port you type on an endpoint are a label
-for your own notes, not a second door.)
+Same app and same port as the screen you've been clicking. Move it with `AIGATE_PORT=9090` and both move together — there is only ever one port. (The host and port on an endpoint are a label for your own notes, not a second door.)
 
-## The three things it answers 🎯
+## The paths that answer 🎯
 
-- `GET /v1/models` — what you may call right now
-- `POST /v1/chat/completions` — the usual one
-- `POST /v1/responses` — the newer OpenAI shape
+- `GET /v1/models` — what you can aim at right now, built live from your providers and combos
+- `POST /v1/chat/completions` — the familiar one
+- `POST /v1/responses` — OpenAI's newer responses shape
+- `POST /v1/messages` — the Anthropic Messages shape, too
+- `POST /v1/messages/count_tokens` — its token counter
 
-That's the whole surface. There are no other endpoints.
+So "OpenAI-compatible" here means plain enough that any client speaking that JSON works — and a client speaking Anthropic's shape is accepted on the same address. The Anthropic path answers in full for now, not streaming.
 
-## `model` is how you aim 🎛️
+## The `model` field is how you aim 🧭
 
-Three spellings, three targets:
-
-| you send | aigate understands |
-|----------|--------------------|
-| `combo:<name>` | a combo you set up — if it holds several members, the top-priority one answers first |
-| `<provider>:<model>` | one specific provider, named exactly as it is on your providers screen |
-| `some-model-id` | a bare name with no prefix → the OpenAI path: the active provider's own address |
-
-## Body and streaming 📄
-
-Request bodies follow the OpenAI format: `model`, `messages`, `stream`, `temperature`, `max_tokens`.
-Set `"stream": true` and the answer flows token by token; leave it out and you get one normal JSON reply.
-
-Raw, copy-pasteable:
+Send a combo you set up — `combo:my-combo` — and if it holds several providers, the top one answers first, and a failure rolls on to the next ([Providers & Combos](Providers-and-Combos)). Or copy any id straight from `GET /v1/models`. Or just send a bare model name: aigate finds an enabled provider that offers it, and if more than one does, it picks the provider you marked as the one in use.
 
 ```bash
 curl http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"model":"combo:<your-combo>","messages":[{"role":"user","content":"hello"}]}'
+  -d '{"model":"combo:my-combo","messages":[{"role":"user","content":"hello"}]}'
 ```
 
-Put your own combo's name where the angle brackets are — the combos screen shows every name, and
-`GET /v1/models` lists what you can aim at. Prefer Python? The official OpenAI
-library works once you point its `base_url` here (a third-party library, not part of aigate). The library
-insists on a key string; aigate only checks it if you switched the endpoint's key on:
+The reply comes back in the same style your client expects — the short version:
 
-```python
-from openai import OpenAI
-
-client = OpenAI(base_url="http://localhost:8080/v1", api_key="unused")
-print(client.chat.completions.create(
-    model="combo:my-combo",
-    messages=[{"role": "user", "content": "hello"}],
-))
+```json
+{"choices":[{"message":{"content":"Hi there."}}],"usage":{"total_tokens":18}}
 ```
+
+Send `"stream":true` to OpenAI-shape providers and it flows in pieces instead. Bodies follow the usual fields — `model`, `messages`, `temperature`, `max_tokens`. Prefer Python? The official OpenAI library works once you point its base URL here — a third-party library, not part of aigate.
 
 ## The key you might need 🔑
 
-If you switched on the access key for this endpoint, send it as a header:
+Turn an endpoint's access key on and send it as `Authorization: Bearer <key>` — or `x-api-key`, the header Anthropic clients use. Leave it off and the API is open to anyone who can reach that port: same network, same airport. That's the [Quick Start](Quick-Start) café warning again. [Configuration and Keys](Configuration-and-Keys) sets it.
 
-```bash
--H "Authorization: Bearer <your-key>"
-```
+## Nothing slips past the books 🧾
 
-If you left it **off**, the API is open to anyone who can reach that port — same network, same café. Worth
-reading [Configuration and Keys](Configuration-and-Keys) before you run this anywhere but your own
-machine.
-
-## Nothing here is off the books 🧾
-
-Requests made from your own code are logged like everything else: tokens in, tokens out, an estimated cost,
-one entry per call. Pointing a script at aigate is not going around it.
+Every call from your own code is recorded like any other — tokens in, tokens out, an estimated cost. Pointing a script at aigate isn't going around it.
 
 ---
 

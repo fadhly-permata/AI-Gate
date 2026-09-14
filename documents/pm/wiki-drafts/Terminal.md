@@ -1,53 +1,32 @@
 # Terminal ⌨️
 
-**"A terminal, inside a browser tab?"** Healthy skepticism — it sounds like a drawing of one. It's the
-real thing: each tab is a live session on the device aigate runs on. What used to need a separate SSH
-app is now a tab beside your providers.
+**On the night bus again, and the build you started an hour ago is still running back at the desk.** The reflex is to reach for an SSH app — keys, hosts, a second thing to babysit. Here, it's one tab inside the page you already have open. Each tab is a real session on the device aigate runs on — not a picture of a terminal.
 
-## What's on the screen 🎛️
+## It keeps working when you walk away 🔌
 
-- **Tabs.** Open several; each is its own session.
-- **Full screen and split.** Fill the display, or put two sessions side by side.
-- **Keep-awake.** Keeps the screen on while you watch something run. (Not a life-support for the session —
-  see the last section.)
-- **A floating button** in the corner of the terminal area, plus a small menu for rare choices.
+Let the phone freeze the tab, lose Wi-Fi mid-run — the job doesn't stop. The browser view detaches; the process keeps running and collecting output, so when you return, you scroll through everything it said in the meantime. A blip reconnects by itself. Close the whole page and reopen it — the live tabs come back.
 
-## Paste, scroll, swipe 📋
+Only two things end a session: you close it, or it sits detached from any tab with nothing new to show for about an hour. A job that's still working never gets swept away for having a quiet tab. **Keep Screen On**, the switch below, keeps your *screen* awake while you watch a run — it isn't life support; the session never needed it.
 
-Pasting injects your clipboard into the active session, and focus comes back by itself so you keep
-typing. Wheel and trackpad scroll; on a phone, so do fingers. Inside full-screen terminal programs — the
-editor-looking ones — a swipe becomes that program's own scroll, natural direction, 1:1 with your finger.
-History holds about 5,000 lines.
+## The controls, all of them 🎛️
 
-## Where the coding tools open 🛠️
+Along the top: a tab strip with a **new-tab button** pinned at its end. In the corner, a small floating cluster that never covers what you're reading:
 
-Every tool launched from the coding-tools screen opens **in a new tab here** — that's the path behind
-[CLI Tools](CLI-Tools). With `AIGATE_DEV=1` you also get a log window and developer helpers.
+- **Paste** — injects your clipboard into the live session, then hands focus straight back so you keep typing. Its menu adds **Paste as Code Block**: the text arrives fenced, so an agent reads it as one piece instead of running your lines one by one.
+- **Settings** — holds **Keep Screen On** and **TUI Passthrough**.
+- One button, two different sizes: **Full Page** fills the page with the terminal; **Fullscreen** is the browser's own full-screen mode.
 
-## Self-Heal 🤖
+## Scrolling, thumb included 📱
 
-The part people don't believe, stated exactly as it behaves. Point aigate at a project's errors:
+Wheel and trackpad do what you expect. A finger swipe tracks 1:1 under your thumb, natural direction, with a little throw when you let go. Inside full-screen terminal apps — vim, htop, less — the same swipe becomes that app's own scrolling, no switch needed. **TUI Passthrough** is the opposite demand: hand the app your raw touch, so drag-to-select works the way the app wants. The last **5,000 lines** of history stay scrollable.
 
-1. It makes a **branch**, so your main line stays untouched while it works.
-2. It runs a coding agent **in a live tab** — you watch, nothing runs hidden.
-3. It fixes warnings and errors **one at a time**, re-running checks and clearing entries that came out
-   clean.
-4. If everything passes, it **merges into the main line**. It never claims success on a failed run: a
-   command that exits badly is marked failed, plainly.
+## When things misbehave 🧯
 
-Needs an installed coding agent (your pick) and a project to aim it at. The risk, straight: it writes
-real code and merges it — use it where you can read what it did. No promises; your project and agent
-decide how far it gets.
+A failed command or a missing tool prints a readable line, not a crash. A coding tool that isn't installed comes with the install command that fits your device — Termux included. Every tool you launch from [CLI Tools](CLI-Tools) opens here, in a new tab. Running aigate with the developer window (`AIGATE_DEV=1`) adds a log window to the page.
 
-## The honest limit 🔌
+## The honest limit 🚪
 
-The browser view and the session behind it are different things. Close the tab, lose Wi-Fi, let your
-phone freeze a backgrounded page — a running job doesn't stop. It keeps running and buffering, and next
-time you open that tab you catch up.
-
-Only two things end a session: you close it, or it sits detached with no output for a while (an hour by
-default, adjustable in settings). A job that's still working never gets swept away because a tab went
-quiet.
+This is a shell on the device aigate itself runs on — not a bridge to some other machine. And that device answers to everyone on the local network, which is why [Quick Start](Quick-Start) warns about cafés.
 
 ---
 

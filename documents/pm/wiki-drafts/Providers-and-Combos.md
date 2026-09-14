@@ -1,54 +1,40 @@
 # Providers & Combos 🧩
 
-**Three words explain everything else in the app: provider, combo, endpoint.** If you read one page
-besides [Quick Start](Quick-Start), read this one. No architecture talk — the kitchen version.
+**Mid-task, the provider that answered all week hits its limit.** The tool waits a beat — and usually nothing worse happens: aigate moves on to the next member without you resending. That move rests on three words: provider, combo, endpoint. If you read one page besides [Quick Start](Quick-Start), read this one.
 
-## The chain, in order 🔗
+## The chain 🔗
 
-**A provider** is one account that can answer: a key, plus an address to reach it. The address may
-even point at the very device aigate runs on, like a local model service that speaks OpenAI's language
-on port 11434. That's how working with no internet at all becomes possible — the app's own pages
-already come from your device, never the internet, and traffic only leaves toward providers *you*
-picked.
+**A provider** is one AI service — a key plus an address to reach it. Kinds and setup live in [Configuration & Keys](Configuration-and-Keys). The address may even point at the device aigate runs on, which is how a model with no internet at all still answers.
 
-**A combo** is a handful of providers lined up together. Each member gets a **priority** and a
-**weight**, and the combo runs on one **strategy** — next section. Combos are yours to build: none
-arrive ready-made, and the names come from your keyboard.
+**One provider can hold several accounts**, in the order you set. Walk them either way: run the first until it runs dry, then move on — or share the turns with a cap per account before the next steps up.
 
-**An endpoint** is the local address a combo hands to your other tools and apps — what you paste into
-a coding tool or a script. Each endpoint can carry its own access key and optionally its own
-outbound proxy. The host and port you type there are labels for your own notes; the app still runs on
-one port — `8080` unless you move it with `AIGATE_PORT`. One door, whatever the labels say.
+**A combo** is a list of provider-and-model choices lined up as one option. None arrive ready-made, and you name them yourself. Each member gets a place in the row and a share of traffic, and the combo runs on one **strategy** — next section.
+
+**An endpoint** is the tidy local address a combo exposes to your tools — the line you paste into a coding tool. One combo, one address; which member answers is aigate's business, not yours.
 
 ## The strategy, in words 🎲
 
-The screen shows three names — `fallback`, `load_balance`, `latency_cost`. What they do:
+Five choices sit on the combo screen:
 
-**Fallback — a queue.** Try the top-priority provider first; if it errors, hits a quota, or stops
-answering, move down the list. Small nuance: when a provider is throttled or its access goes
-bad, aigate first tries **another account of that same provider** before switching providers. And if
-the whole list fails, you see the **last** error message as written — it doesn't hide what happened.
-This is the "keep going when a key runs dry" from [Home](Home).
+**fallback** — the standard one. A queue by row order: ask the first; if it errors, move on **without a resend**. A quota or access complaint first tries the same provider's next account. If the whole queue fails, the last error surfaces as written.
 
-**Load balance — a weighted dice roll.** Each request picks at random, steered by the weights, so work
-spreads across several accounts instead of grinding one down.
+**load_balance** — a dice roll weighted per request: work spreads over several accounts instead of grinding one down.
 
-**Latency cost — the careful spender.** Here the weights are read as cost estimates: the cheapest
-option gets the request, **once**. No retries, no jumping sideways — if that cheap provider happens to
-be down, the request fails rather than quietly moving elsewhere. Cheap-and-steady over always-answers,
-on purpose; don't mix it up with fallback.
+**latency_cost** — reads each share as a cost guess and takes the cheapest, exactly once: if the cheap one is down, the request fails rather than quietly moving elsewhere. Cheap-and-steady over always-answers, on purpose.
 
-## Quotas 📊
+**three_tier** — the same queue, ordered by service level first: subscription, then cheap, then free; row order decides inside each level.
 
-Any provider can carry a quota limit and a reset period. Usage is recorded as it happens and shows up
-on the analytics page. What I won't claim: that aigate slams the door the moment a limit is crossed.
-What it does: the numbers stay visible, and they feed the choosing.
+**round_robin** — strict turns, shares ignored: one member per request, walking the list and wrapping around. A just-failed member is stepped past, so the next request starts elsewhere.
 
-## Why bother 🧠
+Queue-style strategies also read quotas: a member whose provider is at zero remaining moves to the back, never out.
 
-Because of what happens at the other end. Your tools and scripts point at an aigate address and never
-need it changed. Switch the provider, reshuffle a combo, add a cheaper account — here, in one place,
-and every tool follows. The only list you maintain is this one.
+## Keys and the way out 🔌
+
+Each endpoint can require its own access key, so lending a laptop doesn't hand your combo to everyone. Each may also leave through a **proxy pool** — hosts and ports you exit through, taken in turn, each one's health and delay probed and recorded. Wiring an address into your own code: [OpenAI API](OpenAI-API).
+
+## The one-sentence version ✍️
+
+Gather three providers into one combo — call it my-combo, point every tool at its single address, let aigate take the turns. Reshuffle the list in one place, and every connected tool follows.
 
 ---
 
