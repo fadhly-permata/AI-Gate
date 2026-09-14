@@ -1329,3 +1329,10 @@ User: "gua gak ekspek user pake aigate offline... ya udah kita bikin bisa full o
   provider-error di jawaban lalu (114 log asli + `file:line`) TETAP sah (bukan asumsi) — tapi penyebab "kenapa
   upstream timeout" (behavior provider) butuh verifikasi eksternal (status page/Context7) bila diminta.
 - KEPEMILIKAN: PM tulis `documents/pm/**` saja; NOL `src/`/`tests/` (A2/A3); NOL kill/restart (J6).
+## 20260914-B7-DESIGN — Desain streaming Anthropic inbound (/v1/messages) SELESAI (tech-architect, hanya dokumen) (ProjectManager)
+- TASK: B7 Tahap 2 streaming `POST /v1/messages`. tech-architect hasilkan lembar desain `documents/architecture/20260914-desain-anthropic-inbound-streaming.md` (224 baris; write scope `documents/architecture/**` saja, nol `src/**`/`tests/**`).
+- KOREKSI FAKTA: claude SUDAH `LAUNCH_VERIFIED` (`cli_presets.py:174`), BUKAN `LAUNCH_UNSUPPORTED` (`cli_presets.py:133` kini unused buat claude). Jadi B7 = UX upgrade (token paint real-time), BUKAN unblock claude.
+- INTI DESAIN: representasi internal = OpenAI chunk dicts; reuse `anthropic_messages_request_to_openai_chat(payload, allow_stream=True)` (stage-1 intact saat `False`); NEW `openai_chunk_stream_to_anthropic_events` (translator) + `_handle_anthropic_messages_stream` + `_anthropic_stream_response` (router, samping `:578`/`:902`); auto-mount via `server.py:105` (nol ubah server.py).
+- KEPUTUSAN USER DIPERLUKAN (3): (1) scope Tahap 2 = openai-format upstream ONLY? (2) tool-use streaming basic mapping vs defer text-only? (3) mid-stream failure = emit `event: error` frame (spec-aligned) vs silent truncate?
+- STATUS: desain landed; be-dev BELUM spawn sampai 3 keputusan user. PM akan tanya user.
+

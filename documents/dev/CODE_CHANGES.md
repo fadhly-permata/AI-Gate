@@ -2068,3 +2068,25 @@ credential-free (env -i) malah lolos karena `gh` masih login (fallback ke `gh au
 bug); folder tmp `aigate-wiki-*` **nol sisa** (try/finally); `grep` safety: `--publish`/`--delete-removed` =
 `store_true` (default off), nol `git push` tanpa guard, nol traceback (semua `except` → pesan + exit!=0).
 **Belum:** publish `--publish` = hak user (ada draft lain masih berubah; klik bertubi-tubi aman karena dry-run).
+
+
+## 2026-09-14 — B7: streaming `POST /v1/messages` (Anthropic inbound Tahap 2) — PM → be-dev — DONE (DI-COMMIT `feat/anthropic-inbound-streaming`)
+
+**Asal:** user: "lanjut yok kerjaan yang tertunda" → PM lanjut B7 (streaming Anthropic inbound). Keputusan PM (user: "lakukan yang menurut lu terbaik... jangan ngarang"): Tahap 2 = upstream openai-format only; tool-use streaming dasar di-include; mid-stream failure = `event: error` frame.
+**Desain:** `documents/architecture/20260914-desain-anthropic-inbound-streaming.md` (tech-architect, hanya dokumen).
+
+### Perubahan per berkas (kode)
+- `src/backend/gateway/translator.py`: tambah `allow_stream` pada `anthropic_messages_request_to_openai_chat` (default False = stage-1 tetap menolak `stream:true`; True = set `stream:true` + `stream_options.include_usage`); tambah `_AnthropicSseEncoder`, `openai_chunk_stream_to_anthropic_events`, `anthropic_error_sse_frame` (OpenAI chunk dicts -> Anthropic SSE; tool_use dasar via `input_json_delta`; error frame mid-stream).
+- `src/backend/gateway/router.py`: `_handle_anthropic_messages` cabang streaming (`Union[dict, StreamingResponse]`) setelah translate/allow_stream; `_handle_anthropic_messages_stream` (routing openai-format only; combo resolve member openai; non-openai -> 400 `streaming_unsupported_format`); `_anthropic_stream_response` (prime generator, decode SSE upstream, encode Anthropic SSE, mid-stream UpstreamError -> event error, finally `aclose` + `_record_stream_usage_safe`); helper `_iter_openai_sse_chunks`, `_parse_sse_data_frame`, `_chain_first`; wrapper `messages_completions` handle `StreamingResponse` dan tetap catat request log.
+- `tests/backend/test_anthropic_messages_stream.py` (BARU): 17 tes — encoder text/tool_use/usage/error, allow_stream refuse/set, TestClient `/v1/messages` stream (respx+StaticPool) cek event sequence, content-type, model rewrite, stream:true, usage, combo, translated-upstream 400, priming 503/502 JSON, mid-stream event error, stage-1 non-stream regresi.
+- `tests/backend/test_anthropic_messages.py`: tes lama "streaming refused" diubah menjadi penolakan upstream hasil translate non-openai (sesuai keputusan Tahap 2: openai-format boleh stream; anthropic/gemini upstream 400).
+
+### Gerbang PM
+- `python3 -m pytest tests/backend/test_anthropic_messages_stream.py -q` → 17 passed.
+- `python3 -m pytest tests/backend -q` → **574 passed, 1 skipped** (skip pre-existing, unrelated).
+- `git diff --check -- src/backend tests/backend` → clean.
+- Scope: hanya `src/backend/**` + `tests/backend/**`; nol `src/frontend/**`; nol `documents/pm/**` ditulis be-dev. `:8080` user tidak disentuh.
+
+### Commit
+- (a) `feat(gateway): streaming POST /v1/messages (Anthropic inbound Tahap 2, B7)` — 4 berkas kode/tes.
+- (b) `docs(pm): catat desain + implementasi B7 streaming Anthropic inbound` — arsitektur B7, state/status/CODE_CHANGES.
