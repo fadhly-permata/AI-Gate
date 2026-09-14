@@ -2044,3 +2044,27 @@ grep `architecture|testing|архитектур|architectuur|架构|アーキテ
 **MERAGU TERBUKA (keputusan user, belum dikerjakan):** tiap naskah halaman wiki sudah berakhir dengan baris
 kredit, dan `_Footer.md` dirender otomatis di BAWAH semua halaman → kredit bisa muncul **2×**. Pilihan:
 (a) buang baris kredit inline dari 8 naskah saat publish, atau (b) terima dobel. PM condong (a) (bersih).
+
+### 2026-09-14 — W2.4 skrip publisher wiki idempoten (fullstack-dev; audit+verifikasi PM) — branch `feat/wp1-python-check`
+**Asal:** user perintahkan kerjakan kategori B; `documents/plan/wiki-backlog.md` §Tahap 2 item W2.4.
+Handover `documents/pm/handovers/handover-20260914-w24-skrip-publisher-wiki.md`. Sesi `ses_f613427d5ffe12iTIP5RvSWeGH`
+(percobaan pertama kena rate-limit provider 429, diulang sukses).
+**Kepemilikan (A3):** tooling di `.opencode/tools/**` = berkas level-repo di luar write-root spesialis →
+fullstack-dev. PM nol tulis skrip.
+**Per-berkas:**
+- `.opencode/tools/docs/wiki/publish_wiki.py` (BARU, 253 baris, stdlib only): default **DRY-RUN**; `--publish`
+  wajib untuk menerbit nyata; `--delete-removed` wajib untuk hapus halaman. Clone wiki `AI-Gate.wiki.git` ke
+  tmp luar repo (`--depth 1`), banding sha256 sumber (`documents/pm/wiki-drafts/*.md`) vs klon, cetak tabel
+  baru/berubah/tidak-berubah/sumber-hilang; hanya `new`/`changed` yang disalin+commit+push saat `--publish`,
+  panggilan ke-2 nol perubahan → short-circuit tanpa push (idempoten). Kredensial dari `GITHUB_TOKEN`/`gh auth
+  token`, tidak pernah dicetak (`mask_secret`+`mask_url`), `GIT_TERMINAL_PROMPT=0`. `user.name/email` di-set
+  HANYA di klon sementara. Repo utama TIDAK pernah disentuh.
+- `.opencode/tools/docs/wiki/selftest.py` (BARU, 88 baris): 10 kasus tanpa jaringan (baru/berubah/identik/
+  sumber-hilang-ditahan/hapus-eksplisit/campuran/idempoten/sha256/mask_secret/mask_url) → 10/10 PASS.
+**Verifikasi PM mandiri (bukan telan receipt):** `py_compile` OK; selftest **10/10 PASS**; DRY-RUN jalan 2x
+beruntun → tabel **100% identik** (sha sama, exit 0) = idempoten; `git status --porcelain` = hanya 2 berkas
+baru di `.opencode/tools/docs/wiki/**` + handover PM; `git remote -v` origin **tanpa token**; percobaan
+credential-free (env -i) malah lolos karena `gh` masih login (fallback ke `gh auth token` berfungsi, bukan
+bug); folder tmp `aigate-wiki-*` **nol sisa** (try/finally); `grep` safety: `--publish`/`--delete-removed` =
+`store_true` (default off), nol `git push` tanpa guard, nol traceback (semua `except` → pesan + exit!=0).
+**Belum:** publish `--publish` = hak user (ada draft lain masih berubah; klik bertubi-tubi aman karena dry-run).
