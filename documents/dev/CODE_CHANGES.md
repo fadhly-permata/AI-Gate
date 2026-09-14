@@ -1,5 +1,47 @@
 # Code Changes Register (code ↔ docs alignment)
 
+## 2026-09-14 — Tulis ulang 6 halaman wiki (PM → public-writer) — DONE (DI-COMMIT e5a376c + docs(pm), branch docs/wiki, DI-PUSH, DI-PUBLISH ke wiki GitHub)
+
+**Asal:** user: "tulis ulang dokumen wiki dengan menggunakan spesialis agent yang baru" (ronde lalu) →
+"commit, push, dan publish ke halaman wiki dong" (ronde ini, cabut tahan D1).
+
+**Lembar handover:** `documents/pm/handovers/handover-20260914-wiki-rewrite-{1..6}-*.md` (6 lembar, ikut commit a).
+**Laporan:** `.opencode/reports/20260914/docs/1201_wiki-rewrite-public-writer.md`.
+
+### Perubahan per berkas (0 `src/**`; 0 `tests/**`; murni dokumen publik + catatan PM)
+- `documents/pm/wiki-drafts/{Interfaces,Configuration-and-Keys,CLI-Tools,OpenAI-API,Terminal,Providers-and-Combos}.md`:
+  ditulis ulang penuh oleh public-writer (write root-nya). PM hanya mengoreksi 4 baris naskah hasil audit fakta
+  (lihat laporan §Gerbang Verifikasi). 9 koreksi fakta tercatat: tidak ada split-view terminal; 3 setelan teknis
+  "di balik layar" bukan di layar; jalur Anthropic `/v1/messages` sudah hidup; 5 strategi combo; bare-model ≠
+  "penyedia aktif"; port 11434 digeneralisasi; klaim retry/combo dilunakkan. `Home.md` + `Quick-Start.md` TIDAK
+  disentuh (sudah ACC user + sudah tayang).
+- `documents/pm/handovers/…-1..6….md` (BARU, 6): handover per halaman, milik PM.
+- `.opencode/reports/20260914/docs/1201_…-public-writer.md` (BARU): laporan verifikasi PM (ikut commit a).
+- `documents/plan/wiki-backlog.md`: +§Tahap 1.7 (ronde tulis ulang 6 halaman + status publish).
+- `documents/pm/{status,state,memory-bank}.md`: catat ronde, hasil gerbang, keputusan publish.
+
+### Commit (per fitur, H1–H3, `git add` eksplisit — tanpa `git add -A`)
+- (a) `e5a376c` `docs(wiki): rewrite 6 wiki pages via public-writer` — 6 draf + 6 handover + laporan (13 berkas).
+- (b) `docs(pm): record wiki rewrite round + fact corrections` — 4 berkas catatan PM + entri ini.
+
+### Gerbang konten (A11/A12 — dijalankan ULANG sesi ini sebelum publish, bukan menelan hasil lama)
+- Pemindai token terlarang per file (path `src/`/`documents/`, `this repo`, `MIT`, `untested`/`experimental`,
+  `seven`, `ADR-###`, `R#`, id DOM, kelas CSS, nama modul `.py`/`.js`): **0 temuan** di 6 file.
+  Pengecualian SAH & sengaja (bukan bocor): nama file milik user `aigate.db`/`.aigate`, env `AIGATE_PORT`/`AIGATE_DEV`/
+  `AIGATE_DB_PATH`, perintah ketik `python run.py`, alamat `http://localhost:8080[/v1]` — semua fakta sisi-user.
+- Taut internal → semua target ada di 8 nama halaman wiki (0 rusak). Kredit baris terakhir `Made with ❤️ by Fadhly Permata` → 6/6.
+- `aigate` huruf kecil di prosa → lolos (tidak ada "AI Gate"/"AI-Gate" sebagai nama produk). Nol rujukan `documents/**`/handover di naskah → lolos.
+
+### Publish (wewenang diberikan oleh perintah user "publish ke halaman wiki")
+- Note `JANGAN tulis ke wiki GitHub asli` pada handover lama DI-OVERRIDE oleh perintah eksplisit ini.
+- Target: `https://github.com/fadhly-permata/AI-Gate.wiki.git` (tak ada remote `.wiki` → clone ke TMPDIR).
+- Cakupan default: 6 halaman tulis ulang saja (Home/Quick-Start sudah ada; disentuh hanya bila beda & bisa dikonfirmasi).
+- Nama file wiki = persis: Interfaces.md, Configuration-and-Keys.md, CLI-Tools.md, OpenAI-API.md, Terminal.md, Providers-and-Combos.md.
+
+### Status
+SELESAI: commit (a)+(b), push `docs/wiki`, publish 6 halaman ke wiki publik. Blokade yang mungkin: tak ada akses tulis
+wiki → STOP + laporkan (jangan bikin repo publik baru).
+
 ## 2026-09-13 — Settings responsif + rapi + device-sim → modal (Opsi A) (PM → fe-dev) — DONE (DI-COMMIT, refactor/ui, BELUM push)
 
 **Asal:** user: "halaman setting kok gak responsif ya, dan desain ui nya juga terasa aneh" + "berantakan";

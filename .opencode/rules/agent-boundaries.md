@@ -33,6 +33,12 @@ Every agent owns a write scope. Cross-scope writes are violations.
 | business-analyst | `documents/business/**` |
 | tech-architect | `documents/architecture/**` |
 | qa-engineer | `tests/**` (outside be/fe owned), `.opencode/reports/**` |
+| tech-architect | `documents/architecture/**` |
+| public-writer | `documents/pm/wiki-drafts/**`, `README.md`, `documents/readme-variants/**` |
+
+## Public material
+- PM must coordinate README/wiki/docs-site/release-note/language-variant copy with
+  `public-writer`. PM owns publication/commit/push unless explicitly handed over.
 
 ## Rules
 1. Sub-agents may READ `documents/pm/` and their listed read roots, but WRITE only their

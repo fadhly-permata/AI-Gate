@@ -41,7 +41,7 @@ phone, in a browser tab.
 - **Private by default.** Your API keys and history are local data on
   your device. Nothing talks to the cloud except the AI providers you
   chose yourself.
-- **Comfortable to use.** Light and dark themes, seven languages, and a
+- **Comfortable to use.** Light and dark themes, eight languages, and a
   UI that behaves on a small screen.
 
 ## Try it in 60 seconds ⏱️

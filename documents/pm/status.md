@@ -2,6 +2,45 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260914-1201-WIKI-REWRITE — 6 halaman wiki DITULIS ULANG oleh `public-writer`, SEKUENSIAL (ProjectManager)
+- TASK user: "tulis ulang dokumen wiki dengan menggunakan spesialis agent yang baru" → mode dipilih user: **sekuensial** ("sekuen"); setelah halaman 3 disajikan, user: **"lakukan yang terbaik aja"** → keputusan review dilimpahkan ke PM (D2, default dicatat).
+- CAKUPAN (default PM): hanya W1.3–W1.8 (Interfaces, Configuration-and-Keys, CLI-Tools, OpenAI-API, Terminal, Providers-and-Combos). `Home.md` + `Quick-Start.md` **tidak disentuh** — sudah ACC + sudah tayang di GitHub wiki.
+- SPawn: `public-writer` (REUSE, sesi `ses_f61faa11fffeobPweNZWiz8zm5`) ×6, satu halaman per spawn, handover `documents/pm/handovers/handover-20260914-wiki-rewrite-{1..6}-*.md`.
+- SEBELUM nulis: fakta di-audit ulang ke kode — **lembar fakta A/B/C (2026-09-08) terbukti SEBAGIAN BASI.** 9 koreksi keluar dari proses (rinci di laporan `.opencode/reports/20260914/docs/1201_wiki-rewrite-public-writer.md`). Yang paling berat:
+  (1) **"split view/pecah layar" TIDAK ADA** di terminal — salah ini sudah sempat masuk draf lama halaman 3+7 (dan sempat gue ACC di ronde halaman 3, ketahuan pas audit halaman 7 → dibuang);
+  (2) **3 setelan teknis tidak muncul di layar setelan** (halaman 4 dulu menjanjikannya);
+  (3) **Anthropic inbound `/v1/messages` sudah hidup** + claude `verified` — draf lama halaman 6 menulis "there are no other endpoints" = SALAH;
+  (4) **strategi combo = 5**, draf lama cuma tahu sebagian; (5) CSV laporan ternyata **tanpa kunci** (yang bawa kunci cuma JSON setelan) → klaim draf lama dibuang; (6) model nama polos ≠ penyedia aktif (`resolver.py:218-270`).
+- Naskah yang ditambah/dibetulkan PM setelah audit (4 baris, semua di `documents/pm/wiki-drafts/`): halaman 7 buang "(adjustable in settings)"; halaman 8 lemaskan "the stutter never reaches you" + generalisasi port 11434; halaman 6 perbaiki kalimat bare-model; halaman 4 ubah "Plus three technical picks" → "di balik layar, bukan di layar".
+- Tambah materi BARU: **Self-Heal akhirnya didokumentasikan** (selama ini belum ada di halaman mana pun) — ditaruh di `CLI-Tools.md` karena kartunya memang hidup di layar alat coding (`index.html:866-880`), dengan risiko ditulis jujur (menulis kode + merge branch).
+- GATE PM (mandiri, bukan telan receipt): scanner token terlarang per file (path `src/`/`documents/`, `this repo`, MIT, untested/experimental, `seven`, ADR-###, R#, TODO-VERIFY, id DOM, nama kolom/tabel DB, nama modul `.py`/`.js`, kelas CSS) + validasi 8 nama taut internal + kredit baris terakhir + `aigate` kecil + batas kata → **6/6 PASS**. `python3 .opencode/tools/governance/rules-index.py` exit 0 (58 rule).
+- KEPEMILIKAN (A2/A3): naskah = public-writer (write root sah `documents/pm/wiki-drafts/**`); PM = `documents/pm/**` + `documents/plan/wiki-backlog.md` + laporan. **NOL tulis `src/**`/`tests/**`.**
+- BELUM: commit/push (D1 nunggu perintah); publish GitHub wiki (masih cuma Home + Quick Start yang tayang); review user atas 6 halaman; WP.1 (cek versi Python `run.py`) masih antre; Tahap 2 (Sidebar/Footer, terjemahan, Pages) ditahan sampai 8 halaman ACC.
+
+## 20260914-PUBLIC-WRITER-GEN — Spesialis `public-writer` + `public-writer-skill` DI-BUAT (perintah user) (ProjectManager)
+- TASK user: buat agen penulis publik dan PM wajib koordinasi dengannya untuk materi publik (wiki/README/dll.) supaya bisa generate otomatis, menarik, mudah dibaca, ilustratif.
+- GENERATE berbarengan (A5/agent-generation R1-R2): `.opencode/agents/specialists/public-writer.md` + `.opencode/skills/public-writer-skill/SKILL.md`.
+- SCOPE: `documents/pm/wiki-drafts/**`, `README.md`, `documents/readme-variants/**`. Publikasi eksternal tetap lewat PM/user; agen tidak publish sendiri.
+- KUALITAS: skill encode pola yang sudah dipakai: reader-first, manfaat 3-5 baris awal, story motion (tokoh → maunya → rintangan → aksi → hasil berubah), contoh/ilustrasi, skimmable, claim -> bukti, `TODO-VERIFY`, no leak `documents/**`, nama `aigate` lowercase, kultur netral, varian bahasa asli, absolute URLs.
+- ROUTING: PM roster `.opencode/agents/ProjectManager.md` + `.opencode/skills/pm-orchestration/SKILL.md` delegation matrix + `.opencode/rules/agent-boundaries.md` + rule A13 `documents/pm/OPERATING_RULES.md`.
+- CATATAN: belum di-commit/push; working tree masih ada perubahan wiki draft/backlog dari task review sebelumnya. Restart opencode required agar `public-writer` bisa di-spawn sebagai subagent_type (agent-generation R3).
+
+## 20260914-WIKI-PUBLISH — Home + Quick Start TERBIT di GitHub wiki PUBLIK (perintah user "pastikan tampil di halaman wiki") (ProjectManager)
+- PELANGGARAN KEBIJAKAN bidak: rencana awal (wiki-plan.md §6 / backlog W2.4) = TUNGGU 8 halaman ACC lalu publish sekaligus. User override 2026-09-14: publish in-kremental per halaman ACC. PM catat deviasi ini sebagai keputusan user.
+- MEKANISME: clone `AI-Gate.wiki.git` (master; isinya cuma stub "Welcome to the AI-Gate wiki!") → timpa dengan draft ACC persis (`cp`, diff identik) → commit + `git push origin master` (kredensial via `gh auth setup-git`, GH_TOKEN, nilai tak dicetak). Push `4deaf39..1df0d65` exit 0.
+- CAKUPAN (default PM, dicatat): HANYA 2 halaman SUDAH DI-ACC = `Home.md` + `Quick-Start.md`. 6 halaman lain TETAP di staging `documents/pm/wiki-drafts/` sampai user review.
+- VERIFIKASI 3 arah (F3/G3, bukan cuma percaya output): (1) `git ls-remote` wiki master=`1df0d65`; (2) clone FRESH origin → Home.md+Quick-Start.md ada, Home berisi "eight languages"; (3) webfetch `github.com/fadhly-permata/AI-Gate/wiki/Quick-Start` → render publik lengkap, "Wiki pages: 2", "edited Sep 14, 2026".
+- CATATAN: link internal ke halaman belum-terbit (CLI-Tools, Configuration-and-Keys, dll) DIAM sesaat (404 sampai halaman itu dipublish). Temp clone (`/tmp/.../wiki-publish`+`wiki-verify`) SUDAH dihapus.
+- URL: https://github.com/fadhly-permata/AI-Gate/wiki (Home) · /wiki/Quick-Start.
+
+## 20260914-WIKI-HOME-LANG — Home wiki + 8 README: 7→8 bahasa (DI-COMMIT + PUSH tanpa PR) (ProjectManager; perintah user "push tanpa PR")
+- TASK: revisi draft wiki `Home.md` (line 11 "seven languages"→"eight languages") + tulang punggung user: sebar koreksi ke 8 README (root + 7 varian) karena angka 7 basi setelah Hindi masuk registry.
+- FAKTA TERVERIFIKASI KE KODE (F3, bukan tebakan): `window.LANGS` `src/frontend/static/i18n.js:28-37` = 8 entri (en,id,ru,nl,ja,zh,zh-tw,hi); 8 file kamus `i18n/*.js` (ada `hi.js` baru, 2026-09-13, PR #24). Klaim "8 bahasa" sah.
+- EDIT (PM, dokumen — bukan `src/`, A2 aman): `Home.md:11` seven→eight; `README.md:44` seven→eight; `README.id:46` tujuh→delapan; `README.zh:43`/`zh-tw:40`/`ja:42` digit 7→8; `README.ru:48` семь→восемь; `README.nl:44` zeven→acht; `README.hi:43` सात→आठ. Verifikasi grep: 0 sisa "7", 9 baris "8". (Catatan: `семь`=7 substring dlm `восемь`=8 → grep mentah false-positive, sengaja dihindari.)
+- COMMIT `587dc02` `docs: update app language count 7->8 (Hindi added)` — staging eksplisit 10 file (8 isi + `wiki-backlog.md` catatan), BUKAN `git add -A`. `git diff --check` bersih; diff-check rahasia = 0.
+- PUSH `git push origin docs/wiki` (5ffb07a..587dc02, fast-forward, NOL force, tanpa PR perintah user). `git fetch`+`rev-list --count` → lokal=remote 0 0 (sinkron).
+- STATUS: SELESAI & terpush. SISA user: review 7 draft wiki lain (Quick-Start cs) yang masih nunggu ACC; uji mata README di browser.
+
 ## 20260914-PUSH — Log panel DI-COMMIT `81608af` + PUSH + **PR #25 TERBUKA** (label enhancement, MERGEABLE) (ProjectManager; perintah user "push & PR")
 - A12 cek sumber: `git fetch` → origin/main maju ke `eb97455` (PR #24 Hindi MERGED; HEAD feat/i18n-hindi = ancestor main). PR #24 diverifikasi MERGED via `gh pr view`.
 - Branch BARU `feat/log-panel-devmode` berbasis `origin/main` (HEAD=ancestor, cache-buster 20260926 sama) → PR bersih ISI 4 file log-panel SAJA (0 dokumen; `git diff --name-only origin/main...branch | grep documents = 0`).
@@ -1061,3 +1100,91 @@ dihentikan/di-restart; nol `git add -A`; nol commit baru dibuat.
 - Verifikasi API: state OPEN, labels=[enhancement], mergeable MERGEABLE, 17 berkas +538/-8. Aturan H5 (label wajib) lolos.
 - Body PR: ringkasan perubahan + bukti verifikasi PM (vitest 27/686 hijau, git diff --check bersih, scope frontend-only) + catatan utang review penutur asli.
 - SISA user: review+merge PR #24; uji mata; (opsional) review penutur asli.
+
+## 2026-09-08 — Wiki Home direwrite (v2) karena user anggap hambar  (diserap dari branch docs/wiki saat merge 2026-09-14)
+User: "agak kurang menarik ya, rewrite dong".
+- PM mendiagnosa dulu (bukan langsung lempar "buat lebih keren"): pembuka metafora lembek, heading
+  berlabel abstrak, semua bullet berbobot sama, nada terlalu sopan, ritme kalimat seragam 20-30 kata.
+- Acuan gaya = README yang sudah di-ACC user (buka pakai **adegan**) — teksnya ditempel ke prompt,
+  BA disuruh meniru **ritme**, bukan menyalin kata, dan dilarang pakai adegan bus yang sudah kepake.
+- BA menulis ulang (419 kata). PM: audit + 1 penghalusan ("clipboard paste" → "paste straight from
+  your clipboard") → akhir **349 kata**, 6 seksi tetap, nol klaim baru.
+- Gate lolos: nol sebutan Self-Heal · nol "prompts never leave" · nol "this repo" (URL absolut, R45)
+  · angka 24 sekali + catatan daftar bertambah · biaya selalu "estimated" · ekspor disebut CSV ·
+  kredit utuh · 5 tautan internal semuanya dalam 8 halaman rencana · `aigate` lowercase.
+- ⚠️ MASIH TERBUKA (menunggu user): baris "no usage reports phoning home to us" BENAR soal telemetri
+  kita, tapi Font Awesome masih dimuat dari CDN cloudflare → bukan nol request pihak ketiga.
+  Opsi user: (a) terima rumusan sempit ini, (b) vendor ikon.
+
+## 2026-09-08 — Offline penuh (WO.1) + 8 halaman wiki jadi draf  (diserap dari branch docs/wiki saat merge 2026-09-14)
+User: "gua gak ekspek user pake aigate offline... ya udah kita bikin bisa full offline aja deh" lalu
+"setelah selesai, langsung kerjain sisa file wiki... commit & push".
+- **WO.1 selesai**: fe-dev vendor Font Awesome 6.5.1 (CSS + 3 woff2 + LICENSE.txt) → `index.html`
+  cuma 1 blok berubah. PM verifikasi **mandiri**: 4 berkas identik byte vs jsDelivr resmi,
+  `grep` aset eksternal = **0**, `url(http` di CSS = 0. Commit `91de605`.
+  Utang internal (bukan publik): TSD §228 & FSD §320 masih menulis "ikon via CDN" -> salah sekarang.
+- **WO.2–WO.4 selesai** (3 penulis paralel, lembar fakta PM dari kode): halaman 3 Interfaces,
+  4 Configuration-and-Keys, 5 CLI-Tools, 6 OpenAI-API, 7 Terminal, 8 Providers-and-Combos.
+  8/8 lolos audit mesin: 0 path `documents/`/`src/`, 0 nama tabel, 0 ADR/R#, 0 "this repo", 0 MIT,
+  0 "untested/experimental", tidak ada `combo:default`, semua tautan internal valid, kredit utuh.
+- **3 koreksi fakta penting keluar dari proses ini** (lihat memory bank): endpoint host/port bukan
+  listener; putus koneksi tidak membunuh sesi; combo `default` tidak ada. Yang pertama hampir lolos
+  ke publik lewat halaman 4 (sumbernya lembar fakta PM sendiri), yang kedua murni kesalahan lembar
+  fakta C — naskah mengikuti kesalahan gue, ketahuan pas audit, sudah dibetulkan.
+- Dibuang dari halaman 5: angka per kelompok 12/6/6 (basi kalau daftar tumbuh) dan klaim "marked
+  not launchable" (yang benar: tidak ditawarkan jalur launch-nya).
+- Batas kata dipatuhi: Terminal digepeng 555 -> 449.
+- Branch `docs/wiki`: commit produk (`91de605`) + draf & catatan -> push. **Wiki GitHub asli tetap
+  TIDAK disentuh.**
+- GATE user sekarang: review halaman 2–8. WP.1 (cek versi Python di run.py) masih nunggu izin.
+
+## 2026-09-14 — Sinkron `main` → `docs/wiki` (merge) karena user lihat CLI Tools "jadi tombol lagi" (ProjectManager)
+- LAPORAN user: halaman cli-tools kayak ke-rollback (masih tombol), duga gara-gara pindah branch `ui`→`wiki`.
+- DIAGNOSA PM (bukti git): `docs/wiki` cabang dari `main` di `195a1fa` (PR #12, 9 Sep) — SEBELUM redesign
+  card `59c570d` (13 Sep, jalur `refactor/ui`→`main` PR #22/#23). Card TIDAK ancestor `docs/wiki`
+  (`git merge-base --is-ancestor 59c570d docs/wiki` = NO). Jadi bukan rollback — branch wiki emang basis lama.
+  `clitools.js` wiki = pra-card (`createElement("button"); class "btn cli-tool"`).
+- KEPUTUSAN (user serahkan pilihan): MERGE `main`→`docs/wiki` (bukan cherry-pick). Alasan: branch telat 5
+  hari; wiki WAJIB di-sync sebelum merge balik ke main → cegah konflik raksasa nanti; bonus card+UI ikut masuk.
+  Cherry-pick 59c570d juga konflik (clitools.js/index.html/styles.css) → merge lebih bersih & kanonis.
+- Tag pengaman sebelum merge: `backup/docs-wiki-before-sync` = `45ed9cd`. Worktree sebelumnya bersih.
+- KONFLIK 6 berkas: `src/frontend/static/index.html` (auto-ambil `--theirs` main = superset FA-lokal+card,
+  main sudah serap FA via `git restore --source=docs/wiki`), `THIRD_PARTY_NOTICES.md` (main sudah punya
+  notice FA), `documents/pm/state.md` (ambil main = kondisi terkini; checkpoint wiki basi). 3 file governance
+  UNIK wiki di-preserve (append-only, A11): `OPERATING_RULES.md` (R46 gerak-cerita + R47 gerbang-git →
+  ditaruh di LAMPIRAN biar nggak tubrukan nomor v2), `status.md` (2 blok 2026-09-08), `memory-bank.md`
+  (blok fakta lintas-halaman). `clitools.js`+`styles.css` auto-merge BERSIH → card langsung masuk.
+- PM nol tulis `src/` (A2): resolusi `index.html` = `git checkout --theirs` (pilih versi ter-commit, bukan
+  mengarang kode FE) → tanpa spawn fe-dev. Rekonsiliasi `documents/pm/**` = wewenang PM.
+- KOMIT merge `48642a6`. VERIFIKASI GATE: `rules-index.py` exit 0 (57 rule/10 tema); vitest `src/frontend`
+  **27 berkas/686 tes HIJAU** (termasuk `vendor_assets` 7 = nol CDN); `git grep` marker konflik = 0;
+  `clitools.js` = card + platform-logo + badge + legend. HEAD `docs/wiki` = 0-behind/10-ahead vs origin/main.
+- BELUM: push (D1 — nunggu perintah user); uji mata di peramban (G3, hard-refresh — cache-buster beda);
+  merge balik `docs/wiki`→`main` masih ditahan user; WP.1 + review halaman wiki tetap terbuka.
+
+## 2026-09-14 — COMMIT + PUSH + PUBLISH 6 halaman wiki (perintah user, cabut tahan D1) (ProjectManager)
+- PERINTAH user: "commit, push, dan publish ke halaman wiki dong" → D2, kerjakan tanpa tanya. Note handover lama
+  "JANGAN tulis ke wiki GitHub asli" DI-OVERRIDE oleh perintah eksplisit ini.
+- CHECKPOINT (H1): branch `docs/wiki` HEAD `17e0101`, ahead-2 origin; remote hanya `origin` (tak ada `.wiki`).
+- GERBANG KONTEN DIJALANKAN ULANG SESI INI (A11/A12, bukan telan hasil lama): scanner token terlarang per file
+  (path src|documents, this repo, MIT, untested, experimental, seven, ADR-###, R#, id DOM, kelas CSS, modul
+  .py/.js) + validitas taut internal (8 nama halaman) + kredit baris terakhir + `aigate` kecil di prosa + nol
+  rujukan `documents/**`/handover di naskah publik → **6/6 PASS**. Pengecualian sah (fakta sisi-user, bukan bocor):
+  `aigate.db`/`.aigate`, env `AIGATE_PORT/DEV/DB_PATH`, perintah `python run.py`, `http://localhost:8080[/v1]`.
+- RE-READ 6 draf sebelum publikasi → sama dengan yang diverifikasi (nol suntingan nyasar).
+- COMMIT PER FITUR (H1–H3, `git add` eksplisit, BUKAN `git add -A`):
+  (a) `e5a376c` docs(wiki): rewrite 6 wiki pages via public-writer — 6 draf + 6 handover + laporan (13 berkas).
+  (b) `806b4cb` docs(pm): record wiki rewrite round + fact corrections — wiki-backlog + status + state +
+      memory-bank + CODE_CHANGES (5 berkas). Working tree bersih setelahnya.
+- PUSH `docs/wiki` → origin: `0634960..806b4cb` fast-forward, NOL force; sinkron.
+- PUBLISH ke wiki GitHub (tak ada remote `.wiki` → clone `AI-Gate.wiki.git` ke TMPDIR, token via URL
+  non-interaktif GIT_TERMINAL_PROMPT=0/GIT_ASKPASS): wiki tadinya cuma Home+Quick-Start (byte-identik draf ACC
+  lokal → TIDAK disentuh). 6 halaman baru di-copy nama persis → gerbang dijalankan ulang di salinan wiki (PASS) →
+  commit `ae55c46` → push `1df0d65..ae55c46 master`. VERIFIKASI LIVE publik (unauthenticated webfetch): Interfaces +
+  Providers-and-Combos tampil penuh, sidebar "Pages 8", kredit baris terakhir ada, `aigate` kecil. 8 halaman =
+  Home, CLI-Tools, Configuration-and-Keys, Interfaces, OpenAI-API, Providers-and-Combos, Quick-Start, Terminal.
+- CLEANUP: TMPDIR clone + `.git/config` (berisi token di remote URL) DIHAPUS; cek `git remote -v` origin = URL
+  polos TANPA token; `git grep` token di tree = 0. Repo tetap bersih, tak ada kredensial baru dibuat.
+- KEPEMILIKAN (A2/A3): PM nol tulis `src/`/`tests/`; naskah = public-writer (sudah ronden lalu); PM = documents/pm/**
+  + plan + CODE_CHANGES + operasi git/wiki. SISA USER: review 6 halaman tayang (opsional, sudah live); WP.1
+  (cek versi Python run.py) antre; Tahap 2 (Sidebar/Footer + terjemahan + halaman lanjutan + Pages) masih ditahan.

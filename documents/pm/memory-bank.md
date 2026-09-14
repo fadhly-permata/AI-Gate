@@ -4,6 +4,12 @@
 (empty — diisi PM saat task pertama)
 
 ## Decisions
+- 2026-09-14 (PUBLIC-WRITER): user meminta spesialis penulis publik yang selalu dikoordinasikan PM untuk materi publik
+  (wiki/README/dll.) supaya generate otomatis tapi tetap menarik, mudah dibaca, dan ilustratif. PM membuat agen + skill
+  berbarengan: `public-writer` dan `public-writer-skill`. Write scope = `documents/pm/wiki-drafts/**`, `README.md`,
+  `documents/readme-variants/**`. Aturan routing dipasang di PM roster, orchestration matrix, agent boundaries, dan
+  OPERATING_RULES A13. Publikasi eksternal tetap lewat PM/user dan butuh ACC user; agen tidak publish sendiri.
+
 - 2026-09-13 (SETTINGS DUA PANEL SEJAJAR — diagnosis + handover, BELUM eksekusi): user lapor "panel-panel pada
   halaman setting banyak yang gak responsif... kenapa gak dibuat jadi sejajar kesamping aja pas mode layar besar.
   Baru dibuat sejajar kebawah ketika menggunakan layar kecil". Sesuai F5, "gak responsif" = layout tak adaptif
@@ -512,7 +518,9 @@ Arsip: `documents/pm/archive/memory-bank-decisions-lama.md`.
   user (2026-09-08)** — wiki hidup di branch `master`, halaman awal `Home.md`. Izin tulis
   diverifikasi lewat `git push --dry-run` (diterima, 0 byte ditulis) → auto-commit siap.
 - **BATAS IKAT dari user:** jangan menulis/meng-push apa pun ke wiki sampai izin turun.
-  Boleh: baca, clone, probe/dry-run.
+  Boleh: baca, clone, probe/dry-run. **OVERRIDE (2026-09-14):** perintah user "commit, push,
+  dan publish ke halaman wiki dong" MENCABUT batas ini → 6 halaman rewrite dipublikasikan ke
+  `AI-Gate.wiki.git` (commit `ae55c46`, 8 halaman live: 6 baru + Home/Quick-Start identik).
 - Rencana tooling (belum dikerjakan): script publisher di `.opencode/tools/docs/wiki/`
   (idempoten, wajib ada `--dry-run`), token dari `gh auth token` / `.env` (rule secrets,
   gak di-hardcode), sumber konten = `.md` di branch `docs/wiki` ini; wiki = hasil publikasi.
@@ -717,3 +725,46 @@ lebar viewer, vitest hijau, `git diff --check` bersih, bump cache-buster (kini `
 - FIX UX: Developer Mode switch `#setDevMode` kini **langsung apply + persist tanpa Save** (sesuai ekspektasi saklar). fe-dev: `wireDevModeToggle()` (`app.js:485`) listener `change`→`saveSettings()` (reuse PUT + applyDevMode), dipanggil di `init` (`app.js:2584`), hook `window.aigate` (`app.js:789`). Tdk ubah CSS/markup; Port/Theme/Bahasa tdk di-wire change (tak save-per-keystroke).
 - VERIFIKASI PM: vitest **27/698 hijau** (+3 tes: on/off/idempoten); G3 nyata (instance terisolasi, `:8080` user 200 tak disentuh J6): dispatch `change` TANPA submit → body `off→on`, `#logWindowToggle` `none→flex`, `dev_mode=true` TER-SIMPAN ke server (`GET /api/settings`). Nol error.
 - PENJELASAN UTK USER: restart HANYA sekali (krn app.js berubah, proses lama hrs muat ulang); setelah itu switch Developer Mode langsung kerja — TIAP toggle TIDAK perlu restart. Status: selesai tingkat tes + nyata, **BELUM commit** (D1).
+
+## Offline penuh + fakta teknis lintas halaman (era docs/wiki, diserap saat merge 2026-09-14; masih berlaku)
+- Keputusan user: **UI harus bisa jalan 100% tanpa internet**. Font Awesome 6.5.1 di-vendor
+  (`src/frontend/static/vendor/font-awesome/`, CSS + 3 `.woff2` + LICENSE.txt). Setelah ini **nol**
+  referensi eksternal sebagai aset di frontend — satu-satunya `https://` yang tersisa hyperlink repo.
+  Berkas font `.ttf` & face kompat-v4 sengaja tidak diambil: CSS memanggil WOFF2 lebih dulu dan
+  kelas ikon aigate tidak pernah menyentuh keluarga warisan itu.
+- Fakta yang harus konsisten di SEMUA halaman wiki (sudah divalidasi PM dari kode):
+  1. **Satu port nyata** = port aplikasi (bawaan 8080, layar + API bersamaan). Host/port di layar
+     endpoint itu **label dokumentasi user**, bukan listener — jangan pernah menulis sebaliknya.
+  2. Alamat yang disodorkan ke alat coding = `http://localhost:8080/v1` (satu nilai setelan, bisa diganti).
+  3. **Tidak ada combo bawaan** (`default` tidak di-seed) → contoh selalu pakai placeholder.
+  4. Putus koneksi ≠ mati sesi: view lepas, PTY lanjut jalan + buffer; reaper hanya membersihkan yang
+     lepas DAN tanpa keluaran (bawaan 60 menit; setelan `terminal_idle_reap_minutes`).
+  5. `fallback` = urut prioritas + **coba akun lain di penyedia yang sama** dulu + error terakhir
+     dilempar apa adanya. `load_balance` & `latency_cost` = **satu kali percobaan, tanpa pindah**.
+  6. Jenis penyedia yang dikenal punya peta terjemahan sendiri; yang tidak dikenal dianggap jalur
+     OpenAI (pass-through) — jadi penyedia lokal/aneh tetap jalan.
+  7. Hanya 3 variabel lingkungan: `AIGATE_PORT`, `AIGATE_DEV`, `AIGATE_DB_PATH`.
+  8. Setelan bawaan yang nyata: port, mode developer, tema, bahasa, catatan detail per request (mati),
+     retensi log 7 hari, reaper terminal 60 menit.
+
+## Fakta wiki pasca-rewrite `public-writer` (2026-09-14 12:01 — wajib dipakai di halaman mana pun yang direvisi lagi)
+Lembar fakta A/B/C tanggal 2026-09-08 **sebagian basi**. Yang sudah diverifikasi PM ulang dari kode branch `docs/wiki`:
+1. **Terminal TIDAK punya "split view / pecah layar".** Kontrol nyata: new-tab, Paste + Paste as Code Block,
+   Settings (TUI Passthrough + Keep Screen On), Full Page vs Fullscreen, cluster mengambang
+   (`index.html:775-835`). Kelas CSS `term-split` = tombol caret, bukan layar terpisah.
+2. **Layar setelan hanya 4 pilihan**: Port, mode developer, tema, bahasa (`index.html:195-290`).
+   Request logging, retensi log, dan reaper terminal **ada sebagai nilai** (setelan DB) tapi **tidak muncul
+   di layar** → jangan menulisnya seperti pilihan yang bisa diklik.
+3. **Anthropic inbound sudah hidup**: `POST /v1/messages` (non-streaming Stage 1) + `/v1/messages/count_tokens`
+   (`gateway/router.py:528`, `:688`); claude berstatus `verified` (`cli_presets.py:174`). Kalimat
+   "there are no other endpoints" di draf lama = SALAH.
+4. **Strategi combo 5**: `fallback` (bawaan) / `load_balance` / `latency_cost` / `three_tier` / `round_robin`
+   (`index.html:1102-1106`; mesin `combo_routing.py:275-305`).
+5. **Eksport CSV laporan tidak memuat kunci** (`analytics_export.py:85-110`); yang memuat kunci = **JSON
+   setelan** karena mengserialisasi tabel penyedia (`export.py:64-75`). Peringatan "jangan di-commit" hanya untuk JSON.
+6. **Model nama polos** dicari di SEMUA penyedia aktif yang menawarkan model itu; kalau >1 cocok → penyedia yang
+   ditandai dipakai (`gateway/resolver.py:218-270`). Bukan "selalu penyedia aktif".
+7. Port 11434 (Ollama) **bukan fakta aplikasi** — cuma muncul di docstring contoh (`cli_tools_router.py:606`).
+8. **Self-Heal belum pernah terdokumentasi di halaman wiki mana pun**; sekarang ada di `CLI-Tools.md`
+   (kartunya di layar alat coding, `index.html:866-880`) + risiko eksplisit (menulis kode + merge branch).
+9. Angka tool masih 24 (12/6/6) tapi **jangan tulis angka per kelompok** di materi publik — basi saat daftar tumbuh.

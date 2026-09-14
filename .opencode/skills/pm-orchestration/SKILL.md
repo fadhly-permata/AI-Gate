@@ -38,6 +38,7 @@ questions). PM integrates receipts; never duplicates the sub-agent's work.
 | Tests / quality | qa-engineer | tests/**, .opencode/reports/** |
 
 | Design / trade-offs | tech-architect | documents/architecture/** |
+| Public copy / README / wiki / docs-site / release notes | public-writer | documents/pm/wiki-drafts/**, README.md, documents/readme-variants/** |
 
 Spawn only when the need appears. Never pre-create. Generate agent + skill
 together. Reuse (do not delete) once generated.

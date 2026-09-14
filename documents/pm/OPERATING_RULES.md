@@ -16,8 +16,11 @@ A11 `documents/pm/**` = memo kerja PM (rekaman titik-waktu, append-only): blok/e
    + typo; isi catatan/status/keputusan lama haram. Detail: `.opencode/skills/pm-orchestration/SKILL.md` §6 + `task-report.md`
    (laporan diisi maju, tidak dirombak).
 A12 Fakta dunia luar (status PR/branch/isu/merge) = rekaman titik-waktu: boleh dikutip sebagai "per tanggal X", TAPI sebelum
-   jadi dasar kerja WAJIB dicek ulang ke sumbernya (API / `git fetch`) pada sesi itu; kedaluwarsa → tulis koreksi + perbarui
-   baris `updated:` `state.md`, jangan diulang diam-diam sebagai kebenaran aktif. → `.opencode/rules/no-hallucination.md`.
+    jadi dasar kerja WAJIB dicek ulang ke sumbernya (API / `git fetch`) pada sesi itu; kedaluwarsa → tulis koreksi + perbarui
+    baris `updated:` `state.md`, jangan diulang diam-diam sebagai kebenaran aktif. → `.opencode/rules/no-hallucination.md`.
+A13 Materi publik (README/wiki/docs-site/release notes/varian bahasa) WAJIB dikoordinasikan PM ke spesialis public-writer; PM tidak
+   menulis copy publik langsung. Publikasi tetap butuh ACC user. [baru] → `.opencode/agents/specialists/public-writer.md`,
+   `.opencode/skills/public-writer-skill/SKILL.md`.
 
 ## B — Penempatan & higienitas berkas
 B1 Semua dokumen proyek di `documents/**`, bukan `docs/**`. [R5]
@@ -102,3 +105,39 @@ J6 DILARANG kill/pkill/killall/restart proses aigate, uvicorn, atau proses induk
 1 baris perintah + 1 baris alasan. Pelajaran panjang -> arsip, bukan file ini.
 ID baru = huruf tema + nomor_next (A1..J6 terisi; lanjutan J7, dst). Rujukan `[R#]` = ID lama di arsip.
 Gate wajib setelah edit: `python3 .opencode/tools/governance/rules-index.py` (exit 0 = lolos).
+
+## Lampiran (diserap dari branch docs/wiki saat merge `main`→`docs/wiki` 2026-09-14)
+Dua aturan ini ditulis di branch `docs/wiki` dengan nomor lama (R46/R47 era pra-konsolidasi) yang
+nomornya KEUBRAK dengan ID v2 di atas. Isinya TIDAK ada padanannya penuh di v2, jadi dipertahankan
+utuh (append-only). Isi = substansi, bukan nomor.
+
+### (wiki R46) Materi publik harus punya GERAK cerita
+Pelajaran (2026-09-08, dua tegoran beruntun atas wiki Home: "agak kurang menarik ya, rewrite dong"
+→ setelah direwrite masih: "cerita ilustrasinya kurang asik"): PM mendiagnosa "hambar" sebagai masalah
+**kata** (metafora lembek, heading kaku, ritme seragam) dan menyuruh specialist menukar properti-nya;
+user tetap tidak puas, karena yang kurang adalah **gerak**: ilustrasinya cuma satu foto diam, bukan cerita.
+Ciri ilustrasi yang DITERIMA user (bukti: paragraf "Picture this" di README, satu-satunya teks yang
+di-ACC tanpa revisi): ada **tokoh** → **maunya apa** → **rintangannya apa** → **aksi** → **hasil yang
+berubah di akhir**, ditutup kalimat pendek. Rintangan + payoff itu WAJIB; tanpa keduanya teksnya jadi
+brosur, bukan cerita. Aturan untuk SEMUA materi publik (README, varian, wiki): (1) ilustrasi pembuka
+wajib punya konflik kecil + penyelesaian ("orang kerja di meja dapur, kopi dingin" = suasana, bukan
+cerita); (2) rintangan & penyelesaian = perilaku produk yang sudah terbukti (R23/R42) — jangan pinjam
+ketegangan dari fitur yang belum diizinkan (contoh: Self-Heal masih ditahan); (3) gaya tetap R44/R45;
+(4) kalau user bilang "kurang asik" SETELAH satu revisi gaya: JANGAN perbaiki properti-nya lagi, ganti
+**struktur ceritanya**, tawarkan 2–3 pilihan adegan; (5) detail konkret > kata sifat. (Tumpang-tindih
+sebagian dengan I2; disimpan utuh karena rinciannya dipakai tim penulis wiki.)
+
+### (wiki R47) Gerbang git wajib sebelum kerja cabang; jangan pernah percaya `&& echo`
+Pelajaran (2026-09-08, tiga cacat beruntun saat memindahkan draf wiki antar branch): (1) PM membuat
+branch kerja dari branch ber-PR terbuka → kerjaan menumpuk di atas kerja belum di-merge; (2)
+`git cherry-pick -q A B C` → `-q` ditafsirkan pilih commit, bukan senyap; `--abort` diam-diam balikin
+HEAD ke commit LAMA → `reset --soft` menghasilkan commit merge liar; (3) `git ... && echo ok` / `| tee`
+tampak "sukses" padahal gagal, pesan error lewat di antara `echo` yang tetap tercetak. Gerbang wajib
+(semuanya, bukan salah satu): (1) basis branch baru = `origin/main` (kecuali penumpangan sengaja &
+dinyatakan), cek `git rev-list --count origin/main..<basis>` = 0; (2) satu jenis pekerjaan = satu branch;
+(3) nama cabang ditulis lengkap (`origin/main`), dibedakan dari `main` lokal yang bisa basi; (4) setelah
+operasi cabang, verifikasi HASIL bukan niat (`git rev-parse --short HEAD HEAD^`, `git log --oneline
+--graph -3`, `git rev-list --count origin/main..HEAD`, baca isi file berubah); (5) DILARANG merangkai
+perintah git pengubah-state pakai `&& echo "ok"` tanpa baca keluaran — gagal → berhenti & lapor;
+(6) DILARANG nulis file sementara ke `/tmp` — pakai `/data/data/com.termux/files/usr/tmp/opencode/`;
+(7) lokasi draf wiki = branch `docs/wiki`.
