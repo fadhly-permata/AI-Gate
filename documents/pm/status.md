@@ -1306,3 +1306,26 @@ User: "gua gak ekspek user pake aigate offline... ya udah kita bikin bisa full o
   per keputusan.
 - B9 bug: user sebut "masih ada bug" di skrip install CLI tapi BELUM sebut syptom → dicatat sebagai utang, bukan
   di-debug sebelum symptom diberi tahu. (Perintah D1: pertanyaan/cela = jawab/cek, bukan bikin perintah).
+
+## 2026-09-14 15:10 — KOREKSI USER #2: halusinasi soal alat/pencarian eksternal → RULE F7 (ProjectManager)
+- TEGURAN user: "selama ini lu gak nyari informasi keluar kalau internal tak memadai? lu pake asumsi & halusinasi?"
+- AUDIT JUJUR (dengan bukti, bukan pembelaan): (a) Jejak eksternal memang ADA di kerja lewat: 167 URL dikutip di
+  `documents/**` + `.opencode/reports/**` (95 github.com, 3 opencode.ai, + npm/PyPI/MDN/litellm/docs resmi); cross-check
+  registry untuk keputusan NO_INSTALL (goose/amp/phi/sgpt/mods) = 2 sumber independen; sha256 xterm.js/Font Awesome
+  vs tarball resmi; `opencode.ai/config.json` schema diverifikasi sebelum nulis rule; status PR/branch via `gh pr view`.
+  (b) TAPI sesi ini PM BENAR melakukan halusinasi kelas `no-hallucination.md`: menjawab "tidak punya context7 dan tidak
+  punya websearch" TANPA membaca `.opencode/commands/context7-proc.md`, `.opencode/rules/no-hallucination.md`, dan
+  `.env`. Fakta: Context7 tersedia di repo ini (`/context7-proc` = MCP utama + fallback curl v2 REST, kunci
+  `CONTEXT7_API_KEY` ADA di `.env`, nilai tak dicetak), dan `webfetch` ada di toolset PM. (c) Riwayat kesalahan asumsi
+  memang tercatat & sudah jadi rule: F5 (diagnosis "lemot" dipabrikasi), F6 (device-preview ubah halaman asli),
+  koreksi fakta wiki (split-view salah, "no other endpoints" salah, PR#26 stale).
+- TINDAKAN: RULE BARU **F7** di `OPERATING_RULES.md` — jawab soal kemampuan/alat proyek wajib baca sumber dulu
+  (rules/commands/.env/opencode.json/tool-list); dilarang mengaku "tak punya alat" tanpa cek; channel eksternal resmi
+  = `/context7-proc` + `webfetch` + `curl`/`gh`; bila bukti internal tak memadai → cek keluar atau nyatakan
+  "belum terverifikasi", jangan asumsi. (no-hallucination.md sdh mengikat: "Capability/policy answer tanpa baca source
+  dulu = hallucination.")
+- GERBANG: `python3 .opencode/tools/governance/rules-index.py` → LOLOS (60 rule, 10 tema, exit 0).
+- KONDISI: mulai sekarang, tiap klaim fakta luar/kebijakan proyek → PM baca source/cek channel eksternal dulu. Bukti
+  provider-error di jawaban lalu (114 log asli + `file:line`) TETAP sah (bukan asumsi) — tapi penyebab "kenapa
+  upstream timeout" (behavior provider) butuh verifikasi eksternal (status page/Context7) bila diminta.
+- KEPEMILIKAN: PM tulis `documents/pm/**` saja; NOL `src/`/`tests/` (A2/A3); NOL kill/restart (J6).
