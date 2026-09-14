@@ -16,8 +16,11 @@ A11 `documents/pm/**` = memo kerja PM (rekaman titik-waktu, append-only): blok/e
    + typo; isi catatan/status/keputusan lama haram. Detail: `.opencode/skills/pm-orchestration/SKILL.md` §6 + `task-report.md`
    (laporan diisi maju, tidak dirombak).
 A12 Fakta dunia luar (status PR/branch/isu/merge) = rekaman titik-waktu: boleh dikutip sebagai "per tanggal X", TAPI sebelum
-   jadi dasar kerja WAJIB dicek ulang ke sumbernya (API / `git fetch`) pada sesi itu; kedaluwarsa → tulis koreksi + perbarui
-   baris `updated:` `state.md`, jangan diulang diam-diam sebagai kebenaran aktif. → `.opencode/rules/no-hallucination.md`.
+    jadi dasar kerja WAJIB dicek ulang ke sumbernya (API / `git fetch`) pada sesi itu; kedaluwarsa → tulis koreksi + perbarui
+    baris `updated:` `state.md`, jangan diulang diam-diam sebagai kebenaran aktif. → `.opencode/rules/no-hallucination.md`.
+A13 Materi publik (README/wiki/docs-site/release notes/varian bahasa) WAJIB dikoordinasikan PM ke spesialis public-writer; PM tidak
+   menulis copy publik langsung. Publikasi tetap butuh ACC user. [baru] → `.opencode/agents/specialists/public-writer.md`,
+   `.opencode/skills/public-writer-skill/SKILL.md`.
 
 ## B — Penempatan & higienitas berkas
 B1 Semua dokumen proyek di `documents/**`, bukan `docs/**`. [R5]

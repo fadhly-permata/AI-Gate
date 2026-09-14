@@ -2,6 +2,14 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260914-PUBLIC-WRITER-GEN — Spesialis `public-writer` + `public-writer-skill` DI-BUAT (perintah user) (ProjectManager)
+- TASK user: buat agen penulis publik dan PM wajib koordinasi dengannya untuk materi publik (wiki/README/dll.) supaya bisa generate otomatis, menarik, mudah dibaca, ilustratif.
+- GENERATE berbarengan (A5/agent-generation R1-R2): `.opencode/agents/specialists/public-writer.md` + `.opencode/skills/public-writer-skill/SKILL.md`.
+- SCOPE: `documents/pm/wiki-drafts/**`, `README.md`, `documents/readme-variants/**`. Publikasi eksternal tetap lewat PM/user; agen tidak publish sendiri.
+- KUALITAS: skill encode pola yang sudah dipakai: reader-first, manfaat 3-5 baris awal, story motion (tokoh → maunya → rintangan → aksi → hasil berubah), contoh/ilustrasi, skimmable, claim -> bukti, `TODO-VERIFY`, no leak `documents/**`, nama `aigate` lowercase, kultur netral, varian bahasa asli, absolute URLs.
+- ROUTING: PM roster `.opencode/agents/ProjectManager.md` + `.opencode/skills/pm-orchestration/SKILL.md` delegation matrix + `.opencode/rules/agent-boundaries.md` + rule A13 `documents/pm/OPERATING_RULES.md`.
+- CATATAN: belum di-commit/push; working tree masih ada perubahan wiki draft/backlog dari task review sebelumnya. Restart opencode required agar `public-writer` bisa di-spawn sebagai subagent_type (agent-generation R3).
+
 ## 20260914-WIKI-PUBLISH — Home + Quick Start TERBIT di GitHub wiki PUBLIK (perintah user "pastikan tampil di halaman wiki") (ProjectManager)
 - PELANGGARAN KEBIJAKAN bidak: rencana awal (wiki-plan.md §6 / backlog W2.4) = TUNGGU 8 halaman ACC lalu publish sekaligus. User override 2026-09-14: publish in-kremental per halaman ACC. PM catat deviasi ini sebagai keputusan user.
 - MEKANISME: clone `AI-Gate.wiki.git` (master; isinya cuma stub "Welcome to the AI-Gate wiki!") → timpa dengan draft ACC persis (`cp`, diff identik) → commit + `git push origin master` (kredensial via `gh auth setup-git`, GH_TOKEN, nilai tak dicetak). Push `4deaf39..1df0d65` exit 0.

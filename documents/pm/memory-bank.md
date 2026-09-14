@@ -4,6 +4,12 @@
 (empty — diisi PM saat task pertama)
 
 ## Decisions
+- 2026-09-14 (PUBLIC-WRITER): user meminta spesialis penulis publik yang selalu dikoordinasikan PM untuk materi publik
+  (wiki/README/dll.) supaya generate otomatis tapi tetap menarik, mudah dibaca, dan ilustratif. PM membuat agen + skill
+  berbarengan: `public-writer` dan `public-writer-skill`. Write scope = `documents/pm/wiki-drafts/**`, `README.md`,
+  `documents/readme-variants/**`. Aturan routing dipasang di PM roster, orchestration matrix, agent boundaries, dan
+  OPERATING_RULES A13. Publikasi eksternal tetap lewat PM/user dan butuh ACC user; agen tidak publish sendiri.
+
 - 2026-09-13 (SETTINGS DUA PANEL SEJAJAR — diagnosis + handover, BELUM eksekusi): user lapor "panel-panel pada
   halaman setting banyak yang gak responsif... kenapa gak dibuat jadi sejajar kesamping aja pas mode layar besar.
   Baru dibuat sejajar kebawah ketika menggunakan layar kecil". Sesuai F5, "gak responsif" = layout tak adaptif
