@@ -137,3 +137,46 @@ dan WL.2a baru boleh dikerjakan.
       `index.html:43` path relatif, grep CDN di `static/**` = 0, penjaga otomatis `tests/vendor_assets.test.js` (7 tes),
       legal §2 ditulis ulang + ADR-015 di TSD + FSD 321 dikoreksi. commit `19df593` `15862bf` `b256064` `bb759e4`.
       SISA: uji mata offline nyata (matikan jaringan → ikon tetap muncul) belum dilakukan — butuh user/QA.
+
+---
+
+## Tahap 1.7 — REWRITE 6 halaman oleh SPESIALIS `public-writer` (2026-09-14)
+**Perintah user:** "tulis ulang dokumen wiki dengan menggunakan spesialis agent yang baru" → mode: **SEKUENSIAL**
+(pilihan user "sekuen"). **Cakupan (default PM, dicatat):** hanya W1.3–W1.8; `Home.md` + `Quick-Start.md`
+TIDAK disentuh (sudah ACC + sudah tayang). Owner baru = **public-writer** (agent + skill commit `1f4120b`) —
+sebelumnya halaman 3–8 ditulis analyst/engineer, sekarang dirombak total oleh penulis materi publik.
+Handover: `documents/pm/handovers/handover-20260914-wiki-rewrite-{1..6}-*.md` · Laporan:
+`.opencode/reports/20260914/docs/1201_wiki-rewrite-public-writer.md` · Sesi: `ses_f61faa11fffeobPweNZWiz8zm5`.
+
+Status per halaman (hasil + gerbang):
+- [!] **W1.3** `Interfaces.md` — rewrite selesai · 296 kata prosa · gerbang PASS.
+- [!] **W1.4** `Configuration-and-Keys.md` — rewrite selesai · 447 kata · gerbang PASS.
+- [!] **W1.5** `CLI-Tools.md` — rewrite selesai · 393 kata · gerbang PASS · **Self-Heal pertama kali didokumentasikan**
+      di halaman ini (kartunya memang di layar alat coding, `index.html:866-880`) + risikonya ditulis jujur.
+- [!] **W1.6** `OpenAI-API.md` — rewrite selesai · 395 kata · gerbang PASS.
+- [!] **W1.7** `Terminal.md` — rewrite selesai · 394 kata · gerbang PASS.
+- [!] **W1.8** `Providers-and-Combos.md` — rewrite selesai · 477 kata · gerbang PASS.
+
+⚠️ **Lembar fakta A/B/C (2026-09-08) SEBAGIAN BASI — jangan dipakai lagi tanpa audit ulang.**
+Fakta baru yang terbukti dari kode hari ini (9 koreksi; rinci di laporan `1201`):
+1. **Tidak ada "split view / pecah layar" di terminal** — toolbar nyata: new-tab, Paste + Paste as Code Block,
+   Settings (TUI Passthrough, Keep Screen On), Full Page vs Fullscreen, cluster mengambang
+   (`index.html:775-835`). Kelas `term-split` = tombol caret, BUKAN layar terpisah. **Salah ini sudah sempat
+   masuk draf halaman 3 + 7 → dibuang.**
+2. **3 pilihan teknis TIDAK muncul di layar setelan** (logging detail per request, umur simpan log, batas sesi
+   terminal) — layar cuma Port/dev-mode/tema/bahasa (`index.html:195-290`). Halaman 4 dulu menjanjikannya → dibetulkan.
+3. **Anthropic inbound HIDUP**: `POST /v1/messages` (`gateway/router.py:528`, non-streaming Stage 1) +
+   `/v1/messages/count_tokens` (:688); `claude` kini `verified` (`cli_presets.py:174`). Draf lama halaman 6
+   bahkan menulis "there are no other endpoints" → SALAH, sudah dibetulkan.
+4. **Strategi combo = 5**: `fallback` (bawaan) / `load_balance` / `latency_cost` / `three_tier` / `round_robin`
+   (`index.html:1102-1106`; mesin `combo_routing.py:275-305`, docstring `:3-13`). Draf lama cuma tahu sebagian.
+5. **Model nama polos ≠ "penyedia aktif"** — resolver cari semua penyedia aktif yang menawarkan model itu; kalau
+   >1 → pakai penyedia yang ditandai dipakai (`gateway/resolver.py:218-270`).
+6. Port 11434 (Ollama) cuma nongol di docstring contoh (`cli_tools_router.py:606`) = pengetahuan eksternal →
+   disebutannya di halaman 8 digeneralisasi.
+7–9. Tiga klaim dilemaskan (redaksi): "stutter never reaches you" (klien tetap nunggu saat retry),
+   "working offline stays possible" → terlalu tegas, dan "60 menit adjustable in settings" → tidak diekspos layar.
+- Koreksi lama #1 (endpoint bukan port kedua) · #2 (putus koneksi ≠ proses mati) · #3 (tidak ada combo `default`)
+  TETAP BERLAKU dan justru diperkuat di naskah baru.
+- **GATE user sekarang:** review 6 halaman hasil rewrite. Commit/publish BELUM (D1 — nunggu perintah).
+

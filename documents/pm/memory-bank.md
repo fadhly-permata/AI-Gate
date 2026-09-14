@@ -744,3 +744,25 @@ lebar viewer, vitest hijau, `git diff --check` bersih, bump cache-buster (kini `
   7. Hanya 3 variabel lingkungan: `AIGATE_PORT`, `AIGATE_DEV`, `AIGATE_DB_PATH`.
   8. Setelan bawaan yang nyata: port, mode developer, tema, bahasa, catatan detail per request (mati),
      retensi log 7 hari, reaper terminal 60 menit.
+
+## Fakta wiki pasca-rewrite `public-writer` (2026-09-14 12:01 — wajib dipakai di halaman mana pun yang direvisi lagi)
+Lembar fakta A/B/C tanggal 2026-09-08 **sebagian basi**. Yang sudah diverifikasi PM ulang dari kode branch `docs/wiki`:
+1. **Terminal TIDAK punya "split view / pecah layar".** Kontrol nyata: new-tab, Paste + Paste as Code Block,
+   Settings (TUI Passthrough + Keep Screen On), Full Page vs Fullscreen, cluster mengambang
+   (`index.html:775-835`). Kelas CSS `term-split` = tombol caret, bukan layar terpisah.
+2. **Layar setelan hanya 4 pilihan**: Port, mode developer, tema, bahasa (`index.html:195-290`).
+   Request logging, retensi log, dan reaper terminal **ada sebagai nilai** (setelan DB) tapi **tidak muncul
+   di layar** → jangan menulisnya seperti pilihan yang bisa diklik.
+3. **Anthropic inbound sudah hidup**: `POST /v1/messages` (non-streaming Stage 1) + `/v1/messages/count_tokens`
+   (`gateway/router.py:528`, `:688`); claude berstatus `verified` (`cli_presets.py:174`). Kalimat
+   "there are no other endpoints" di draf lama = SALAH.
+4. **Strategi combo 5**: `fallback` (bawaan) / `load_balance` / `latency_cost` / `three_tier` / `round_robin`
+   (`index.html:1102-1106`; mesin `combo_routing.py:275-305`).
+5. **Eksport CSV laporan tidak memuat kunci** (`analytics_export.py:85-110`); yang memuat kunci = **JSON
+   setelan** karena mengserialisasi tabel penyedia (`export.py:64-75`). Peringatan "jangan di-commit" hanya untuk JSON.
+6. **Model nama polos** dicari di SEMUA penyedia aktif yang menawarkan model itu; kalau >1 cocok → penyedia yang
+   ditandai dipakai (`gateway/resolver.py:218-270`). Bukan "selalu penyedia aktif".
+7. Port 11434 (Ollama) **bukan fakta aplikasi** — cuma muncul di docstring contoh (`cli_tools_router.py:606`).
+8. **Self-Heal belum pernah terdokumentasi di halaman wiki mana pun**; sekarang ada di `CLI-Tools.md`
+   (kartunya di layar alat coding, `index.html:866-880`) + risiko eksplisit (menulis kode + merge branch).
+9. Angka tool masih 24 (12/6/6) tapi **jangan tulis angka per kelompok** di materi publik — basi saat daftar tumbuh.

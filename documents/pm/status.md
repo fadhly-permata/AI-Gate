@@ -2,6 +2,21 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260914-1201-WIKI-REWRITE — 6 halaman wiki DITULIS ULANG oleh `public-writer`, SEKUENSIAL (ProjectManager)
+- TASK user: "tulis ulang dokumen wiki dengan menggunakan spesialis agent yang baru" → mode dipilih user: **sekuensial** ("sekuen"); setelah halaman 3 disajikan, user: **"lakukan yang terbaik aja"** → keputusan review dilimpahkan ke PM (D2, default dicatat).
+- CAKUPAN (default PM): hanya W1.3–W1.8 (Interfaces, Configuration-and-Keys, CLI-Tools, OpenAI-API, Terminal, Providers-and-Combos). `Home.md` + `Quick-Start.md` **tidak disentuh** — sudah ACC + sudah tayang di GitHub wiki.
+- SPawn: `public-writer` (REUSE, sesi `ses_f61faa11fffeobPweNZWiz8zm5`) ×6, satu halaman per spawn, handover `documents/pm/handovers/handover-20260914-wiki-rewrite-{1..6}-*.md`.
+- SEBELUM nulis: fakta di-audit ulang ke kode — **lembar fakta A/B/C (2026-09-08) terbukti SEBAGIAN BASI.** 9 koreksi keluar dari proses (rinci di laporan `.opencode/reports/20260914/docs/1201_wiki-rewrite-public-writer.md`). Yang paling berat:
+  (1) **"split view/pecah layar" TIDAK ADA** di terminal — salah ini sudah sempat masuk draf lama halaman 3+7 (dan sempat gue ACC di ronde halaman 3, ketahuan pas audit halaman 7 → dibuang);
+  (2) **3 setelan teknis tidak muncul di layar setelan** (halaman 4 dulu menjanjikannya);
+  (3) **Anthropic inbound `/v1/messages` sudah hidup** + claude `verified` — draf lama halaman 6 menulis "there are no other endpoints" = SALAH;
+  (4) **strategi combo = 5**, draf lama cuma tahu sebagian; (5) CSV laporan ternyata **tanpa kunci** (yang bawa kunci cuma JSON setelan) → klaim draf lama dibuang; (6) model nama polos ≠ penyedia aktif (`resolver.py:218-270`).
+- Naskah yang ditambah/dibetulkan PM setelah audit (4 baris, semua di `documents/pm/wiki-drafts/`): halaman 7 buang "(adjustable in settings)"; halaman 8 lemaskan "the stutter never reaches you" + generalisasi port 11434; halaman 6 perbaiki kalimat bare-model; halaman 4 ubah "Plus three technical picks" → "di balik layar, bukan di layar".
+- Tambah materi BARU: **Self-Heal akhirnya didokumentasikan** (selama ini belum ada di halaman mana pun) — ditaruh di `CLI-Tools.md` karena kartunya memang hidup di layar alat coding (`index.html:866-880`), dengan risiko ditulis jujur (menulis kode + merge branch).
+- GATE PM (mandiri, bukan telan receipt): scanner token terlarang per file (path `src/`/`documents/`, `this repo`, MIT, untested/experimental, `seven`, ADR-###, R#, TODO-VERIFY, id DOM, nama kolom/tabel DB, nama modul `.py`/`.js`, kelas CSS) + validasi 8 nama taut internal + kredit baris terakhir + `aigate` kecil + batas kata → **6/6 PASS**. `python3 .opencode/tools/governance/rules-index.py` exit 0 (58 rule).
+- KEPEMILIKAN (A2/A3): naskah = public-writer (write root sah `documents/pm/wiki-drafts/**`); PM = `documents/pm/**` + `documents/plan/wiki-backlog.md` + laporan. **NOL tulis `src/**`/`tests/**`.**
+- BELUM: commit/push (D1 nunggu perintah); publish GitHub wiki (masih cuma Home + Quick Start yang tayang); review user atas 6 halaman; WP.1 (cek versi Python `run.py`) masih antre; Tahap 2 (Sidebar/Footer, terjemahan, Pages) ditahan sampai 8 halaman ACC.
+
 ## 20260914-PUBLIC-WRITER-GEN — Spesialis `public-writer` + `public-writer-skill` DI-BUAT (perintah user) (ProjectManager)
 - TASK user: buat agen penulis publik dan PM wajib koordinasi dengannya untuk materi publik (wiki/README/dll.) supaya bisa generate otomatis, menarik, mudah dibaca, ilustratif.
 - GENERATE berbarengan (A5/agent-generation R1-R2): `.opencode/agents/specialists/public-writer.md` + `.opencode/skills/public-writer-skill/SKILL.md`.
