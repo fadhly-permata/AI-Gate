@@ -2,6 +2,40 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260914-PUSH — Log panel DI-COMMIT `81608af` + PUSH + **PR #25 TERBUKA** (label enhancement, MERGEABLE) (ProjectManager; perintah user "push & PR")
+- A12 cek sumber: `git fetch` → origin/main maju ke `eb97455` (PR #24 Hindi MERGED; HEAD feat/i18n-hindi = ancestor main). PR #24 diverifikasi MERGED via `gh pr view`.
+- Branch BARU `feat/log-panel-devmode` berbasis `origin/main` (HEAD=ancestor, cache-buster 20260926 sama) → PR bersih ISI 4 file log-panel SAJA (0 dokumen; `git diff --name-only origin/main...branch | grep documents = 0`).
+- COMMIT `81608af` feat(ui) staging EKSPLISIT 4 src (BUKAN git add -A): app.js/index.html/styles.css/logwindow.test.js (+440/-30). Dokumen PM TETAP di luar PR.
+- PUSH `git push -u origin feat/log-panel-devmode` (token dari `.env` via GH_TOKEN, nilai tak dicetak). `gh pr create --base main --label enhancement` → **PR #25** https://github.com/fadhly-permata/AI-Gate/pull/25. VERIFIKASI `gh pr view --json`: OPEN / base main / labels=[enhancement] / mergeable=MERGEABLE (H5 label nempel terbukti).
+- Isi PR = stacktrace-persist + icon-only + gate dev mode + switch instant. GATE sebelumnya: vitest 27/698 + G3 Chromium nyata hijau.
+- docs(pm) (memory-bank/state/status/handover) commit TERPISAH ke main (pola sesi lalu), di luar PR #25. SISA user: review + merge PR #25.
+
+
+- BUKAN bug: G3 nyata tunjukkan jalur switch→Save bekerja (attr off→on, toggle flex, saved, nol error). Akar = switch baru berlaku SETELAH klik Simpan (pola lama sama spt Theme/Port). User belum klik Simpan → terasa mati. Restart hanya sekali (muat app.js baru), bukan tiap toggle.
+- FIX (fe-dev, JS+test only): `wireDevModeToggle` `app.js:485` change→saveSettings (reuse PUT+applyDevMode), dipanggil init `:2584`, hook `:789`. Switch kini langsung apply+persist tanpa Save.
+- GATE PM: vitest 27/698 HIJAU (+3 on/off/idempoten), git diff --check bersih. G3 nyata (isolated, :8080 user utuh): change tanpa submit → body on, #logWindowToggle flex, dev_mode=true ke-simpan server, nol error.
+- STATUS: selesai tes+nyata. BELUM commit (D1). Tunggu perintah user (commit/push/PR) + user reload utk liat.
+
+## 20260914-LOGPANEL-DONE — fe-dev SELESAI + G3 BROWSER NYATA HIJAU (stacktrace fix lolos jebakan id-string, ketahuan PM) (ProjectManager)
+- ACC user "gas" → spawn fe-dev 1 pass (Task tool tersedia). Receipt: 694 tes hijau.
+- **G3 nyata = penentu**: Chromium instance terisolasi → Task 1 GAGAL di browser (`stackAfterPoll=open=false`) walau jsdom hijau. AKAR (bukti): API `id`=NUMBER, `data-logid`=string, `openStackIds.has(row.id)` number→tak cocok; tes fe-dev pake id STRING → lolos palsu. PM TIDAK telan receipt (G3/F3).
+- FIX (fe-dev resume): normalisasi dua sisi → String (`app.js:2179 has(String(row.id))`, `:2220 id=String(id)`) + tes regresi id-number (`logwindow.test.js:575`, gagal-sebelum/lolos-setelah).
+- GATE PM MANDIRI: vitest `src/frontend` **27/695 HIJAU** (+1 numerik, nol regresi); `git diff --check` bersih; scope 4 berkas src/frontend/**, nol backend, nol hex, nol CDN (glyph diverifikasi di FA lokal). PM nol tulis src (A2).
+- G3 PM (isolated 59123+DB tmp+CDP59124, PID sendiri; `:8080` user 200 tak disentuh J6): dev_mode=false→kelima surface display:none; =true→toggle/panel/device muncul; stacktrace bertahan open=true menembus poll; 375px icon-only overflow ok. SEMUA HIJAU.
+- Deviasi sah: body-attr→inline script (dom.js slice `<body>`), cache-buster lockstep 20260927 (invarian i18n.test.js:314-315), openStackIds IIFE-top.
+- STATUS: selesai tingkat tes + terverifikasi nyata. **BELUM commit/push/PR** (D1). Sisa user: restart aigate (J6) + hard-refresh + uji mata/HP.
+
+## 20260914-LOGPANEL-PLAN — PM DIAGNOSIS BERBUKTI + LEMBAR DESAIN: log panel (stacktrace fix + icon) + gate dev mode (ProjectManager; task user; nol tulis src/ — A2)
+- MASUK: 3 permintaan user (stacktrace auto-collapse?; semua tombol panel log → ikon; Developer Mode True/False gate Log Window + Device Simulation + Self Heal, default False setelah install).
+- METODE: investigasi read-only berbukti `file:line` (C4), BUKAN tebakan. F5 dijaga — "kenapa auto collapse" dijawab pakai akar nyata, bukan karangan.
+- AKAR BUG (bukti): `renderLogs` rombak `#logTableBody.innerHTML` penuh (`app.js:2126-2150`) tiap poll 3d (`setInterval` `app.js:2135-2138`) → `<details class="log-stack">` dibuat ulang tanpa `open` (`app.js:2134`) = collapse. Fix = preservasi `open` per id + delegate `toggle`, poll tetap jalan.
+- FACT (bukti): `dev_mode` default `"false"` (`config/settings.py:35`) + diekspos `GET /api/settings` (`settings_router.py:52`) + dibaca `app.js:410` → **murni frontend, nol backend**; default-False user SUDAH dipenuhi backend.
+- VERIF IKON (G3): glyph fa-rotate/fa-trash/fa-eye/fa-check-double dicek ADA di FA LOKAL `vendor/font-awesome/css/all.min.css` (grep class) — nol CDN.
+- PETA GATE: `#logWindowToggle` index.html:78 + `#logWindow`:1277; device `[data-device-trigger]`:166/:1423; `.selfheal-card`:866; saklar dev_mode TETAP tampil. Rancang `body[data-devmode=off]` + `applyDevMode`.
+- LEMBAR DESAIN: `documents/pm/handovers/handover-20260914-logpanel-icon-dan-devmode-gate.md`.
+- MODE: sekuensial TERPAKSA (3 tugas sentuh app.js/index.html/styles.css sama) → 1 pass fe-dev.
+- STATUS: landed diagnosis+desain; **BELUM spawn fe-dev** — tunggu ACC user (D6). Ambigu default diusulkan: show-resolved=fa-eye, resolve-all=fa-check-double, label Severity hidden layar sempit. Working tree PM bersih dari src (hanya documents/pm/**).
+
 ## 20260914-0540 — PM AUDIT + VERIFIKASI MANDIRI + COMMIT `52f4a50` + PUSH (lebar panel settings persen SELESAI) (ProjectManager)
 - MASUK: receipt fe-dev (handover `documents/pm/handovers/handover-20260913-settings-panel-width-persen.md`): 2 berkas berubah, BEFORE/AFTER 13 viewport, vitest 27/685 hijau, `git diff --check` bersih, BELUM commit. fe-dev JUJUR pisahkan yang ditulis vs diverifikasi.
 - AUDIT (poin 1): `git status`/`git diff` scope HANYA `styles.css` (+10: komentar + 1 rule) + `index.html:61` cache-buster `20260925→20260926`. Rule persis `.view[data-view="settings"] .settings-card{max-width:none}`; global cap :493 TETAP ada; NOL hex baru (scan added-line=0); NOL `@media` baru (scan=0); `.welcome-card` utuh; `settings-card` index.html hanya :201/:250. NOL nyasar/kepotong. `git diff --check` exit 0.
