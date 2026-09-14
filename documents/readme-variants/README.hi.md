@@ -71,9 +71,13 @@ aigate Linux, Windows और Android (Termux) पर जाँचा जा च�
 
 ## पूरी तकनीकी बात wiki पर 📚
 
-API, architecture, install तरीके और testing की पूरी जानकारी
-[wiki](https://github.com/fadhly-permata/AI-Gate/wiki) पर है। यह README
-बस परिचय तक सीमित है।
+जो बातें यह README हल्के में छोड़ देता है, वे wiki पर विस्तार से हैं — provider और
+combo कैसे मिलकर काम करते हैं, अपने coding tools कैसे जोड़ें, और अपने कोड से API
+कैसे बुलाएँ। यहाँ से शुरू कीजिए:
+[Quick Start](https://github.com/fadhly-permata/AI-Gate/wiki/Quick-Start) ·
+[Providers & Combos](https://github.com/fadhly-permata/AI-Gate/wiki/Providers-and-Combos) ·
+[Terminal](https://github.com/fadhly-permata/AI-Gate/wiki/Terminal) ·
+[CLI Tools](https://github.com/fadhly-permata/AI-Gate/wiki/CLI-Tools)
 
 ## हालत 📌
 

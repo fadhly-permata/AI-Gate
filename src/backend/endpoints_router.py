@@ -23,7 +23,6 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from backend.config.db import SessionLocal
-from backend.gateway.token_saver import TOKEN_SAVER_MODES
 from backend.log import log_info, log_warning
 from backend.models import Endpoint, EndpointBinding
 
@@ -50,7 +49,6 @@ class EndpointCreate(BaseModel):
     access_control_enabled: Optional[bool] = False
     internal_api_key: Optional[str] = ""
     proxy_pool_id: Optional[int] = None
-    token_saver: Optional[str] = "off"  # ADR-013: 'off'|'rtk'|'caveman'|'ponytail'
     binding: Optional[BindingRef] = None
 
     class Config:
@@ -64,7 +62,6 @@ class EndpointUpdate(BaseModel):
     access_control_enabled: Optional[bool] = None
     internal_api_key: Optional[str] = None
     proxy_pool_id: Optional[int] = None
-    token_saver: Optional[str] = None
     binding: Optional[BindingRef] = None
 
     class Config:
@@ -79,7 +76,6 @@ class EndpointDTO(BaseModel):
     access_control_enabled: bool
     internal_api_key: str  # ADR-007: plaintext
     proxy_pool_id: Optional[int]
-    token_saver: str  # ADR-013
     binding: Optional[dict]
 
     class Config:
@@ -109,7 +105,6 @@ def _endpoint_to_dto(session: Session, endpoint: Endpoint) -> dict:
         access_control_enabled=bool(endpoint.access_control_enabled),
         internal_api_key=endpoint.internal_api_key,  # ADR-007: plaintext
         proxy_pool_id=endpoint.proxy_pool_id,
-        token_saver=endpoint.token_saver or "off",  # ADR-013
         binding=_binding_to_dict(binding),
     ).dict()
 
@@ -160,12 +155,6 @@ def list_endpoints() -> dict:
 
 @router.post("/api/endpoints", status_code=201)
 def create_endpoint(req: EndpointCreate) -> dict:
-    if req.token_saver is not None and req.token_saver not in TOKEN_SAVER_MODES:
-        return _bad_request(
-            f"invalid token_saver: '{req.token_saver}' "
-            f"(must be one of {TOKEN_SAVER_MODES})",
-            "invalid_token_saver",
-        )
     endpoint = Endpoint(
         name=req.name,
         listen_host=req.listen_host or "127.0.0.1",
@@ -173,7 +162,6 @@ def create_endpoint(req: EndpointCreate) -> dict:
         access_control_enabled=bool(req.access_control_enabled),
         internal_api_key=req.internal_api_key or "",
         proxy_pool_id=req.proxy_pool_id,
-        token_saver=(req.token_saver or "off"),
     )
     with SessionLocal() as session:
         session.add(endpoint)
@@ -242,15 +230,6 @@ def update_endpoint(endpoint_id: int, req: EndpointUpdate) -> dict:
         if req.proxy_pool_id is not None:
             endpoint.proxy_pool_id = req.proxy_pool_id
             changed.append("proxy_pool_id")
-        if req.token_saver is not None:
-            if req.token_saver not in TOKEN_SAVER_MODES:
-                return _bad_request(
-                    f"invalid token_saver: '{req.token_saver}' "
-                    f"(must be one of {TOKEN_SAVER_MODES})",
-                    "invalid_token_saver",
-                )
-            endpoint.token_saver = req.token_saver
-            changed.append("token_saver")
         if req.binding is not None:
             # Replace the endpoint's single binding.
             _replace_binding(

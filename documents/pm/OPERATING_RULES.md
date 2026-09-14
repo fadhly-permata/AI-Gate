@@ -22,6 +22,8 @@ A13 Materi publik (README/wiki/docs-site/release notes/varian bahasa) WAJIB diko
    menulis copy publik langsung. Publikasi tetap butuh ACC user. [baru] → `.opencode/agents/specialists/public-writer.md`,
    `.opencode/skills/public-writer-skill/SKILL.md`.
 
+A14 PM DILARANG nulis/run harness/tes/probe sendiri (puppeteer/CDP/A-B/py/curl/urllib/http/port) — itu kode (A2,G7). Butuh e2e/tes nyata → SPAWN qa-engineer (atau fe/be-dev); mereka bikin & run, PM nilai hasil.
+
 ## B — Penempatan & higienitas berkas
 B1 Semua dokumen proyek di `documents/**`, bukan `docs/**`. [R5]
 B2 Artefak opencode (command/rule/skill/agent) di `.opencode/**` proyek; global hanya bila user menyebut "global". [R6]
@@ -56,6 +58,7 @@ E2 Satu panggilan = satu tujuan; reuse `file:line` yang sudah dibaca; spawn cepa
 E3 Jangan kirim pekerjaan baru di tengah `/run-impl`; tahan perubahan spec sampai run selesai atau batch di awal. [R15]
 E4 Saat iterasi hanya jalankan tes relevan; suite penuh sekali sebagai gate commit; perubahan yang tak tertes (markup/komentar/dokumen) tanpa suite; klaim kecepatan wajib angka `time`/`--durations`. [R35]
 E5 Jalur yang dijalankan tiap shell (`~/.bashrc`, `PROMPT_COMMAND`, hook) wajib bebas perintah blocking; kebutuhan hidup → cache state + background. Ukur dulu (`time bash -ic true`) sebelum dan sesudah. [R37]
+E6 Default eksekusi multi-agen = **SEKUENSIAL**, bukan paralel. PM wajib TAWARKAN pilihan (E1) sebelum spawn 2+ agen; kalau user belum jawab, JALANKAN sekuensial — jangan asumsikan paralel aman hanya karena write-root berbeda. Pelanggaran 2026-09-14: PM spawn 2 agen paralel tanpa tanya → user menegur "jangan paralel kerjanya.. sekuen aja". [R16]
 
 ## F — Fakta, sumber, provenance
 F1 Mengadopsi fitur dari sumber eksternal: fetch isinya dulu, sitat (nama + URL) di dokumen, align ke isi asli, lalu verifikasi sitat benar-benar ada. [R17]
@@ -64,6 +67,7 @@ F3 Klaim teknis wajib bukti: `file:line`, URL, atau konfirmasi user. Fakta ekste
 F4 Klaim ukuran/kuantitas wajib menyebut alat + satuan aslinya (`wc -c`=byte, `du -k`=KiB blok terbulatkan, `wc -l`=baris). Angka beda alat tidak boleh dicampur tanpa label; sebut rentang, bukan satu angka palsu-presisi. [baru]
 F5 PM DILARANG memaknai ulang gejala yang user laporkan dengan arti teknis lain, dan DILARANG mengarang akar masalah (mis. "lemot"/"laggy"/"slow") yang user tidak pernah sebut. Bila istilah ambigu — terutama kata UI kolokial id/msa seperti "responsif", "lemot", "aneh", "berantakan" — WAJIB klarifikasi maksudnya 1 kalimat SEBELUM mendiagnosis, jangan berasumsi. Bukti diagnosis = `file:line` nyata, bukan gejala yang diada-adakan. [baru — pm-postmortem 2026-09-13: diagnosis "lemot" dipabrikasi dari keluhan "gak responsif/berantakan" yang artinya responsive-design + layout, bukan performa].
 F6 "PREVIEW" simulasi perangkat WAJIB terisolasi total di dalam modal/iframe. Memilih mode DILARANG mengubah halaman asli: tanpa `applyDevice`/tanpa menulis `body[data-device]` pada dokumen luar, dan tanpa ukuran konten di-`transform: scale()`-kecil di halaman luar. Viewport perangkat cukup disimulasikan lewat lebar iframe — media-query + `body[data-device]` di DALAM dokumen iframe menyala sendiri, nol efek ke dokumen luar. Handover/desain yang membuat "preview" mengubah halaman nyata = cacat, DITOLAK PM sebelum spawn fe-dev. [baru — pm-postmortem 2026-09-13: modal device-sim (dinamai preview) ternyata panggil applyDevice di dokumen luar (app.js:151) + scale iframe ~48% (app.js:126) → halaman asli ikut berubah & konten kecil; user: "yang berubah bukan yang asli"].
+F7 Menjawab soal KEMAMPUAN/alat/kebijakan proyek ("punya context7?", "bisa web search?", "ada akses X?") WAJIB baca sumbernya lebih dulu: `.opencode/rules/*.md`, `.opencode/commands/*`, `opencode.json`, tool-list sesi, dan `.env` (nilai kredensial tidak pernah dicetak). DILARANG mengaku "tidak punya alat/sumber" tanpa cek — itu halusinasi kelas yang dilarang `no-hallucination.md`. Channel eksternal resmi proyek: `/context7-proc` (Context7: MCP utama, fallback curl v2 REST pakai `CONTEXT7_API_KEY`), `webfetch`, `curl`/`gh` ke registry & API resmi. Kalau bukti internal tidak memadai untuk menjawab fakta → PAKAI salah satu channel itu atau nyatakan "belum terverifikasi", jangan tambal pakai asumsi. [baru — pm-postmortem 2026-09-14: PM menjawab "tidak punya context7 dan tidak punya websearch" tanpa membaca `.opencode/commands/context7-proc.md` + `.opencode/rules/no-hallucination.md` + `.env`, padahal Context7 tersedia di repo ini]
 
 ## G — Verifikasi & quality gate
 G1 Kode produksi mengikuti DRY/KISS/SOLID/YAGNI; gate QA + PM menolak receipt copy-paste/over-engineer. Detail: `.opencode/rules/code-quality-principles.md`. [R25]
@@ -71,6 +75,8 @@ G2 Sub-agent: `py_compile` semua `.py` yang ditulis. Full `pytest`/`npm test` di
 G3 Aset yang dipakai fitur di-vendor lokal (bukan CDN); dependensi runtime masuk `pyproject` + diverifikasi terpasang. Klaim "fitur X jalan" hanya setelah fitur itu di-exercise end-to-end di lingkungan nyata; e2e menyentuh tiap fitur inti; "test hijau" ≠ "aplikasi kepake". [R20]
 G4 Setelah perubahan FE: periksa HTML final dari artefak markup/tool-call (`tsoassistant`, `recipient_name`, `functions.*`). `git diff --check` + unit test tidak cukup. [R24]
 G5 Perintah yang dibangkitkan orchestrator (self-heal): pakai subcommand non-interaktif yang dicek dari `--help`; marker `.done` hanya bila exit 0, `.failed` bila tidak; model id dikualifikasi ke `provider/model`; uji live, bukan assertion string. [R34]
+G6 Tes gateway HANYA model TERDAFTAR di combo/provider (ProviderModel nyata, bukan id rekaan `provider:<nama>:<model>`) + ENABLE (provider+ProviderModel+akun). Cek daftar via GET /api/providers/{id} / /v1/models dulu.
+G7 Verifikasi PM = run suite BELUM di-run (entrypoint resmi) + baca receipt/diff + scanner statis. DILARANG request/probe server hidup (curl/urllib/http/puppeteer/port) buat cek; sub-agent bilang selesai + test-nya sudah assert → JANGAN tes ulang.
 
 ## H — Git, catatan, PR
 H1 Awal task: checkpoint commit (`git add -A && git commit -m "checkpoint: <task> start"`). Tiap subtask selesai & terverifikasi: commit langsung. Conventional Commits; hormati `.gitignore` (`.env`, DB di `~/.aigate`); cek `git status` sebelum commit. [R19]

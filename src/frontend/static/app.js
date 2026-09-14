@@ -1103,12 +1103,30 @@
     if (inp) inp.disabled = !rr;
   }
 
+  // Master<->sub switch linkage for the Token Saver block. The three sub
+  // switches are only meaningful while the master is ON; master OFF disables
+  // them (and saveProvider() then forces the three booleans false).
+  var TS_SUB_IDS = ["provTsRtk", "provTsCaveman", "provTsPonytail"];
+
+  function syncTokenSaverUI() {
+    var master = provEl("provTokenSaver");
+    var on = !!master && master.checked;
+    TS_SUB_IDS.forEach(function (id) {
+      var el = provEl(id);
+      if (el) el.disabled = !on;
+    });
+  }
+
   function openAddModal() {
     selectedProviderId = null;
     var f = provEl("provForm");
     if (f) f.reset();
     provEl("provId").value = "";
     provEl("provModalTitle").textContent = getStr("providers.add");
+    // Fresh provider: master + subs start OFF and disabled.
+    var tsMaster = provEl("provTokenSaver");
+    if (tsMaster) tsMaster.checked = false;
+    syncTokenSaverUI();
     renderHeadersEditor([]);
     // Fresh provider: clear any stale discovered options + value from a prior
     // edit (free text still works with an empty option list).
@@ -1131,6 +1149,22 @@
       // ADR-007: show api_key as plaintext (no redaction).
       provEl("provApiKey").value = p.api_key != null ? p.api_key : "";
       provEl("provEnabled").checked = !!p.enabled;
+      // Token Saver (D6/ACC): master is ON if any sub is stored true; each sub
+      // reads its own boolean. syncTokenSaverUI then enables/disables the subs.
+      var tsMaster = provEl("provTokenSaver");
+      if (tsMaster) {
+        tsMaster.checked = !!(p.token_saver_rtk || p.token_saver_caveman || p.token_saver_ponytail);
+      }
+      var tsInputs = {
+        provTsRtk: p.token_saver_rtk,
+        provTsCaveman: p.token_saver_caveman,
+        provTsPonytail: p.token_saver_ponytail
+      };
+      TS_SUB_IDS.forEach(function (id) {
+        var el = provEl(id);
+        if (el) el.checked = !!tsInputs[id];
+      });
+      syncTokenSaverUI();
       // Default model: seed the combobox with this provider's known models
       // (sorted) and set the stored value. A custom (undiscovered) value is
       // still shown because the input holds any string.
@@ -1205,7 +1239,12 @@
       api_key: provEl("provApiKey").value,
       default_model: provModelValue(),
       enabled: provEl("provEnabled").checked,
-      custom_headers: collectHeaders()
+      custom_headers: collectHeaders(),
+      // Token Saver (D6/ACC): never send the removed string field. When the
+      // master is OFF every sub is forced false; when ON each toggles freely.
+      token_saver_rtk: !!provEl("provTokenSaver").checked && !!provEl("provTsRtk").checked,
+      token_saver_caveman: !!provEl("provTokenSaver").checked && !!provEl("provTsCaveman").checked,
+      token_saver_ponytail: !!provEl("provTokenSaver").checked && !!provEl("provTsPonytail").checked
     };
     setProvMsg("");
     var req = id
@@ -1971,6 +2010,9 @@
     if (provAdd) provAdd.addEventListener("click", openAddModal);
     var provForm = document.getElementById("provForm");
     if (provForm) provForm.addEventListener("submit", saveProvider);
+    // Token Saver master: toggling it enables/disables the three sub-switches.
+    var provTsMaster = document.getElementById("provTokenSaver");
+    if (provTsMaster) provTsMaster.addEventListener("change", syncTokenSaverUI);
     var provTest = document.getElementById("provTestBtn");
     if (provTest) provTest.addEventListener("click", testProviderConnection);
     var provCancel = document.getElementById("provCancel");

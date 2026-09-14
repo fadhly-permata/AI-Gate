@@ -66,6 +66,12 @@ class Provider(Base):
     fallback_strategy: Mapped[str] = mapped_column(String, default="fill-first")
     # Sticky length for 'round-robin'. Clamped to >= 1 at selection time.
     sticky_round_robin_limit: Mapped[int] = mapped_column(Integer, default=3)
+    # Token Saver hooks (moved here from the Endpoint level). Each saver is an
+    # independent on/off toggle applied in order rtk -> caveman -> ponytail.
+    # Default off (no hook).
+    token_saver_rtk: Mapped[bool] = mapped_column(Boolean, default=False)
+    token_saver_caveman: Mapped[bool] = mapped_column(Boolean, default=False)
+    token_saver_ponytail: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     models: Mapped[list["ProviderModel"]] = relationship(back_populates="provider")
@@ -245,11 +251,6 @@ class Endpoint(Base):
     # proxy). FK to proxy_pools.id; null = no proxy for this endpoint.
     proxy_pool_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("proxy_pools.id"), nullable=True
-    )
-    # ADR-013 / B5.4: Token Saver hook mode applied as a pre-translate hook.
-    # Allowed: 'off' | 'rtk' | 'caveman' | 'ponytail'. Default 'off' (no hook).
-    token_saver: Mapped[str] = mapped_column(
-        String, nullable=False, default="off"
     )
 
     bindings: Mapped[list["EndpointBinding"]] = relationship(

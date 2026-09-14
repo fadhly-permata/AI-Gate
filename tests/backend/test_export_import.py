@@ -170,7 +170,6 @@ def _seed_full_config(sf: sessionmaker) -> dict[str, int]:
             access_control_enabled=True,
             internal_api_key="internal-PLAINTEXT",  # ADR-007
             proxy_pool_id=pool.id,
-            token_saver="rtk",
         )
         s.add(ep)
         s.flush()

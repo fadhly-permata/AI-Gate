@@ -72,10 +72,13 @@ volledige Linux-distro op de telefoon.
 
 ## Technische details in de wiki 📚
 
-Over de API, de architectuur, de installatieopties en het draaien van
-tests gaat de
-[wiki](https://github.com/fadhly-permata/AI-Gate/wiki). Deze README houdt
-het kort; de wiki gaat de diepte in.
+Wat dit README kort houdt, staat uitgebreid in de wiki: hoe providers en
+combo's werken, je codingtools koppelen, en de API aanroepen vanuit eigen
+code. Goed startpunt:
+[Quick Start](https://github.com/fadhly-permata/AI-Gate/wiki/Quick-Start) ·
+[Providers & Combos](https://github.com/fadhly-permata/AI-Gate/wiki/Providers-and-Combos) ·
+[Terminal](https://github.com/fadhly-permata/AI-Gate/wiki/Terminal) ·
+[CLI Tools](https://github.com/fadhly-permata/AI-Gate/wiki/CLI-Tools).
 
 ## Status 📌
 

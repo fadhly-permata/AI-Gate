@@ -388,16 +388,42 @@ def test_messages_model_not_found(monkeypatch) -> None:
     assert body["error"]["type"] == "invalid_request_error"
 
 
-def test_messages_streaming_refused(monkeypatch) -> None:
-    client = _client_with_db(monkeypatch)
+@respx.mock
+def test_messages_streaming_refused_for_translated_upstream(monkeypatch) -> None:
+    """Tahap 2 (B7): streaming is now supported for OpenAI-format upstreams, but a
+    translated (anthropic) upstream still returns 400 ``streaming_unsupported_format``
+    (the legacy ``anthropic_streaming_unsupported`` refusal no longer applies to a
+    stream:true request — see design §8 decision D-A)."""
+    sf = _make_sessionmaker()
+    with sf() as session:
+        provider = Provider(
+            name="claude",
+            type="anthropic",
+            base_url="http://claude.upstream",
+            api_key="sk-ant-plain",
+            enabled=True,
+        )
+        session.add(provider)
+        session.flush()
+        session.add(
+            ProviderModel(
+                provider_id=provider.id,
+                model_id="claude-sonnet-4-5",
+                model_name="Claude Sonnet 4.5",
+                capabilities="chat",
+            )
+        )
+        session.commit()
+    _patch_db(monkeypatch, sf)
+    client = TestClient(app)
     resp = client.post(
         "/v1/messages",
-        json={**VALID_BODY, "stream": True},
+        json={**VALID_BODY, "model": "provider:claude:claude-sonnet-4-5", "stream": True},
     )
     assert resp.status_code == 400
     body = resp.json()
     assert body["type"] == "error"
-    assert body["error"]["code"] == translator.ANTHROPIC_STREAMING_UNSUPPORTED_CODE
+    assert body["error"]["code"] == "streaming_unsupported_format"
 
 
 def test_messages_missing_model(monkeypatch) -> None:

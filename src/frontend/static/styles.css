@@ -600,6 +600,30 @@ body.sidebar-collapsed .nav-item {
 .switch input:checked + .switch-slider { background: var(--accent); }
 .switch input:checked + .switch-slider:before { transform: translateX(20px); }
 
+/* Keyboard focus ring on the visible slider (the input itself is hidden). */
+.switch input:focus-visible + .switch-slider {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Disabled switch: grey + no pointer. A checked-but-disabled slider keeps the
+   accent fill but dims with the rest, so "off because the master is off" reads
+   clearly without inventing a new colour. */
+.switch input:disabled + .switch-slider {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* Token Saver block in the provider modal: one master + three sub-switches.
+   Indent the subs so the parent/child relation is visible. */
+.ts-fieldset {
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+.ts-help { margin: 2px 0 8px; color: var(--muted); font-size: 13px; }
+.ts-subs { padding-left: 16px; }
+
 .form-actions { margin-top: 6px; }
 
 .btn {

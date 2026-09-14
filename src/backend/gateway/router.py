@@ -57,17 +57,24 @@ logger = logging.getLogger(__name__)
 
 from backend.config import settings as _settings
 from backend.config.db import SessionLocal
-from backend.combo_routing import execute_combo, resolve_combo_stream_target
+from backend.combo_routing import (
+    build_candidates,
+    execute_combo,
+    resolve_combo_stream_target,
+)
 from backend.gateway import provider_adapter
-from backend.gateway.errors import GatewayError
+from backend.gateway.errors import GatewayError, UpstreamError
 from backend.gateway import responses as _responses
 from backend.gateway.resolver import ResolvedTarget, TargetNotFound, resolve_target
 from backend.gateway.translator import (
     ANTHROPIC_INVALID_REQUEST_CODE,
     ANTHROPIC_MISSING_MODEL_CODE,
     AnthropicMessagesRequest,
+    _AnthropicSseEncoder,
     _extract_text,
+    anthropic_error_sse_frame,
     anthropic_messages_request_to_openai_chat,
+    format_for_provider_type,
     openai_chat_response_to_anthropic_messages,
 )
 from backend.log import log_error_exc, log_info, log_warning, log_warning_exc
@@ -272,11 +279,14 @@ async def _handle_chat_completion(request: Request, ctx: dict) -> Union[dict, Re
     # driven by the Endpoint's EndpointBinding instead of the model reference.
     endpoint_name = request.headers.get("x-aigate-endpoint")
     if endpoint_name:
-        # ADR-013 / B5.4: apply the Endpoint's Token Saver hook to the payload
-        # BEFORE forwarding. Fail-open: never raises; original payload returned
-        # on any error / missing endpoint / mode 'off'. B5.6: also capture the
+        # ADR-013: apply the bound Provider's Token Saver hook to the payload
+        # BEFORE forwarding (endpoint -> provider binding; combos use their first
+        # candidate member). Fail-open: never raises; original payload returned
+        # on any error / no provider / all toggles off. B5.6: also capture the
         # input-side savings estimate for the UsageRecord.
-        payload, saved_bytes = _apply_token_saver_for_endpoint(endpoint_name, payload)
+        payload, saved_bytes = _apply_token_saver_for_provider(
+            _resolve_saver_provider(endpoint_name=endpoint_name), payload
+        )
         # NOTE: ctx["payload"] keeps the ORIGINAL received body (ERD RequestLog
         # "header/isi" = what the client sent); the saver effect is captured by
         # saved_bytes -> UsageRecord.saved_tokens_est, not by re-dumping.
@@ -307,6 +317,16 @@ async def _handle_chat_completion(request: Request, ctx: dict) -> Union[dict, Re
     # marker resolves upstream_model="" (members are decided inside
     # execute_combo) — the requested combo ref stays; the result upgrades it.
     _upgrade_ctx_model(ctx, target.upstream_model)
+
+    # ADR-013: model-based path — apply the resolved Provider's Token Saver hook
+    # to the payload BEFORE forwarding (provider ref / combo first member).
+    # Fail-open: original payload returned on any error / no provider / all
+    # toggles off. B5.6: capture the input-side savings estimate for the
+    # UsageRecord / RequestLog.
+    payload, saved_bytes = _apply_token_saver_for_provider(
+        _resolve_saver_provider(target=target), payload
+    )
+    ctx["saved_bytes"] = saved_bytes
 
     # --- SSE streaming (stream:true) ----------------------------------------
     # Decided AFTER resolution so we know the target's format. A ``combo:``
@@ -348,14 +368,20 @@ async def _handle_chat_completion(request: Request, ctx: dict) -> Union[dict, Re
         combo_name = model[len("combo:"):]
         # B5.5: ``execute_combo`` records the UsageRecord itself (it knows which
         # member/account actually succeeded). No endpoint on this path.
-        result = await execute_combo(combo_name, payload)
+        # B5.6: thread the token_saver savings estimate (from ctx) through.
+        result = await execute_combo(
+            combo_name, payload, saved_tokens_est=_saved_tokens_est(ctx)
+        )
         # B5.6: prefer the model that actually served (upstream envelope), else
         # keep the requested combo ref.
         _upgrade_ctx_model(ctx, result.get("model"))
     else:
         result = await provider_adapter.chat_completion(target, payload)
         # B5.5: persist usage telemetry (fail-open — never breaks the client).
-        _record_usage_safe(result, target, endpoint_id=None)
+        # B5.6: + token_saver savings when a saver was applied (None = no saver).
+        _record_usage_safe(
+            result, target, endpoint_id=None, saved_bytes=ctx.get("saved_bytes")
+        )
 
     # ADR-011 / R12: success path must still land in LogEntry.
     log_info(
@@ -453,8 +479,10 @@ async def _handle_responses(request: Request, ctx: dict) -> dict:
     # SSE Response here).
     endpoint_name = request.headers.get("x-aigate-endpoint")
     if endpoint_name:
-        chat_payload, saved_bytes = _apply_token_saver_for_endpoint(
-            endpoint_name, chat_payload
+        # ADR-013: apply the bound Provider's Token Saver hook (endpoint ->
+        # provider binding; combos use their first candidate member).
+        chat_payload, saved_bytes = _apply_token_saver_for_provider(
+            _resolve_saver_provider(endpoint_name=endpoint_name), chat_payload
         )
         ctx["saved_bytes"] = saved_bytes
         chat_result = await _route_via_endpoint(
@@ -492,17 +520,27 @@ async def _handle_responses(request: Request, ctx: dict) -> dict:
 
     _upgrade_ctx_model(ctx, target.upstream_model)
 
+    # ADR-013: model-based path — apply the resolved Provider's Token Saver hook.
+    chat_payload, saved_bytes = _apply_token_saver_for_provider(
+        _resolve_saver_provider(target=target), chat_payload
+    )
+    ctx["saved_bytes"] = saved_bytes
+
     # Combo strategy routing / plain provider — identical to the chat path so
     # usage recording (B5.5) and savings attribution stay shared.
     if target.combo_used:
         combo_name = model[len("combo:"):]
-        chat_result = await execute_combo(combo_name, chat_payload)
+        chat_result = await execute_combo(
+            combo_name, chat_payload, saved_tokens_est=_saved_tokens_est(ctx)
+        )
         # B5.6: prefer the model that actually served (upstream envelope), else
         # keep the requested combo ref.
         _upgrade_ctx_model(ctx, chat_result.get("model"))
     else:
         chat_result = await provider_adapter.chat_completion(target, chat_payload)
-        _record_usage_safe(chat_result, target, endpoint_id=None)
+        _record_usage_safe(
+            chat_result, target, endpoint_id=None, saved_bytes=ctx.get("saved_bytes")
+        )
 
     log_info(
         f"responses completion success for model '{model}'",
@@ -571,12 +609,26 @@ async def messages_completions(request: Request) -> Response:
                 }
             ),
         )
+    if isinstance(result, StreamingResponse):
+        # Streaming: the SSE body is already committed to the client; usage is
+        # recorded after the stream completes (inside _anthropic_stream_response).
+        # The debug row records result=None (a Response is not a dict) — mirror chat.
+        _record_request_log_safe(ctx, request, t0, result=None, http_status=200)
+        return result
     _record_request_log_safe(ctx, request, t0, result=result, http_status=200)
     return JSONResponse(content=result)
 
 
-async def _handle_anthropic_messages(request: Request, ctx: dict) -> dict:
-    """Validate + translate + route one Anthropic Messages request (raises)."""
+async def _handle_anthropic_messages(
+    request: Request, ctx: dict
+) -> Union[dict, StreamingResponse]:
+    """Validate + translate + route one Anthropic Messages request (raises).
+
+    Returns a JSON dict (non-streaming, Stage 1) or a ``StreamingResponse``
+    (Anthropic SSE) when the client asked for ``stream:true`` (Tahap 2). Errors on
+    the streaming path surface as a ``GatewayError`` before the 200 SSE is
+    committed (the generator is primed in :func:`_anthropic_stream_response`).
+    """
     payload = await _parse_object_body(request)
 
     # `model` must be a non-empty string (resolved verbatim downstream, like chat).
@@ -609,21 +661,35 @@ async def _handle_anthropic_messages(request: Request, ctx: dict) -> dict:
             ANTHROPIC_INVALID_REQUEST_CODE,
         )
 
-    # Anthropic → OpenAI chat translation; refuses stream:true / thinking.
-    chat_payload = anthropic_messages_request_to_openai_chat(payload)
+    # Anthropic → OpenAI chat translation; refuses thinking. ``stream:true`` is
+    # accepted ONLY on the streaming surface (allow_stream) — a stream:false/absent
+    # request keeps the exact Stage-1 behavior.
+    wants_stream = payload.get("stream") is True
+    chat_payload = anthropic_messages_request_to_openai_chat(
+        payload, allow_stream=wants_stream
+    )
 
     # ADR-008: named Endpoint via X-Aigate-Endpoint header (same path as chat/responses).
     endpoint_name = request.headers.get("x-aigate-endpoint")
+
+    if wants_stream:
+        # Tahap 2 inbound Anthropic SSE: translate the upstream OpenAI stream into
+        # the Anthropic SSE envelope (openai-format upstreams only — decision D-A).
+        return await _handle_anthropic_messages_stream(
+            request, ctx, model, chat_payload, endpoint_name
+        )
+
     if endpoint_name:
-        chat_payload, saved_bytes = _apply_token_saver_for_endpoint(
-            endpoint_name, chat_payload
+        # ADR-013: apply the bound Provider's Token Saver hook (endpoint ->
+        # provider binding; combos use their first candidate member).
+        chat_payload, saved_bytes = _apply_token_saver_for_provider(
+            _resolve_saver_provider(endpoint_name=endpoint_name), chat_payload
         )
         ctx["saved_bytes"] = saved_bytes
         chat_result = await _route_via_endpoint(
             endpoint_name, model, chat_payload, request, ctx
         )
         if not isinstance(chat_result, dict):
-            # Defensive: unreachable while stream is refused; fail loudly (R12).
             raise GatewayError(
                 500,
                 "endpoint path returned a stream for a non-streaming request",
@@ -653,15 +719,25 @@ async def _handle_anthropic_messages(request: Request, ctx: dict) -> dict:
 
     _upgrade_ctx_model(ctx, target.upstream_model)
 
+    # ADR-013: model-based path — apply the resolved Provider's Token Saver hook.
+    chat_payload, saved_bytes = _apply_token_saver_for_provider(
+        _resolve_saver_provider(target=target), chat_payload
+    )
+    ctx["saved_bytes"] = saved_bytes
+
     # Combo strategy routing / plain provider — identical to the responses path so
     # usage recording (B5.5) and savings attribution stay shared.
     if target.combo_used:
         combo_name = model[len("combo:"):]
-        chat_result = await execute_combo(combo_name, chat_payload)
+        chat_result = await execute_combo(
+            combo_name, chat_payload, saved_tokens_est=_saved_tokens_est(ctx)
+        )
         _upgrade_ctx_model(ctx, chat_result.get("model"))
     else:
         chat_result = await provider_adapter.chat_completion(target, chat_payload)
-        _record_usage_safe(chat_result, target, endpoint_id=None)
+        _record_usage_safe(
+            chat_result, target, endpoint_id=None, saved_bytes=ctx.get("saved_bytes")
+        )
 
     log_info(
         f"anthropic completion success for model '{model}'",
@@ -669,6 +745,321 @@ async def _handle_anthropic_messages(request: Request, ctx: dict) -> dict:
         context={"model": model},
     )
     return openai_chat_response_to_anthropic_messages(chat_result, model)
+
+
+# --------------------------------------------------------------------------- #
+# Inbound Anthropic SSE streaming (Tahap 2 / B7) — OpenAI-format upstream only
+# --------------------------------------------------------------------------- #
+
+
+async def _handle_anthropic_messages_stream(
+    request: Request,
+    ctx: dict,
+    model: str,
+    chat_payload: dict,
+    endpoint_name: Optional[str],
+) -> StreamingResponse:
+    """Route an inbound Anthropic ``stream:true`` request to an OpenAI-format
+    upstream and translate its SSE into the Anthropic Messages SSE envelope.
+
+    Tahap 2 scope (decision D-A): only OpenAI-format upstreams stream — provider
+    openai, combo member openai, or endpoint-bound openai. An anthropic/gemini
+    upstream (or a combo with no openai member) raises
+    :func:`_streaming_unsupported_error` (400 ``streaming_unsupported_format``),
+    reusing the chat-surface rejection. No secrets are forwarded: the client
+    ``x-api-key``/``Authorization`` never reaches the upstream; provider keys are
+    attached only at egress by :mod:`backend.gateway.provider_adapter`.
+    """
+
+    async def _stream_for(target, proxy_url, endpoint_id) -> StreamingResponse:
+        fmt = (target.format or "openai").lower()
+        if fmt != "openai":
+            log_warning(
+                "anthropic streaming requested for translated format "
+                f"'{fmt}' (not supported yet)",
+                source=ANTHROPIC_LOG_SOURCE,
+                context={"model": target.model_ref, "format": fmt},
+            )
+            raise _streaming_unsupported_error()
+        return await _anthropic_stream_response(
+            target,
+            chat_payload,
+            ctx,
+            endpoint_id,
+            request_model=model,
+            proxy_url=proxy_url,
+        )
+
+    # Endpoint-bound path (mirror _route_via_endpoint, but Anthropic-encoded).
+    if endpoint_name:
+        # ADR-013: apply the bound Provider's Token Saver hook (endpoint ->
+        # provider binding; combos use their first candidate member).
+        chat_payload, saved_bytes = _apply_token_saver_for_provider(
+            _resolve_saver_provider(endpoint_name=endpoint_name), chat_payload
+        )
+        ctx["saved_bytes"] = saved_bytes
+        with SessionLocal() as session:
+            endpoint = (
+                session.query(Endpoint).filter_by(name=endpoint_name).first()
+            )
+            if endpoint is None:
+                log_warning(
+                    f"_handle_anthropic_messages_stream: endpoint '{endpoint_name}' "
+                    "not found",
+                    source=ANTHROPIC_LOG_SOURCE,
+                )
+                raise GatewayError(
+                    400, f"endpoint '{endpoint_name}' not found",
+                    "invalid_request_error", "endpoint_not_found",
+                )
+            ctx["endpoint_id"] = endpoint.id
+            if endpoint.access_control_enabled and not _endpoint_authorized(
+                request, endpoint
+            ):
+                log_warning(
+                    f"_handle_anthropic_messages_stream: unauthorized request to "
+                    f"endpoint '{endpoint_name}'",
+                    source=ANTHROPIC_LOG_SOURCE,
+                )
+                raise GatewayError(
+                    401,
+                    "unauthorized: missing or invalid API key for endpoint",
+                    "authentication_error", "unauthorized",
+                )
+            binding = (
+                session.query(EndpointBinding)
+                .filter_by(endpoint_id=endpoint.id).first()
+            )
+            if binding is None:
+                raise GatewayError(
+                    400, f"endpoint '{endpoint_name}' has no upstream binding",
+                    "invalid_request_error", "endpoint_no_binding",
+                )
+            proxy_url = None
+            if endpoint.proxy_pool_id is not None:
+                pool = session.get(ProxyPool, endpoint.proxy_pool_id)
+                if pool is not None:
+                    node = proxy_selector.select_node(pool, session)
+                    if node is not None:
+                        proxy_url = proxy_selector.build_proxy_url(node)
+            if binding.bind_type == "provider":
+                provider = session.get(Provider, binding.bind_id)
+                if provider is None:
+                    raise GatewayError(
+                        400, f"endpoint '{endpoint_name}' binds a missing provider",
+                        "invalid_request_error", "provider_not_found",
+                    )
+                api_key, account_id = select_provider_credential_with_account(
+                    provider, session,
+                    preferred_account_id=_preferred_account_id(request),
+                )
+                target = ResolvedTarget(
+                    base_url=provider.base_url,
+                    api_key=api_key,
+                    model_ref=model,
+                    upstream_model=_strip_binding_prefix(model),
+                    combo_used=False,
+                    provider_id=provider.id,
+                    account_id=account_id,
+                    format=format_for_provider_type(provider.type),
+                )
+                _upgrade_ctx_model(ctx, target.upstream_model)
+                return await _stream_for(target, proxy_url, endpoint.id)
+            if binding.bind_type == "combo":
+                member = resolve_combo_stream_target(binding.bind_id)
+                if member is None or (member.format or "openai").lower() != "openai":
+                    raise _streaming_unsupported_error()
+                _upgrade_ctx_model(ctx, member.upstream_model)
+                return await _stream_for(member, proxy_url, endpoint.id)
+            raise GatewayError(
+                400,
+                f"endpoint '{endpoint_name}' has unsupported bind_type "
+                f"'{binding.bind_type}'",
+                "invalid_request_error", "endpoint_no_binding",
+            )
+
+    # Model-based resolution (verbatim mirror of _handle_anthropic_messages).
+    try:
+        target = resolve_target(
+            model, preferred_account_id=_preferred_account_id(request)
+        )
+    except TargetNotFound as exc:
+        log_warning(
+            f"model reference not found: {model}", source=ANTHROPIC_LOG_SOURCE,
+        )
+        raise GatewayError(400, str(exc), "invalid_request_error", "model_not_found")
+
+    _upgrade_ctx_model(ctx, target.upstream_model)
+
+    if target.combo_used:
+        combo_name = model[len("combo:"):]
+        member = resolve_combo_stream_target(combo_name)
+        if member is None or (member.format or "openai").lower() != "openai":
+            log_warning(
+                "anthropic streaming requested for a combo with no OpenAI-compatible "
+                f"member (model '{model}')",
+                source=ANTHROPIC_LOG_SOURCE,
+            )
+            raise _streaming_unsupported_error()
+        _upgrade_ctx_model(ctx, member.upstream_model)
+        # ADR-013: streaming model-based combo — apply the selected member's
+        # Provider Token Saver hook before the SSE is committed (fail-open).
+        chat_payload, saved_bytes = _apply_token_saver_for_provider(
+            _resolve_saver_provider(target=member), chat_payload
+        )
+        ctx["saved_bytes"] = saved_bytes
+        return await _stream_for(member, None, None)
+
+    # ADR-013: streaming model-based provider — apply the resolved Provider's
+    # Token Saver hook before the SSE is committed (fail-open).
+    chat_payload, saved_bytes = _apply_token_saver_for_provider(
+        _resolve_saver_provider(target=target), chat_payload
+    )
+    ctx["saved_bytes"] = saved_bytes
+    return await _stream_for(target, None, None)
+
+
+async def _anthropic_stream_response(
+    target: ResolvedTarget,
+    payload: dict,
+    ctx: dict,
+    endpoint_id: Optional[int],
+    request_model: str,
+    proxy_url: Optional[str] = None,
+) -> StreamingResponse:
+    """Build an SSE ``StreamingResponse`` that translates an upstream OpenAI-format
+    stream into the Anthropic Messages SSE envelope.
+
+    Mirrors :func:`_streaming_response` (prime before commit; usage-after-stream)
+    but the body generator decodes the upstream OpenAI SSE bytes -> chunk dicts and
+    encodes them through :class:`_AnthropicSseEncoder`, flushing per chunk for low
+    latency. A mid-stream transport failure (status already 200) emits ONE
+    Anthropic-shaped ``event: error`` frame (design §5.2 / R6) — never a silent
+    truncation.
+    """
+    fmt = (target.format or "openai").lower()
+    if fmt != "openai":
+        raise _streaming_unsupported_error()
+
+    # Force the upstream stream + final usage chunk (the encoder needs usage for
+    # message_delta). The adapter also rewrites the model and sets stream=True.
+    out = dict(payload)
+    out["stream"] = True
+    out.setdefault("stream_options", {"include_usage": True})
+
+    agen = provider_adapter.chat_completion_stream(target, out, proxy_url)
+    # Prime: pull the first bytes so upstream connect/HTTP/timeout errors raise HERE
+    # (mapped to the Anthropic JSON envelope) instead of after the 200 SSE commit.
+    try:
+        first = await agen.__anext__()
+    except StopAsyncIteration:
+        first = None
+    except Exception:
+        await agen.aclose()
+        raise
+
+    encoder = _AnthropicSseEncoder(request_model)
+
+    async def body():
+        buf = bytearray()
+        completed = False
+        try:
+            async for chunk in _iter_openai_sse_chunks(_chain_first(first, agen), buf):
+                for event in encoder.feed([chunk]):
+                    yield event.encode("utf-8")
+            for event in encoder.finish():
+                yield event.encode("utf-8")
+            completed = True
+        except UpstreamError as exc:
+            # Mid-stream transport failure (status already 200): emit ONE
+            # Anthropic-shaped error frame, then stop (design §5.2 / R6).
+            err = exc.envelope.get("error", {}) if isinstance(exc.envelope, dict) else {}
+            yield anthropic_error_sse_frame(err).encode("utf-8")
+        except Exception as exc:  # noqa: BLE001 - honest termination, not truncation
+            logger.error(
+                "anthropic inbound stream failed mid-stream: %s", exc, exc_info=True
+            )
+            log_error_exc(
+                "anthropic inbound stream failed mid-stream",
+                source="backend.gateway.router",
+                exc=exc,
+                context={"model_ref": ctx.get("model")},
+            )
+            yield anthropic_error_sse_frame(
+                {
+                    "type": "api_error",
+                    "message": "upstream stream interrupted",
+                    "code": "upstream_stream_interrupted",
+                }
+            ).encode("utf-8")
+        finally:
+            await agen.aclose()
+            if completed:
+                _record_stream_usage_safe(
+                    buf, target, endpoint_id=endpoint_id,
+                    saved_bytes=ctx.get("saved_bytes"),
+                )
+
+    return StreamingResponse(
+        body(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+async def _chain_first(first, agen):
+    """Yield the (already-primed) first bytes, then the remainder of the byte stream."""
+    if first is not None:
+        yield first
+    async for raw in agen:
+        yield raw
+
+
+async def _iter_openai_sse_chunks(byte_stream, buf: bytearray):
+    """Decode an OpenAI SSE *byte* async-iterable into OpenAI chunk dicts.
+
+    Buffers every raw byte into ``buf`` (reused for usage-after-stream) and yields
+    one chunk dict per ``data:`` frame, skipping ``[DONE]`` and non-JSON frames.
+    Frames spanning byte boundaries are reassembled across ``\\n\\n`` events.
+    """
+    pending = bytearray()
+    async for raw in byte_stream:
+        buf.extend(raw)
+        pending.extend(raw)
+        while True:
+            idx = pending.find(b"\n\n")
+            if idx == -1:
+                break
+            frame = bytes(pending[:idx])
+            del pending[: idx + 2]
+            chunk = _parse_sse_data_frame(frame)
+            if chunk is not None:
+                yield chunk
+    if pending:
+        chunk = _parse_sse_data_frame(bytes(pending))
+        if chunk is not None:
+            yield chunk
+
+
+def _parse_sse_data_frame(frame: bytes) -> Optional[dict]:
+    """Parse one raw SSE ``data:`` frame into an OpenAI chunk dict (or None)."""
+    try:
+        text = frame.decode("utf-8", "replace")
+    except Exception:  # noqa: BLE001 - defensive only
+        return None
+    data_blobs = []
+    for line in text.splitlines():
+        line = line.rstrip("\r")
+        if line.startswith("data:"):
+            data_blobs.append(line[len("data:"):].strip())
+    joined = "\n".join(data_blobs).strip()
+    if not joined or joined == "[DONE]":
+        return None
+    try:
+        obj = json.loads(joined)
+    except (ValueError, TypeError):
+        return None
+    return obj if isinstance(obj, dict) else None
 
 
 def _anthropic_error_body(error: dict) -> dict:
@@ -1124,41 +1515,121 @@ def _lookup_endpoint(session, ref: str) -> Optional[Endpoint]:
     return session.query(Endpoint).filter_by(name=ref).first()
 
 
-def _apply_token_saver_for_endpoint(
-    name: str, payload: dict
-) -> Tuple[dict, Optional[int]]:
-    """Apply the Token Saver hook for the named/identified Endpoint (fail-open).
+def _first_member_provider(session, combo: "Combo") -> Optional[Provider]:
+    """Return the combo's first candidate member Provider (read-only, fail-open).
 
-    Looks up the ``Endpoint`` by id-or-name; if found and its ``token_saver``
-    mode is not ``off``/None, runs ``apply_token_saver_with_metrics`` on the
-    payload. Returns ``(payload, saved_bytes)``: ``saved_bytes`` is None when
-    NO saver was applied (unknown endpoint / mode off / lookup failure —
-    "not measured"), and an int >= 0 when one ran (B5.6 savings tracking).
-    Any failure results in the original ``payload`` being returned unchanged
-    (ADR-013 fail-open).
+    Used to attribute a Token Saver hook to a combo target before the concrete
+    member is executed: ``build_candidates`` resolves members in the combo's
+    strategy order WITHOUT advancing any cursor or mutating state, so this is a
+    side-effect-free pick of the member that will (for fallback/three_tier)
+    serve first. ``None`` when the combo has no usable member/provider.
+    """
+    candidates = build_candidates(combo, session)
+    if candidates and candidates[0].provider_id:
+        return session.get(Provider, candidates[0].provider_id)
+    return None
+
+
+def _resolve_saver_provider(
+    endpoint_name: Optional[str] = None,
+    target: Optional[ResolvedTarget] = None,
+) -> Optional[Provider]:
+    """Resolve the ``Provider`` whose Token Saver toggles apply to a request.
+
+    Priority:
+    * ``endpoint_name`` given -> follow the Endpoint's single ``EndpointBinding``
+      (``provider`` -> that Provider; ``combo`` -> its first candidate member
+      Provider via :func:`_first_member_provider`);
+    * else a resolved ``target`` -> its ``provider_id`` (a plain provider ref);
+      a combo marker (``combo_used`` + ``combo:<name>`` model_ref) resolves via
+      its first candidate member.
+
+    Returns ``None`` (no saver applied) when nothing resolves. Fail-open: any
+    lookup error is logged and yields ``None`` — the request is never broken.
     """
     try:
         with SessionLocal() as session:
-            endpoint = _lookup_endpoint(session, name)
-            if endpoint is None:
-                # header present but endpoint unknown -> no hook
-                return payload, None
-            mode = endpoint.token_saver
-            if not mode or mode == "off":
-                return payload, None
-            log_info(
-                f"applying token_saver mode '{mode}' for endpoint "
-                f"'{endpoint.name}'",
-                source="backend.gateway.router",
-                context={"endpoint": endpoint.name, "mode": mode},
-            )
-            new_payload, saved_bytes = _token_saver.apply_token_saver_with_metrics(
-                mode, payload
-            )
-            return new_payload, saved_bytes
+            if endpoint_name:
+                endpoint = _lookup_endpoint(session, endpoint_name)
+                if endpoint is None:
+                    return None
+                binding = (
+                    session.query(EndpointBinding)
+                    .filter_by(endpoint_id=endpoint.id)
+                    .first()
+                )
+                if binding is None:
+                    return None
+                if binding.bind_type == "provider":
+                    return session.get(Provider, binding.bind_id)
+                if binding.bind_type == "combo":
+                    combo = session.get(Combo, binding.bind_id)
+                    if combo is None:
+                        return None
+                    return _first_member_provider(session, combo)
+                return None
+            if target is not None:
+                if getattr(target, "provider_id", 0):
+                    return session.get(Provider, target.provider_id)
+                if getattr(target, "combo_used", False):
+                    ref = getattr(target, "model_ref", "") or ""
+                    if ref.startswith("combo:"):
+                        combo = (
+                            session.query(Combo)
+                            .filter_by(name=ref[len("combo:"):])
+                            .first()
+                        )
+                        if combo is not None:
+                            return _first_member_provider(session, combo)
+            return None
     except Exception as exc:  # noqa: BLE001 - fail-open mandated by ADR-013
         log_warning_exc(
-            "token_saver endpoint lookup failed; passing through original payload",
+            "token_saver provider resolution failed; no saver applied",
+            source="backend.gateway.router",
+            exc=exc,
+        )
+        return None
+
+
+def _apply_token_saver_for_provider(
+    provider: Optional[Provider], payload: dict
+) -> Tuple[dict, Optional[int]]:
+    """Apply a resolved ``Provider``'s Token Saver toggles to the payload.
+
+    The Provider carries three independent on/off toggles; the enabled modes
+    are applied in the fixed order ``rtk -> caveman -> ponytail`` via
+    :func:`backend.gateway.token_saver.apply_token_savers` (so later savers see
+    the earlier ones' output). Returns ``(payload, saved_bytes)``:
+    ``saved_bytes`` is ``None`` when NO saver ran (no provider / all toggles
+    off / lookup failure — "not measured", per B5.6) and an ``int >= 0`` when
+    one ran. Any failure returns the original payload unchanged (ADR-013
+    fail-open).
+    """
+    if provider is None:
+        return payload, None
+    modes = [
+        mode
+        for mode, on in (
+            ("rtk", provider.token_saver_rtk),
+            ("caveman", provider.token_saver_caveman),
+            ("ponytail", provider.token_saver_ponytail),
+        )
+        if on
+    ]
+    if not modes:
+        return payload, None
+    try:
+        log_info(
+            f"applying token_saver modes {modes} for provider "
+            f"'{getattr(provider, 'name', '?')}'",
+            source="backend.gateway.router",
+            context={"provider": getattr(provider, "name", None), "modes": modes},
+        )
+        new_payload, saved_bytes = _token_saver.apply_token_savers(modes, payload)
+        return new_payload, saved_bytes
+    except Exception as exc:  # noqa: BLE001 - fail-open mandated by ADR-013
+        log_warning_exc(
+            "token_saver provider application failed; passing through original payload",
             source="backend.gateway.router",
             exc=exc,
         )

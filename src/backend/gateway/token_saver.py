@@ -1,7 +1,11 @@
 """Token Saver pre-translate hooks (ADR-013 / B5.4).
 
-Applies a per-Endpoint ``token_saver`` mode to an incoming OpenAI-style chat
-completion payload BEFORE it is forwarded to the upstream provider.
+Applies the resolved **Provider's** enabled Token Saver modes to an incoming
+OpenAI-style chat completion payload BEFORE it is forwarded to the upstream
+provider. Each mode is an independent on/off toggle on the Provider row
+(``token_saver_rtk`` / ``token_saver_caveman`` / ``token_saver_ponytail``);
+multiple may be active at once and are applied in the fixed order
+rtk -> caveman -> ponytail. (This setting previously lived on the Endpoint.)
 
 Modes
 -----
@@ -109,6 +113,30 @@ def apply_token_saver_with_metrics(mode: str, payload: dict) -> tuple[dict, int]
             exc=exc,
         )
         return payload, 0
+
+
+def apply_token_savers(modes: list[str], payload: dict) -> tuple[dict, int]:
+    """Apply an ordered list of saver modes, summing the reported savings.
+
+    Provider-level Token Saver (Endpoint -> Provider move): a provider may have
+    several independent toggles on at once. The caller passes the enabled modes
+    in the fixed application order ``['rtk', 'caveman', 'ponytail']``; each is
+    applied in turn via :func:`apply_token_saver_with_metrics` so later savers
+    see the payload the earlier ones produced.
+
+    Returns ``(payload, saved_bytes)`` where ``saved_bytes`` is the sum of the
+    per-mode input-side savings (only ``rtk`` measures any; the instruction
+    savers report ``0``). Fail-open is preserved per mode: a failing mode passes
+    its input through unchanged and contributes ``0`` — the chain never raises
+    into the gateway. Empty/``None`` ``modes`` -> ``(payload, 0)``.
+    """
+    if not modes:
+        return payload, 0
+    saved_total = 0
+    for mode in modes:
+        payload, saved = apply_token_saver_with_metrics(mode, payload)
+        saved_total += saved
+    return payload, saved_total
 
 
 # --------------------------------------------------------------------------- #
@@ -273,4 +301,9 @@ def _apply_instruction(payload: dict, instruction: str) -> dict:
     return new_payload
 
 
-__all__ = ["TOKEN_SAVER_MODES", "apply_token_saver", "apply_token_saver_with_metrics"]
+__all__ = [
+    "TOKEN_SAVER_MODES",
+    "apply_token_saver",
+    "apply_token_saver_with_metrics",
+    "apply_token_savers",
+]

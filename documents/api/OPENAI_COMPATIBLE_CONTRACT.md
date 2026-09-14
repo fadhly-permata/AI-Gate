@@ -104,8 +104,10 @@ Mengambil log operasional dari tabel `LogEntry` (mode developer / observabilitas
   Rute ini lokal; tidak ada pengiriman ke pihak ketiga.
 
 ### Token Saver toggle (PRD §2.4.1)
-- Field `token_saver` (enum: `off | rtk | caveman | ponytail`) di config
-  Endpoint — diterapkan sebagai pre-translate hook (lihat TSD ADR-013).
+- Tiga toggle independen di **Provider**: `token_saver_rtk` / `token_saver_caveman` /
+  `token_saver_ponytail` (boolean, default false). Semua mode yang nyala diterapkan
+  berurutan `rtk → caveman → ponytail` sebagai pre-translate hook (lihat TSD ADR-013).
+  Setting ini sudah **dipindah dari Endpoint**; Endpoint tidak lagi punya field `token_saver`.
 
 ### Chat Playground (PRD §2.9 — reuse gateway, ADR-014)
 - `GET /api/chat/sessions` — daftar sesi. `POST /api/chat/sessions`

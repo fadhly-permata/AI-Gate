@@ -74,10 +74,13 @@ untuk menjalankan distro Linux penuh di dalam HP.
 
 ## Detail teknis ada di wiki 📚
 
-Penjelasan lengkap soal API, arsitektur, cara memasang, dan cara
-menjalankan tes ada di
-[wiki](https://github.com/fadhly-permata/AI-Gate/wiki). README ini
-cukup gambaran besarnya saja.
+Bagian yang README ini singatkan ada di wiki: cara kerja provider dan
+combo, cara menyambungkan tool coding, sampai memakai API dari kode
+sendiri. Mulai dari sini:
+[Quick Start](https://github.com/fadhly-permata/AI-Gate/wiki/Quick-Start) ·
+[Providers & Combos](https://github.com/fadhly-permata/AI-Gate/wiki/Providers-and-Combos) ·
+[Terminal](https://github.com/fadhly-permata/AI-Gate/wiki/Terminal) ·
+[CLI Tools](https://github.com/fadhly-permata/AI-Gate/wiki/CLI-Tools).
 
 ## Status 📌
 

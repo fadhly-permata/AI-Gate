@@ -1995,3 +1995,98 @@ yang menyebut "edit sudah ada di working tree, saya cuma verifikasi" TIDAK cocok
 **Verifikasi PM mandiri (G3/F3, tak telan receipt):** `vitest run tests/i18n.test.js` = **36/36 hijau** (paritas hi via `it.each` + registry 8 bahasa + endonim); `vitest run` penuh = **27 berkas / 686 tes hijau** (baseline 685 +1 kasus paritas `hi`, nol regresi); `git diff --check` exit 0; semua 8 kamus = 445 kunci (`lang.hi` hadir 1× di tiap kamus); ASCII-murni di hi.js = hanya endonim nama-OS (Linux/Windows/macOS) + endonim bahasa (English/Bahasa Indonesia/Nederlands) = tak ada kunci terlewat diterjemah; scope = HANYA `src/frontend/**` (fe-dev), PM nol tulis src/ (A2). 
 **Catatan kualitas (utang, sama dgn 6 bahasa lain):** terjemahan Hindi = hasil generate, BELUM ditinjau penutur asli; perlu review manual user kalau mau akurat.
 **Belum:** push / PR (nunggu perintah user).
+
+### 2026-09-14 — WP.1 gerbang versi Python di `run.py` (fullstack-dev; audit+verifikasi+commit PM) — branch `feat/wp1-python-check`
+**Asal:** user perintahkan kerjakan kategori A & B daftar pending; B4 = **WP.1** (`documents/plan/wiki-backlog.md` §Tahap 1.9).
+**Kepemilikan (A3):** `run.py` = berkas level-repo di luar write-root spesialis mana pun → owner **fullstack-dev**
+(bukan be-dev, yang cuma pegang `src/backend/**` + `tests/backend/**`). Handover
+`documents/pm/handovers/handover-20260914-wp1-python-check.md`. PM nol tulis `run.py`.
+**Per-berkas:**
+- `run.py` (+30, 46→76 baris, nol baris dihapus): konstanta `MIN_PYTHON = (3, 10)` + komentar rujukan
+  `pyproject.toml:11` `requires-python = ">=3.10"` (satu sumber kebenaran); fungsi `_check_python_version(info)`
+  → kalau `< MIN_PYTHON`, tulis 2 baris ke **stderr** lalu `sys.exit(1)`; dipanggil **sebelum**
+  `sys.path.insert`, `ensure_deps()`, dan import `backend.*` → interpreter tua lihat pesan, bukan traceback pip/import.
+  Teks pesan: `aigate needs Python 3.10 or newer - you have <versi>` + `Install Python 3.10 or newer, then run this again.`
+  Nomor versi dari `sys.version_info[:3]`; angka "3.10" dibangun dari `MIN_PYTHON` (tidak hardkode ganda).
+**Verifikasi PM mandiri (G3/F3, bukan telan receipt):** `python3 -m py_compile run.py` exit 0;
+`ast.parse(..., feature_version=(3,9))` LOLOS (bukti gerbang masih bisa di-parse Python 3.9 — syarat mutlak,
+gerbang yang SyntaxError di interpreter tua = percuma); kontrol negatif `match/case` + `X | Y` dengan
+`feature_version=(3,9)` → `SyntaxError` (menegakkan grammar 3.9); jalur gagal terisolasi
+`_check_python_version((3,9,7))` → pesan di stderr + `SystemExit code = 1`; jalur lolos senyap untuk
+`(3,10,0)` (batas), `(3,12,0)`, dan interpreter nyata `(3,14,6)`; **END-TO-END** `runpy.run_path("run.py",
+run_name="__main__")` dengan `sys.version_info` dipaksa `(3,9,7,"final",0)` → berhenti rapi exit 1 SEBELUM
+pip install / import backend (bukti urutan gerbang, bukan asumsi); `git diff --check` exit 0; `git status`
+= hanya `run.py` (+ catatan PM) → nol berkas nyasar; tidak ada server dijalankan, port 8080 user tak disentuh (J6).
+**Belum:** push / PR (nunggu perintah user).
+
+### 2026-09-14 — W2.1 navigasi wiki + W2.5 tautan README (public-writer; audit+verifikasi PM) — branch `feat/wp1-python-check`
+**Asal:** user perintahkan kerjakan kategori B; `documents/plan/wiki-backlog.md` §Tahap 2 item W2.1 + W2.5.
+Handover `documents/pm/handovers/handover-20260914-w21-w25-nav-wiki-readme.md`. Sesi `ses_f61340bf5ffepYbCmL7kuKi2kM`.
+**Kepemilikan (A3):** penulis naskah = public-writer (write-root: `documents/pm/wiki-drafts/**`, `README.md`,
+`documents/readme-variants/**`); PM nol tulis materi publik. NOL sentuh `src/**`/`tests/**`/`.opencode/**`.
+**Per-berkas:**
+- `documents/pm/wiki-drafts/_Sidebar.md` (BARU, 37 kata): 3 kelompok (Start here / Set it up / Every way to use
+  it), menaut 8 halaman nyata pakai nama target persis (`Quick-Start`, `Providers-and-Combos`, dst.).
+- `documents/pm/wiki-drafts/_Footer.md` (BARU, 17 kata): kredit "Made with ❤️ by Fadhly Permata" + taut balik
+  `Home` + beranda repo URL absolut.
+- `README.md:75-77 → :75-81`: blok "Want the technical details?" dibetulkan — kalimat lama menyebut
+  "architecture ... testing docs" padahal dua halaman itu BELUM ada (W2.3 masih terbuka) = klaim melebihkan;
+  sekarang menunjuk 4 halaman nyata (Quick Start, Providers & Combos, Terminal, CLI Tools) URL absolut.
+- `documents/readme-variants/README.{id,ja,nl,ru,zh,zh-tw,hi}.md`: blok setara ditulis ULANG natural per
+  bahasa (bukan calque), 4 tautan sama, nama halaman tidak diterjemah (target tautan), jumlah halaman sengaja
+  tidak disebut biar tak basi saat W2.3 bertambah.
+**Verifikasi PM mandiri (bukan telan receipt):** `diff <daftar 8 halaman wiki-drafts> <target _Sidebar>` =
+**KOSONG** (nol tautan mati/nama salah eja); 8 URL halaman wiki di-fetch nyata → **HTTP 200 semua**
+(Quick-Start/Providers-and-Combos/Terminal/CLI-Tools/Home/Interfaces/Configuration-and-Keys/OpenAI-API);
+grep `architecture|testing|архитектур|architectuur|架构|アーキテクチャ` di README+7 varian = **0**; kredit
+"Fadhly" hadir 1× di 8 berkas publik; penutup "Try it, break it..." tak diubah; `git diff --check` exit 0;
+`git status` = hanya berkas dalam write-root public-writer.
+**MERAGU TERBUKA (keputusan user, belum dikerjakan):** tiap naskah halaman wiki sudah berakhir dengan baris
+kredit, dan `_Footer.md` dirender otomatis di BAWAH semua halaman → kredit bisa muncul **2×**. Pilihan:
+(a) buang baris kredit inline dari 8 naskah saat publish, atau (b) terima dobel. PM condong (a) (bersih).
+
+### 2026-09-14 — W2.4 skrip publisher wiki idempoten (fullstack-dev; audit+verifikasi PM) — branch `feat/wp1-python-check`
+**Asal:** user perintahkan kerjakan kategori B; `documents/plan/wiki-backlog.md` §Tahap 2 item W2.4.
+Handover `documents/pm/handovers/handover-20260914-w24-skrip-publisher-wiki.md`. Sesi `ses_f613427d5ffe12iTIP5RvSWeGH`
+(percobaan pertama kena rate-limit provider 429, diulang sukses).
+**Kepemilikan (A3):** tooling di `.opencode/tools/**` = berkas level-repo di luar write-root spesialis →
+fullstack-dev. PM nol tulis skrip.
+**Per-berkas:**
+- `.opencode/tools/docs/wiki/publish_wiki.py` (BARU, 253 baris, stdlib only): default **DRY-RUN**; `--publish`
+  wajib untuk menerbit nyata; `--delete-removed` wajib untuk hapus halaman. Clone wiki `AI-Gate.wiki.git` ke
+  tmp luar repo (`--depth 1`), banding sha256 sumber (`documents/pm/wiki-drafts/*.md`) vs klon, cetak tabel
+  baru/berubah/tidak-berubah/sumber-hilang; hanya `new`/`changed` yang disalin+commit+push saat `--publish`,
+  panggilan ke-2 nol perubahan → short-circuit tanpa push (idempoten). Kredensial dari `GITHUB_TOKEN`/`gh auth
+  token`, tidak pernah dicetak (`mask_secret`+`mask_url`), `GIT_TERMINAL_PROMPT=0`. `user.name/email` di-set
+  HANYA di klon sementara. Repo utama TIDAK pernah disentuh.
+- `.opencode/tools/docs/wiki/selftest.py` (BARU, 88 baris): 10 kasus tanpa jaringan (baru/berubah/identik/
+  sumber-hilang-ditahan/hapus-eksplisit/campuran/idempoten/sha256/mask_secret/mask_url) → 10/10 PASS.
+**Verifikasi PM mandiri (bukan telan receipt):** `py_compile` OK; selftest **10/10 PASS**; DRY-RUN jalan 2x
+beruntun → tabel **100% identik** (sha sama, exit 0) = idempoten; `git status --porcelain` = hanya 2 berkas
+baru di `.opencode/tools/docs/wiki/**` + handover PM; `git remote -v` origin **tanpa token**; percobaan
+credential-free (env -i) malah lolos karena `gh` masih login (fallback ke `gh auth token` berfungsi, bukan
+bug); folder tmp `aigate-wiki-*` **nol sisa** (try/finally); `grep` safety: `--publish`/`--delete-removed` =
+`store_true` (default off), nol `git push` tanpa guard, nol traceback (semua `except` → pesan + exit!=0).
+**Belum:** publish `--publish` = hak user (ada draft lain masih berubah; klik bertubi-tubi aman karena dry-run).
+
+
+## 2026-09-14 — B7: streaming `POST /v1/messages` (Anthropic inbound Tahap 2) — PM → be-dev — DONE (DI-COMMIT `feat/anthropic-inbound-streaming`)
+
+**Asal:** user: "lanjut yok kerjaan yang tertunda" → PM lanjut B7 (streaming Anthropic inbound). Keputusan PM (user: "lakukan yang menurut lu terbaik... jangan ngarang"): Tahap 2 = upstream openai-format only; tool-use streaming dasar di-include; mid-stream failure = `event: error` frame.
+**Desain:** `documents/architecture/20260914-desain-anthropic-inbound-streaming.md` (tech-architect, hanya dokumen).
+
+### Perubahan per berkas (kode)
+- `src/backend/gateway/translator.py`: tambah `allow_stream` pada `anthropic_messages_request_to_openai_chat` (default False = stage-1 tetap menolak `stream:true`; True = set `stream:true` + `stream_options.include_usage`); tambah `_AnthropicSseEncoder`, `openai_chunk_stream_to_anthropic_events`, `anthropic_error_sse_frame` (OpenAI chunk dicts -> Anthropic SSE; tool_use dasar via `input_json_delta`; error frame mid-stream).
+- `src/backend/gateway/router.py`: `_handle_anthropic_messages` cabang streaming (`Union[dict, StreamingResponse]`) setelah translate/allow_stream; `_handle_anthropic_messages_stream` (routing openai-format only; combo resolve member openai; non-openai -> 400 `streaming_unsupported_format`); `_anthropic_stream_response` (prime generator, decode SSE upstream, encode Anthropic SSE, mid-stream UpstreamError -> event error, finally `aclose` + `_record_stream_usage_safe`); helper `_iter_openai_sse_chunks`, `_parse_sse_data_frame`, `_chain_first`; wrapper `messages_completions` handle `StreamingResponse` dan tetap catat request log.
+- `tests/backend/test_anthropic_messages_stream.py` (BARU): 17 tes — encoder text/tool_use/usage/error, allow_stream refuse/set, TestClient `/v1/messages` stream (respx+StaticPool) cek event sequence, content-type, model rewrite, stream:true, usage, combo, translated-upstream 400, priming 503/502 JSON, mid-stream event error, stage-1 non-stream regresi.
+- `tests/backend/test_anthropic_messages.py`: tes lama "streaming refused" diubah menjadi penolakan upstream hasil translate non-openai (sesuai keputusan Tahap 2: openai-format boleh stream; anthropic/gemini upstream 400).
+
+### Gerbang PM
+- `python3 -m pytest tests/backend/test_anthropic_messages_stream.py -q` → 17 passed.
+- `python3 -m pytest tests/backend -q` → **574 passed, 1 skipped** (skip pre-existing, unrelated).
+- `git diff --check -- src/backend tests/backend` → clean.
+- Scope: hanya `src/backend/**` + `tests/backend/**`; nol `src/frontend/**`; nol `documents/pm/**` ditulis be-dev. `:8080` user tidak disentuh.
+
+### Commit
+- (a) `feat(gateway): streaming POST /v1/messages (Anthropic inbound Tahap 2, B7)` — 4 berkas kode/tes.
+- (b) `docs(pm): catat desain + implementasi B7 streaming Anthropic inbound` — arsitektur B7, state/status/CODE_CHANGES.

@@ -84,30 +84,55 @@ def _ensure_provider_default_model_column(engine) -> None:
         logger.warning("skipping provider.default_model migration: %s", exc)
 
 
-def _ensure_endpoint_token_saver_column(engine) -> None:
-    """Self-heal ``endpoints.token_saver`` on pre-existing DBs (B5.4 / ADR-013).
+def _ensure_provider_token_saver_columns(engine) -> None:
+    """Self-heal the provider-level Token Saver toggles on pre-existing DBs.
 
-    ``create_all`` never alters existing tables, so a DB created before the
-    column existed lacks it. Idempotent: a PRAGMA check guards the ALTER, and
-    only the specific ``OperationalError`` is swallowed (R12 — no bare
-    ``except``).
+    The Token Saver feature moved from the Endpoint level to the Provider
+    level with independent per-mode toggles (rtk / caveman / ponytail).
+    ``create_all`` never alters existing tables, so a DB created before these
+    columns existed lacks them and every ``/api/providers`` call 500s.
+    Idempotent: a PRAGMA check guards each ALTER (a repeated run never raises a
+    duplicate-column ``OperationalError``), the boolean default ``0`` (False) is
+    applied by SQLite to pre-existing rows, and only the specific
+    ``OperationalError`` is swallowed (R12 — no bare ``except``). Mirrors the
+    existing ``_ensure_*`` self-heal helpers.
     """
     try:
         with engine.connect() as conn:
             existing = {
                 row[1]
-                for row in conn.execute(text("PRAGMA table_info(endpoints)")).fetchall()
+                for row in conn.execute(text("PRAGMA table_info(providers)")).fetchall()
             }
-            if "token_saver" not in existing:
-                conn.execute(
-                    text(
-                        "ALTER TABLE endpoints ADD COLUMN token_saver TEXT "
-                        "NOT NULL DEFAULT 'off'"
+            for col in ("token_saver_rtk", "token_saver_caveman", "token_saver_ponytail"):
+                if col not in existing:
+                    conn.execute(
+                        text(
+                            f"ALTER TABLE providers ADD COLUMN {col} BOOLEAN "
+                            "NOT NULL DEFAULT 0"
+                        )
                     )
-                )
-                conn.commit()
+                    conn.commit()
     except OperationalError as exc:  # e.g. table missing on a bare/empty engine
-        logger.warning("skipping endpoint.token_saver migration: %s", exc)
+        logger.warning("skipping provider token_saver columns migration: %s", exc)
+
+
+def _drop_endpoint_token_saver_column(engine) -> None:
+    """Remove the retired ``endpoints.token_saver`` column from pre-existing DBs.
+
+    The Token Saver setting now lives on the Provider, so the Endpoint-level
+    column is dropped. ``create_all`` never alters existing tables, so a DB
+    created while the column existed keeps it (harmless but stale) unless it is
+    dropped here. Best-effort and idempotent: SQLite (>= 3.35) supports
+    ``DROP COLUMN``; the operation is wrapped so a repeated run (already-dropped
+    column) or an older SQLite that rejects it only logs a warning (R12 — only
+    the specific ``OperationalError`` is swallowed, never a bare ``except``).
+    """
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE endpoints DROP COLUMN token_saver"))
+            conn.commit()
+    except OperationalError as exc:  # already dropped, or unsupported SQLite
+        logger.info("skipping endpoints.token_saver drop: %s", exc)
 
 
 def _ensure_provider_tier_column(engine) -> None:
@@ -357,9 +382,10 @@ def init_db() -> None:
     _ensure_provider_default_model_column(engine)
     _ensure_provider_tier_column(engine)
     _ensure_provider_quota_columns(engine)
-    _ensure_endpoint_token_saver_column(engine)
+    _ensure_provider_token_saver_columns(engine)
     _ensure_usage_record_saved_tokens_column(engine)
     _ensure_log_entry_resolved_column(engine)
     _ensure_provider_account_routing_columns(engine)
     _ensure_combo_last_used_index_column(engine)
     _ensure_combo_member_enabled_column(engine)
+    _drop_endpoint_token_saver_column(engine)
