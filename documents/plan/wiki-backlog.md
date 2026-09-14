@@ -81,7 +81,10 @@ Hasil kerja tambahan saat menulis (jangan sampai hilang):
 - [ ] **W2.4** Script publisher `.opencode/tools/docs/wiki/` — idempoten, `--dry-run` wajib,
       token dari `gh auth token`/`.env`. **Butuh izin user sebelum menulis ke wiki.**
 - [ ] **W2.5** Perbaiki README root + 7 varian: tautkan halaman wiki yang sudah benar-benar ada
-      (baris "Detailed documentation" sekarang menunjuk wiki yang isinya masih kosong).
+       (baris "Detailed documentation" sekarang menunjuk wiki yang isinya masih kosong).
+- [ ] **W2.6** **GitHub Pages DITUNDA** (keputusan user 2026-09-14): opsi bikin situs docs aigate
+       lewat GitHub Pages (website statis) BARU dikerjain SETELAH ke-8 halaman wiki ACC + terbit.
+       Bukan sekarang. Catatan: Pages ≠ Wiki (beda layanan). Tangguhkan sampai wiki rampung.
 
 ## Catatan lintas halaman (jangan sampai hilang)
 - Nama file wiki pakai tanda hubung (`Quick-Start.md`); tautan internal harus sama persis.

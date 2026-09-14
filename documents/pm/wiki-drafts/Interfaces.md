@@ -7,17 +7,20 @@ whichever fits the moment.
 ## The screen in your browser 🖥️
 
 Type `http://localhost:8080` after `python run.py` and the whole app is there: the welcome screen first,
-then the places where you add providers, line them up into combos, and set up the endpoints — the local
-addresses your combos answer on, with optional outbound proxies beside them. From the same page you
+then the places where you add providers, line them up into combos, and set up **endpoints** — a named
+entry point your tools or scripts aim at, each able to carry its own access key and outbound proxy.
+Grouping those outbound proxies is what **Proxy Pools** is for. Everything still lives on the same one
+local address; a named endpoint is something you aim at, not a second port. From the same page you
 reach the terminal, your coding tools, the usage records, the analytics view, and settings.
 
 Phone or laptop on the same network can both open it. That is why [Quick Start](Quick-Start) warns about
-cafés, and why [Configuration and Keys](Configuration-and-Keys) has a lock you can turn on.
+cafés, and why you can lock an endpoint behind its own key — [Configuration and Keys](Configuration-and-Keys)
+shows how.
 
 ## A terminal, inside the browser ⌨️
 
-A real shell, drawn in a tab: open several tabs at once, go full screen, split the screen, keep the
-display awake, and float the controls over the top. [Terminal](Terminal) walks through it.
+A real shell, drawn in a tab: open several tabs at once, go full screen, keep the display awake, and
+work from a floating cluster of controls. [Terminal](Terminal) walks through it.
 
 ## One address your own code can call 🔁
 
