@@ -1251,3 +1251,27 @@ User: "gua gak ekspek user pake aigate offline... ya udah kita bikin bisa full o
   user → akan ditanyakan dalam satu putaran. B6 (review 6 wiki halaman) = aksi user, opsional, tidak spawnable.
 - KEPEMILIKAN: PM = `documents/pm/**` + operasi git; NOL tulis `src/`/`tests/` (A2/A3); NOL kill/restart (J6).
   Sumber tunggal daftar pending = kunci `pending:` di `state.md`.
+
+## 2026-09-14 14:45 — B4 + B5(W2.1/W2.4/W2.5) SELESAI-TERVERIFIKASI (ProjectManager ← fullstack-dev + public-writer)
+- **B4 WP.1** (`run.py`): commit `1fe592d` branch `feat/wp1-python-check`. Gate PM: py_compile OK;
+  `ast.parse(feature_version=(3,9))` LOLOS (+kontrol negatif `match/case`, `X|Y`); gerbang terisolasi
+  `(3,9,7)`→stderr+exit 1, senyap `(3,10,0)`/`(3,12,0)`/`(3,14,6)`; END-TO-END `runpy` dengan version_info
+  dipaksa 3.9.7 → berhenti rapi SEBELUM pip/import; **BOOT NYATA** `python run.py` di port uji sendiri 57711
+  (DB tmp, PID sendiri, fd diverifikasi → `{"status":"ok"}`), `:8080` user 200 tak disentuh (J6), proses uji
+  dibersihkan, tmp dihapus. Owner dikoreksi: `run.py` di luar write-root be-dev → **fullstack-dev**.
+- **B5 W2.1+W2.5**: commit `d415855` (`_Sidebar.md`+`_Footer.md` BARU; `README.md`+7 varian ditulis ulang).
+  Gate PM: sidebar 8 target == 8 berkas nyata (`diff` KOSONG); 8 URL halaman wiki di-fetch → **HTTP 200 semua**;
+  grep klaim architecture/testing di 8 berkas publik = **0**; kredit "Fadhly" 1× per berkas; penutup ACC tak diubah;
+  `git diff --check` exit 0; nol path internal bocor (baris 14 README = pemilih bahasa pra-ada, dicek `git show HEAD`).
+- **B5 W2.4**: commit `3a3dfb3` (`.opencode/tools/docs/wiki/publish_wiki.py` 253 baris + `selftest.py` 88).
+  Gate PM: selftest **10/10**; DRY-RUN 2× beruntun tabel **identik** (idempoten, exit 0); default dry-run,
+  `--publish`+`--delete-removed` explisit; tmp `aigate-wiki-*` nol sisa; `git remote -v` origin tanpa token;
+  repo utama tak tersentuh. **NOL `--publish`** (hak user).
+- REUSE agen (tanpa generator): fullstack-dev `ses_f613427d5ffe12iTIP5RvSWeGH` (percobaan 1 kena 429 provider,
+  diulang sukses), public-writer `ses_f61340bf5ffepYbCmL7kuKi2kM`. Satu spawn paralel → satu kena rate limit,
+  dikerjakan ulang sekuensial; tulis-root tidak bersinggungan (A3 aman).
+- MASIH BUTUH KEPUTUSAN user: terbit `_Sidebar/_Footer` + kredit dobel (inline vs footer) · W2.2 terjemah wiki
+  7 bahasa · W2.3 halaman lanjutan · W2.5/PR push+publish · B7 Anthropic Tahap 2 (scope+mode) · B8 Chat Playground
+  (lembar desain+ACC D6) · B9 lokasi folder skrip CLI · push/PR branch `feat/wp1-python-check`.
+- KEPEMILIKAN: PM = `documents/pm/**` + `documents/dev/CODE_CHANGES.md` + operasi git; naskah = public-writer;
+  skrip+`run.py` = fullstack-dev. NOL tulis `src/`/`tests/` oleh PM (A2/A3). NOL kill/restart proses user (J6).
