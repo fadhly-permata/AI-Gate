@@ -130,7 +130,7 @@ Arsitektur dibagi menjadi 7 modul berlapis. Komunikasi antar modul mengikuti kon
 - **Status:** Accepted (adopsi dari 9router, 2026-09-03).
 - **Konteks:** token mahal; beberapa provider resmi butuh OAuth (bukan API key statis).
 - **Keputusan:**
-  - **Token Saver:** hook pra-kirim di endpoint (`Endpoint.token_saver`: off | rtk | caveman | ponytail). RTK memadatkan `tool_result` sebelum ke LLM (fail-open: bila gagal → teks asli). Caveman/Ponytail menyuntikkan instruksi gaya ke prompt. Semua fail-open.
+  - **Token Saver:** hook pra-kirim di level **Provider** (3 toggle independen `token_saver_rtk` / `token_saver_caveman` / `token_saver_ponytail`, default off). Endpoint tidak lagi punya setting ini. Mode yang aktif diterapkan berurutan `rtk → caveman → ponytail` via `apply_token_savers`. RTK memadatkan `tool_result` sebelum ke LLM (fail-open: bila gagal → teks asli). Caveman/Ponytail menyuntikkan instruksi gaya ke prompt. Semua fail-open.
   - **OAuth Auto-Refresh:** `ProviderAccount.auth_type=oauth` menyimpan `oauth_token`+`refresh_token`+`expires_at`; sebelum request, sistem refresh otomatis bila hampir kedaluwarsa (tanpa login ulang).
 - **Trade-off:** token saver bisa mengubah isi request (tapi fail-open aman); OAuth butuh flow callback (lihat API contract `/api/oauth/*`).
 
@@ -315,10 +315,12 @@ non-base64 images) pakai *direct route* bila tersedia, bukan double-hop lossy.
 Terjemahan tidak merusak streaming (diterapkan per-chunk).
 
 ### 4.6 Token Saver & OAuth Auto-Refresh (ADR-013)
-- **Token Saver:** hook pra-kirim di endpoint (`Endpoint.token_saver`:
-  `off | rtk | caveman | ponytail`). RTK memadatkan `tool_result` (git diff, grep,
-  ls, tree) sebelum ke LLM (hemat 20–40% input); Caveman menyuntikkan gaya
-  jawaban singkat; Ponytail menyuntikkan instruksi "tulis kode minimal". Semua
+- **Token Saver:** hook pra-kirim di level **Provider** (3 toggle independen
+  `token_saver_rtk` / `token_saver_caveman` / `token_saver_ponytail`, default off;
+  Endpoint tidak lagi membawa setting ini). Mode aktif diterapkan berurutan
+  `rtk → caveman → ponytail`. RTK memadatkan `tool_result` (git diff, grep, ls,
+  tree) sebelum ke LLM (hemat 20–40% input); Caveman menyuntikkan gaya jawaban
+  singkat; Ponytail menyuntikkan instruksi "tulis kode minimal". Semua
   **fail-open**: bila hook gagal → request jalan dengan teks asli.
 - **OAuth Auto-Refresh:** `ProviderAccount.auth_type=oauth` menyimpan
   `oauth_token`+`refresh_token`+`expires_at`; sebelum request, sistem refresh

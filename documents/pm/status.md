@@ -1344,3 +1344,11 @@ User: "gua gak ekspek user pake aigate offline... ya udah kita bikin bisa full o
 - COMMIT `8f13379` docs(pm): catat desain + implementasi B7 (arsitektur B7 + state/status/CODE_CHANGES).
 - STATUS: B7 BEKERJA di level tes + terverifikasi isolated (TestClient respx+StaticPool, nol port). BELUM push/PR (tunggu perintah user). NEXT: B8 Chat Playground Fase 6 (desain sudah ada `documents/architecture/20260914-desain-chat-playground-fase6.md`, butuh ACC user D6 sebelum fe-dev).
 
+## 20260914-TOKEN-SAVER-PROVIDER — Token Saver dipindah ke level Provider (backend+docs; UI menunggu ACC) (ProjectManager)
+- PERINTAH user: "pindahin aja ke level provider, tapi pastikan ada toggle switcher on/off nya untuk masing-masing jenis token savernya". PM catat default: 3 toggle boolean independen di Provider (`token_saver_rtk` / `token_saver_caveman` / `token_saver_ponytail`), mode aktif diterapkan berurutan rtk→caveman→ponytail. Endpoint token_saver dihapus (logis + coba drop kolom).
+- BE: be-dev selesai (receipt): `src/backend/config/db.py` (self-heal provider bools + drop endpoint token_saver), `src/backend/models.py` (Provider 3 bools, Endpoint kolom dihapus), `endpoints_router.py` (hapus token_saver), `providers_router.py` (DTO/create/update bools), `gateway/token_saver.py` (`apply_token_savers`), `gateway/router.py` (`_resolve_saver_provider` + `_apply_token_saver_for_provider` + 4+ call sites). Tests: new `test_provider_token_saver.py` (10), endpoint tests disesuaikan.
+- GERBANG PM MANDIRI: `pytest tests/backend/test_provider_token_saver.py` = **10 passed**; `pytest tests/backend` (oleh be-dev) = **584 passed, 1 skipped**; `git diff --check` clean; scope backend+tests; `:8080` user tak disentuh.
+- COMMIT `6d24deb` feat(gateway): pindahkan token saver ke level provider (toggle rtk/caveman/ponytail) — 10 berkas kode/tes.
+- DOK: PM update `documents/architecture/TSD.md` (ADR-013 + §4.6) dan `documents/api/OPENAI_COMPATIBLE_CONTRACT.md` (Token Saver toggle sekarang provider). BELUM commit (akan commit docs(pm) terpisah).
+- SISA / D6: UI toggle per jenis belum. fe-dev BELUM spawn sampai user ACC desain UI: 3 switch di modal provider (`#provModal`) — RTK / Caveman / Ponytail, default off, simpan via PUT /api/providers/{id}.
+

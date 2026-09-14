@@ -60,3 +60,5 @@ checkpoint: "RONDE A+B (2026-09-14 14:07→, user: 'C udah gua lakukan dan sudah
 updated: 2026-09-14 14:07 (A1+A2 SELESAI (commit 800ae97, stash di-drop SHA 0913a3be); B4 WP.1 SELESAI+TERVERIFIKASI BOOT NYATA (commit 1fe592d, owner fullstack-dev); B5.W2.1+W2.4+W2.5 SELESAI (draft+skrip, commit d415855+3a3dfb3); B5 publikasi sidebar/footer + W2.2/W2.3 + B7 + B8 + B9 = BUTUH KEPUTUSAN user)
 updated: 2026-09-14 (B7 design sheet landed; 3 user decisions pending before be-dev)
 checkpoint: "B7 DESAIN STREAMING ANTHROPIC INBOUND — SELESAI (tech-architect). Doc: documents/architecture/20260914-desain-anthropic-inbound-streaming.md. claude sudah LAUNCH_VERIFIED (cli_presets.py:174) -> B7 = UX upgrade. 3 keputusan user ditunggu: scope openai-only, tool-use streaming, mid-stream error frame. be-dev BELUM spawn."
+updated: 2026-09-14 (Token Saver provider backend+docs landed commit 6d24deb; UI toggle needs ACC D6 before fe-dev)
+checkpoint: "TOKEN-SAVER-PROVIDER — backend+docs selesai. Provider punya 3 bool token saver; endpoint kolom dihapus/drop; router pakai provider resolved; 584 backend tests. UI toggle provider modal BELUM; butuh ACC user D6."
