@@ -177,11 +177,15 @@ def test_endpoint_header_applies_caveman_hook(monkeypatch):
     sf = _make_sessionmaker()
     _seed(sf)
     with sf() as session:
-        ep = Endpoint(name="ep1", token_saver="caveman")
+        provider = session.query(Provider).filter_by(name="test").first()
+        # Token Saver now lives on the Provider (caveman toggle on).
+        provider.token_saver_caveman = True
+        session.commit()
+        ep = Endpoint(name="ep1")
         session.add(ep)
         session.flush()
         session.add(
-            EndpointBinding(endpoint_id=ep.id, bind_type="provider", bind_id=1)
+            EndpointBinding(endpoint_id=ep.id, bind_type="provider", bind_id=provider.id)
         )
         session.commit()
 
@@ -225,11 +229,15 @@ def test_endpoint_header_rtk_compresses_forwarded_payload(monkeypatch):
     sf = _make_sessionmaker()
     _seed(sf)
     with sf() as session:
-        ep = Endpoint(name="ep2", token_saver="rtk")
+        provider = session.query(Provider).filter_by(name="test").first()
+        # Token Saver now lives on the Provider (rtk toggle on).
+        provider.token_saver_rtk = True
+        session.commit()
+        ep = Endpoint(name="ep2")
         session.add(ep)
         session.flush()
         session.add(
-            EndpointBinding(endpoint_id=ep.id, bind_type="provider", bind_id=1)
+            EndpointBinding(endpoint_id=ep.id, bind_type="provider", bind_id=provider.id)
         )
         session.commit()
 

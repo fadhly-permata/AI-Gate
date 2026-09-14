@@ -68,6 +68,10 @@ class ProviderCreate(BaseModel):
     # 'round-robin' and is clamped to >= 1.
     fallback_strategy: Optional[str] = DEFAULT_FALLBACK_STRATEGY
     sticky_round_robin_limit: Optional[int] = DEFAULT_STICKY_ROUND_ROBIN_LIMIT
+    # Token Saver hooks (Endpoint-level -> Provider-level, per-mode toggles).
+    token_saver_rtk: Optional[bool] = False
+    token_saver_caveman: Optional[bool] = False
+    token_saver_ponytail: Optional[bool] = False
 
     class Config:
         pass
@@ -84,6 +88,10 @@ class ProviderUpdate(BaseModel):
     # None = leave unchanged (partial update); validated + clamped below.
     fallback_strategy: Optional[str] = None
     sticky_round_robin_limit: Optional[int] = None
+    # Token Saver toggles. None = leave unchanged (partial update).
+    token_saver_rtk: Optional[bool] = None
+    token_saver_caveman: Optional[bool] = None
+    token_saver_ponytail: Optional[bool] = None
 
     class Config:
         pass
@@ -112,6 +120,10 @@ class ProviderDTO(BaseModel):
     # NULL row can never break the DTO).
     fallback_strategy: str = DEFAULT_FALLBACK_STRATEGY
     sticky_round_robin_limit: int = DEFAULT_STICKY_ROUND_ROBIN_LIMIT
+    # Token Saver hook toggles (read-only reflect of provider state).
+    token_saver_rtk: bool = False
+    token_saver_caveman: bool = False
+    token_saver_ponytail: bool = False
     models: List[ModelDTO]
 
     class Config:
@@ -157,6 +169,9 @@ def _provider_to_dto(session: Session, provider: Provider) -> ProviderDTO:
         default_model=provider.default_model,
         fallback_strategy=provider.fallback_strategy or DEFAULT_FALLBACK_STRATEGY,
         sticky_round_robin_limit=clamp_sticky_limit(provider.sticky_round_robin_limit),
+        token_saver_rtk=bool(provider.token_saver_rtk),
+        token_saver_caveman=bool(provider.token_saver_caveman),
+        token_saver_ponytail=bool(provider.token_saver_ponytail),
         models=[
             ModelDTO(
                 id=m.id,
@@ -444,6 +459,9 @@ async def create_provider(req: ProviderCreate) -> Any:
         default_model=req.default_model,
         fallback_strategy=req.fallback_strategy or DEFAULT_FALLBACK_STRATEGY,
         sticky_round_robin_limit=clamp_sticky_limit(req.sticky_round_robin_limit),
+        token_saver_rtk=bool(req.token_saver_rtk),
+        token_saver_caveman=bool(req.token_saver_caveman),
+        token_saver_ponytail=bool(req.token_saver_ponytail),
     )
     with SessionLocal() as session:
         session.add(provider)
@@ -524,6 +542,16 @@ def update_provider(provider_id: int, req: ProviderUpdate) -> Any:
                 req.sticky_round_robin_limit
             )
             changed.append("sticky_round_robin_limit")
+        # Token Saver toggles: None = unchanged, explicit True/False = set.
+        if req.token_saver_rtk is not None:
+            provider.token_saver_rtk = bool(req.token_saver_rtk)
+            changed.append("token_saver_rtk")
+        if req.token_saver_caveman is not None:
+            provider.token_saver_caveman = bool(req.token_saver_caveman)
+            changed.append("token_saver_caveman")
+        if req.token_saver_ponytail is not None:
+            provider.token_saver_ponytail = bool(req.token_saver_ponytail)
+            changed.append("token_saver_ponytail")
 
         session.commit()
         session.refresh(provider)

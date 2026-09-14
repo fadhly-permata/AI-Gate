@@ -57,7 +57,11 @@ logger = logging.getLogger(__name__)
 
 from backend.config import settings as _settings
 from backend.config.db import SessionLocal
-from backend.combo_routing import execute_combo, resolve_combo_stream_target
+from backend.combo_routing import (
+    build_candidates,
+    execute_combo,
+    resolve_combo_stream_target,
+)
 from backend.gateway import provider_adapter
 from backend.gateway.errors import GatewayError, UpstreamError
 from backend.gateway import responses as _responses
@@ -275,11 +279,14 @@ async def _handle_chat_completion(request: Request, ctx: dict) -> Union[dict, Re
     # driven by the Endpoint's EndpointBinding instead of the model reference.
     endpoint_name = request.headers.get("x-aigate-endpoint")
     if endpoint_name:
-        # ADR-013 / B5.4: apply the Endpoint's Token Saver hook to the payload
-        # BEFORE forwarding. Fail-open: never raises; original payload returned
-        # on any error / missing endpoint / mode 'off'. B5.6: also capture the
+        # ADR-013: apply the bound Provider's Token Saver hook to the payload
+        # BEFORE forwarding (endpoint -> provider binding; combos use their first
+        # candidate member). Fail-open: never raises; original payload returned
+        # on any error / no provider / all toggles off. B5.6: also capture the
         # input-side savings estimate for the UsageRecord.
-        payload, saved_bytes = _apply_token_saver_for_endpoint(endpoint_name, payload)
+        payload, saved_bytes = _apply_token_saver_for_provider(
+            _resolve_saver_provider(endpoint_name=endpoint_name), payload
+        )
         # NOTE: ctx["payload"] keeps the ORIGINAL received body (ERD RequestLog
         # "header/isi" = what the client sent); the saver effect is captured by
         # saved_bytes -> UsageRecord.saved_tokens_est, not by re-dumping.
@@ -310,6 +317,16 @@ async def _handle_chat_completion(request: Request, ctx: dict) -> Union[dict, Re
     # marker resolves upstream_model="" (members are decided inside
     # execute_combo) — the requested combo ref stays; the result upgrades it.
     _upgrade_ctx_model(ctx, target.upstream_model)
+
+    # ADR-013: model-based path — apply the resolved Provider's Token Saver hook
+    # to the payload BEFORE forwarding (provider ref / combo first member).
+    # Fail-open: original payload returned on any error / no provider / all
+    # toggles off. B5.6: capture the input-side savings estimate for the
+    # UsageRecord / RequestLog.
+    payload, saved_bytes = _apply_token_saver_for_provider(
+        _resolve_saver_provider(target=target), payload
+    )
+    ctx["saved_bytes"] = saved_bytes
 
     # --- SSE streaming (stream:true) ----------------------------------------
     # Decided AFTER resolution so we know the target's format. A ``combo:``
@@ -351,14 +368,20 @@ async def _handle_chat_completion(request: Request, ctx: dict) -> Union[dict, Re
         combo_name = model[len("combo:"):]
         # B5.5: ``execute_combo`` records the UsageRecord itself (it knows which
         # member/account actually succeeded). No endpoint on this path.
-        result = await execute_combo(combo_name, payload)
+        # B5.6: thread the token_saver savings estimate (from ctx) through.
+        result = await execute_combo(
+            combo_name, payload, saved_tokens_est=_saved_tokens_est(ctx)
+        )
         # B5.6: prefer the model that actually served (upstream envelope), else
         # keep the requested combo ref.
         _upgrade_ctx_model(ctx, result.get("model"))
     else:
         result = await provider_adapter.chat_completion(target, payload)
         # B5.5: persist usage telemetry (fail-open — never breaks the client).
-        _record_usage_safe(result, target, endpoint_id=None)
+        # B5.6: + token_saver savings when a saver was applied (None = no saver).
+        _record_usage_safe(
+            result, target, endpoint_id=None, saved_bytes=ctx.get("saved_bytes")
+        )
 
     # ADR-011 / R12: success path must still land in LogEntry.
     log_info(
@@ -456,8 +479,10 @@ async def _handle_responses(request: Request, ctx: dict) -> dict:
     # SSE Response here).
     endpoint_name = request.headers.get("x-aigate-endpoint")
     if endpoint_name:
-        chat_payload, saved_bytes = _apply_token_saver_for_endpoint(
-            endpoint_name, chat_payload
+        # ADR-013: apply the bound Provider's Token Saver hook (endpoint ->
+        # provider binding; combos use their first candidate member).
+        chat_payload, saved_bytes = _apply_token_saver_for_provider(
+            _resolve_saver_provider(endpoint_name=endpoint_name), chat_payload
         )
         ctx["saved_bytes"] = saved_bytes
         chat_result = await _route_via_endpoint(
@@ -495,17 +520,27 @@ async def _handle_responses(request: Request, ctx: dict) -> dict:
 
     _upgrade_ctx_model(ctx, target.upstream_model)
 
+    # ADR-013: model-based path — apply the resolved Provider's Token Saver hook.
+    chat_payload, saved_bytes = _apply_token_saver_for_provider(
+        _resolve_saver_provider(target=target), chat_payload
+    )
+    ctx["saved_bytes"] = saved_bytes
+
     # Combo strategy routing / plain provider — identical to the chat path so
     # usage recording (B5.5) and savings attribution stay shared.
     if target.combo_used:
         combo_name = model[len("combo:"):]
-        chat_result = await execute_combo(combo_name, chat_payload)
+        chat_result = await execute_combo(
+            combo_name, chat_payload, saved_tokens_est=_saved_tokens_est(ctx)
+        )
         # B5.6: prefer the model that actually served (upstream envelope), else
         # keep the requested combo ref.
         _upgrade_ctx_model(ctx, chat_result.get("model"))
     else:
         chat_result = await provider_adapter.chat_completion(target, chat_payload)
-        _record_usage_safe(chat_result, target, endpoint_id=None)
+        _record_usage_safe(
+            chat_result, target, endpoint_id=None, saved_bytes=ctx.get("saved_bytes")
+        )
 
     log_info(
         f"responses completion success for model '{model}'",
@@ -645,8 +680,10 @@ async def _handle_anthropic_messages(
         )
 
     if endpoint_name:
-        chat_payload, saved_bytes = _apply_token_saver_for_endpoint(
-            endpoint_name, chat_payload
+        # ADR-013: apply the bound Provider's Token Saver hook (endpoint ->
+        # provider binding; combos use their first candidate member).
+        chat_payload, saved_bytes = _apply_token_saver_for_provider(
+            _resolve_saver_provider(endpoint_name=endpoint_name), chat_payload
         )
         ctx["saved_bytes"] = saved_bytes
         chat_result = await _route_via_endpoint(
@@ -682,15 +719,25 @@ async def _handle_anthropic_messages(
 
     _upgrade_ctx_model(ctx, target.upstream_model)
 
+    # ADR-013: model-based path — apply the resolved Provider's Token Saver hook.
+    chat_payload, saved_bytes = _apply_token_saver_for_provider(
+        _resolve_saver_provider(target=target), chat_payload
+    )
+    ctx["saved_bytes"] = saved_bytes
+
     # Combo strategy routing / plain provider — identical to the responses path so
     # usage recording (B5.5) and savings attribution stay shared.
     if target.combo_used:
         combo_name = model[len("combo:"):]
-        chat_result = await execute_combo(combo_name, chat_payload)
+        chat_result = await execute_combo(
+            combo_name, chat_payload, saved_tokens_est=_saved_tokens_est(ctx)
+        )
         _upgrade_ctx_model(ctx, chat_result.get("model"))
     else:
         chat_result = await provider_adapter.chat_completion(target, chat_payload)
-        _record_usage_safe(chat_result, target, endpoint_id=None)
+        _record_usage_safe(
+            chat_result, target, endpoint_id=None, saved_bytes=ctx.get("saved_bytes")
+        )
 
     log_info(
         f"anthropic completion success for model '{model}'",
@@ -745,8 +792,10 @@ async def _handle_anthropic_messages_stream(
 
     # Endpoint-bound path (mirror _route_via_endpoint, but Anthropic-encoded).
     if endpoint_name:
-        chat_payload, saved_bytes = _apply_token_saver_for_endpoint(
-            endpoint_name, chat_payload
+        # ADR-013: apply the bound Provider's Token Saver hook (endpoint ->
+        # provider binding; combos use their first candidate member).
+        chat_payload, saved_bytes = _apply_token_saver_for_provider(
+            _resolve_saver_provider(endpoint_name=endpoint_name), chat_payload
         )
         ctx["saved_bytes"] = saved_bytes
         with SessionLocal() as session:
@@ -853,8 +902,20 @@ async def _handle_anthropic_messages_stream(
             )
             raise _streaming_unsupported_error()
         _upgrade_ctx_model(ctx, member.upstream_model)
+        # ADR-013: streaming model-based combo — apply the selected member's
+        # Provider Token Saver hook before the SSE is committed (fail-open).
+        chat_payload, saved_bytes = _apply_token_saver_for_provider(
+            _resolve_saver_provider(target=member), chat_payload
+        )
+        ctx["saved_bytes"] = saved_bytes
         return await _stream_for(member, None, None)
 
+    # ADR-013: streaming model-based provider — apply the resolved Provider's
+    # Token Saver hook before the SSE is committed (fail-open).
+    chat_payload, saved_bytes = _apply_token_saver_for_provider(
+        _resolve_saver_provider(target=target), chat_payload
+    )
+    ctx["saved_bytes"] = saved_bytes
     return await _stream_for(target, None, None)
 
 
@@ -1454,41 +1515,121 @@ def _lookup_endpoint(session, ref: str) -> Optional[Endpoint]:
     return session.query(Endpoint).filter_by(name=ref).first()
 
 
-def _apply_token_saver_for_endpoint(
-    name: str, payload: dict
-) -> Tuple[dict, Optional[int]]:
-    """Apply the Token Saver hook for the named/identified Endpoint (fail-open).
+def _first_member_provider(session, combo: "Combo") -> Optional[Provider]:
+    """Return the combo's first candidate member Provider (read-only, fail-open).
 
-    Looks up the ``Endpoint`` by id-or-name; if found and its ``token_saver``
-    mode is not ``off``/None, runs ``apply_token_saver_with_metrics`` on the
-    payload. Returns ``(payload, saved_bytes)``: ``saved_bytes`` is None when
-    NO saver was applied (unknown endpoint / mode off / lookup failure —
-    "not measured"), and an int >= 0 when one ran (B5.6 savings tracking).
-    Any failure results in the original ``payload`` being returned unchanged
-    (ADR-013 fail-open).
+    Used to attribute a Token Saver hook to a combo target before the concrete
+    member is executed: ``build_candidates`` resolves members in the combo's
+    strategy order WITHOUT advancing any cursor or mutating state, so this is a
+    side-effect-free pick of the member that will (for fallback/three_tier)
+    serve first. ``None`` when the combo has no usable member/provider.
+    """
+    candidates = build_candidates(combo, session)
+    if candidates and candidates[0].provider_id:
+        return session.get(Provider, candidates[0].provider_id)
+    return None
+
+
+def _resolve_saver_provider(
+    endpoint_name: Optional[str] = None,
+    target: Optional[ResolvedTarget] = None,
+) -> Optional[Provider]:
+    """Resolve the ``Provider`` whose Token Saver toggles apply to a request.
+
+    Priority:
+    * ``endpoint_name`` given -> follow the Endpoint's single ``EndpointBinding``
+      (``provider`` -> that Provider; ``combo`` -> its first candidate member
+      Provider via :func:`_first_member_provider`);
+    * else a resolved ``target`` -> its ``provider_id`` (a plain provider ref);
+      a combo marker (``combo_used`` + ``combo:<name>`` model_ref) resolves via
+      its first candidate member.
+
+    Returns ``None`` (no saver applied) when nothing resolves. Fail-open: any
+    lookup error is logged and yields ``None`` — the request is never broken.
     """
     try:
         with SessionLocal() as session:
-            endpoint = _lookup_endpoint(session, name)
-            if endpoint is None:
-                # header present but endpoint unknown -> no hook
-                return payload, None
-            mode = endpoint.token_saver
-            if not mode or mode == "off":
-                return payload, None
-            log_info(
-                f"applying token_saver mode '{mode}' for endpoint "
-                f"'{endpoint.name}'",
-                source="backend.gateway.router",
-                context={"endpoint": endpoint.name, "mode": mode},
-            )
-            new_payload, saved_bytes = _token_saver.apply_token_saver_with_metrics(
-                mode, payload
-            )
-            return new_payload, saved_bytes
+            if endpoint_name:
+                endpoint = _lookup_endpoint(session, endpoint_name)
+                if endpoint is None:
+                    return None
+                binding = (
+                    session.query(EndpointBinding)
+                    .filter_by(endpoint_id=endpoint.id)
+                    .first()
+                )
+                if binding is None:
+                    return None
+                if binding.bind_type == "provider":
+                    return session.get(Provider, binding.bind_id)
+                if binding.bind_type == "combo":
+                    combo = session.get(Combo, binding.bind_id)
+                    if combo is None:
+                        return None
+                    return _first_member_provider(session, combo)
+                return None
+            if target is not None:
+                if getattr(target, "provider_id", 0):
+                    return session.get(Provider, target.provider_id)
+                if getattr(target, "combo_used", False):
+                    ref = getattr(target, "model_ref", "") or ""
+                    if ref.startswith("combo:"):
+                        combo = (
+                            session.query(Combo)
+                            .filter_by(name=ref[len("combo:"):])
+                            .first()
+                        )
+                        if combo is not None:
+                            return _first_member_provider(session, combo)
+            return None
     except Exception as exc:  # noqa: BLE001 - fail-open mandated by ADR-013
         log_warning_exc(
-            "token_saver endpoint lookup failed; passing through original payload",
+            "token_saver provider resolution failed; no saver applied",
+            source="backend.gateway.router",
+            exc=exc,
+        )
+        return None
+
+
+def _apply_token_saver_for_provider(
+    provider: Optional[Provider], payload: dict
+) -> Tuple[dict, Optional[int]]:
+    """Apply a resolved ``Provider``'s Token Saver toggles to the payload.
+
+    The Provider carries three independent on/off toggles; the enabled modes
+    are applied in the fixed order ``rtk -> caveman -> ponytail`` via
+    :func:`backend.gateway.token_saver.apply_token_savers` (so later savers see
+    the earlier ones' output). Returns ``(payload, saved_bytes)``:
+    ``saved_bytes`` is ``None`` when NO saver ran (no provider / all toggles
+    off / lookup failure — "not measured", per B5.6) and an ``int >= 0`` when
+    one ran. Any failure returns the original payload unchanged (ADR-013
+    fail-open).
+    """
+    if provider is None:
+        return payload, None
+    modes = [
+        mode
+        for mode, on in (
+            ("rtk", provider.token_saver_rtk),
+            ("caveman", provider.token_saver_caveman),
+            ("ponytail", provider.token_saver_ponytail),
+        )
+        if on
+    ]
+    if not modes:
+        return payload, None
+    try:
+        log_info(
+            f"applying token_saver modes {modes} for provider "
+            f"'{getattr(provider, 'name', '?')}'",
+            source="backend.gateway.router",
+            context={"provider": getattr(provider, "name", None), "modes": modes},
+        )
+        new_payload, saved_bytes = _token_saver.apply_token_savers(modes, payload)
+        return new_payload, saved_bytes
+    except Exception as exc:  # noqa: BLE001 - fail-open mandated by ADR-013
+        log_warning_exc(
+            "token_saver provider application failed; passing through original payload",
             source="backend.gateway.router",
             exc=exc,
         )

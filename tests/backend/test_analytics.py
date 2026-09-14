@@ -100,12 +100,16 @@ def _seed_provider(sf, name="p", base_url=None) -> int:
 
 def _seed_endpoint(sf, name, token_saver_mode, provider_id) -> int:
     with sf() as session:
-        ep = Endpoint(name=name, token_saver=token_saver_mode)
+        ep = Endpoint(name=name)
         session.add(ep)
         session.flush()
         session.add(
             EndpointBinding(endpoint_id=ep.id, bind_type="provider", bind_id=provider_id)
         )
+        # Token Saver now lives on the Provider; enable the requested mode toggle.
+        if token_saver_mode in ("rtk", "caveman", "ponytail"):
+            provider = session.get(Provider, provider_id)
+            setattr(provider, f"token_saver_{token_saver_mode}", True)
         session.commit()
         return ep.id
 
