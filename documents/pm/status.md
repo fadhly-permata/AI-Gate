@@ -2,6 +2,14 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260914-WIKI-HOME-LANG — Home wiki + 8 README: 7→8 bahasa (DI-COMMIT + PUSH tanpa PR) (ProjectManager; perintah user "push tanpa PR")
+- TASK: revisi draft wiki `Home.md` (line 11 "seven languages"→"eight languages") + tulang punggung user: sebar koreksi ke 8 README (root + 7 varian) karena angka 7 basi setelah Hindi masuk registry.
+- FAKTA TERVERIFIKASI KE KODE (F3, bukan tebakan): `window.LANGS` `src/frontend/static/i18n.js:28-37` = 8 entri (en,id,ru,nl,ja,zh,zh-tw,hi); 8 file kamus `i18n/*.js` (ada `hi.js` baru, 2026-09-13, PR #24). Klaim "8 bahasa" sah.
+- EDIT (PM, dokumen — bukan `src/`, A2 aman): `Home.md:11` seven→eight; `README.md:44` seven→eight; `README.id:46` tujuh→delapan; `README.zh:43`/`zh-tw:40`/`ja:42` digit 7→8; `README.ru:48` семь→восемь; `README.nl:44` zeven→acht; `README.hi:43` सात→आठ. Verifikasi grep: 0 sisa "7", 9 baris "8". (Catatan: `семь`=7 substring dlm `восемь`=8 → grep mentah false-positive, sengaja dihindari.)
+- COMMIT `587dc02` `docs: update app language count 7->8 (Hindi added)` — staging eksplisit 10 file (8 isi + `wiki-backlog.md` catatan), BUKAN `git add -A`. `git diff --check` bersih; diff-check rahasia = 0.
+- PUSH `git push origin docs/wiki` (5ffb07a..587dc02, fast-forward, NOL force, tanpa PR perintah user). `git fetch`+`rev-list --count` → lokal=remote 0 0 (sinkron).
+- STATUS: SELESAI & terpush. SISA user: review 7 draft wiki lain (Quick-Start cs) yang masih nunggu ACC; uji mata README di browser.
+
 ## 20260914-PUSH — Log panel DI-COMMIT `81608af` + PUSH + **PR #25 TERBUKA** (label enhancement, MERGEABLE) (ProjectManager; perintah user "push & PR")
 - A12 cek sumber: `git fetch` → origin/main maju ke `eb97455` (PR #24 Hindi MERGED; HEAD feat/i18n-hindi = ancestor main). PR #24 diverifikasi MERGED via `gh pr view`.
 - Branch BARU `feat/log-panel-devmode` berbasis `origin/main` (HEAD=ancestor, cache-buster 20260926 sama) → PR bersih ISI 4 file log-panel SAJA (0 dokumen; `git diff --name-only origin/main...branch | grep documents = 0`).
