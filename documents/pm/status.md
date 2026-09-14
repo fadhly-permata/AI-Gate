@@ -1188,3 +1188,66 @@ User: "gua gak ekspek user pake aigate offline... ya udah kita bikin bisa full o
 - KEPEMILIKAN (A2/A3): PM nol tulis `src/`/`tests/`; naskah = public-writer (sudah ronden lalu); PM = documents/pm/**
   + plan + CODE_CHANGES + operasi git/wiki. SISA USER: review 6 halaman tayang (opsional, sudah live); WP.1
   (cek versi Python run.py) antre; Tahap 2 (Sidebar/Footer + terjemahan + halaman lanjutan + Pages) masih ditahan.
+
+## 2026-09-14 14:05 — PINDAH BRANCH `docs/wiki` → `main` + PULL fast-forward + KOREKSI: PR #26 sudah MERGED (perintah user "kita ke branch main yuk" → "1") (ProjectManager)
+- PERINTAH user: pindah ke `main`, lalu pilih opsi 1 = tarik sampai sejalan. D2: dikerjakan tanpa tanya lagi.
+- HALANGAN AWAL: `git switch main` DITOLAK git — `documents/pm/state.md` (+2 baris) & `documents/pm/status.md`
+  (+19 baris) belum di-commit dan isinya beda vs `main` ("would be overwritten by checkout").
+- PENANGANAN: `git stash push -m "pm-notes: PR#26 docs/wiki push+PR record (2026-09-14 13:32)"` utk 2 berkas itu
+  → `stash@{0}` TIDAK di-drop, TIDAK di-pop ke `main` (isi = catatan kerja di `docs/wiki`; nge-pop = campur histori
+  2 branch). NOL commit dibuat dari perubahan itu. Isi catatan PR#26 sekarang TERCOVER ulang oleh entri ini.
+- `git switch main` LOLOS → `git pull --ff-only` fast-forward `5f9684a..c145b55` (44 berkas, +2159 −83), NOL konflik,
+  NOL commit merge baru, working tree bersih sesudahnya. `main` sekarang = `c145b55`.
+- ⚠️ KOREKSI ATAS KLAIM PM SENDIRI (A11 append-only + A12/A13 cek ulang ke sumber): kalimat PM ke user
+  "PR #26 masih terbuka, belum di-merge" itu **SUDAHI BASI**. Bukti sumber-ke-sumber `gh pr view 26 --json`:
+  state=**MERGED** · mergedAt=2026-09-14T06:40:59Z · mergeCommit=`c145b55` · base=main · head=docs/wiki.
+  Jadi merge dilakukan user SESUDAH PM mencatat pembukaan PR (13:32) — catatan lama tidak ditulis ulang,
+  koreksi = entri baru ini. `documents/pm/state.md` ikut di-update `updated:`-nya.
+- DAMPAK: isi `docs/wiki` (rewrite 6 halaman wiki + handover + laporan + catatan PM) sekarang **sudah masuk `main`**,
+  termasuk berkas spesialis `public-writer` + skill-nya, `OPERATING_RULES.md` (+43), `wiki-drafts/` 8 halaman.
+  NOL perubahan kode `src/backend/**` (yang sentuh src = `src/frontend/static/{app.js,index.html,styles.css}`
+  + `src/frontend/tests/logwindow.test.js` — bawaan PR #25 log-panel, bukan PR #26).
+- STATUS SISA: branch `docs/wiki` lokal+remote masih ada (isi sudah 100% masuk `main` → kandidat hapus,
+  TIDAK dihapus — butuh perintah user). PR terbuka lain TIDAK dicek ronde ini. WP.1 (cek versi Python `run.py`)
+  tetap antre; wiki Tahap 2 tetap ditahan.
+- KEPEMILIKAN: PM = operasi git + `documents/pm/**` saja; NOL tulis `src/`/`tests/` (A2/A3). NOL kill/restart
+  proses (J6).
+
+## 2026-09-14 14:15 — HAPUS SEMUA BRANCH LOKAL kecuali `main`; REMOTE TIDAK disentuh (perintah user "di local hapus aja seluruh branch. tapi yang di remote biarin aja semuanya") (ProjectManager)
+- GERBANG KEAMANAN SEBELUM HAPUS (F3, semua diukur sesi ini): `git fetch --prune` → `git branch --no-merged main`
+  = **KOSONG** (semua branch lokal sudah ter-merge ke `main`) → `git for-each-ref refs/heads ahead-behind:origin/main`
+  = **`ahead=0` semua** (nol commit yang cuma hidup di lokal) + tiap branch punya `upstream=origin/<nama>`.
+  Kesimpulan: hapus lokal = nol kehilangan kerjaan; salinan remote tetap ada.
+- YANG DIHAPUS (6 branch, `git branch -d` aman — BUKAN `-D`; `-d` bakal nolak kalau belum merge, jadi ini bukti
+  tambahan): `docs/readme-main` (5a3f6e7) · `docs/wiki` (89dd66c) · `feat/i18n-hindi` (fc4f816) ·
+  `feat/i18n-locales` (2fbde70) · `feat/log-panel-devmode` (81608af) · `refactor/ui` (729f237).
+  SHA lama dicatat di sini + ada di reflog → bisa dipulihkan (`git branch <nama> <sha>`).
+- DEFAULT YANG PM AMBIL (D2, dicatat): **`main` TIDAK dihapus** — sedang checked-out (branch aktif) dan itu
+  branch utama; "seluruh branch" ditafsirkan = seluruh branch KERJA/fitur. NOL pertanyaan balik karena aman.
+- REMOTE: **NOL `git push --delete`, NOL operasi tulis apa pun ke origin** (permintaan eksplisit user).
+  Bukti sesudah: `git branch -r` = 8 ref utuh (docs/readme-main, docs/wiki, feat/i18n-hindi, feat/i18n-locales,
+  feat/log-panel-devmode, main, refactor/ui, setup/cli-tools) + `origin/HEAD`.
+  Catatan: `setup/cli-tools` memang **tidak pernah ada lokalnya** → tak terpengaruh.
+- SUDAH DI-MERGE (konteks): `refactor/ui`→PR #23, `feat/i18n-hindi`→PR #24, `feat/log-panel-devmode`→PR #25,
+  `docs/wiki`→PR #26 — semuanya MERGED (PR #26 diverifikasi `gh pr view 26` ronde sebelumnya, 14:05).
+  → keenam branch lokal itu memang sisa historis, bukan kerjaan hidup.
+- STASH: `stash@{0}` ("pm-notes: PR#26 docs/wiki push+PR record", dibuat 14:05 dari `docs/wiki`) **masih utuh** —
+  hapus branch tidak nyentuh stash. Sekarang menggantung tanpa branch aslinya; isinya sudah TERCOVER oleh entri
+  14:05 di file ini → kandidat `git stash drop`, TAPI belum dikerjakan (nol perintah).
+- SISA working tree: `documents/pm/state.md` + `documents/pm/status.md` modified (catatan PM ronde 14:05 & 14:15),
+  BELUM commit — nunggu perintah user (D1).
+- KEPEMILIKAN: PM = operasi git + `documents/pm/**`; NOL tulis `src/`/`tests/` (A2/A3). NOL kill/restart (J6).
+
+## 2026-09-14 14:07 — TUTUP KATEGORI C + EKSEKUSI RUMAH TANGGA (A) + MULAI B (perintah user "untuk C sudah gua lakuin, catat biar gak tampil lagi" + "untuk A & B kita kerjain yuk") (ProjectManager)
+- KATEGORI C DITUTUP: user melaporkan semua uji manual (lebar panel setelan, device-sim modal, Hindi di Setelan,
+  ikon offline, log panel + dev-mode setelah restart) SUDAH dilakukan & aman. Pencatatan (memory-bank + `state.md`
+  kunci `pending:`) dibuat supaya item C tidak lagi muncul di laporan. Koreksi: catatan lama yang menulis
+  "BELUM commit" untuk log-panel/dev-mode/Hindi = BASI — PR #25 (`mergedAt 2026-09-14T00:43:21Z`) & PR #24 sudah
+  MERGED, `gh pr list --state open` = [] , `wireDevModeToggle` ada di HEAD. Fakta eksternal di-recheck ke sumber.
+- A (rumah tangga): A1 commit 2 catatan PM (`documents/pm/state.md`+`status.md`); A2 `git stash drop` untuk
+  `stash@{0}` (SHA `0913a3be95ac35ca2bbf0c6bc0ff4c7014f0ba73` dicatat → masih bisa `git stash apply`/`branch`
+  lewat reflog); A3 7 branch remote = biarkan (instruksi user).
+- B (pekerjaan): B4 WP.1 didelegasikan ke **be-dev** (cek versi Python di `run.py`). B5/B7/B8/B9 butuh keputusan
+  user → akan ditanyakan dalam satu putaran. B6 (review 6 wiki halaman) = aksi user, opsional, tidak spawnable.
+- KEPEMILIKAN: PM = `documents/pm/**` + operasi git; NOL tulis `src/`/`tests/` (A2/A3); NOL kill/restart (J6).
+  Sumber tunggal daftar pending = kunci `pending:` di `state.md`.
