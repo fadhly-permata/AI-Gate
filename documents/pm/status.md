@@ -1098,3 +1098,27 @@ User: "gua gak ekspek user pake aigate offline... ya udah kita bikin bisa full o
 - Branch `docs/wiki`: commit produk (`91de605`) + draf & catatan -> push. **Wiki GitHub asli tetap
   TIDAK disentuh.**
 - GATE user sekarang: review halaman 2–8. WP.1 (cek versi Python di run.py) masih nunggu izin.
+
+## 2026-09-14 — Sinkron `main` → `docs/wiki` (merge) karena user lihat CLI Tools "jadi tombol lagi" (ProjectManager)
+- LAPORAN user: halaman cli-tools kayak ke-rollback (masih tombol), duga gara-gara pindah branch `ui`→`wiki`.
+- DIAGNOSA PM (bukti git): `docs/wiki` cabang dari `main` di `195a1fa` (PR #12, 9 Sep) — SEBELUM redesign
+  card `59c570d` (13 Sep, jalur `refactor/ui`→`main` PR #22/#23). Card TIDAK ancestor `docs/wiki`
+  (`git merge-base --is-ancestor 59c570d docs/wiki` = NO). Jadi bukan rollback — branch wiki emang basis lama.
+  `clitools.js` wiki = pra-card (`createElement("button"); class "btn cli-tool"`).
+- KEPUTUSAN (user serahkan pilihan): MERGE `main`→`docs/wiki` (bukan cherry-pick). Alasan: branch telat 5
+  hari; wiki WAJIB di-sync sebelum merge balik ke main → cegah konflik raksasa nanti; bonus card+UI ikut masuk.
+  Cherry-pick 59c570d juga konflik (clitools.js/index.html/styles.css) → merge lebih bersih & kanonis.
+- Tag pengaman sebelum merge: `backup/docs-wiki-before-sync` = `45ed9cd`. Worktree sebelumnya bersih.
+- KONFLIK 6 berkas: `src/frontend/static/index.html` (auto-ambil `--theirs` main = superset FA-lokal+card,
+  main sudah serap FA via `git restore --source=docs/wiki`), `THIRD_PARTY_NOTICES.md` (main sudah punya
+  notice FA), `documents/pm/state.md` (ambil main = kondisi terkini; checkpoint wiki basi). 3 file governance
+  UNIK wiki di-preserve (append-only, A11): `OPERATING_RULES.md` (R46 gerak-cerita + R47 gerbang-git →
+  ditaruh di LAMPIRAN biar nggak tubrukan nomor v2), `status.md` (2 blok 2026-09-08), `memory-bank.md`
+  (blok fakta lintas-halaman). `clitools.js`+`styles.css` auto-merge BERSIH → card langsung masuk.
+- PM nol tulis `src/` (A2): resolusi `index.html` = `git checkout --theirs` (pilih versi ter-commit, bukan
+  mengarang kode FE) → tanpa spawn fe-dev. Rekonsiliasi `documents/pm/**` = wewenang PM.
+- KOMIT merge `48642a6`. VERIFIKASI GATE: `rules-index.py` exit 0 (57 rule/10 tema); vitest `src/frontend`
+  **27 berkas/686 tes HIJAU** (termasuk `vendor_assets` 7 = nol CDN); `git grep` marker konflik = 0;
+  `clitools.js` = card + platform-logo + badge + legend. HEAD `docs/wiki` = 0-behind/10-ahead vs origin/main.
+- BELUM: push (D1 — nunggu perintah user); uji mata di peramban (G3, hard-refresh — cache-buster beda);
+  merge balik `docs/wiki`→`main` masih ditahan user; WP.1 + review halaman wiki tetap terbuka.
