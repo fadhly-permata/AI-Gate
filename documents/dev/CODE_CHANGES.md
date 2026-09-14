@@ -1995,3 +1995,26 @@ yang menyebut "edit sudah ada di working tree, saya cuma verifikasi" TIDAK cocok
 **Verifikasi PM mandiri (G3/F3, tak telan receipt):** `vitest run tests/i18n.test.js` = **36/36 hijau** (paritas hi via `it.each` + registry 8 bahasa + endonim); `vitest run` penuh = **27 berkas / 686 tes hijau** (baseline 685 +1 kasus paritas `hi`, nol regresi); `git diff --check` exit 0; semua 8 kamus = 445 kunci (`lang.hi` hadir 1× di tiap kamus); ASCII-murni di hi.js = hanya endonim nama-OS (Linux/Windows/macOS) + endonim bahasa (English/Bahasa Indonesia/Nederlands) = tak ada kunci terlewat diterjemah; scope = HANYA `src/frontend/**` (fe-dev), PM nol tulis src/ (A2). 
 **Catatan kualitas (utang, sama dgn 6 bahasa lain):** terjemahan Hindi = hasil generate, BELUM ditinjau penutur asli; perlu review manual user kalau mau akurat.
 **Belum:** push / PR (nunggu perintah user).
+
+### 2026-09-14 — WP.1 gerbang versi Python di `run.py` (fullstack-dev; audit+verifikasi+commit PM) — branch `feat/wp1-python-check`
+**Asal:** user perintahkan kerjakan kategori A & B daftar pending; B4 = **WP.1** (`documents/plan/wiki-backlog.md` §Tahap 1.9).
+**Kepemilikan (A3):** `run.py` = berkas level-repo di luar write-root spesialis mana pun → owner **fullstack-dev**
+(bukan be-dev, yang cuma pegang `src/backend/**` + `tests/backend/**`). Handover
+`documents/pm/handovers/handover-20260914-wp1-python-check.md`. PM nol tulis `run.py`.
+**Per-berkas:**
+- `run.py` (+30, 46→76 baris, nol baris dihapus): konstanta `MIN_PYTHON = (3, 10)` + komentar rujukan
+  `pyproject.toml:11` `requires-python = ">=3.10"` (satu sumber kebenaran); fungsi `_check_python_version(info)`
+  → kalau `< MIN_PYTHON`, tulis 2 baris ke **stderr** lalu `sys.exit(1)`; dipanggil **sebelum**
+  `sys.path.insert`, `ensure_deps()`, dan import `backend.*` → interpreter tua lihat pesan, bukan traceback pip/import.
+  Teks pesan: `aigate needs Python 3.10 or newer - you have <versi>` + `Install Python 3.10 or newer, then run this again.`
+  Nomor versi dari `sys.version_info[:3]`; angka "3.10" dibangun dari `MIN_PYTHON` (tidak hardkode ganda).
+**Verifikasi PM mandiri (G3/F3, bukan telan receipt):** `python3 -m py_compile run.py` exit 0;
+`ast.parse(..., feature_version=(3,9))` LOLOS (bukti gerbang masih bisa di-parse Python 3.9 — syarat mutlak,
+gerbang yang SyntaxError di interpreter tua = percuma); kontrol negatif `match/case` + `X | Y` dengan
+`feature_version=(3,9)` → `SyntaxError` (menegakkan grammar 3.9); jalur gagal terisolasi
+`_check_python_version((3,9,7))` → pesan di stderr + `SystemExit code = 1`; jalur lolos senyap untuk
+`(3,10,0)` (batas), `(3,12,0)`, dan interpreter nyata `(3,14,6)`; **END-TO-END** `runpy.run_path("run.py",
+run_name="__main__")` dengan `sys.version_info` dipaksa `(3,9,7,"final",0)` → berhenti rapi exit 1 SEBELUM
+pip install / import backend (bukti urutan gerbang, bukan asumsi); `git diff --check` exit 0; `git status`
+= hanya `run.py` (+ catatan PM) → nol berkas nyasar; tidak ada server dijalankan, port 8080 user tak disentuh (J6).
+**Belum:** push / PR (nunggu perintah user).

@@ -58,10 +58,16 @@ Legenda: `[ ]` antre · `[~]` dikerjakan · `[!]` draft siap, **nunggu review us
          + `Quick-Start.md`; 6 halaman lain (Interfaces cs) TETAP di staging sampai lu review.
 
 ## Tahap 1.9 — Perbaikan produk ketemu dari penulisan wiki
-- [ ] **WP.1** Tambah cek versi Python di awal `run.py`: kalau < 3.10, cetak satu pesan manusiawi
+- [x] **WP.1** Tambah cek versi Python di awal `run.py`: kalau < 3.10, cetak satu pesan manusiawi
       ("aigate needs Python 3.10+ — you have X.Y") lalu keluar bersih, BUKAN traceback.
       → owner: be-dev · alasan: ini kegagalan langkah-pertama paling umum, dan dokumentasi tidak
         bisa menutupi kode yang diam saja.
+      **SELESAI 2026-09-14** (commit `1fe592d`, branch `feat/wp1-python-check`). Koreksi kepemilikan:
+      `run.py` = berkas root di luar write-root be-dev → dikerjain **fullstack-dev** (A3). Gerbang:
+      `MIN_PYTHON=(3,10)` (acuan `pyproject.toml:11`), pesan 2 baris ke stderr, `sys.exit(1)`, dipanggil
+      SEBELUM `sys.path.insert`/pip/import backend, dan file tetap parse-able grammar 3.9 (bukti
+      `ast.parse(feature_version=(3,9))` + uji end-to-end versi dipaksa 3.9.7 → berhenti rapi).
+      BELUM push/PR (nunggu perintah user).
 
 DRAF 8 HALAMAN SUDAH SEMUA (user 2026-09-08: "langsung kerjain sisa file wiki"). Status per halaman:
 W1.1 Home = DI-ACC · W1.2–W1.8 = draf jadi, **belum direview user**.

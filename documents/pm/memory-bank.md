@@ -768,3 +768,20 @@ Lembar fakta A/B/C tanggal 2026-09-08 **sebagian basi**. Yang sudah diverifikasi
 8. **Self-Heal belum pernah terdokumentasi di halaman wiki mana pun**; sekarang ada di `CLI-Tools.md`
    (kartunya di layar alat coding, `index.html:866-880`) + risiko eksplisit (menulis kode + merge branch).
 9. Angka tool masih 24 (12/6/6) tapi **jangan tulis angka per kelompok** di materi publik — basi saat daftar tumbuh.
+
+## C DITUTUP + PUSAT PENDING DIPINDAH KE `state.md` (2026-09-14 14:07, PM)
+- User: "untuk yang C udah gua lakukan dan sudah aman. catat ya biar gak tampil lagi." → SEMUA item kategori C
+  (uji mata + sentuhan HP: lebar panel setelan, modal device-simulation, Hindi di Setelan, ikon offline,
+  log panel + gerbang dev-mode setelah restart) = **SELESAI, terverifikasi user**. Coret dari daftar pending
+  selamanya; jangan dimunculkan lagi di laporan "sisa user".
+- KOREKSI atas catatan historis (append-only, teks lama tidak ditulis ulang): blok lama masih menulis
+  "BELUM commit/BELUM push" untuk log-panel/dev-mode dan Hindi. Dicek ke sumber sesi ini: PR #25 MERGED
+  (`mergedAt 2026-09-14T00:43:21Z`), PR #24 MERGED, PR #23/#26 MERGED, `gh pr list --state open` = **KOSONG**,
+  `main` = `origin/main` = `c145b55`, dan `wireDevModeToggle` terbukti ADA di HEAD (`app.js:485/789/2584`).
+- **Sumber tunggal daftar pending kini `documents/pm/state.md` kunci `pending:`** (blok terkurkini, ringkas,
+  anti-basi). Memory Bank tetap menyimpan histori + fakta; kalau bertentangan, `pending:` yang menang dan
+  fakta eksternal (PR/branch/merge) WAJIB dicek ulang ke `gh`/`git` sebelum dipakai (A12).
+- Ronde ini: A (rumah tangga) dikerjakan — commit 2 catatan PM + `git stash drop` (`stash@{0}`, SHA
+  `0913a3be95ac35ca2bbf0c6bc0ff4c7014f0ba73` dicatat supaya bisa dipulihkan; isi sudah tercover entri 14:05).
+  B4 (WP.1 cek versi Python di `run.py`) didelegasikan ke **be-dev**. B5/B7/B8/B9 butuh keputusan user →
+  ditanyakan sekali, hemat putaran.
