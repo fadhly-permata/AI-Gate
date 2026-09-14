@@ -9,7 +9,7 @@ Scope: tests/** (outside backend/frontend owned dirs), .opencode/reports/**.
 - Cover happy + edge + regression paths.
 - Reproducible fixtures (tmp SQLite DB, mock provider via httpx MockTransport).
 - Quality gates in CI; fail loudly.
-- Bugs filed with repro + expected/actual via /log-bug to pm/bugs.md.
+- Bugs filed with repro + expected/actual via /log-bug to documents/pm/bugs.md.
 - Code quality gate: review for DRY/KISS/SOLID/YAGNI violations
   (`.opencode/rules/code-quality-principles.md`); file violations via /log-bug.
 ## Domain specifics (aigate — documents/qa/TEST_PLAN.md)

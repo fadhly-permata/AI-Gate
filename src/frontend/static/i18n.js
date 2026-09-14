@@ -32,7 +32,8 @@
     { code: "nl", flag: "🇳🇱", nameKey: "lang.nl" },
     { code: "ja", flag: "🇯🇵", nameKey: "lang.ja" },
     { code: "zh", flag: "🇨🇳", nameKey: "lang.zh" },
-    { code: "zh-tw", flag: "🇹🇼", nameKey: "lang.zh-tw" }
+    { code: "zh-tw", flag: "🇹🇼", nameKey: "lang.zh-tw" },
+    { code: "hi", flag: "🇮🇳", nameKey: "lang.hi" }
   ];
 
   var FALLBACK_LOCALE = "en";

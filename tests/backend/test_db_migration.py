@@ -174,3 +174,62 @@ def test_ensure_log_entry_resolved_noop_when_present():
     _ensure_log_entry_resolved_column(engine)
     assert "resolved" in _column_names(engine, "log_entries")
     engine.dispose()
+
+
+# --- combos.last_used_index (Combo round_robin cursor, task 2026-09-13) ------- #
+
+
+def _build_combos_without_last_used_index(engine) -> None:
+    """Create a ``combos`` table that mimics a pre-column DB."""
+    with engine.connect() as conn:
+        conn.execute(
+            text(
+                "CREATE TABLE combos ("
+                "id INTEGER PRIMARY KEY, "
+                "name TEXT, "
+                "strategy TEXT, "
+                "enabled BOOLEAN)"
+            )
+        )
+        conn.commit()
+
+
+def test_ensure_combo_last_used_index_adds_column():
+    from backend.config.db import _ensure_combo_last_used_index_column
+
+    engine = create_engine("sqlite:///:memory:", future=True)
+    _build_combos_without_last_used_index(engine)
+
+    assert "last_used_index" not in _column_names(engine, "combos")
+
+    _ensure_combo_last_used_index_column(engine)
+
+    assert "last_used_index" in _column_names(engine, "combos")
+    engine.dispose()
+
+
+def test_ensure_combo_last_used_index_is_idempotent():
+    from backend.config.db import _ensure_combo_last_used_index_column
+
+    engine = create_engine("sqlite:///:memory:", future=True)
+    _build_combos_without_last_used_index(engine)
+
+    # Running twice must not raise (no duplicate-column OperationalError).
+    _ensure_combo_last_used_index_column(engine)
+    _ensure_combo_last_used_index_column(engine)
+
+    assert "last_used_index" in _column_names(engine, "combos")
+    engine.dispose()
+
+
+def test_ensure_combo_last_used_index_noop_when_present():
+    from backend import models  # noqa: F401  (register mappers)
+    from backend.config.db import Base, _ensure_combo_last_used_index_column
+
+    engine = create_engine("sqlite:///:memory:", future=True)
+    Base.metadata.create_all(engine)
+    # Model already declares the column — migration must be a no-op.
+    assert "last_used_index" in _column_names(engine, "combos")
+    _ensure_combo_last_used_index_column(engine)
+    assert "last_used_index" in _column_names(engine, "combos")
+    engine.dispose()

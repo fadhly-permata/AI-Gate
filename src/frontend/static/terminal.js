@@ -297,10 +297,44 @@
    * the SAME tab_id (reattach + replay) with exponential backoff. We only send
    * the {"type":"close"} kill frame when the user DELIBERATELY closes a tab. */
 
-  // Write a dim status line into the terminal (ADR-011 surface status/errors).
+  /* Render a connection status as a DOM banner OVERLAY on the tab's container —
+     NOT into the xterm buffer. Writing status text with term.write() left lines
+     in scrollback that misaligned a full-screen TUI (vim/htop/less) on
+     reconnect (the overlap bug). The banner is a sibling of the .xterm node, so
+     it never touches the PTY grid. Created lazily per tab; a11y: role=status +
+     aria-live=polite so a screen reader announces drops/reconnects. */
+  function statusBanner(tab) {
+    if (!tab || !tab.container) return null;
+    if (tab.statusBannerEl && tab.statusBannerEl.parentNode === tab.container) {
+      return tab.statusBannerEl;
+    }
+    var el = document.createElement("div");
+    el.className = "term-status-banner";
+    el.setAttribute("role", "status");
+    el.setAttribute("aria-live", "polite");
+    tab.container.appendChild(el);
+    tab.statusBannerEl = el;
+    return el;
+  }
+
   function writeStatus(tab, text) {
-    if (!tab || !tab.term) return;
-    try { tab.term.write("\r\n\x1b[2m" + text + "\x1b[0m\r\n"); } catch (e) {}
+    var el = statusBanner(tab);
+    if (!el) return;
+    if (tab.statusTimer) { clearTimeout(tab.statusTimer); tab.statusTimer = null; }
+    el.textContent = text;
+    el.hidden = false;
+  }
+
+  // Hide + detach the banner and cancel any pending auto-clear timer.
+  function clearStatus(tab) {
+    if (!tab) return;
+    if (tab.statusTimer) { clearTimeout(tab.statusTimer); tab.statusTimer = null; }
+    var el = tab.statusBannerEl;
+    if (!el) return;
+    el.hidden = true;
+    el.textContent = "";
+    if (el.parentNode) el.parentNode.removeChild(el);
+    tab.statusBannerEl = null;
   }
 
   /* Minimal transient notice. aigate has NO global toast system (the existing
@@ -427,9 +461,13 @@
   function wireSocket(tab, ws) {
     ws.onopen = function () {
       tab.reconnectAttempt = 0;
+      clearStatus(tab);             // wipe any "Connecting…"/"Reconnecting…" banner
       if (tab.reconnectShown) {
         tab.reconnectShown = false;
+        // Briefly show "Reconnected" in the overlay (never in the buffer), then
+        // auto-clear it — so it can't overlap a TUI on the freshly-attached shell.
         writeStatus(tab, t("term.reconnected"));
+        tab.statusTimer = setTimeout(function () { clearStatus(tab); }, 1800);
       }
       tab.lastPingAt = Date.now();   // fresh socket: start the liveness clock
       armLiveness(tab);
@@ -550,12 +588,17 @@
       reconnectShown: false,      // "Reconnecting…" shown for this episode
       lastPingAt: 0,              // ms stamp of the last heartbeat ping received
       livenessTimer: null,        // one-shot watchdog setTimeout handle (re-armed per ping)
+      statusBannerEl: null,       // lazily-created DOM status overlay (writeStatus)
+      statusTimer: null,          // pending "Reconnected" auto-clear handle
       _forceReconnectNow: false   // set when a liveness close should skip backoff
     };
     tabs.set(tabId, tab);
     addSavedTabId(tabId);         // remember it so a discard+reload reattaches
 
-    term.write("\x1b[2m" + t("term.connecting") + "\x1b[0m\r\n");
+    // Surface "Connecting…" as a banner overlay (NOT into the buffer — that
+    // would leave a stray line in scrollback and corrupt a TUI on first paint).
+    // The onopen handler clears it once the socket is live.
+    writeStatus(tab, t("term.connecting"));
 
     // Keystrokes always go to the tab's CURRENT socket (tab.ws), so input keeps
     // working after a reconnect swaps in a new WebSocket.
@@ -655,10 +698,12 @@
 
   /* Tear a tab down. `opts.exited` marks the backend exit-sentinel path (the
      shell already died): NO {"type":"close"} kill frame is sent (the server is
-     closing the WS itself) and NO replacement tab is auto-opened when it was the
-     last one — the empty state shows instead. A deliberate closeTab (the X
-     button, opts omitted) keeps the old behavior: kill frame + always keep at
-     least one tab alive. */
+     closing the WS itself). A deliberate closeTab (the X button, opts omitted)
+     sends the {"type":"close"} kill frame so the backend KILLS the PTY. Either
+     way, when the closed tab was the LAST one, we show the empty state and do
+     NOT auto-open a replacement shell — the empty state's "New Tab" button
+     (termEmptyNewTab) lets the user reopen, so a single remaining tab can
+     always be closed. */
   function closeTab(id, opts) {
     var tab = tabs.get(id);
     if (!tab) return;
@@ -678,6 +723,9 @@
     }
     try { tab.ws.close(); } catch (e) {}
     try { tab.term.dispose(); } catch (e) {}
+    // Drop any status banner + its pending auto-clear timer so the disposed tab
+    // leaks neither a DOM node nor a dangling setTimeout.
+    clearStatus(tab);
     // BUG2: stop observing the closed tab's stage box (the observer only ever
     // watches the active container, so this is a targeted cleanup; reactivation
     // below re-targets it at the surviving tab via observeActiveStage()).
@@ -695,12 +743,13 @@
       var it = tabs.keys().next();
       if (!it.done) {
         activate(it.value);
-      } else if (opts.exited) {
-        // Last tab exited: show the empty state, do NOT spawn a new shell.
-        activeId = null;
       } else {
+        // Last tab gone (deliberate X close OR backend exit sentinel): show the
+        // empty state, do NOT respawn a shell. The empty state has a working
+        // "New Tab" button (termEmptyNewTab), so the user can reopen — no
+        // dead-end. The {type:"close"} kill frame above already killed the PTY.
+        clearStatus(tab);
         activeId = null;
-        openTab(); // deliberate close of the last tab: keep at least one alive
       }
     }
     updateEmptyState();

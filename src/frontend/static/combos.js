@@ -12,6 +12,13 @@
    * Creating a NEW combo (no id): members are buffered client-side
      (membersBuffer) and sent in one shot in the POST /api/combos body
      `members:[...]` on Save.
+   * ORDER IS THE PRIORITY (stage-8): the table has no Priority column and the
+     sub-form has no Priority field — the row position IS the queue the engine
+     walks (fallback) or breaks ties with (load_balance / latency_cost). ▲▼ per
+     row (moveMember) renumbers the visible list to 0..n-1 and PUTs only the
+     rows that actually changed, sequentially, then re-reads the server; in
+     buffer mode it only moves the array. A NEW member always joins LAST
+     (priority = the current count), never at the old default of 0.
    ADR-011: every failure surfaces in #comboMemberMsg / #comboMsg — never
     swallowed.
 
@@ -79,6 +86,9 @@
   var editingBufferIndex = null; // buffer index loaded into the sub-form
   var modelFetchSeq = 0;        // race-guard token for the model auto-fetch
   var modelLoading = false;     // true while a discover fetch is in flight
+  var dragState = null;         // active grip-drag: {fromIdx, tr, pointerId}
+  var pendingMovedRef = null;   // member object that just moved (drives the move flash)
+  var movedFlashTimer = null;   // handle for the transient highlight cleanup
 
   /* ---- Pure mapping (importable + testable) ---- */
   function mapComboToRow(c) {
@@ -93,18 +103,22 @@
   }
 
   /* Normalize a member to the backend ComboMemberCreate shape:
-     {provider_id:int, provider_model:str, priority:int, weight:float}. */
+     {provider_id:int, provider_model:str, priority:int?, weight:float}.
+     `priority` is carried ONLY when the caller supplies one: the sub-form has
+     no priority field any more (stage-8 — position is the priority), and a
+     partial PUT must leave the stored order of an edited row untouched. */
   function normalizeMember(m) {
     m = m || {};
     var prio = parseInt(m.priority, 10);
     var w = parseFloat(m.weight);
-    return {
+    var out = {
       provider_id: m.provider_id == null || m.provider_id === ""
         ? null : parseInt(m.provider_id, 10),
       provider_model: m.provider_model == null ? "" : String(m.provider_model).trim(),
-      priority: isNaN(prio) ? 0 : prio,
       weight: isNaN(w) ? 1 : w
     };
+    if (m.priority != null && m.priority !== "" && !isNaN(prio)) out.priority = prio;
+    return out;
   }
 
   function providersById() {
@@ -115,6 +129,18 @@
 
   /* ---- DOM helpers ---- */
   function el(id) { return document.getElementById(id); }
+
+  /* Respect users who asked for minimal motion: when true, the move flash is
+      never started (see renderMembers / scheduleMovedFlash). Guarded so a
+      missing or throwing matchMedia can never break the reorder path. */
+  function prefersReducedMotion() {
+    try {
+      return !!(window.matchMedia &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    } catch (_) {
+      return false;
+    }
+  }
 
   function setMsg(text, kind) {
     var m = el("comboMsg");
@@ -375,47 +401,350 @@
     });
   }
 
-  /* ---- Members table render ---- */
+  /* Remove the transient `just-moved` highlight once it has played, so the next
+      render starts clean. Uses a single timer; re-entrancy-safe via clearTimeout.
+      Under reduced motion the class is never added, so this is a no-op there. */
+  function scheduleMovedFlash(body) {
+    var row = body ? body.querySelector("tr.member-row.just-moved") : null;
+    if (!row) return;
+    if (movedFlashTimer) { clearTimeout(movedFlashTimer); movedFlashTimer = null; }
+    movedFlashTimer = setTimeout(function () {
+      var r = body.querySelector("tr.member-row.just-moved");
+      if (r) r.classList.remove("just-moved");
+      movedFlashTimer = null;
+    }, 650);
+  }
+
+  /* Actions for the per-row kebab (three-dots) submenu in the members table.
+      Replicates EXACTLY the edit/delete logic the old pencil/trash buttons ran
+      (combos.js delegated listener). Edit -> editMemberRow(mid, idx); Delete ->
+      removeMember(mid) for a saved row, removeMemberLocal(idx) for a buffer row. */
+  function memberRowActions(tr) {
+    var idx = parseInt(tr.getAttribute("data-idx"), 10);
+    var mid = tr.getAttribute("data-id");
+    return [
+      {
+        action: "edit",
+        label: getStr("combos.member.edit"),
+        icon: "fa-pen",
+        onClick: function () { editMemberRow(mid, idx); }
+      },
+      {
+        action: "delete",
+        label: getStr("combos.member.remove"),
+        icon: "fa-trash",
+        danger: true,
+        onClick: function () {
+          if (selectedId && mid != null) removeMember(mid);
+          else removeMemberLocal(idx);
+        }
+      }
+    ];
+  }
+
+  /* ---- Members table render ----
+      There is no Priority column: the ROW ORDER is the priority (stage-8), and
+      ▲▼ in the action cell is the only way to change it — the same affordance as
+      the account cards on the provider page. */
   function renderMembers(members, byId) {
     var body = el("comboMembersBody");
     if (!body) return;
     members = members || [];
     byId = byId || providersById();
+    // Capture the move marker for THIS render, then clear it so it can only ever
+    // highlight the single row of the single move that just happened.
+    var movedRef = pendingMovedRef;
+    pendingMovedRef = null;
     if (!members.length) {
-      body.innerHTML = '<tr><td colspan="5" class="empty-cell">' +
+      body.innerHTML = '<tr><td colspan="4" class="empty-cell">' +
         escapeHtml(getStr("combos.members.none")) + "</td></tr>";
       return;
     }
+    var total = members.length;
     body.innerHTML = members.map(function (m, i) {
-      var prov = byId[String(m.provider_id)];
-      var pname = prov ? prov.name : ("#" + m.provider_id);
+      // Flash the row that just moved (▲▼ OR drag). Matched by object reference
+      // in buffer mode, by id after a server reload (new objects from JSON).
+      var movedCls = (movedRef && !prefersReducedMotion() &&
+        (m === movedRef ||
+         (m.id != null && movedRef.id != null &&
+          String(m.id) === String(movedRef.id))))
+        ? " just-moved" : "";
+      // (A) Provider NAME removed from the row — the column keeps the drag grip
+      // only (see handover §A). `byId` is no longer needed here.
       var idAttr = m.id != null ? ' data-id="' + escapeHtml(m.id) + '"' : "";
-      return '<tr class="member-row"' + idAttr + ' data-idx="' + i + '">' +
-        "<td>" + escapeHtml(pname) + "</td>" +
+      // (B) Per-member enable/disable — server now ships `enabled`. Default True
+      // when absent (old members / new buffer rows).
+      var enabled = m.enabled === false ? false : true;
+      var disCls = enabled ? "" : " is-disabled";
+      var enLbl = getStr("combos.member.enabled");
+      // Boundary buttons: aria-disabled + a title that says WHY (never a dead
+      // tap that pretends nothing happened) — same contract as the account cards.
+      var upOff = i === 0;
+      var downOff = i === total - 1;
+      var upLbl = getStr("combos.member.move_up");
+      var downLbl = getStr("combos.member.move_down");
+      var dragLbl = getStr("combos.member.drag");
+      var upAttrs = 'aria-label="' + escapeHtml(upLbl) + '" title="' +
+        escapeHtml(upOff ? getStr("combos.member.already_first") : upLbl) + '"' +
+        (upOff ? ' aria-disabled="true"' : "");
+      var downAttrs = 'aria-label="' + escapeHtml(downLbl) + '" title="' +
+        escapeHtml(downOff ? getStr("combos.member.already_last") : downLbl) + '"' +
+        (downOff ? ' aria-disabled="true"' : "");
+      return '<tr class="member-row' + movedCls + disCls + '"' + idAttr + ' data-idx="' + i + '">' +
+        '<td>' +
+          '<button type="button" class="icon-btn-small js-mem-drag"' +
+            ' aria-label="' + escapeHtml(dragLbl) + '" title="' + escapeHtml(dragLbl) + '">' +
+            '<i class="fa fa-grip-vertical" aria-hidden="true"></i></button>' +
+          '<input type="checkbox" class="js-mem-enabled"' +
+            ' aria-label="' + escapeHtml(enLbl) + '"' + (enabled ? " checked" : "") + ' />' +
+        "</td>" +
         "<td>" + escapeHtml(m.provider_model) + "</td>" +
-        "<td>" + escapeHtml(m.priority) + "</td>" +
         "<td>" + escapeHtml(m.weight) + "</td>" +
         '<td class="row-actions">' +
-          '<button type="button" class="icon-btn-small js-mem-edit" title="' +
-            escapeHtml(getStr("combos.member.edit")) + '"><i class="fa fa-pen"></i></button>' +
-          '<button type="button" class="icon-btn-small js-mem-del" title="' +
-            escapeHtml(getStr("combos.member.remove")) + '"><i class="fa fa-trash"></i></button>' +
+          '<span class="member-move">' +
+            '<button type="button" class="icon-btn-small js-mem-up"' + upAttrs + '>' +
+              '<i class="fa fa-arrow-up" aria-hidden="true"></i></button>' +
+            '<button type="button" class="icon-btn-small js-mem-down"' + downAttrs + '>' +
+              '<i class="fa fa-arrow-down" aria-hidden="true"></i></button>' +
+          "</span>" +
+          // (B) Edit + Delete collapsed into ONE kebab (three-dots) submenu — reuses
+          // the shared row-menu wiring in app.js (window.aigate.wireRowMenu). ▲▼ stay
+          // OUTSIDE the kebab as a separate affordance. Button markup mirrors
+          // rowMenuCellHtml() (button only — this table keeps ▲▼ in the same actions
+          // <td>, so we do not wrap the kebab in its own <td>).
+          '<button type="button" class="icon-btn-small js-row-menu" aria-haspopup="true" ' +
+            'aria-expanded="false" title="' + escapeHtml(getStr("common.actions")) + '" ' +
+            'aria-label="' + escapeHtml(getStr("common.actions")) + '">' +
+            '<i class="fa fa-ellipsis-vertical" aria-hidden="true"></i></button>' +
         "</td>" +
       "</tr>";
     }).join("");
 
-    Array.prototype.forEach.call(body.querySelectorAll(".member-row"), function (tr) {
-      var idx = parseInt(tr.getAttribute("data-idx"), 10);
-      var mid = tr.getAttribute("data-id");
-      tr.querySelector(".js-mem-edit").addEventListener("click", function (e) {
-        e.stopPropagation(); editMemberRow(mid, idx);
+    /* ONE delegated listener per tbody — renderMembers re-writes the rows after
+       every mutation but the tbody node itself survives, hence the wiring guard
+       (same pattern as #accList in app.js). */
+    if (body.getAttribute("data-mem-wired") !== "1") {
+      body.setAttribute("data-mem-wired", "1");
+      body.addEventListener("click", function (e) {
+        // The grip is drag-only: a click (or its synthetic click after a drag)
+        // must never be read as an arrow/edit/delete action.
+        if (e.target.closest && e.target.closest(".js-mem-drag")) return;
+        var tr = e.target.closest ? e.target.closest(".member-row") : null;
+        if (!tr) return;
+        var idx = parseInt(tr.getAttribute("data-idx"), 10);
+        if (isNaN(idx)) return;
+        var mid = tr.getAttribute("data-id");
+        // Edit + Delete now live in the kebab submenu (wired via
+        // window.aigate.wireRowMenu at the end of renderMembers), so they are no
+        // longer handled by this delegated listener.
+        var up = e.target.closest(".js-mem-up");
+        var down = e.target.closest(".js-mem-down");
+        // aria-disabled buttons explain themselves and never hit the network.
+        if (up && up.getAttribute("aria-disabled") !== "true") moveMember(idx, -1);
+        else if (down && down.getAttribute("aria-disabled") !== "true") moveMember(idx, 1);
       });
-      tr.querySelector(".js-mem-del").addEventListener("click", function (e) {
-        e.stopPropagation();
-        if (selectedId && mid != null) removeMember(mid);
-        else removeMemberLocal(idx);
+      // Drag-to-reorder (handle only, not the row) — Pointer Events so the same
+      // path serves touch + mouse. startDrag guards on .js-mem-drag itself.
+      body.addEventListener("pointerdown", startDrag);
+      // (B) Enable/disable toggle. Uses `change` (not `click`): a checkbox click
+      // handler would read the PRE-toggle value, but `change` fires AFTER the
+      // box flips, so `tgl.checked` is the true new state. A saved member fires a
+      // direct partial PUT of {enabled}; a buffer member flips the local object.
+      body.addEventListener("change", function (e) {
+        if (!e.target || !e.target.closest) return;
+        var tgl = e.target.closest(".js-mem-enabled");
+        if (!tgl) return;
+        var tr = tgl.closest(".member-row");
+        if (!tr) return;
+        var mid = tr.getAttribute("data-id");
+        var idx = parseInt(tr.getAttribute("data-idx"), 10);
+        var newEnabled = !!tgl.checked;
+        if (selectedId && mid != null) {
+          setMemberEnabled(mid, newEnabled);
+        } else if (!isNaN(idx) && membersBuffer[idx]) {
+          membersBuffer[idx].enabled = newEnabled;
+          renderMembers(membersBuffer, providersById());
+        }
+      });
+    }
+
+    // (B) Re-wire the kebab (three-dots) submenu after EVERY render:
+    // renderMembers rewrites tbody.innerHTML on each mutation, so the freshly
+    // recreated .js-row-menu buttons must be re-bound. wireRowMenu only attaches
+    // the per-button click that opens the shared row-menu; the document-level
+    // click-outside / Escape close handler is owned by app.js initRowMenuGlobal
+    // (registered ONCE at module load), so no document listener is added here and
+    // none can be duplicated. The grip/drag path uses pointerdown; the kebab uses
+    // click via wireRowMenu — the two never collide.
+    var a0 = app();
+    if (typeof a0.wireRowMenu === "function") a0.wireRowMenu(body, memberRowActions);
+
+    // Transient highlight on the row that just moved (▲▼ OR drag). Purely
+    // cosmetic — never touches the order logic or the wiring above.
+    if (movedRef && !prefersReducedMotion()) scheduleMovedFlash(body);
+  }
+
+  /* ---- Priority = row order (stage-8) ----
+     The SAME contract as moveAccount() on the provider page (app.js): swap i
+     with i±1, normalise the visible list to priority = 0..n-1, PUT only the
+     rows whose stored value actually changes, do it SEQUENTIALLY (a
+     deterministic order on the server beats n requests landing in any order),
+     then ALWAYS re-read the server — after a partial failure the view must
+     show the truth, not the order the user tried to create.
+     Buffer mode (a new, unsaved combo) is array-only: zero requests, and the
+     position becomes the priority when the combo is saved (buildMembersPayload).
+     An untouched combo is never renumbered: the first ▲▼ is what normalises it. */
+  /* ---- Shared reorder contract (used by BOTH ▲▼ AND drag) ----
+      `newOrder` is the desired final member list (full array, in display order).
+      The function normalises it to priority = 0..n-1, then PUTs ONLY the rows
+      whose stored number actually changed, SEQUENTIALLY, then re-reads the
+      server — the one contract stage-8 mandates (same as moveAccount in app.js).
+      Buffer mode (new, unsaved combo) is array-only: zero requests, and the
+      edited row's index is followed so "Update member" cannot land wrong. */
+  function applyOrderAndPersist(newOrder) {
+    newOrder = newOrder || [];
+
+    if (!selectedId) {
+      // A sub-form edit in buffer mode is keyed by INDEX: follow the row the
+      // user just moved, so "Update member" cannot land on the wrong one.
+      if (editingBufferIndex != null) {
+        var oldItem = membersBuffer[editingBufferIndex];
+        for (var k = 0; k < newOrder.length; k++) {
+          if (newOrder[k] === oldItem) { editingBufferIndex = k; break; }
+        }
+      }
+      membersBuffer = newOrder.slice();
+      renderMembers(membersBuffer, providersById());
+      return Promise.resolve();
+    }
+
+    var changed = [];
+    newOrder.forEach(function (m, i) {
+      var cur = parseInt(m.priority, 10);
+      if (isNaN(cur)) cur = 0;
+      if (cur !== i) changed.push({ id: m.id, priority: i });
+    });
+    if (!changed.length) return reloadCombo();
+    setMemberMsg("");
+    var chain = Promise.resolve();
+    changed.forEach(function (c) {
+      chain = chain.then(function () {
+        return fetchJson(COMBO_API + "/" + selectedId + "/members/" +
+          encodeURIComponent(c.id), {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            // Partial PUT: the endpoint updates only the fields it receives.
+            body: JSON.stringify({ priority: c.priority })
+          });
       });
     });
+    return chain.then(function () {
+      return reloadCombo();
+    }).catch(function (err) {
+      // Re-read first, message second: the reload must never erase the reason.
+      return reloadCombo().then(function () { setMemberMsg(err.message, "error"); });
+    });
+  }
+
+  /* Move one row by ±1 (the ▲▼ buttons). Builds the swapped array and hands the
+      whole thing to applyOrderAndPersist — no third code path for the order. */
+  function moveMember(index, dir) {
+    var list = selectedId ? currentMembers : membersBuffer;
+    var target = index + dir;
+    if (index < 0 || target < 0 || target >= list.length) return Promise.resolve();
+    var order = list.slice();
+    var swap = order[index];
+    order[index] = order[target];
+    order[target] = swap;
+    pendingMovedRef = swap; // flash the row that changed position
+    return applyOrderAndPersist(order);
+  }
+
+  /* Drag-to-reorder: move the row at `fromIdx` to the slot `insertIdx` (an
+      insertion position in the ORIGINAL order — 0..n; `n` = the very end).
+      Delegates the renumber/PUT/reload to the SAME applyOrderAndPersist used by
+      ▲▼, so the two affordances can never drift apart. A no-op move (drop on the
+      same row) returns cleanly with no request. */
+  function reorderMembers(fromIdx, insertIdx) {
+    var list = selectedId ? currentMembers : membersBuffer;
+    if (fromIdx < 0 || fromIdx >= list.length) return Promise.resolve();
+    if (insertIdx < 0) insertIdx = 0;
+    if (insertIdx > list.length) insertIdx = list.length;
+    var order = list.slice();
+    var item = order.splice(fromIdx, 1)[0];
+    if (insertIdx > fromIdx) insertIdx--; // removal shifts later indices left
+    order.splice(insertIdx, 0, item);
+    // No actual move (dropped back where it started, or past an edge that lands
+    // on the same slot) = the SAME boundary no-op as an out-of-range ▲▼: zero
+    // requests, no reload.
+    var unchanged = order.length === list.length;
+    for (var i = 0; unchanged && i < order.length; i++) {
+      if (order[i] !== list[i]) unchanged = false;
+    }
+    if (unchanged) return Promise.resolve();
+    pendingMovedRef = item; // flash the row that changed position
+    return applyOrderAndPersist(order);
+  }
+
+  /* Where would a pointer at clientY drop the dragged row? Returns the insertion
+      index = the first row whose vertical midpoint lies below the pointer (so the
+      dragged row lands just above it); past the last row = the end. Pure of the
+      DOM except getBoundingClientRect, hence unit-testable with stubbed rects. */
+  function computeDropIndex(rows, clientY) {
+    if (!rows || !rows.length) return null;
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i].getBoundingClientRect();
+      if (clientY < (r.top || 0) + (r.height || 0) / 2) return i;
+    }
+    return rows.length - 1;
+  }
+
+  /* ---- Grip drag (Pointer Events: touch + mouse, ONE path) ----
+      Only the .js-mem-drag handle starts a drag — the row itself stays a normal
+      row (arrow buttons / edit / delete keep working). preventDefault on
+      pointerdown stops the table scrolling and suppresses the trailing click so
+      the grip never masquerades as an arrow/edit/delete tap. */
+  function startDrag(e) {
+    if (!e.target || !e.target.closest) return;
+    var handle = e.target.closest(".js-mem-drag");
+    if (!handle) return;
+    var tr = e.target.closest(".member-row");
+    if (!tr) return;
+    var fromIdx = parseInt(tr.getAttribute("data-idx"), 10);
+    if (isNaN(fromIdx)) return;
+    e.preventDefault();
+    if (typeof tr.setPointerCapture === "function" && e.pointerId != null) {
+      try { tr.setPointerCapture(e.pointerId); } catch (_) {}
+    }
+    dragState = { fromIdx: fromIdx, tr: tr, pointerId: e.pointerId };
+    if (tr) tr.classList.add("is-dragging"); // minimal in-drag feedback (token tint)
+    document.addEventListener("pointermove", onGripPointerMove);
+    document.addEventListener("pointerup", onGripPointerUp);
+    document.addEventListener("pointercancel", onGripPointerUp);
+  }
+
+  function onGripPointerMove(e) {
+    if (!dragState) return;
+    // Keep the table from scrolling under a finger while a row is being dragged.
+    e.preventDefault();
+  }
+
+  function onGripPointerUp(e) {
+    if (!dragState) return;
+    document.removeEventListener("pointermove", onGripPointerMove);
+    document.removeEventListener("pointerup", onGripPointerUp);
+    document.removeEventListener("pointercancel", onGripPointerUp);
+    var from = dragState.fromIdx;
+    var tr = dragState.tr;
+    if (tr) tr.classList.remove("is-dragging");
+    if (tr && typeof tr.releasePointerCapture === "function" && dragState.pointerId != null) {
+      try { tr.releasePointerCapture(dragState.pointerId); } catch (_) {}
+    }
+    dragState = null;
+    var body = el("comboMembersBody");
+    var rows = body ? Array.prototype.slice.call(body.querySelectorAll("tr.member-row")) : [];
+    var insertIdx = computeDropIndex(rows, e.clientY != null ? e.clientY : 0);
+    if (insertIdx != null && insertIdx !== from) reorderMembers(from, insertIdx);
   }
 
   /* ---- Sub-form (add member / edit member) ---- */
@@ -429,13 +758,20 @@
     return inp ? String(inp.value || "").trim() : "";
   }
 
+  /* What the sub-form owns: provider + model + weight. NO priority — that is
+     the row's position (▲▼ / save order), never a typed number. */
   function memberFormValues() {
     return normalizeMember({
       provider_id: el("comboMemberProvider") ? el("comboMemberProvider").value : "",
       provider_model: modelFieldValue(),
-      priority: el("comboMemberPriority") ? el("comboMemberPriority").value : 0,
       weight: el("comboMemberWeight") ? el("comboMemberWeight").value : 1
     });
+  }
+
+  /* The queue index a NEW member joins at: the END of the current list. With
+     the old default (0) a new member jumped the retry queue. */
+  function appendPriority() {
+    return (selectedId ? currentMembers : membersBuffer).length;
   }
 
   function resetMemberForm() {
@@ -446,7 +782,6 @@
     renderModelOptions([]);   // clear the combobox option list
     clearModelSelection();    // blank the input
     var c = modelCombo(); if (c) c.close(); // never leave the panel open
-    var pr = el("comboMemberPriority"); if (pr) pr.value = "0";
     var w = el("comboMemberWeight"); if (w) w.value = "1";
     var add = el("comboMemberAddBtn");
     if (add) { add.textContent = getStr("combos.member.add"); add.disabled = false; }
@@ -468,7 +803,6 @@
     // value set above), so the member being edited keeps its model while the
     // searchable list refreshes beneath it.
     fetchModelsForProvider(m.provider_id);
-    var pr = el("comboMemberPriority"); if (pr) pr.value = String(m.priority != null ? m.priority : 0);
     var w = el("comboMemberWeight"); if (w) w.value = String(m.weight != null ? m.weight : 1);
     var add = el("comboMemberAddBtn");
     if (add) add.textContent = getStr("combos.member.update");
@@ -520,8 +854,7 @@
 
   /* ---- Server mode (existing combo): POST|PUT|DELETE + reload ---- */
   function addMember(m) {
-    m = m || memberFormValues();
-    m = normalizeMember(m);
+    m = normalizeMember(m || memberFormValues());
     if (m.provider_id == null) {
       setMemberMsg(getStr("combos.member.provider_required"), "error");
       return Promise.resolve();
@@ -531,6 +864,8 @@
       return Promise.resolve();
     }
     if (!selectedId) return Promise.resolve(bufferMemberLocal(m));
+    // A new member goes LAST: priority = how many members there are now.
+    m.priority = appendPriority();
     setMemberMsg("");
     return fetchJson(COMBO_API + "/" + selectedId + "/members", {
       method: "POST",
@@ -545,13 +880,38 @@
   function saveMember(mid, patch) {
     if (!selectedId) return Promise.resolve();
     setMemberMsg("");
+    // Partial PUT: whatever the caller did not send (notably priority, which the
+    // form no longer has) keeps its stored value on the server.
+    var body = normalizeMember(patch);
     return fetchJson(COMBO_API + "/" + selectedId + "/members/" + encodeURIComponent(mid), {
       method: "PUT",
       headers: { "Content-Type": "application/json", "Accept": "application/json" },
-      body: JSON.stringify(normalizeMember(patch))
+      body: JSON.stringify(body)
     }).then(function () {
       return reloadCombo();
     }).catch(function (err) { setMemberMsg(err.message, "error"); });
+  }
+
+  /* Enable/disable ONE member: a DIRECT partial PUT of { enabled } only.
+     MUST bypass normalizeMember() (which strips `enabled`): this toggle is the
+     one field normalizeMember drops, so routing it through there would send an
+     empty body and silently no-op. On success the combo reloads (the row's
+     greyed state then reflects the server); on failure the message surfaces AND
+     the optimistic checkbox reverts to the last known server truth (currentMembers). */
+  function setMemberEnabled(mid, enabled) {
+    if (!selectedId || mid == null) return Promise.resolve();
+    setMemberMsg("");
+    return fetchJson(COMBO_API + "/" + selectedId + "/members/" + encodeURIComponent(mid), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify({ enabled: !!enabled })
+    }).then(function () {
+      return reloadCombo();
+    }).catch(function (err) {
+      // Revert the optimistic toggle to the stored server state.
+      renderMembers(currentMembers, providersById());
+      setMemberMsg(err.message, "error");
+    });
   }
 
   function removeMember(mid) {
@@ -578,7 +938,10 @@
 
   /* ---- Buffer mode (new combo): local array ops, sent on Save ---- */
   function bufferMemberLocal(m) {
-    membersBuffer.push(normalizeMember(m));
+    // Same join rule as the server path: a new member goes at the END.
+    var buf = normalizeMember(m);
+    buf.priority = appendPriority();
+    membersBuffer.push(buf);
     renderMembers(membersBuffer, providersById());
     return membersBuffer.length;
   }
@@ -590,8 +953,15 @@
     return membersBuffer.length;
   }
 
+  /* Position IS the priority for a combo being created: the payload is numbered
+     0..n-1 in the order the user sees, so a buffer-mode ▲▼ move (array only,
+     zero requests) is what lands on the server. */
   function buildMembersPayload() {
-    return membersBuffer.map(normalizeMember);
+    return membersBuffer.map(function (m, i) {
+      var v = normalizeMember(m);
+      v.priority = i;
+      return v;
+    });
   }
 
   /* ---- Modal (add / edit) ---- */
@@ -689,7 +1059,7 @@
     // Enter inside the OTHER sub-form fields adds/updates the member, never
     // saves the whole combo form. (The model combobox is handled separately,
     // delegated, because it owns Enter while its panel is open.)
-    ["comboMemberProvider", "comboMemberPriority", "comboMemberWeight"]
+    ["comboMemberProvider", "comboMemberWeight"]
       .forEach(function (id) {
         var node = el(id);
         if (!node) return;
@@ -750,12 +1120,17 @@
     renderModelOptions: renderModelOptions,
     getModelCombobox: modelCombo,
     renderMembers: renderMembers,
+    moveMember: moveMember,
+    applyOrderAndPersist: applyOrderAndPersist,
+    reorderMembers: reorderMembers,
+    computeDropIndex: computeDropIndex,
     memberFormValues: memberFormValues,
     fillMemberForm: fillMemberForm,
     submitMemberForm: submitMemberForm,
     resetMemberForm: resetMemberForm,
     addMember: addMember,
     saveMember: saveMember,
+    setMemberEnabled: setMemberEnabled,
     removeMember: removeMember,
     reloadCombo: reloadCombo,
     bufferMemberLocal: bufferMemberLocal,

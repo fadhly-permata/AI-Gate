@@ -73,7 +73,9 @@ class ResolvedTarget:
     format: str = "openai"
 
 
-def resolve_target(model: str) -> ResolvedTarget:
+def resolve_target(
+    model: str, preferred_account_id: Optional[int] = None
+) -> ResolvedTarget:
     """Resolve a ``provider:`` / ``combo:`` model reference to an upstream.
 
     Accepted forms (canonical scheme, R9):
@@ -92,6 +94,10 @@ def resolve_target(model: str) -> ResolvedTarget:
       :func:`_resolve_bare_model`).
 
     :param model: the request ``model`` string.
+    :param preferred_account_id: optional account pin (gateway header
+        ``x-connection-id``) forwarded to the selection engine, where it
+        bypasses the provider's routing strategy. Ignored for combo refs
+        (member credentials are chosen inside ``backend.combo_routing``).
     :raises TargetNotFound: if nothing matches the reference.
     """
     with SessionLocal() as session:
@@ -115,7 +121,7 @@ def resolve_target(model: str) -> ResolvedTarget:
                         f"model '{model_id}' not found for provider '{name}'"
                     )
                 api_key, account_id = select_provider_credential_with_account(
-                    provider, session
+                    provider, session, preferred_account_id=preferred_account_id
                 )
                 return ResolvedTarget(
                     base_url=provider.base_url,
@@ -143,7 +149,7 @@ def resolve_target(model: str) -> ResolvedTarget:
                 if first_model is None:
                     raise TargetNotFound(f"provider '{name}' has no models")
                 api_key, account_id = select_provider_credential_with_account(
-                    provider, session
+                    provider, session, preferred_account_id=preferred_account_id
                 )
                 return ResolvedTarget(
                     base_url=provider.base_url,
@@ -180,7 +186,7 @@ def resolve_target(model: str) -> ResolvedTarget:
         # Bare model id (no ``provider:``/``combo:`` prefix). OpenAI-compatible
         # CLIs (aider, etc.) send a plain model name; resolve it against the
         # enabled providers that advertise it.
-        return _resolve_bare_model(model, session)
+        return _resolve_bare_model(model, session, preferred_account_id)
 
 
 def _pick_default_provider(
@@ -209,7 +215,9 @@ def _pick_default_provider(
     return providers[0]
 
 
-def _resolve_bare_model(model: str, session) -> ResolvedTarget:
+def _resolve_bare_model(
+    model: str, session, preferred_account_id: Optional[int] = None
+) -> ResolvedTarget:
     """Resolve a bare (unprefixed) model id to an enabled provider's upstream.
 
     ``model`` is matched against ``ProviderModel.model_id`` joined to ENABLED
@@ -223,7 +231,8 @@ def _resolve_bare_model(model: str, session) -> ResolvedTarget:
     * none -> :class:`TargetNotFound` with a hint to use the ``provider:`` form.
 
     Credential selection reuses B5.1 (:func:`select_provider_credential_with_account`)
-    so account round-robin / OAuth apply exactly as on the ``provider:`` path.
+    so the provider's routing strategy / pin / OAuth auto-refresh apply exactly
+    as on the ``provider:`` path.
     """
     rows = session.scalars(
         select(Provider)
@@ -265,7 +274,9 @@ def _resolve_bare_model(model: str, session) -> ResolvedTarget:
             },
         )
 
-    api_key, account_id = select_provider_credential_with_account(provider, session)
+    api_key, account_id = select_provider_credential_with_account(
+        provider, session, preferred_account_id=preferred_account_id
+    )
     return ResolvedTarget(
         base_url=provider.base_url,
         api_key=api_key,

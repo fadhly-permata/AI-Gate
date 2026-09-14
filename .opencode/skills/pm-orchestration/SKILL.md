@@ -33,11 +33,11 @@ questions). PM integrates receipts; never duplicates the sub-agent's work.
 | Server / API / DB | be-dev | src/backend/** |
 | UI / components | fe-dev | src/frontend/** |
 | Full vertical slice | fullstack-dev | one assigned module |
-| Requirements / flows | system-analyst | docs/analysis/** |
-| Value / stories | business-analyst | docs/business/** |
+| Requirements / flows | system-analyst | documents/analysis/** |
+| Value / stories | business-analyst | documents/business/** |
 | Tests / quality | qa-engineer | tests/**, .opencode/reports/** |
 
-| Design / trade-offs | tech-architect | docs/architecture/** |
+| Design / trade-offs | tech-architect | documents/architecture/** |
 
 Spawn only when the need appears. Never pre-create. Generate agent + skill
 together. Reuse (do not delete) once generated.
@@ -53,3 +53,32 @@ truly independent and scopes don't overlap; otherwise sequential.
 Each sub-agent writes only its scope. PM owns `documents/pm/` and the final merge.
 Cross-scope writes are violations — reject the receipt and ask for fix. See
 `.opencode/rules/agent-boundaries.md`.
+
+## 6. Record Protocol (user correction → durable rule)
+Trigger: user corrects a PM decision, OR PM acted outside a granted file scope,
+OR a rule was violated.
+1. Append block to `documents/pm/status.md` (newest first):
+
+```
+## <yyyymmdd-HHMM> — PM decided wrong → user correction recorded (ProjectManager)
+
+### Violation
+- Rule broken: <rule id + path:line>
+- What PM did: <one factual line>
+
+### Correction
+- Durable rule captured: <R#> — <title>
+- Decision: <user ruling + rationale>
+
+### Prevention
+- Mechanism: <guardrail / gate added>
+- Verification: <gate or check that catches a recurrence>
+```
+
+2. Append the `R#` to `documents/pm/OPERATING_RULES.md` (heading + lesson + rule).
+3. Update `documents/pm/memory-bank.md` Decisions/Progress.
+4. Update `documents/pm/state.md`: `mode`, `delay_seconds`, `checkpoint`,
+   `updated`, `rules_ref`.
+5. Report to user: violation + correction + prevention.
+6. Never delete a recorded violation. Never edit a past block.
+No extra file per event — append to `status.md` (R38).

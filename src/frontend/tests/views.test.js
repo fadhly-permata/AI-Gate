@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { indexDocument, stylesCss, staticSource } from "./helpers/dom.js";
+import { indexDocument, indexHtml, stylesCss, staticSource, htmlRefBase } from "./helpers/dom.js";
 
 // i18n.js is a side-effect module: attaches window.I18N (no document access at
 // load). Imported so the collapse-key regression guard can read the dicts.
@@ -50,6 +50,32 @@ describe("index.html structure — missing views + global Log Window", () => {
     expect(doc.querySelector('[data-view="endpoints"]')).not.toBeNull();
   });
 
+  /* ===== The provider-detail page is the ONE exception to "view = menu" =====
+     stage-3 (Opsi A): it is a sub-page of Providers, opened from a row name, so
+     it must NOT grow a sidebar or bottom-nav entry — otherwise the mirror list
+     below (and the phone shell's reachability contract) changes shape. app.js
+     keeps .nav-item[data-view="providers"] highlighted while it is shown. */
+  it("provider-detail view exists but has NO nav or bottom-nav entry", () => {
+    const view = doc.querySelector('section.view[data-view="provider-detail"]');
+    expect(view, "detail view section present").not.toBeNull();
+    expect(view.classList.contains("view")).toBe(true);
+    expect(doc.querySelector('.nav-item[data-view="provider-detail"]')).toBeNull();
+    expect(doc.querySelector('.bn-item[data-view="provider-detail"]')).toBeNull();
+    // It is still reachable by keyboard/mouse: the entry point is a real button.
+    expect(doc.querySelector('.nav-item[data-view="providers"]')).not.toBeNull();
+  });
+
+  it("provider-detail is one vertical column of cards (no grid, no wide table)", () => {
+    const view = doc.querySelector('section.view[data-view="provider-detail"]');
+    const cards = view.querySelectorAll(":scope > .card");
+    expect(cards.length, "head + 4 cards").toBeGreaterThanOrEqual(5);
+    // The only table left inside it is the B5.5 top-models one that usage.js
+    // owns; the 6-column accounts table must not come back.
+    expect(view.querySelector("#accList").tagName).toBe("DIV");
+    expect(view.querySelector("#accList table")).toBeNull();
+    expect(doc.getElementById("accountsTable")).toBeNull();
+  });
+
   it("sidebar + bottom-nav link to the three new views", () => {
     ["combos", "proxies", "endpoints"].forEach(function (v) {
       expect(doc.querySelector('.nav-item[data-view="' + v + '"]')).not.toBeNull();
@@ -72,13 +98,17 @@ describe("index.html structure — missing views + global Log Window", () => {
   });
 
   it("loads the three new module scripts (after app.js)", () => {
-    const srcs = Array.from(doc.querySelectorAll("script[src]")).map(function (s) {
-      return s.getAttribute("src");
-    });
-    expect(srcs).toContain("combos.js");
-    expect(srcs).toContain("proxies.js");
-    expect(srcs).toContain("endpoints.js");
-    expect(srcs.indexOf("app.js")).toBeLessThan(srcs.indexOf("combos.js"));
+    // Version-aware (stage-8 follow-up): every module now carries a `?v=`
+    // cache-buster, so compare BASENAMES — the presence + order contract is
+    // unchanged, it just survives version bumps.
+    const bases = Array.from(doc.querySelectorAll("script[src]"))
+      .map((s) => htmlRefBase(s.getAttribute("src")));
+    expect(bases).toContain("combos.js");
+    expect(bases).toContain("proxies.js");
+    expect(bases).toContain("endpoints.js");
+    expect(bases.indexOf("app.js")).toBeLessThan(bases.indexOf("combos.js"));
+    expect(bases.indexOf("app.js")).toBeLessThan(bases.indexOf("proxies.js"));
+    expect(bases.indexOf("app.js")).toBeLessThan(bases.indexOf("endpoints.js"));
   });
 
   it("Log Window keeps severity filter + refresh; the old collapse button is gone", () => {
@@ -245,13 +275,254 @@ describe("sidebar Repository link — sticky footer", () => {
     expect(sidebar).toMatch(/overflow-y:\s*auto/);  // still the scroll container
   });
 
-  it("phones are unchanged: sidebar stays hidden, no repo item in .bottom-nav", () => {
+  it("phones reach the repo too: sidebar hidden, repo link added to .bottom-nav", () => {
     expect(css).toMatch(/@media \(max-width: 600px\)[\s\S]{0,400}\.sidebar\s*\{\s*display:\s*none/);
     expect(ruleBlock(/(^|\n)body\[data-device="phone"\] \.sidebar\s*\{[^}]*\}/))
       .toMatch(/display:\s*none/);
-    expect(doc.querySelector('.bottom-nav a[href*="github"]')).toBeNull();
-    // 7 = current bottom-nav items; guards that the repo link was NOT added here.
-    expect(doc.querySelectorAll(".bottom-nav .bn-item")).toHaveLength(7);
+    // Request 2026-09-09: the sticky sidebar footer stays the tablet/desktop
+    // entry point, but the phone shell (sidebar hidden) must also reach the
+    // repo — icon-only as the last .bn-item, a real external link.
+    const navRepo = doc.querySelector('.bottom-nav a.bn-item[href*="github"]');
+    expect(navRepo, "repo link present in .bottom-nav").not.toBeNull();
+    expect(navRepo.getAttribute("href")).toBe(REPO_URL);
+    expect(navRepo.getAttribute("target")).toBe("_blank");
+    const navRel = (navRepo.getAttribute("rel") || "").split(/\s+/);
+    expect(navRel).toContain("noopener");
+    expect(navRel).toContain("noreferrer");
+    // No data-view -> app.js keeps native link behaviour (binding above).
+    expect(navRepo.hasAttribute("data-view")).toBe(false);
+    // 9 app views + repo = 10 items in the bottom nav.
+    expect(doc.querySelectorAll(".bottom-nav .bn-item")).toHaveLength(10);
+  });
+});
+
+/* ===== Phone shell: hamburger hidden, bottom nav scrolls sideways =====
+   User report 2026-09-09: on the phone shell the sidebar is replaced by
+   .bottom-nav, so #sidebarToggle toggles nothing (dead tap) and the icons were
+   squeezed to ~50px each — the last ones unreachable. Fix = hide the hamburger
+   in BOTH phone contexts and let the nav scroll horizontally instead of clip.
+   Retest the same day: menus still "unreachable", because .bottom-nav only had
+   7 of the sidebar's 9 app views — usage and analytics were never rendered on a
+   phone. Fix = mirror the sidebar 1:1; 9 x min-width overflows a 360px row, so
+   the scroll rule above is now what makes the LAST item reachable.
+    jsdom evaluates neither @media nor flex layout, so the rule TEXT is the
+    contract (same approach as the sticky-footer checks above).
+    Follow-up 2026-09-09: the repo link joined the nav as a 10th icon-only
+    item, and .bn-sep dividers were added at the sidebar's group boundaries —
+    the nav now mirrors the grouping, not just the item list. */
+describe("phone shell — hamburger hidden, bottom nav scrollable", () => {
+  const PHONE_QUERY = "@media (max-width: 600px)";
+  const TABLET_QUERY = "@media (max-width: 960px)";
+  const NARROW_PHONE_PX = 360;  // smallest phone viewport we design for
+
+  /** Index just past the "}" matching the "{" at `open`; -1 when unbalanced. */
+  function blockEnd(text, open) {
+    let depth = 0;
+    for (let i = open; i < text.length; i += 1) {
+      if (text[i] === "{") depth += 1;
+      else if (text[i] === "}" && (depth -= 1) === 0) return i + 1;
+    }
+    return -1;
+  }
+
+  /** Inner text of every @media block whose header contains `query`. */
+  function mediaBodies(query) {
+    const bodies = [];
+    let i = css.indexOf(query);
+    while (i !== -1) {
+      const open = css.indexOf("{", i);
+      const end = blockEnd(css, open);
+      if (end !== -1) bodies.push(css.slice(open + 1, end - 1));
+      i = css.indexOf(query, i + query.length);
+    }
+    return bodies;
+  }
+
+  // The file has two 600px blocks; the phone SHELL is the one that hides the
+  // sidebar (the other only tucks the app subtitle away).
+  const phoneShell = () => mediaBodies(PHONE_QUERY).find(function (body) {
+    return /\.sidebar\s*\{/.test(body);
+  });
+
+  it("hides #sidebarToggle in both phone shells and nowhere else", function () {
+    const shell = phoneShell();
+    expect(shell, "phone-shell @media block found").toBeTruthy();
+    expect(shell).toMatch(/\.sidebar\s*\{\s*display:\s*none/);       // nothing left to toggle
+    expect(shell).toMatch(/#sidebarToggle\s*\{\s*display:\s*none/);  // so the button goes too
+    expect(ruleBlock(/(^|\n)body\[data-device="phone"\] #sidebarToggle\s*\{[^}]*\}/))
+      .toMatch(/display:\s*none/);                                   // simulation shell mirrors it
+    // display:none takes it out of layout AND the tab order, so the dead tap in
+    // app.js can never fire on a phone. Exactly one rule per phone context:
+    expect(css.match(/#sidebarToggle\s*\{/g), "two phone shells = two rules").toHaveLength(2);
+    // Tablet (>600px) keeps the AdminLTE sidebar, so the hamburger must stay.
+    const tablet = mediaBodies(TABLET_QUERY);
+    expect(tablet, "single tablet block").toHaveLength(1);
+    expect(tablet[0]).toMatch(/--sidebar-w:/);                       // really the tablet block
+    expect(tablet[0]).not.toMatch(/#sidebarToggle/);
+  });
+
+  it("renders EVERY sidebar view in the bottom nav (no phone-unreachable menu)", function () {
+    // Root cause of the 2026-09-09 retest: usage + analytics existed in the
+    // sidebar only, so on a phone they were literally never rendered. Compare the
+    // two lists (same order too: the nav is the phone mirror of the menu).
+    const sidebarViews = Array.from(
+      doc.querySelectorAll(".sidebar .nav-item[data-view]")
+    ).map(function (item) { return item.getAttribute("data-view"); });
+    // [data-view] only: the repo link is also a .bn-item but is an external
+    // anchor, not a view — including it would inject a null into the mirror.
+    const navViews = Array.from(doc.querySelectorAll(".bottom-nav .bn-item[data-view]")).map(function (item) {
+      return item.getAttribute("data-view");
+    });
+    expect(sidebarViews).toEqual([
+      "providers", "combos", "proxies", "endpoints", "terminal", "cli",
+      "usage", "analytics", "settings"
+    ]);
+    expect(navViews).toEqual(sidebarViews);
+    // Every mirrored item keeps the shared i18n aria key, so its label is
+    // localized in both locales (app.js binds taps generically by data-view).
+    navViews.forEach(function (v) {
+      const item = doc.querySelector('.bottom-nav .bn-item[data-view="' + v + '"]');
+      expect(item.getAttribute("data-i18n-aria")).toBe("nav." + v);
+      expect(window.I18N.en["nav." + v]).toBeTruthy();
+      expect(window.I18N.id["nav." + v]).toBeTruthy();
+    });
+  });
+
+  it("scrolls .bottom-nav sideways so all 10 items stay reachable", function () {
+    const shell = phoneShell();
+    expect(shell, "phone-shell @media block found").toBeTruthy();
+    const nav = ruleBlock(/(^|\n)\.bottom-nav\s*\{[^}]*\}/);
+    expect(nav, ".bottom-nav base rule present").not.toBeNull();
+    expect(nav).toMatch(/overflow-x:\s*auto/);                   // scroll, never clip
+    expect(nav).toMatch(/-webkit-overflow-scrolling:\s*touch/);  // momentum in mobile webviews
+    expect(nav).toMatch(/justify-content:\s*flex-start/);        // centring would overflow BOTH ends
+    expect(nav).toMatch(/align-items:\s*center/);                // vertical centring untouched
+    const item = ruleBlock(/(^|\n)\.bn-item\s*\{[^}]*\}/);
+    const minTap = item && item.match(/min-width:\s*(\d+)px/);
+    expect(minTap, ".bn-item keeps a min-width (overflow -> scroll, no squeeze)").not.toBeNull();
+    expect(Number(minTap[1]), "still a comfortable tap target").toBeGreaterThanOrEqual(44);
+    expect(item).toMatch(/justify-content:\s*center/);           // icon stays centred in its cell
+    // flex-shrink must NOT be able to win over min-width, or the items squeeze
+    // back into the viewport and the scroll disappears (the reported symptom).
+    expect(item).toMatch(/flex:\s*1 1 0/);
+    const items = doc.querySelectorAll(".bottom-nav .bn-item");
+    expect(items).toHaveLength(10);
+    // 10 x 60px = 600px > 360px (separators only add width): the row cannot
+    // fit, so it must scroll — and no item can shrink below the tap target,
+    // i.e. none is clipped out of reach.
+    expect(items.length * Number(minTap[1])).toBeGreaterThan(NARROW_PHONE_PX);
+    // Both phone shells only switch the nav ON; undoing the base row would kill
+    // the scroll again (space-around / a hidden overflow were the old bug).
+    const shellNav = shell.match(/\.bottom-nav\s*\{[^}]*\}/);
+    [shellNav && shellNav[0],
+     ruleBlock(/body\[data-device="phone"\] \.bottom-nav\s*\{[^}]*\}/)].forEach(function (rule) {
+      expect(rule, ".bottom-nav rule in the phone shell").not.toBeNull();
+      expect(rule).toMatch(/display:\s*flex/);
+      expect(rule, "no justify-content/override inside the phone shell")
+        .not.toMatch(/justify-content|overflow/);
+    });
+    // Active/hover feedback that makes the row usable survives the change.
+    expect(ruleBlock(/\.bn-item\.active\s*\{[^}]*\}/)).toMatch(/background:/);
+  });
+
+  it("divides the nav into the sidebar's groups with 4 separators", function () {
+    // Gateway | Operations | Insights | System | Repo = 5 clusters -> 4 dividers.
+    const seps = doc.querySelectorAll(".bottom-nav .bn-sep");
+    expect(seps, "one separator at every group boundary").toHaveLength(4);
+    seps.forEach(function (sep) {
+      // Decorative: keep it out of the accessible name of the nav.
+      expect(sep.getAttribute("aria-hidden")).toBe("true");
+    });
+    // Count alone is not enough: each divider must sit at a real boundary,
+    // mirroring the sidebar .nav-section edges (aria keys identify the sides).
+    const boundaries = Array.from(seps).map(function (sep) {
+      return [sep.previousElementSibling.getAttribute("data-i18n-aria"),
+              sep.nextElementSibling.getAttribute("data-i18n-aria")];
+    });
+    // Parity note (2026-09-13, device-sim moved out of Settings -> modal, Opsi A):
+    // the control is now a <button class="bn-device"> placed directly ABOVE the Repo
+    // item. It is NOT a .bn-item (so the 10-item mirror count above stays valid) and
+    // carries data-i18n-aria "settings.device_sim". The dividers still mark the same
+    // four sidebar group edges; the LAST one now sits System -> device-sim, with Repo
+    // immediately after the control (no dedicated divider: both are non-view tail
+    // controls, and Repo stays the final bottom-nav item).
+    expect(boundaries).toEqual([
+      ["nav.endpoints", "nav.terminal"],       // Gateway  -> Operations
+      ["nav.cli", "nav.usage"],                // Operations -> Insights
+      ["nav.analytics", "nav.settings"],       // Insights -> System
+      ["nav.settings", "settings.device_sim"]  // System   -> device-sim (Repo follows)
+    ]);
+    // jsdom has no layout: the rule text carries the visible-divider contract.
+    const rule = ruleBlock(/(^|\n)\.bn-sep\s*\{[^}]*\}/);
+    expect(rule, ".bn-sep base rule present").not.toBeNull();
+    expect(rule).toMatch(/flex:\s*0 0 auto/);                 // never squeezed by the row
+    expect(rule).toMatch(/width:\s*1px/);                     // hairline
+    expect(rule).toMatch(/background:\s*var\(--panel-border\)/); // token, light+dark aware
+    expect(rule).not.toMatch(/#[0-9a-fA-F]{3,8}/);            // no new hex
+  });
+});
+
+/* ===== Cache-buster guard — every LOCAL script/stylesheet carries ?v= =====
+   Stage-8 follow-up (2026-09-12): six modules (device/combos/proxies/endpoints/
+   usage/clitools) shipped with a bare src, so a browser holding a stale cached
+   copy ran the OLD code after an update — the exact "kok tab-nya gak ada"
+   incident class. This guard makes a bare local ref fail loudly: it scans the
+   RENDERED markup (jsdom parses out HTML comments, so no commented-out tag can
+   satisfy it — proven by temporarily reverting one ?v= and watching it fail).
+   Rule: local .js/.css refs must match ?v=<digits>. External refs are banned
+   outright by vendor_assets.test.js (G3), so "local" needs no extra check. */
+describe("cache-buster guard — every local script/stylesheet has ?v=", () => {
+  // EXPLICIT exceptions, each with its reason. Keep this list empty unless a
+  // ref genuinely cannot carry a static ?v=, and say WHY next to it.
+  const EXEMPT = [];
+
+  const CACHEABLE = /\.(?:js|mjs|css)$/;
+  // V is a single source of truth per release day; ?raw= / ?data= style dynamic
+  // refs would slip past a `[?&]v=` test, so only ?v=<digits> counts as busted.
+  const BUSTED = /\?v=\d+$/;
+
+  it("every <script src> of a local .js carries ?v=<digits> (or is exempted)", () => {
+    const offenders = Array.from(doc.querySelectorAll("script[src]"))
+      .map((s) => s.getAttribute("src"))
+      .filter((src) => CACHEABLE.test(htmlRefBase(src)) && !EXEMPT.includes(src))
+      .filter((src) => {
+        const q = src.indexOf("?");
+        const query = q === -1 ? "" : src.slice(q).split("#")[0];
+        return !BUSTED.test(query);
+      });
+    expect(offenders, "scripts missing ?v=").toEqual([]);
+  });
+
+  it("every <link rel=stylesheet href> of a local .css carries ?v=<digits> (or is exempted)", () => {
+    const offenders = Array.from(doc.querySelectorAll('link[rel~="stylesheet"][href]'))
+      .map((l) => l.getAttribute("href"))
+      .filter((href) => CACHEABLE.test(htmlRefBase(href)) && !EXEMPT.includes(href))
+      .filter((href) => {
+        const q = href.indexOf("?");
+        const query = q === -1 ? "" : href.slice(q).split("#")[0];
+        return !BUSTED.test(query);
+      });
+    expect(offenders, "stylesheets missing ?v=").toEqual([]);
+  });
+
+  it("the guard is not vacuous (it sees the real module + css refs)", () => {
+    // If these ever hit 0, the scan broke (selector/markup change) and the two
+    // tests above would pass on an empty list — the exact silent failure this
+    // whole block exists to prevent.
+    const scripts = Array.from(doc.querySelectorAll("script[src]"))
+      .map((s) => s.getAttribute("src"))
+      .filter((src) => CACHEABLE.test(htmlRefBase(src)));
+    expect(scripts.length, "cacheable <script src> count").toBeGreaterThanOrEqual(13);
+    expect(scripts.some((s) => htmlRefBase(s) === "combos.js")).toBe(true);
+    const csses = Array.from(doc.querySelectorAll('link[rel~="stylesheet"][href]'))
+      .map((l) => l.getAttribute("href"))
+      .filter((href) => CACHEABLE.test(htmlRefBase(href)));
+    expect(csses.length, "cacheable stylesheet count").toBeGreaterThanOrEqual(2);
+    // i18n preloader (inline in <head>) is NOT covered by the scan above: its
+    // dictionary tags are document.write'd at runtime and already carry the
+    // shared V (window.I18N_VER). Pinned here, straight from the raw source,
+    // so removing the runtime ?v= also fails this file.
+    expect(indexHtml()).toMatch(/\.js\?v="\s*\+\s*V/);
   });
 });
 

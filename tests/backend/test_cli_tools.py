@@ -197,6 +197,8 @@ def test_list_cli_tools(monkeypatch) -> None:
         "enabled",
         "launch_mode",
         "launch_reason",
+        # 'compat' added by the per-platform compatibility catalog (36b71ad)
+        "compat",
     }
 
     modes = {
@@ -208,7 +210,9 @@ def test_list_cli_tools(monkeypatch) -> None:
     assert modes["aider"][0] == "verified"
     assert modes["opencode"][0] == "verified"
     # unsupported: needs a wire format the gateway does not expose -> struck
-    assert modes["claude"] == ("unsupported", "anthropic_only")
+    # claude flipped: the gateway now serves a native inbound /v1/messages
+    # (anthropic-inbound work) and a dedicated _claude_builder exists -> verified
+    assert modes["claude"] == ("verified", "")
     assert modes["antigravity"] == ("unsupported", "not_a_cli")
     # verified live on Termux: codex 0.122 dropped wire_api="chat" -> needs
     # /v1/responses, which the gateway does not serve
@@ -264,9 +268,12 @@ def test_resolve_tool_by_name(monkeypatch) -> None:
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize(
     "tool,mode,reason",
-    [
-        ("claude", "unsupported", "anthropic_only"),  # needs /v1/messages
-        ("codex", "unsupported", "responses_only"),  # needs /v1/responses
+        [
+            # claude REMOVED here: it is VERIFIED since the gateway serves a
+            # native inbound POST /v1/messages (anthropic-inbound work) and
+            # now has a dedicated launch builder (_claude_builder). The
+            # refusal path stays covered by the cases below.
+            ("codex", "unsupported", "responses_only"),  # needs /v1/responses
         ("antigravity", "unsupported", "not_a_cli"),  # GUI IDE, no binary
         # library + web app only: pip installs NO `gpt-researcher` binary
         ("gpt-researcher", "unsupported", "not_a_cli"),
@@ -308,6 +315,33 @@ def test_generic_builder_is_the_verified_tool_fallback() -> None:
     assert cli_tools_router._build_run_command(ctx_flags) == (
         "demo --verbose --model provider:B.AI:gpt-5.5"
     )
+
+
+def test_claude_builder_uses_anthropic_root_env_form() -> None:
+    """claude-code appends /v1/messages itself -> ANTHROPIC_BASE_URL must be
+    the gateway ROOT (scripts/cli-tools/claude.sh:64-83, verified form).
+    Registered in _LAUNCH_BUILDERS, so the verified-preset guard is honest."""
+    assert "claude" in cli_tools_router._LAUNCH_BUILDERS
+    ctx = cli_tools_router._LaunchCtx(
+        binary_name="claude",
+        default_flags="",
+        model="provider:test:m1",
+        raw_model="m1",
+        base="http://localhost:8080/v1",
+        key="k",
+    )
+    cmd = cli_tools_router._build_run_command(ctx)
+    assert cmd.startswith(
+        "ANTHROPIC_BASE_URL=http://localhost:8080 "
+        "ANTHROPIC_API_KEY=k ANTHROPIC_MODEL=provider:test:m1 claude "
+        "--model provider:test:m1"
+    )
+    # No model chosen -> claude's own default; base+key still point at aigate.
+    no_model = dataclasses.replace(ctx, model=None)
+    cmd2 = cli_tools_router._build_run_command(no_model)
+    assert "ANTHROPIC_MODEL" not in cmd2
+    assert "--model" not in cmd2
+    assert cmd2.startswith("ANTHROPIC_BASE_URL=http://localhost:8080 ")
 
 
 def test_every_verified_preset_has_a_launch_path() -> None:

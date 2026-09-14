@@ -275,4 +275,4 @@ Sebagai User, saya ingin mengatur system prompt & temperature per sesi.
 
 ---
 
-*Dokumen ini ditulis di bawah scope `docs/business/` sesuai aturan specialist Business Analyst.*
+*Dokumen ini ditulis di bawah scope `documents/business/` sesuai aturan specialist Business Analyst.*

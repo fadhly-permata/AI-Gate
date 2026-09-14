@@ -179,20 +179,63 @@ describe("auto-reconnect + reattach", () => {
     expect(MockWebSocket.instances.length).toBe(n + 1);
   });
 
-  it("writes a dim 'Reconnecting…' status once (no spam across retries)", () => {
+  it("shows a 'Reconnecting…' status BANNER overlay once (no buffer, no spam)", () => {
     const tab = T().openTab();
     tab.ws._open();
     tab.ws._unexpectedClose();
-    expect(tab.term.writes.some(w => w.indexOf("Reconnecting") !== -1)).toBe(true);
 
-    // second retry must NOT add another Reconnecting line
+    // The status is a real DOM node inside the tab's container...
+    const banner = tab.container.querySelector(".term-status-banner");
+    expect(banner).not.toBeNull();
+    expect(banner.getAttribute("role")).toBe("status");
+    expect(banner.textContent).toContain("Reconnecting");
+    // ...and it is NEVER written into the xterm buffer (bug #2: leftover lines
+    // in scrollback corrupted a full-screen TUI on reconnect).
+    expect(tab.term.writes.some(w => w.indexOf("Reconnecting") !== -1)).toBe(false);
+
+    // A second retry must NOT add a second banner (reconnectShown guard holds).
     vi.advanceTimersByTime(500);
     const ws2 = MockWebSocket.instances[MockWebSocket.instances.length - 1];
-    const before = tab.term.writes.filter(w => w.indexOf("Reconnecting") !== -1).length;
+    const before = tab.container.querySelectorAll(".term-status-banner").length;
     ws2._unexpectedClose();
     vi.advanceTimersByTime(1000);
-    const after = tab.term.writes.filter(w => w.indexOf("Reconnecting") !== -1).length;
+    const after = tab.container.querySelectorAll(".term-status-banner").length;
     expect(after).toBe(before);
+    expect(after).toBe(1);
+  });
+
+  it("clears the banner and flashes 'Reconnected' briefly on a successful reattach", () => {
+    const tab = T().openTab();
+    tab.ws._open();
+    tab.ws._unexpectedClose();                      // → "Reconnecting…" banner
+    expect(tab.container.querySelector(".term-status-banner")).not.toBeNull();
+
+    vi.advanceTimersByTime(500);
+    const ws2 = MockWebSocket.instances[MockWebSocket.instances.length - 1];
+    ws2._open();                                    // reattach succeeds
+
+    // "Reconnecting…" is replaced by "Reconnected" (still a banner, not buffer)...
+    const banner = tab.container.querySelector(".term-status-banner");
+    expect(banner).not.toBeNull();
+    expect(banner.textContent).toContain("Reconnected");
+    expect(tab.term.writes.some(w => w.indexOf("Reconnected") !== -1)).toBe(false);
+
+    // ...and it auto-clears after ~1.8s, so it can never overlap the TUI.
+    vi.advanceTimersByTime(1800);
+    expect(tab.container.querySelector(".term-status-banner")).toBeNull();
+  });
+
+  it("the initial 'Connecting' status never pollutes the xterm buffer", () => {
+    const tab = T().openTab();
+    // It renders as a banner overlay...
+    const banner = tab.container.querySelector(".term-status-banner");
+    expect(banner).not.toBeNull();
+    expect(banner.textContent).toContain("Connecting");
+    // ...never as a buffered write.
+    expect(tab.term.writes.some(w => w.indexOf("Connecting") !== -1)).toBe(false);
+    // Once the socket opens, the banner is cleared.
+    tab.ws._open();
+    expect(tab.container.querySelector(".term-status-banner")).toBeNull();
   });
 });
 

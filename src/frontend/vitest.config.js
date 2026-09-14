@@ -20,7 +20,13 @@ export default defineConfig({
     // See tests/helpers/quiet.js.
     // i18n-dicts.js mirrors what <script> tags do in the browser: it loads
     // every static/i18n/<code>.js into window.I18N. See that file.
-    setupFiles: ["./tests/helpers/quiet.js", "./tests/helpers/i18n-dicts.js"],
+    // jsdom-storage.js must run FIRST: it re-points globalThis.localStorage /
+    // sessionStorage at the jsdom window's real storage, which vitest 2.1.9's
+    // jsdom environment refuses to copy on Node >= 22.4 (the names already
+    // exist on Node's global, and they are not in its KEYS allow-list, so
+    // tests would otherwise see Node's broken file-backed stub — undefined
+    // localStorage). See tests/helpers/jsdom-storage.js.
+    setupFiles: ["./tests/helpers/jsdom-storage.js", "./tests/helpers/quiet.js", "./tests/helpers/i18n-dicts.js"],
     // Cap the worker count. Termux reports `os.cpus().length === 0`, so vitest
     // falls back to availableParallelism() = 8 forks and oversubscribes a
     // throttled phone CPU: each fork rebuilds the jsdom environment and the

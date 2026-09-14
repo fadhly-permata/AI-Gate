@@ -17,7 +17,7 @@
        below; it is also read by i18n.js for the on-demand URLs. -->
   <script>
     (function () {
-      var V = "20260914";
+      var V = "20260924";
       window.I18N_VER = V;
       var loc = "en";
       try {
@@ -37,15 +37,28 @@
     })();
   </script>
   <title>aigate</title>
-  <!-- Font Awesome 6.5.1 Free vendored LOCALLY (offline-safe; ADR-001 no build) -->
-  <link rel="stylesheet" href="vendor/font-awesome/css/all.min.css" />
+  <!-- Favicon: BERKAS LOKAL, tanpa CDN (OPERATING_RULES G3). Sebelum ada rujukan
+       ini, peramban minta /favicon.ico dengan sendirinya dan server menjawab 404
+       (terukur). SVG untuk peramban modern; .ico sebagai fallback (peramban yang
+       tidak mendukung SVG minta .ico, dan file-nya kini memang ada). Bentuknya
+       tanda netral: kotak warna aksen + huruf "a" geometris — BUKAN logo merek. -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="alternate icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
+  <!-- Font Awesome 6.5.1 vendored LOCALLY (offline-safe; OPERATING_RULES G3 — no
+       CDN). Files live in vendor/font-awesome/ (css + webfonts woff2, + LICENSE).
+       No network request: icons render with the phone offline. -->
+  <link rel="stylesheet" href="vendor/font-awesome/css/all.min.css?v=20260920" />
   <!-- xterm.js 5.x + FitAddon vendored LOCALLY (offline-safe; ADR-001 no build,
-       ADR-009 native run). No CDN dependency — terminal works with no internet. -->
-  <link rel="stylesheet" href="vendor/xterm/xterm.css" />
-  <script defer src="vendor/xterm/xterm.js"></script>
-  <script defer src="vendor/xterm/xterm-addon-fit.js"></script>
+        ADR-009 native run). No CDN dependency — terminal works with no internet.
+        ?v= cache-buster: required on EVERY local asset (see the cache-buster
+        guard in tests/views.test.js). Vendored files are immutable, so all
+        three share the release V; bump only when the vendor copy is replaced. -->
+  <link rel="stylesheet" href="vendor/xterm/xterm.css?v=20260920" />
+  <script defer src="vendor/xterm/xterm.js?v=20260920"></script>
+  <script defer src="vendor/xterm/xterm-addon-fit.js?v=20260920"></script>
 
-  <link rel="stylesheet" href="styles.css?v=20260912" />
+  <link rel="stylesheet" href="styles.css?v=20260926" />
 </head>
 <body>
   <div class="layout">
@@ -147,6 +160,16 @@
            thing as before. No data-view: app.js only hijacks clicks on items
            that carry one, so this anchor keeps native link behaviour. -->
       <div class="sidebar-footer">
+        <!-- Device-view simulation (moved OUT of Settings, Opsi A): opens the
+             #deviceModal preview. A <button> (not .nav-item[data-view]) so it is
+             never treated as a view by app.js's nav wiring. -->
+        <button type="button" class="device-trigger" id="deviceTriggerDesktop"
+                data-device-trigger aria-haspopup="dialog" aria-controls="deviceModal"
+                aria-label="Device view simulation" data-i18n-aria="settings.device_sim"
+                title="Device view simulation">
+          <i class="nav-icon fa-solid fa-mobile-screen-button" aria-hidden="true"></i>
+          <span class="nav-label" data-i18n="settings.device_sim">Device Simulation</span>
+        </button>
         <a class="nav-item" href="https://github.com/fadhly-permata/AI-Gate"
            target="_blank" rel="noopener noreferrer"
            aria-label="aigate Repo" data-i18n-aria="nav.repo" title="aigate Repo">
@@ -170,6 +193,11 @@
 
       <!-- Settings view (B1.3) -->
       <section class="view" data-view="settings">
+        <div class="page-banner">
+          <i class="fa fa-circle-info" aria-hidden="true"></i>
+          <p class="page-banner-text" data-i18n="page_desc.settings">Configure how aigate runs — port, theme, language, developer mode, device view — then back up or restore every setting from one file.</p>
+        </div>
+
         <div class="card settings-card">
           <h2 class="settings-title" data-i18n="nav.settings">Settings</h2>
           <form id="settingsForm" class="settings-form" autocomplete="off">
@@ -206,19 +234,6 @@
               </select>
             </div>
 
-            <!-- Device Simulation (B4.2): dev/visual aid only, client-side. -->
-            <div class="form-row">
-              <label class="form-label" for="setDevice" data-i18n="settings.device_sim">Device Simulation</label>
-              <select class="form-input" id="setDevice" name="device">
-                <option value="desktop" data-i18n="settings.device_desktop">Desktop</option>
-                <option value="tablet" data-i18n="settings.device_tablet">Tablet</option>
-                <option value="phone" data-i18n="settings.device_phone">Phone</option>
-              </select>
-            </div>
-            <p class="settings-dev-note" id="setDeviceNote" data-i18n="settings.device_note">
-              Visual aid for development only — does not change server behavior.
-            </p>
-
             <div class="form-actions">
               <button type="submit" class="btn btn-primary" id="setSave"
                       data-i18n="settings.save">Save</button>
@@ -239,13 +254,6 @@
           </p>
 
           <div class="form-row">
-            <span class="form-label" data-i18n="settings.export">Export settings</span>
-            <a class="btn btn-primary" id="exportBtn" href="/api/settings/export"
-               role="button"><i class="fa fa-download"></i>
-              <span data-i18n="settings.export">Export settings</span></a>
-          </div>
-
-          <div class="form-row">
             <label class="form-label" for="importMode" data-i18n="settings.import.mode">Mode</label>
             <select class="form-input" id="importMode">
               <option value="replace" data-i18n="settings.import.mode.replace">Replace (overwrite all)</option>
@@ -258,7 +266,15 @@
             <input class="form-input" type="file" id="importFile" accept="application/json" />
           </div>
 
-          <div class="form-actions">
+          <!-- One action bar for both backup actions (was: a lone Export label
+               row whose <a.btn> sat taller/wider than the field rows above it,
+               breaking the rhythm — handover §1.B). Both are anchors/buttons of
+               the SAME .btn.btn-primary footprint, side by side, wrapping to a
+               stack on narrow screens. -->
+          <div class="form-actions backup-actions">
+            <a class="btn btn-primary" id="exportBtn" href="/api/settings/export"
+               role="button"><i class="fa fa-download"></i>
+              <span data-i18n="settings.export">Export settings</span></a>
             <button type="button" class="btn btn-primary" id="importBtn">
               <i class="fa fa-upload"></i> <span data-i18n="settings.import">Import settings</span>
             </button>
@@ -270,6 +286,11 @@
 
       <!-- Providers view (B2.2) -->
       <section class="view" data-view="providers">
+        <div class="page-banner">
+          <i class="fa fa-circle-info" aria-hidden="true"></i>
+          <p class="page-banner-text" data-i18n="page_desc.providers">Register the AI services behind your models, add API keys or OAuth accounts, discover their model lists, and track each provider's usage.</p>
+        </div>
+
         <!-- List + add -->
         <div class="card providers-card">
           <div class="providers-head">
@@ -296,112 +317,170 @@
           </table>
         </div>
 
-        <!-- Detail + models -->
-        <div class="card providers-detail" id="provDetail" hidden>
-          <div class="providers-head">
-            <h3 class="modal-title" id="provDetailTitle"></h3>
-            <div class="detail-actions">
-              <button class="btn btn-primary" id="provDiscoverBtn" type="button">
-                <i class="fa fa-magnifying-glass"></i>
-                <span data-i18n="providers.discover">Discover Models</span>
-              </button>
-              <button class="btn" id="provEditBtn" type="button" title="Edit" data-i18n-aria="common.edit">
-                <i class="fa fa-pen"></i>
-              </button>
-              <button class="btn btn-danger" id="provDeleteBtn" type="button" title="Delete" data-i18n-aria="common.delete">
-                <i class="fa fa-trash"></i>
-              </button>
-            </div>
+        <!-- The old detail card is gone (stage-3, Opsi A): usage moved into
+             Kartu D of the provider-detail view, Edit/Delete into its head, and
+             the account CRUD into its own page + modal. -->
+      </section>
+
+      <!-- ===== Provider detail view (stage-3, Opsi A: "satu permukaan per
+           pekerjaan") =====
+           Everything about ONE provider lives here, as ONE vertical column of
+           cards (no grid: a phone must never break it apart):
+             head      = back + name + enabled badge + Edit / Delete
+             KARTU A   = profile, read-only (edit through the head's Edit button)
+             KARTU B   = account rotation strategy (its own save button)
+             KARTU C   = the accounts, one card each, ordered by priority
+             KARTU D   = today's usage (B5.5, moved out of the old detail card)
+           NO nav / bottom-nav entry: it is opened from a provider name in the
+           list, and app.js keeps the "Penyedia" menu item highlighted while it
+           is shown, so the nav <-> view parity check stays untouched. -->
+      <section class="view provider-detail" data-view="provider-detail"
+               role="region" aria-label="Provider details"
+               data-i18n-aria="provider_detail.title">
+        <div class="card providers-card pd-head">
+          <button class="btn pd-back" id="provDetailBackBtn" type="button">
+            <i class="fa fa-arrow-left" aria-hidden="true"></i>
+            <span data-i18n="provider_detail.back">Back to Providers</span>
+          </button>
+          <div class="pd-title-wrap">
+            <h2 class="providers-title pd-name" id="provDetailTitle"></h2>
+            <span class="badge pd-badge" id="provDetailBadge" hidden></span>
           </div>
+          <div class="detail-actions">
+            <button class="btn" id="provEditBtn" type="button" data-i18n-aria="common.edit" title="Edit">
+              <i class="fa fa-pen" aria-hidden="true"></i>
+              <span data-i18n="common.edit">Edit</span>
+            </button>
+            <button class="btn btn-danger" id="provDeleteBtn" type="button" data-i18n-aria="common.delete" title="Delete">
+              <i class="fa fa-trash" aria-hidden="true"></i>
+              <span data-i18n="common.delete">Delete</span>
+            </button>
+          </div>
+        </div>
 
-          <p class="settings-msg" id="provModelMsg" role="status" aria-live="polite"></p>
+        <!-- KARTU A — profile, read-only. Labels stay in the markup so a locale
+             switch re-translates them; JS only ever writes the <dd> text. -->
+        <div class="card">
+          <h3 class="pd-card-title" data-i18n="provider_detail.profile">Profile</h3>
+          <dl class="pd-profile">
+            <div class="pd-row">
+              <dt data-i18n="providers.type">Type</dt>
+              <dd id="pdType"></dd>
+            </div>
+            <div class="pd-row">
+              <dt data-i18n="providers.base_url">Base URL</dt>
+              <dd class="pd-mono pd-clip" id="pdBaseUrl"></dd>
+            </div>
+            <div class="pd-row">
+              <dt data-i18n="providers.model">Model</dt>
+              <dd class="pd-clip" id="pdDefaultModel"></dd>
+            </div>
+            <div class="pd-row">
+              <dt data-i18n="providers.api_key">API Key</dt>
+              <!-- ADR-007 / J3: plaintext on purpose, never masked. Long keys are
+                   cut by CSS (ellipsis) and the full value rides in title. -->
+              <dd class="pd-mono pd-clip" id="pdApiKey"></dd>
+            </div>
+            <div class="pd-row">
+              <dt data-i18n="providers.custom_headers">Custom Headers</dt>
+              <dd id="pdHeaders"></dd>
+            </div>
+            <div class="pd-row">
+              <dt data-i18n="providers.models">Models</dt>
+              <dd id="pdModels"></dd>
+            </div>
+          </dl>
+          <p class="pd-note" data-i18n="provider_detail.profile_note">
+            Read only — use Edit above to change these.
+          </p>
+          <!-- Silent /discover speaks up here (stage-3, gap no.5): one small text
+               line, never a table, and a failure never blocks anything. -->
+          <p class="pd-status" id="pdModelStatus" role="status" aria-live="polite"></p>
+        </div>
 
-          <table class="data-table" id="provModelsTable">
-            <thead>
-              <tr>
-                <th data-i18n="providers.model_id">Model ID</th>
-                <th data-i18n="providers.model_name">Model Name</th>
-              </tr>
-            </thead>
-            <tbody id="provModelsBody"></tbody>
-          </table>
+        <!-- KARTU B — rotation strategy. The ONLY place fallback_strategy /
+             sticky_round_robin_limit are ever sent (the profile modal no longer
+             carries them), so the two surfaces can never overwrite each other. -->
+        <div class="card">
+          <h3 class="pd-card-title" data-i18n="provider_detail.strategy_card">Account rotation</h3>
+          <p class="pd-note" data-i18n="provider_detail.strategy_help">
+            How the gateway picks one of this provider's accounts for each request.
+          </p>
+          <div class="form-row">
+            <label class="form-label" for="pdStrategy" data-i18n="provider_detail.strategy">Strategy</label>
+            <select class="form-input" id="pdStrategy">
+              <option value="fill-first" data-i18n="providers.strategy_fill_first">Fill first</option>
+              <option value="round-robin" data-i18n="providers.strategy_round_robin">Round-robin</option>
+            </select>
+          </div>
+          <!-- Only meaningful for round-robin: app.js hides AND disables this row
+               for fill-first, so nothing dead ever travels to the server. -->
+          <div class="form-row" id="pdStickyRow" hidden>
+            <label class="form-label" for="pdStickyLimit" data-i18n="provider_detail.sticky_limit">Uses per account before rotating</label>
+            <input class="form-input" type="number" id="pdStickyLimit" min="1" step="1" value="3" />
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" id="pdStrategySaveBtn" type="button"
+                    data-i18n="provider_detail.save_strategy">Save strategy</button>
+          </div>
+          <p class="settings-msg" id="pdStrategyMsg" role="status" aria-live="polite"></p>
+        </div>
 
-          <!-- Accounts subsection (B5.1): multi-account per provider + OAuth -->
-          <div class="accounts-section">
-            <div class="providers-head">
-              <h4 class="accounts-title" data-i18n="accounts.title">Accounts</h4>
+        <!-- KARTU C — accounts. One CARD per account (no wide table: it survived
+             on a desktop only). Order = the server's priority order
+             (GET /api/accounts sorts priority asc, id asc — render as-is). -->
+        <div class="card">
+          <div class="providers-head">
+            <h3 class="pd-card-title" data-i18n="accounts.title">Accounts</h3>
+            <div class="detail-actions">
+              <button class="btn btn-primary" id="pdAccAddBtn" type="button">
+                <i class="fa fa-plus" aria-hidden="true"></i>
+                <span data-i18n="provider_detail.add_account">Add account</span>
+              </button>
               <button class="btn" id="provConnectOAuthBtn" type="button">
-                <i class="fa fa-link"></i>
+                <i class="fa fa-link" aria-hidden="true"></i>
                 <span data-i18n="accounts.connect_oauth">Connect OAuth</span>
               </button>
-            </div>
-
-            <p class="settings-msg" id="accountsMsg" role="status" aria-live="polite"></p>
-
-            <div class="accounts-add">
-              <div class="form-row-inline">
-                <label class="form-label" for="accLabel" data-i18n="accounts.label">Label</label>
-                <input class="form-input" type="text" id="accLabel" />
-              </div>
-              <div class="form-row-inline">
-                <label class="form-label" for="accAuthType" data-i18n="accounts.auth_type">Auth Type</label>
-                <select class="form-input" id="accAuthType">
-                  <option value="api_key" data-i18n="accounts.auth_api_key">API Key</option>
-                  <option value="oauth" data-i18n="accounts.auth_oauth">OAuth</option>
-                </select>
-              </div>
-              <div class="form-row-inline" id="accApiKeyRow">
-                <label class="form-label" for="accApiKey" data-i18n="accounts.api_key">API Key</label>
-                <input class="form-input" type="text" id="accApiKey" />
-              </div>
-              <button class="btn btn-primary" id="accAddBtn" type="button">
-                <i class="fa fa-plus"></i>
-                <span data-i18n="accounts.add">Add Account</span>
+              <button class="btn" id="pdAccReloadBtn" type="button">
+                <i class="fa fa-rotate" aria-hidden="true"></i>
+                <span data-i18n="provider_detail.reload">Reload</span>
               </button>
             </div>
-
-            <table class="data-table" id="accountsTable">
-              <thead>
-                <tr>
-                  <th data-i18n="accounts.label">Label</th>
-                  <th data-i18n="accounts.auth_type">Auth Type</th>
-                  <th data-i18n="accounts.credential">Credential</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody id="accountsBody"></tbody>
-            </table>
           </div>
 
-          <!-- Usage subsection (B5.5): this provider's day summary -->
-          <div class="accounts-section usage-section">
-            <div class="providers-head">
-              <h4 class="accounts-title" data-i18n="usage.summary">Usage summary</h4>
-            </div>
+          <p class="settings-msg" id="accountsMsg" role="status" aria-live="polite"></p>
+          <div class="acc-list" id="accList"></div>
+        </div>
 
-            <p class="settings-msg" id="provUsageMsg" role="status" aria-live="polite"></p>
-
-            <div class="usage-stats" id="provUsageTotals"></div>
-
-            <h3 class="usage-subtitle" data-i18n="usage.top_models">Top models</h3>
-            <table class="data-table" id="provUsageModelTable">
-              <thead>
-                <tr>
-                  <th data-i18n="usage.model">Model</th>
-                  <th data-i18n="usage.requests">Requests</th>
-                  <th data-i18n="usage.tokens_in">Tokens in</th>
-                  <th data-i18n="usage.tokens_out">Tokens out</th>
-                  <th data-i18n="usage.cost">Cost (est.)</th>
-                </tr>
-              </thead>
-              <tbody id="provUsageModelBody"></tbody>
-            </table>
-          </div>
+        <!-- KARTU D — B5.5 usage (moved verbatim out of the old detail card;
+             usage.js still renders into these ids, unchanged). -->
+        <div class="card usage-section">
+          <h3 class="pd-card-title" data-i18n="usage.summary">Usage summary</h3>
+          <p class="settings-msg" id="provUsageMsg" role="status" aria-live="polite"></p>
+          <div class="usage-stats" id="provUsageTotals"></div>
+          <h4 class="usage-subtitle" data-i18n="usage.top_models">Top models</h4>
+          <table class="data-table" id="provUsageModelTable">
+            <thead>
+              <tr>
+                <th data-i18n="usage.model">Model</th>
+                <th data-i18n="usage.requests">Requests</th>
+                <th data-i18n="usage.tokens_in">Tokens in</th>
+                <th data-i18n="usage.tokens_out">Tokens out</th>
+                <th data-i18n="usage.cost">Cost (est.)</th>
+              </tr>
+            </thead>
+            <tbody id="provUsageModelBody"></tbody>
+          </table>
         </div>
       </section>
 
       <!-- Combos view (B2.4) -->
       <section class="view" data-view="combos">
+        <div class="page-banner">
+          <i class="fa fa-circle-info" aria-hidden="true"></i>
+          <p class="page-banner-text" data-i18n="page_desc.combos">Combine several providers and models into one address with automatic-failover or load-balancing rules; set members, priority, and weights here.</p>
+        </div>
+
         <div class="card combos-card">
           <div class="providers-head">
             <h2 class="providers-title" data-i18n="combos.title">Combos</h2>
@@ -429,6 +508,11 @@
 
       <!-- Proxy Pools view (B2.3) -->
       <section class="view" data-view="proxies">
+        <div class="page-banner">
+          <i class="fa fa-circle-info" aria-hidden="true"></i>
+          <p class="page-banner-text" data-i18n="page_desc.proxies">Group several proxies and choose how they rotate, so outgoing calls don't pile up on a single route.</p>
+        </div>
+
         <div class="card proxies-pool-card">
           <div class="providers-head">
             <h2 class="providers-title" data-i18n="proxies.title">Proxy Pools</h2>
@@ -456,6 +540,11 @@
 
       <!-- Endpoints view (B2.5) -->
       <section class="view" data-view="endpoints">
+        <div class="page-banner">
+          <i class="fa fa-circle-info" aria-hidden="true"></i>
+          <p class="page-banner-text" data-i18n="page_desc.endpoints">Set the local gateway address your apps call models through: port, access key, provider or combo target, egress proxy, and token saving.</p>
+        </div>
+
         <div class="card endpoints-card">
           <div class="providers-head">
             <h2 class="providers-title" data-i18n="endpoints.title">Endpoints</h2>
@@ -484,6 +573,11 @@
 
       <!-- Usage & Quota view (B5.5): quota panel + summary + recent usage -->
       <section class="view" data-view="usage">
+        <div class="page-banner">
+          <i class="fa fa-circle-info" aria-hidden="true"></i>
+          <p class="page-banner-text" data-i18n="page_desc.usage">Watch each provider's remaining quota and reset countdown, and review request, token, and cost summaries from daily to monthly.</p>
+        </div>
+
         <!-- Quota panel -->
         <div class="card usage-quota-card">
           <div class="providers-head">
@@ -576,6 +670,11 @@
       <!-- Analytics view (B5.6, PRD §2.4.3): usage analytics dashboard +
            request log viewer (debug). Vanilla CSS bar chart — no chart lib. -->
       <section class="view" data-view="analytics">
+        <div class="page-banner">
+          <i class="fa fa-circle-info" aria-hidden="true"></i>
+          <p class="page-banner-text" data-i18n="page_desc.analytics">View usage trends, totals, and cost breakdowns per model or provider, export CSV, and read raw request logs for troubleshooting.</p>
+        </div>
+
         <!-- Usage Analytics dashboard -->
         <div class="card analytics-card">
           <div class="providers-head">
@@ -752,6 +851,11 @@
 
       <!-- CLI Tools view (B3.4): preset groups A/B/C + launch modal -->
       <section class="view" data-view="cli">
+        <div class="page-banner">
+          <i class="fa fa-circle-info" aria-hidden="true"></i>
+          <p class="page-banner-text" data-i18n="page_desc.cli">Launch AI CLI tools in a terminal tab from this page, check their compatibility notes, and use Self-Heal for repairs.</p>
+        </div>
+
         <div class="card cli-card">
           <h2 class="cli-title" data-i18n="nav.cli">CLI Tools</h2>
           <p class="settings-msg" id="cliLoadMsg" role="status" aria-live="polite"></p>
@@ -803,7 +907,11 @@
         </div>
       </section>
 
-      <!-- Provider add/edit modal (B2.2) -->
+      <!-- Provider add/edit modal (B2.2) — stage-3: PROFILE ONLY. The stage-2
+           tablist + Accounts panel are gone (one surface per job): accounts and
+           the rotation strategy live on the provider-detail page. The strategy
+           fields deliberately do NOT exist here any more, so saving the profile
+           can never overwrite what Kartu B just stored. -->
       <div class="modal-overlay" id="provModal" hidden>
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="provModalTitle">
           <h3 class="modal-title" id="provModalTitle" data-i18n="providers.add">Add Provider</h3>
@@ -848,6 +956,10 @@
                 <ul class="aigate-combo-list" id="provModelList" role="listbox" hidden></ul>
               </div>
             </div>
+            <!-- Model discovery status (stage-3): one small text line under the
+                 combobox. /discover stays a silent background POST, but the user
+                 now sees WHY the list is empty instead of wondering. -->
+            <p class="pd-status" id="provModalModelStatus" role="status" aria-live="polite"></p>
             <div class="form-row">
               <label class="form-label" for="provEnabled" data-i18n="providers.enabled">Enabled</label>
               <label class="switch" title="Enabled">
@@ -867,6 +979,74 @@
               <button type="button" class="btn" id="provTestBtn" data-i18n="providers.test">Test Connection</button>
               <button type="submit" class="btn btn-primary" id="provSaveBtn" data-i18n="providers.save">Save</button>
               <button type="button" class="btn" id="provCancel" data-i18n="providers.cancel">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Add / edit-account modal (stage-5, ONE surface two modes): #accModal
+           serves BOTH creating an account (POST /api/accounts) and editing one
+           (PUT /api/accounts/{id}). Which rows and which submit label are shown
+           is set by app.js (openAccountModal / openAccountEditModal), so the
+           field set per mode stays honest:
+             add  : label, auth_type, api_key?, priority   (enabled omitted —
+                    the POST body is unchanged, a new account is always live)
+             edit : label, auth_type (read-only), api_key?, enabled  (no priority
+                    — reordering already lives in the ▲▼ buttons, two doors for
+                    one job = the confusion the arrows were built to remove)
+           The api_key row is hidden for an oauth account in EITHER mode, because
+           PUT/POST of a key to an oauth account is rejected 400
+           oauth_account_key_readonly. -->
+      <div class="modal-overlay" id="accModal" hidden>
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="accModalTitle">
+          <h3 class="modal-title" id="accModalTitle" data-i18n="provider_detail.account_modal_title">New account for this provider</h3>
+          <form id="accForm" class="settings-form" autocomplete="off">
+            <div class="form-row">
+              <label class="form-label" for="accLabel" data-i18n="accounts.label">Label</label>
+              <input class="form-input" type="text" id="accLabel" name="label" />
+            </div>
+            <div class="form-row">
+              <label class="form-label" for="accAuthType" data-i18n="accounts.auth_type">Auth Type</label>
+              <!-- Read-only in edit mode (auth_type cannot be changed) — app.js
+                   sets `disabled`. It is never put in the request body. -->
+              <select class="form-input" id="accAuthType" name="auth_type">
+                <option value="api_key" data-i18n="accounts.auth_api_key">API Key</option>
+                <option value="oauth" data-i18n="accounts.auth_oauth">OAuth</option>
+              </select>
+            </div>
+            <div class="form-row" id="accApiKeyRow">
+              <label class="form-label" for="accApiKey" data-i18n="accounts.api_key">API Key</label>
+              <!-- ADR-007 / J3: plaintext on purpose -->
+              <input class="form-input" type="text" id="accApiKey" name="api_key" />
+            </div>
+            <!-- Shown instead of the key row for an oauth account: its credential
+                 is the token the OAuth callback refreshes automatically, so there
+                 is nothing to type here. -->
+            <p class="pd-note" id="accOauthNote" hidden data-i18n="provider_detail.oauth_key_note">
+              OAuth accounts refresh their own token; there is no API key to set here.
+            </p>
+            <!-- Enabled: EDIT-only row (app.js hides it on add). Lets someone
+                 take one account out of rotation without deleting it. -->
+            <div class="form-row" id="accEnabledRow" hidden>
+              <label class="form-label" for="accEnabled" data-i18n="provider_detail.enabled">Enabled</label>
+              <label class="switch">
+                <input type="checkbox" id="accEnabled" name="enabled" />
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+            <!-- Priority: ADD-only block (app.js hides it on edit; reorder via ▲▼). -->
+            <div class="form-row" id="accPriorityRow">
+              <label class="form-label" for="accPriority" data-i18n="provider_detail.priority">Priority</label>
+              <input class="form-input" type="number" id="accPriority" name="priority"
+                     min="0" step="1" value="0" />
+            </div>
+            <p class="pd-note" id="accPriorityNote" data-i18n="provider_detail.priority_note">
+              Smaller number is tried first. Reorder later with the arrows.
+            </p>
+            <p class="settings-msg" id="accModalMsg" role="status" aria-live="polite"></p>
+            <div class="form-actions">
+              <button type="button" class="btn" id="accCancelBtn" data-i18n="providers.cancel">Cancel</button>
+              <button type="submit" class="btn btn-primary" id="accAddBtn" data-i18n="accounts.add">Add Account</button>
             </div>
           </form>
         </div>
@@ -923,6 +1103,7 @@
                 <option value="load_balance" data-i18n="combos.strategy.load_balance">load_balance</option>
                 <option value="latency_cost" data-i18n="combos.strategy.latency_cost">latency_cost</option>
                 <option value="three_tier" data-i18n="combos.strategy.three_tier">three_tier</option>
+                <option value="round_robin" data-i18n="combos.strategy.round_robin">Round robin</option>
               </select>
             </div>
             <div class="form-row">
@@ -932,16 +1113,19 @@
                 <span class="switch-slider"></span>
               </label>
             </div>
-            <!-- Members editor (multi-provider routes, 9router-style) -->
+            <!-- Members editor (multi-provider routes, 9router-style).
+                 There is NO Priority column/field: the ROW ORDER is the priority
+                 (stage-8) and ▲▼ in the action cell is the only way to change it. -->
             <div class="form-row combo-members-row">
               <label class="form-label" data-i18n="combos.members">Members</label>
+              <p class="combo-members-hint" id="comboMembersHint"
+                 data-i18n="combos.member.order_hint">Row order is the retry queue.</p>
               <p class="settings-msg" id="comboMemberMsg" role="status" aria-live="polite"></p>
               <table class="data-table" id="comboMembersTable">
                 <thead>
                   <tr>
-                    <th data-i18n="combos.member.provider">Provider</th>
+                    <th data-i18n="combos.member.enabled">Enabled</th>
                     <th data-i18n="combos.member.model">Model</th>
-                    <th data-i18n="combos.member.priority">Priority</th>
                     <th data-i18n="combos.member.weight">Weight</th>
                     <th></th>
                   </tr>
@@ -950,8 +1134,8 @@
               </table>
               <!-- Add/edit member sub-form: responsive labeled grid. Each field
                    has a visible <label for=...> (a11y + i18n); fields sit in a
-                   2-col grid (Provider|Model / Priority|Weight) so nothing is
-                   orphaned by mid-row wrap; buttons on their own aligned row.
+                   2-col grid (Provider|Model / Weight) so nothing is orphaned
+                   by mid-row wrap; buttons on their own aligned row.
                    Element ids unchanged — combos.js + tests depend on them. -->
               <div class="combo-member-form" id="comboMemberForm">
                 <div class="combo-member-fields">
@@ -982,11 +1166,6 @@
                               hidden aria-hidden="true"><i class="fa fa-spinner fa-spin"></i></span>
                       </div>
                     </div>
-                  </div>
-                  <div class="combo-member-field">
-                    <label class="form-label" for="comboMemberPriority"
-                           data-i18n="combos.member.priority">Priority</label>
-                    <input class="form-input" type="number" id="comboMemberPriority" value="0" step="1" />
                   </div>
                   <div class="combo-member-field">
                     <label class="form-label" for="comboMemberWeight"
@@ -1168,8 +1347,51 @@
         </div>
       </div>
 
+      <!-- Device-view simulation modal (moved OUT of the Settings form, Opsi A).
+           Reuses the shared .modal-overlay + .modal shell (index.html provModal).
+           role=dialog + aria-modal + aria-labelledby; app.js adds the focus trap,
+           ESC-to-close, click-outside-to-close and focus restore to the trigger.
+           A same-origin <iframe> previews THIS app at the picked device size. -->
+      <div class="modal-overlay" id="deviceModal" hidden>
+        <div class="modal device-modal" role="dialog" aria-modal="true" aria-labelledby="deviceModalTitle">
+          <h3 class="modal-title" id="deviceModalTitle" data-i18n="settings.device_sim">Device Simulation</h3>
+          <p class="settings-dev-note" data-i18n="settings.device_note">
+            Visual aid for development only — does not change server behavior.
+          </p>
+          <div class="device-modes" role="group" aria-label="Device size" data-i18n-aria="settings.device_sim">
+            <button type="button" class="btn device-mode" data-device-mode="phone" aria-pressed="false">
+              <i class="fa-solid fa-mobile-screen-button" aria-hidden="true"></i>
+              <span data-i18n="settings.device_phone">Phone</span>
+              <small>375×667</small>
+            </button>
+            <button type="button" class="btn device-mode" data-device-mode="tablet" aria-pressed="false">
+              <i class="fa-solid fa-tablet-screen-button" aria-hidden="true"></i>
+              <span data-i18n="settings.device_tablet">Tablet</span>
+              <small>768×1024</small>
+            </button>
+            <button type="button" class="btn device-mode" data-device-mode="desktop" aria-pressed="false">
+              <i class="fa-solid fa-desktop" aria-hidden="true"></i>
+              <span data-i18n="settings.device_desktop">Desktop</span>
+              <small>1280×800</small>
+            </button>
+          </div>
+          <div class="device-preview" id="devicePreview">
+            <div class="device-frame-wrap" id="deviceFrameWrap">
+              <iframe class="device-frame" id="deviceFrame" title="aigate device preview"></iframe>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn" id="deviceModalClose" data-i18n="common.close">Close</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Mobile bottom navigation (B4.2): shown only on phone device
-           simulation or real narrow viewports. Icons only, non-AdminLTE shell. -->
+           simulation or real narrow viewports. Icons only, non-AdminLTE shell.
+           Mirrors the sidebar 1:1 — its 9 app views plus the repository link
+           (icon-only, no data-view = stays a real external link), with .bn-sep
+           dividers at the group boundaries. The row overflows and scrolls
+           sideways so every item stays reachable. -->
       <nav class="bottom-nav" aria-label="Mobile navigation">
         <a class="bn-item" href="#" data-view="providers"
            data-i18n-aria="nav.providers"><i class="fa fa-server"></i></a>
@@ -1179,12 +1401,31 @@
            data-i18n-aria="nav.proxies"><i class="fa fa-network-wired"></i></a>
         <a class="bn-item" href="#" data-view="endpoints"
            data-i18n-aria="nav.endpoints"><i class="fa fa-plug"></i></a>
+        <span class="bn-sep" aria-hidden="true"></span>
         <a class="bn-item" href="#" data-view="terminal"
            data-i18n-aria="nav.terminal"><i class="fa fa-terminal"></i></a>
         <a class="bn-item" href="#" data-view="cli"
            data-i18n-aria="nav.cli"><i class="fa fa-screwdriver-wrench"></i></a>
+        <span class="bn-sep" aria-hidden="true"></span>
+        <a class="bn-item" href="#" data-view="usage"
+           data-i18n-aria="nav.usage"><i class="fa fa-chart-line"></i></a>
+        <a class="bn-item" href="#" data-view="analytics"
+           data-i18n-aria="nav.analytics"><i class="fa fa-chart-column"></i></a>
+        <span class="bn-sep" aria-hidden="true"></span>
         <a class="bn-item" href="#" data-view="settings"
            data-i18n-aria="nav.settings"><i class="fa fa-gear"></i></a>
+        <span class="bn-sep" aria-hidden="true"></span>
+        <!-- Device-view simulation trigger (moved OUT of Settings, Opsi A). It is
+             a <button class="bn-device">, NOT a .bn-item: it opens the #deviceModal
+             rather than switching a view, and keeping it out of .bn-item preserves
+             the "10 nav items mirror the sidebar" parity the views test asserts.
+             Placed directly ABOVE the Repo item. -->
+        <button type="button" class="bn-device" id="deviceTriggerMobile"
+                data-device-trigger aria-haspopup="dialog" aria-controls="deviceModal"
+                aria-label="Device view simulation" data-i18n-aria="settings.device_sim"><i class="fa-solid fa-mobile-screen-button" aria-hidden="true"></i></button>
+        <a class="bn-item" href="https://github.com/fadhly-permata/AI-Gate"
+           target="_blank" rel="noopener noreferrer"
+           aria-label="aigate Repo" data-i18n-aria="nav.repo"><i class="fa-brands fa-github"></i></a>
       </nav>
     </div>
 
@@ -1192,34 +1433,40 @@
        Translation strings live in i18n/<code>.js, loaded by the inline
        preloader in <head> (active language) and on demand by this file.
        ?v= cache-buster: bump whenever i18n.js changes (stale cache = missing labels). -->
-  <script src="i18n.js?v=20260914" defer></script>
-  <!-- Device simulation helper (B4.2) — must load before app.js uses it -->
-  <script src="device.js" defer></script>
+  <script src="i18n.js?v=20260924" defer></script>
+   <!-- Device simulation helper (B4.2) — must load before app.js uses it.
+        ?v= cache-buster: bump whenever device.js changes. -->
+    <script src="device.js?v=20260922" defer></script>
   <!-- Searchable combobox widget (model pickers) — must load before app.js /
        combos.js, which call window.aigate.createCombobox.
        ?v= cache-buster: bump whenever combobox.js changes. -->
   <script src="combobox.js?v=20260911" defer></script>
   <!-- App bootstrap (defer preserves order).
        ?v= cache-buster: bump whenever app.js changes. -->
-  <script src="app.js?v=20260914" defer></script>
-  <!-- Combos / Proxy Pools / Endpoints management (B2.4 / B2.3 / B2.5) -->
-  <script src="combos.js" defer></script>
-  <script src="proxies.js" defer></script>
-  <script src="endpoints.js" defer></script>
-  <!-- Usage & Quota tracking (B5.5) — needs app.js (window.aigate helpers) -->
-  <script src="usage.js" defer></script>
+  <script src="app.js?v=20260924" defer></script>
+   <!-- Combos / Proxy Pools / Endpoints management (B2.4 / B2.3 / B2.5).
+        ?v= cache-buster: bump whenever these modules change — combos.js held
+        a plain src through the stage-8 rewrite, so browsers kept serving the
+        stale cached copy (the "tab hilang" class of incident). -->
+   <script src="combos.js?v=20260920" defer></script>
+   <script src="proxies.js?v=20260920" defer></script>
+   <script src="endpoints.js?v=20260920" defer></script>
+   <!-- Usage & Quota tracking (B5.5) — needs app.js (window.aigate helpers).
+        ?v= cache-buster: bump whenever usage.js changes. -->
+   <script src="usage.js?v=20260920" defer></script>
   <!-- Usage Analytics + Request Log viewer (B5.6) — needs app.js + usage.js formatters.
        ?v= cache-buster: a plain src lets the browser run a STALE cached copy after
        an update (bump the value whenever analytics.js changes). -->
   <script src="analytics.js?v=20260906" defer></script>
-  <!-- CLI Tools launcher (B3.4) — needs app.js (window.aigate) + terminal.js -->
-  <script src="clitools.js" defer></script>
+   <!-- CLI Tools launcher (B3.4) — needs app.js (window.aigate) + terminal.js.
+        ?v= cache-buster: bump whenever clitools.js changes. -->
+   <script src="clitools.js?v=20260921" defer></script>
   <!-- Self-Heal UI (B4.1) — needs i18n.js (window.I18N) + clitools.js.
        ?v= cache-buster: bump the value whenever selfheal.js changes. -->
   <script src="selfheal.js?v=20260911" defer></script>
   <!-- Terminal manager (B3.3) — after xterm CDN + app.js. ?v= cache-buster:
        a plain src lets the browser run a STALE cached copy after an update
        (bump the value whenever terminal.js changes). -->
-  <script src="terminal.js?v=20260907" defer></script>
+  <script src="terminal.js?v=20260913" defer></script>
 </body>
 </html>

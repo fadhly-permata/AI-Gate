@@ -446,8 +446,81 @@ body.sidebar-collapsed .nav-item {
   color: var(--muted);
 }
 
+/* ===== Page-purpose banner =====
+   A calm, static info strip rendered as the FIRST block of a management view
+   (welcome + terminal intentionally have none). It reuses the card tokens so it
+   reads as part of the same surface family, with a single accent edge + icon to
+   signal "info" rather than an alert. Visibility needs no new rule: the banner
+   lives inside the section, so .view / .view.is-active (above) already toggles
+   it with the page. Uses only existing theme variables — light/dark both work
+   with zero extra rules; no fixed/sticky positioning, so the bottom nav stays
+   uncovered on phone and the banner simply flows as the first scrolling block. */
+.page-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  margin: 0 0 18px;
+  padding: 14px 18px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.page-banner > i {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--accent);
+  font-size: 16px;
+}
+
+.page-banner-text {
+  margin: 0;
+  color: var(--fg);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Narrow: stack the icon above the sentence so the text keeps full width. */
+@media (max-width: 600px) {
+  .page-banner { flex-direction: column; gap: 6px; padding: 12px 14px; }
+  .page-banner > i { margin-top: 0; }
+}
+
 /* ===== Settings panel (B1.3) ===== */
 .settings-card { max-width: 540px; }
+
+/* Settings: the two panels (main form + Backup & Restore) sit SIDE BY SIDE on a
+   large screen and stack only when the screen gets small (user 2026-09-13).
+   Base = desktop-first, so the grid is the > 960px state and the EXISTING
+   `@media (max-width: 960px)` block below reverts it to the stacked layout.
+   Reuses the repo's own 960px tablet breakpoint (no new breakpoint) and mirrors
+   the safe two-column grid pattern of .combo-member-fields (styles.css:1062) —
+   minmax(0, 1fr) so a fixed-width .form-input can never blow a column out.
+   18px column-gap = the repo's existing panel rhythm (.page-banner margin-bottom
+   / .backup-card margin-top); align-items:start keeps the short Backup card from
+   stretching to the form's height. Tokens only, no new colors. */
+.view[data-view="settings"].is-active {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 18px;
+  row-gap: 0;
+  align-items: start;
+}
+.view[data-view="settings"] .page-banner { grid-column: 1 / -1; }
+.view[data-view="settings"] .backup-card { margin-top: 0; }
+
+/* The 540px cap (line 493, warisan era satu-kolom) still clamps each card INSIDE
+   the wider grid columns → 46% @1440, 32.6% @1920 (user: "gak kayak 50%"), and
+   75–97% in the 781–960 stacked band (user: "gak 100% di layar kecil"). Inside the
+   Settings view only, drop the cap: grid items then fill their column (≈50% minus
+   half the 18px gap) and stacked cards fill the container (100%). Specificity
+   (0,2,0) beats `.settings-card` :493 (0,1,0) and the ≤600 `max-width:100%` rule
+   (:880) — `none` there is equivalent, so phones keep the proven 100%. No new
+   breakpoint, no colors, no other view touched (.welcome-card cap stays). */
+.view[data-view="settings"] .settings-card { max-width: none; }
 
 .settings-title {
   margin: 0 0 18px;
@@ -464,6 +537,12 @@ body.sidebar-collapsed .nav-item {
   gap: 16px;
   margin-bottom: 16px;
 }
+
+/* `display:flex` here beats the UA `[hidden]` rule (author > UA), so a hidden
+   form row would still show. Every other [hidden] control in this file needs
+   the same explicit undo; these are the rows JS toggles: the sticky limit of
+   Kartu B and the API-key row of the account modal. */
+.form-row[hidden] { display: none; }
 
 .form-label {
   font-weight: 600;
@@ -561,22 +640,31 @@ body.sidebar-collapsed .nav-item {
 
 /* ===== Device simulation (B4.2) + responsiveness ===== */
 
-/* Mobile bottom navigation — hidden unless phone simulation or narrow viewport. */
+/* Mobile bottom navigation — hidden unless phone simulation or narrow viewport.
+   Scrolls SIDEWAYS when the icons do not fit (every view must stay reachable),
+   so justify-content stays flex-start: a centred/space-around row would overflow
+   on both ends and push the first item out of reach. */
 .bottom-nav {
   display: none;
   align-items: center;
-  justify-content: space-around;
+  justify-content: flex-start;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   background: var(--sidebar-bg);
   color: var(--sidebar-fg);
   border-top: 1px solid var(--panel-border);
   z-index: 20;
 }
 
+/* min-width beats flex-shrink: the icons fill the row evenly when every tap
+   target fits, and overflow into a scroll when they don't — never squeezed or
+   clipped. */
 .bn-item {
   display: flex;
   align-items: center;
   justify-content: center;
   flex: 1 1 0;
+  min-width: 60px;
   height: 100%;
   color: var(--sidebar-fg);
   text-decoration: none;
@@ -586,6 +674,19 @@ body.sidebar-collapsed .nav-item {
 
 .bn-item:hover { color: var(--sidebar-fg-hover); }
 .bn-item.active { color: var(--accent-contrast); background: var(--sidebar-active); }
+
+/* Vertical group divider, mirroring the sidebar sections (Gateway | Operations
+   | Insights | System | Repo). Hairline-thin and never a tap target; fixed
+   height + align-self so it neither stretches nor gets squeezed by the row.
+   Invisible on tablet/desktop because .bottom-nav itself is display:none. */
+.bn-sep {
+  flex: 0 0 auto;
+  width: 1px;
+  align-self: center;
+  height: 26px;
+  margin: 0 2px;
+  background: var(--panel-border);
+}
 
 .settings-dev-note {
   margin: 6px 0 0;
@@ -606,16 +707,166 @@ input.form-input[type="file"] {
 }
 a.btn { text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
 
+/* Both backup actions now live in ONE action bar (Export was moved out of its
+   own .form-row, where a <a.btn> sat taller/wider than the field rows above it
+   and broke the rhythm — handover §1.B). Same .btn.btn-primary footprint -> equal
+   height; they wrap to a full-width stack on phone so the card keeps one edge. */
+.backup-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.backup-actions > .btn { display: inline-flex; align-items: center; justify-content: center; }
+@media (max-width: 600px) { .backup-actions > .btn { flex: 1 1 auto; } }
+body[data-device="phone"] .backup-actions > .btn { flex: 1 1 auto; }
+
+/* ===== Device-view simulation control + modal (Opsi A) =====
+   The control was moved OUT of the Settings form into a small trigger row above
+   the Repo link — .device-trigger in the sticky sidebar footer (tablet/desktop),
+   .bn-device in the bottom nav (phone). Tokens only, no new hex. */
+.device-trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  color: var(--sidebar-fg);
+  white-space: nowrap;
+  background: none;
+  border: none;
+  border-left: 3px solid transparent;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition), color var(--transition),
+              border-color var(--transition);
+}
+.device-trigger:hover { background: rgba(255, 255, 255, 0.06); color: var(--sidebar-fg-hover); }
+body.sidebar-collapsed .device-trigger { justify-content: center; padding: 12px 0; }
+
+/* Bottom-nav sibling of the Repo item (a <button>, NOT a .bn-item: the
+   nav-parity test counts .bn-item = 10, and this is a control, not a view). */
+.bn-device {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 0;
+  min-width: 60px;
+  height: 100%;
+  color: var(--sidebar-fg);
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  transition: color var(--transition), background var(--transition);
+}
+.bn-device:hover { color: var(--sidebar-fg-hover); }
+
+/* Device-sized dialog. --dev-w / --dev-h are set per mode by JS on this box and
+   cascade into .device-frame. The box auto-sizes to the device but is clamped to
+   the viewer (max-width/height); anything larger scrolls INSIDE it (overflow:auto)
+   instead of being scaled down. The live page behind is never resized.
+   Selector is `.modal.device-modal` (not just `.device-modal`) so it outranks the
+   base `.modal{width:100%;max-width:540px;max-height:90vh}` rule further down —
+   equal specificity + later source order would otherwise pin the box to 540px. */
+.modal.device-modal {
+  /* Hug the device instead of forcing the box to --dev-w; the modal itself must
+     NOT scroll — only .device-preview scrolls. fit-content lets the box shrink to
+     the device yet stay clamped by max-width/height to the viewer. */
+  width: fit-content;
+  max-width: 92vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* Direct children must not shrink — they carry their own height (title, note,
+   mode buttons, footer) so they always stay in the viewport; only the preview
+   area between them is allowed to shrink and scroll internally. */
+.modal.device-modal > .modal-title,
+.modal.device-modal > .settings-dev-note,
+.modal.device-modal > .device-modes,
+.modal.device-modal > .form-actions { flex: 0 0 auto; }
+.device-modes { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 16px; }
+.device-mode {
+  flex: 1 1 0;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 8px;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition),
+              color var(--transition);
+}
+.device-mode i { font-size: 20px; }
+.device-mode small { font-weight: 400; color: var(--muted); font-size: 12px; }
+.device-mode:hover { border-color: var(--accent); }
+.device-mode.is-active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+}
+.device-mode.is-active small { color: var(--accent-contrast); }
+
+/* Live preview of the app itself, rendered at REAL device size inside the iframe.
+   No scale transform: .device-frame keeps its exact device px (--dev-w/--dev-h) so
+   the iframe's own media queries + body[data-device] rules fire INSIDE the frame.
+   The .device-frame-wrap is a non-shrinking flex child (flex:0 0 auto) so the box
+   never squeezes the device; anything wider/taller than the viewer scrolls inside
+   .device-preview (overflow:auto), content stays full size. */
+.device-preview {
+  /* flex:0 1 auto + min-height:0 = the ONE scrollable area: it may shrink so the
+     footer (Close) stays in view, and it scrolls internally instead of pushing the
+     Close button out of a short viewport. justify-content:flex-start (NOT center)
+     is the core fix: centering splits overflow symmetrically and scrollLeft can't
+     go negative, so the LEFT edge was permanently unreachable. With flex-start the
+     content starts at scrollLeft=0; the child's margin-inline:auto below re-centers
+     it only when there is free space (safe-center). */
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  padding: 10px;
+  background: var(--bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  overflow: auto;
+}
+/* margin-inline:auto centers the device when it fits, and collapses to 0 on
+   overflow so the left edge sits at scrollLeft=0 — both edges stay reachable. */
+.device-frame-wrap { flex: 0 0 auto; margin-inline: auto; }
+.device-frame {
+  display: block;
+  width: var(--dev-w, 100%);
+  height: var(--dev-h, 500px);
+  transform: none;
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+}
+
 /* Tablet: keep the AdminLTE-like layout, just tighten spacing/widths. */
 @media (max-width: 960px) {
   :root { --sidebar-w: 200px; --ws-pad: 14px; }
   .card { padding: 18px; }
   .form-input { width: 200px; max-width: 100%; }
   .welcome-card { margin-top: 4vh; }
+  /* Small screen: undo the side-by-side grid so the two Settings panels go back
+     to stacking vertically (exactly the pre-2026-09-13 layout — no regression).
+     .backup-card's 18px vertical rhythm returns now that column-gap is gone. */
+  .view[data-view="settings"].is-active { display: block; }
+  .view[data-view="settings"] .page-banner { grid-column: auto; }
+  .view[data-view="settings"] .backup-card { margin-top: 18px; }
 }
 
 /* Phone — real narrow viewport OR device simulation = phone: NON-AdminLTE shell.
-   Sidebar hidden, content single full-width column, bottom nav (icons only). */
+   Sidebar hidden (so #sidebarToggle is hidden too: it would toggle nothing and its
+   tap is dead there), content single full-width column, bottom nav (icons only).
+   The body[data-device="phone"] rules below mirror this shell for simulation. */
 @media (max-width: 600px) {
   :root { --ws-pad: 12px; }
   .layout {
@@ -635,7 +886,17 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; gap: 6
     grid-row: 3;
     height: 56px;
   }
+  #sidebarToggle { display: none; }
   .settings-card, .welcome-card { max-width: 100%; }
+  /* Fix "gak responsif": the two-column .form-row (label | input) must stack
+     label-above-input once there is no room for both side by side, or a 375px
+     phone squeezes the label to ~40% and clips the input. Reuse .form-row-stack
+     behaviour here (column + stretch) and let the control fill the row. Tokens
+     only — no new colors. */
+  .settings-card .form-row { flex-direction: column; align-items: stretch; gap: 8px; }
+  .settings-card .form-row > .form-label { margin: 0; }
+  .settings-card .form-input { width: 100%; max-width: 100%; }
+  .settings-card .switch { align-self: flex-start; }
   .cli-tools { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
   .data-table { display: block; overflow-x: auto; white-space: nowrap; }
   .modal { width: 100%; }
@@ -659,8 +920,15 @@ body[data-device="phone"] .bottom-nav {
   grid-row: 3;
   height: 56px;
 }
+body[data-device="phone"] #sidebarToggle { display: none; }
 body[data-device="phone"] .settings-card,
 body[data-device="phone"] .welcome-card { max-width: 100%; }
+/* Device-simulation = phone mirrors the real narrow viewport above (same
+   stacking contract, so the preview iframe shows what a phone user sees). */
+body[data-device="phone"] .settings-card .form-row { flex-direction: column; align-items: stretch; gap: 8px; }
+body[data-device="phone"] .settings-card .form-row > .form-label { margin: 0; }
+body[data-device="phone"] .settings-card .form-input { width: 100%; max-width: 100%; }
+body[data-device="phone"] .settings-card .switch { align-self: flex-start; }
 body[data-device="phone"] .cli-tools { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
 body[data-device="phone"] .data-table { display: block; overflow-x: auto; white-space: nowrap; }
 body[data-device="phone"] .modal { width: 100%; }
@@ -683,9 +951,7 @@ body[data-device="phone"] .modal { width: 100%; }
   font-size: 20px;
 }
 
-.providers-detail { margin-bottom: 18px; }
-
-.detail-actions { display: flex; align-items: center; gap: 8px; }
+.detail-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 /* Data table */
 .data-table {
@@ -756,6 +1022,34 @@ body[data-device="phone"] .modal { width: 100%; }
   transition: background var(--transition), color var(--transition);
 }
 .icon-btn-small:hover { background: var(--accent); color: var(--accent-contrast); }
+/* Drag handle for reordering combo-member rows: the SECOND reorder affordance
+   alongside ▲▼. Pointer Events (not the whole row) drive it so touch + mouse
+   share one path; touch-action:none stops the table scrolling under a finger. */
+ .js-mem-drag { touch-action: none; cursor: grab; }
+ .js-mem-drag:active { cursor: grabbing; }
+
+ /* Transient highlight on the row that just moved (▲▼ OR drag-drop reorder).
+    Token-only colours (no new hex): a brief accent tint that fades. Animates
+    background-color only — paint, never layout — so no reflow / flicker / dup
+    rows. combos.js adds `.just-moved` on the moved row, then removes it. */
+ @keyframes member-row-just-moved {
+   from { background-color: color-mix(in srgb, var(--accent) 22%, transparent); }
+   to   { background-color: transparent; }
+ }
+ .member-row.just-moved { animation: member-row-just-moved 600ms ease-out; }
+
+  /* Minimal in-drag feedback, sitting alongside the existing grab cursor. */
+  .member-row.is-dragging {
+    background-color: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+
+  /* (B) Disabled member rows are greyed but stay visible (can be re-enabled).
+     Uses the existing opacity token pattern — no new hex colours. */
+  .member-row.is-disabled { opacity: 0.5; }
+
+ @media (prefers-reduced-motion: reduce) {
+   .member-row.just-moved { animation: none; }
+ }
 
 /* Danger variant */
 .btn-danger { background: #dc3545; color: #fff; }
@@ -780,12 +1074,20 @@ body[data-device="phone"] .modal { width: 100%; }
 .header-row .hdr-val { width: 100%; flex: 1; max-width: none; }
 
 /* Combo members editor (B5.x) — inline add/edit/remove. The sub-form is a
-   responsive labeled grid: 4 fields in 2 columns (Provider|Model over
-   Priority|Weight) so no field is orphaned by mid-row wrapping, with the
-   Add/Cancel buttons on their own aligned row. Stacks to a single column on
-   narrow screens. Reuses .form-label/.form-input; theme-safe (custom props). */
+   responsive labeled grid: the 3 fields the form owns (Provider, Model,
+   Weight) in 2 columns, with the Add/Cancel buttons on their own aligned row.
+   Priority is NOT in it: the row order is the priority, moved with ▲▼ in the
+   table (stage-8). Stacks to a single column on narrow screens. Reuses
+   .form-label/.form-input; theme-safe (custom props). */
 .combo-members-row { display: block; }
 .combo-members-row > .form-label { display: block; margin-bottom: 8px; }
+/* One line above the members table: row order = the retry queue, and for the
+   strategies where weight rules, so the order does not read as "ignored". */
+.combo-members-hint {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
 
 .combo-member-form {
   display: flex;
@@ -1007,6 +1309,159 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
   font-size: 20px;
 }
 
+/* ===== Provider detail page (stage-3, Opsi A) =====
+   ONE vertical column of cards; no grid, no wide table, so a phone never has
+   to pan sideways. Token-only colors: the dark theme follows automatically. */
+.provider-detail .card { margin-bottom: 18px; }
+.provider-detail .card:last-child { margin-bottom: 0; }
+
+.pd-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.pd-back { flex: 0 0 auto; }
+.pd-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.pd-name { word-break: break-word; }
+.pd-badge { flex: 0 0 auto; }
+
+.pd-card-title {
+  margin: 0 0 12px;
+  color: var(--accent);
+  font-size: 16px;
+}
+
+/* Read-only profile: label + value rows, stacked on narrow screens so a long
+   base URL or key can never force the card wider than the viewport. */
+.pd-profile { margin: 0; }
+.pd-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--panel-border);
+}
+.pd-row:last-child { border-bottom: none; }
+.pd-row dt { flex: 0 0 34%; color: var(--muted); font-weight: 600; }
+.pd-row dd { flex: 1 1 auto; margin: 0; min-width: 0; }
+.pd-mono { font-family: "Menlo", "Consolas", monospace; }
+/* Cut long values visually; the full text stays reachable via `title`. */
+.pd-clip {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pd-note { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+.pd-status { margin: 8px 0 0; min-height: 18px; font-size: 12px; color: var(--muted); }
+
+/* The Models cell is a machine count, so keep the digits aligned. Its title +
+   aria-label (app.js renderProviders) explain where the number comes from. */
+.prov-models { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ===== Account cards (Kartu C) — replaced the 6-column table ===== */
+.acc-list { display: flex; flex-direction: column; gap: 12px; }
+.acc-empty { margin: 0; color: var(--muted); font-size: 13px; }
+
+.acc-card {
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  padding: 12px 14px;
+}
+.acc-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.acc-pos {
+  flex: 0 0 auto;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.acc-label { font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.acc-type { flex: 0 0 auto; color: var(--muted); font-size: 12px; }
+.acc-cred { margin: 8px 0 0; min-width: 0; }
+.acc-cred-label { color: var(--muted); font-size: 12px; }
+.acc-key {
+  display: block;
+  font-family: "Menlo", "Consolas", monospace;
+  font-size: 13px;
+  color: var(--fg);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.acc-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+/* .member-move = the SAME affordance on the combo members table (stage-8): the
+   ▲▼ pair that replaces the old Priority column. One set of rules for both, so
+   the two reorder UIs can never drift apart. */
+.acc-move, .member-move { display: inline-flex; gap: 4px; }
+/* The arrows are the ONLY reorder affordance, so they get a slightly bigger
+   target than a table icon button — and a phone-sized one on the phone shell. */
+.acc-up, .acc-down { width: 34px; height: 34px; }
+@media (max-width: 600px) {
+  .acc-move .icon-btn-small { width: 44px; height: 36px; }
+  /* Combo rows: on a phone ALL four row actions grow together, so the cell
+     stays one even row of buttons (the table scrolls sideways if needed). */
+  .member-row .row-actions .icon-btn-small { width: 44px; height: 36px; }
+}
+body[data-device="phone"] .acc-move .icon-btn-small { width: 44px; height: 36px; }
+body[data-device="phone"] .member-row .row-actions .icon-btn-small { width: 44px; height: 36px; }
+.acc-last { flex: 1 1 120px; min-width: 0; color: var(--muted); font-size: 12px; }
+/* Edit + Delete are the two footer actions on ONE level: Ubah is a neutral
+   secondary (.btn), Hapus stays danger (.btn-danger). Same footprint so the
+   footer never jumps between an account with 1 action and one with 2. */
+.acc-edit, .acc-del { flex: 0 0 auto; font-size: 12px; padding: 6px 12px; }
+/* aria-disabled is the honest state: visible, announced, and a no-op tap. */
+.acc-move .icon-btn-small[aria-disabled="true"],
+.member-move .icon-btn-small[aria-disabled="true"] {
+  color: var(--muted);
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.acc-move .icon-btn-small[aria-disabled="true"]:hover,
+.member-move .icon-btn-small[aria-disabled="true"]:hover {
+  background: transparent;
+  color: var(--muted);
+}
+
+/* Narrow: the profile rows stack (label above value) and the account-card
+   footer keeps its buttons on one line. The body[data-device="phone"] mirror is
+   the device-simulation shell (a wide window pretending to be a phone), so both
+   narrow contexts behave the same — same pattern as the .bottom-nav rules. */
+@media (max-width: 600px) {
+  .pd-row { flex-direction: column; gap: 2px; }
+  .pd-row dt { flex: 0 0 auto; }
+}
+body[data-device="phone"] .pd-row { flex-direction: column; gap: 2px; }
+body[data-device="phone"] .pd-row dt { flex: 0 0 auto; }
+
 /* ===== Terminal view (B3.1) — ONE COHESIVE PANEL =====
    The tab strip and the terminal surface are two rows of a single framed panel
    (.terminal-body): shared dark surface colour, one 1px seam between them, and
@@ -1192,6 +1647,8 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
   width: 100%;
   height: 100%;
   padding: 0 0 0 var(--term-pad);
+  /* Anchor for the status banner overlay (.term-status-banner). */
+  position: relative;
 }
 /* The vertical inset lives on the .xterm element itself, which FitAddon DOES
    subtract from the row budget -> the grid always fits inside the panel and the
@@ -1236,6 +1693,30 @@ body[data-device="phone"] .combo-member-fields { grid-template-columns: 1fr; }
 .term-empty-icon { font-size: 26px; opacity: 0.55; }
 .term-empty-text { margin: 0; max-width: 34ch; line-height: 1.5; }
 .term-empty .btn { font-size: 13px; padding: 8px 16px; }
+
+/* ---- Status banner overlay (terminal.js writeStatus/clearStatus) ----
+   A connection status (Connecting… / Reconnecting… / Reconnected) is rendered
+   as a DOM overlay ABOVE the xterm node — never into the PTY buffer, so it can
+   never corrupt a full-screen TUI. Reuses the toast surface tokens; pointer-
+   events:none so it never intercepts keystrokes or swipes meant for the term. */
+.term-status-banner {
+  position: absolute;
+  top: var(--term-pad);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  padding: 4px 12px;
+  border-radius: 6px;
+  background: var(--term-chrome, #26292f);
+  color: var(--term-chrome-fg-strong, #f4f6f9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0.85;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.term-status-banner[hidden] { display: none; }
 
 /* ---- Session-ended toast (terminal.js) ----
    Lives on <body> so it outlives the disposed tab; above the modals (1000). */
@@ -1576,26 +2057,116 @@ body.log-visible .workspace {
   border-left: 3px solid var(--accent, #3b82f6);
   padding-left: 8px;
 }
+/* Cards: comfortable desktop min so each card has room for name + 4 logos. */
 .cli-tools {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
 }
+/* The whole card IS the launch button — native keyboard focus + Enter/Space. */
 .cli-tool {
-  justify-content: center;
-  text-align: center;
-  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  text-align: left;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--panel-border, #e3e6ea);
+  background: var(--panel, #fff);
+  color: var(--fg, #343a40);
+  box-shadow: var(--shadow, 0 1px 3px rgba(0,0,0,0.08));
+  font-family: inherit;
+  font-size: 14px;
   font-weight: 500;
+  line-height: 1.3;
+  transition: transform var(--transition, 0.22s ease),
+              box-shadow var(--transition, 0.22s ease),
+              border-color var(--transition, 0.22s ease);
 }
-.cli-tool-disabled { opacity: 0.5; }
-/* Struck-through name = not launchable at the gateway yet (no verified launch
-   command, or a wire format aigate does not serve). Kept visible on purpose:
-   the strike is the operator's to-do marker, and the tooltip says why. */
-.cli-tool-unsupported {
-  text-decoration: line-through;
-  opacity: 0.55;
-  cursor: help;
+.cli-tool:hover,
+.cli-tool:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--accent, #007bff);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.14);
+  outline: none;
 }
+.cli-tool:focus-visible { outline: 2px solid var(--accent, #007bff); outline-offset: 2px; }
+[data-theme="dark"] .cli-tool:hover,
+[data-theme="dark"] .cli-tool:focus-visible {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+}
+/* Header row: bold name + small launch-state marker (icon-only badge). */
+.cli-tool-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cli-tool-name { font-weight: 700; font-size: 14px; overflow-wrap: anywhere; }
+.cli-tool-state { flex: 0 0 auto; display: inline-flex; align-items: center; }
+.cli-tool-state .fa-solid { font-size: 13px; }
+/* verified = green check; non-verified (pending/unsupported) = muted info glyph
+   + reduced opacity. NO line-through — a tasteful disabled look, not a wall.
+   cli-tool-unsupported is kept as a stable hook (see clitools.js) but carries no
+   strike; it inherits the same muted treatment as cli-tool-soon. */
+.cli-tool-ready .cli-tool-state { color: #1f9d55; }
+.cli-tool-soon,
+.cli-tool-unsupported { opacity: 0.66; }
+.cli-tool-soon .cli-tool-name,
+.cli-tool-unsupported .cli-tool-name { color: var(--muted, #6c757d); }
+[data-theme="dark"] .cli-tool-ready .cli-tool-state { color: #5dd879; }
+.cli-tool-disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Platform logo row: 4 brand icons, no text. Color = status, current = ringed. */
+.cli-compat { display: flex; flex-wrap: wrap; gap: 5px; }
+.cli-plat {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 8px; line-height: 1;
+  font-size: 16px;
+  border: 1px solid transparent;
+  background: transparent;
+  transition: box-shadow var(--transition, 0.22s ease), background var(--transition, 0.22s ease);
+}
+.cli-plat .fa-brands { pointer-events: none; }
+.cli-plat-current {
+  box-shadow: 0 0 0 2px var(--accent, #007bff);
+  background: rgba(0, 123, 255, 0.07);
+}
+[data-theme="dark"] .cli-plat-current { background: rgba(74, 158, 255, 0.14); }
+.cli-plat-dim { opacity: 0.4; }
+/* Status palette applied to the glyph (matches the old chip accents). */
+.cli-plat.cli-status-verified   { color: #1f9d55; }
+.cli-plat.cli-status-installable { color: #1a56b0; }
+.cli-plat.cli-status-broken     { color: #d93025; }
+.cli-plat.cli-status-no_install { color: #b8860b; }
+.cli-plat.cli-status-not_a_cli  { color: #607d8b; }
+.cli-plat.cli-status-not_wired  { color: #7b1fa2; }
+.cli-plat.cli-status-unknown    { color: #80868b; }
+[data-theme="dark"] .cli-plat.cli-status-verified   { color: #5dd879; }
+[data-theme="dark"] .cli-plat.cli-status-installable { color: #7ab7ff; }
+[data-theme="dark"] .cli-plat.cli-status-broken     { color: #ff6b6b; }
+[data-theme="dark"] .cli-plat.cli-status-no_install { color: #e3b341; }
+[data-theme="dark"] .cli-plat.cli-status-not_a_cli  { color: #a7b0bb; }
+[data-theme="dark"] .cli-plat.cli-status-not_wired  { color: #c58af9; }
+[data-theme="dark"] .cli-plat.cli-status-unknown    { color: #8b929c; }
+
+/* Icon legend above the groups: 4 logos + one-line note. */
+.cli-compat-legend {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--muted, #6c757d); margin-bottom: 4px;
+}
+.cli-compat-legend .cli-plat { width: 22px; height: 22px; font-size: 14px; }
+
+/* Subtle in-card warning (current platform cannot use the tool). */
+.cli-compat-warn {
+  font-size: 11px; line-height: 1.25; text-align: left; padding: 5px 7px; border-radius: 8px;
+  color: #b00020; background: rgba(220,0,32,0.06); border: 1px solid rgba(220,0,32,0.15);
+}
+[data-theme="dark"] .cli-compat-warn { color: #ff9a9a; background: rgba(255,80,80,0.12); border-color: rgba(255,80,80,0.25); }
+
+/* Phone / narrow: shrink cards + tiles so the logo row never jagged-wraps. */
+@media (max-width: 600px) {
+  .cli-tools { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .cli-tool { padding: 12px; border-radius: 10px; }
+}
+body[data-device="phone"] .cli-tools { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+body[data-device="phone"] .cli-tool { padding: 12px; border-radius: 10px; }
 .cli-hint {
   margin: 0 0 10px;
   padding: 8px 10px;

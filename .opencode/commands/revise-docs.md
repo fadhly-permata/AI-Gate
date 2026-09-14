@@ -12,12 +12,12 @@ If first arg in `help` / `info` / `information` / `?` -> print usage, stop.
 
 Usage: /revise-docs [note]
   note = free text of the new user request (optional; if empty, read latest
-         from conversation / pm/memory-bank.md / pm/status.md)
+         from conversation / documents/pm/memory-bank.md / documents/pm/status.md)
 
 Procedure (PM executes):
 1. Load the request:
-   - Use `note` arg, or the latest user message, or pm/memory-bank.md &
-     pm/status.md open items.
+   - Use `note` arg, or the latest user message, or documents/pm/memory-bank.md &
+     documents/pm/status.md open items.
 2. Inventory: glob `documents/**/*.md`.
 3. Probe each document — read its purpose and decide impact:
    - PRD  : high-level what/why. Request adds/changes a feature/requirement? -> UPDATE.
@@ -30,7 +30,7 @@ Procedure (PM executes):
 5. Keep traceability PRD->BRD->FSD/ERD->TSD consistent (propagate IDs).
 6. If a change needs specialist expertise, spawn the matching sub-agent
    (after registered — see R4) or edit directly as PM.
-7. Log in pm/status.md + report under `.opencode/reports/`.
+7. Log in documents/pm/status.md + report under `.opencode/reports/`.
 8. Print changelog: which docs updated + why, which skipped + why.
 
 Definition of done:

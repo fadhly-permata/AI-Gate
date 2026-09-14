@@ -3,7 +3,7 @@
 **Versi:** 1.0
 **Tanggal:** 2026-09-03
 **Penulis:** System Analyst (stand-in)
-**Sumber rujukan:** `documents/PRD.md` §2–§3, `docs/business/BRD.md`, `docs/analysis/FSD.md`
+**Sumber rujukan:** `documents/PRD.md` §2–§3, `documents/business/BRD.md`, `documents/analysis/FSD.md`
 **Storage engine:** SQLite (via SQLAlchemy/peewee, lihat PRD §3 — Configuration Engine)
 
 Dokumen ini memodelkan storage model untuk config engine aigate. Semua entitas disimpan di SQLite lokal; relasi mencerminkan kebutuhan routing, grouping CLI, dan sesi terminal.
@@ -402,4 +402,4 @@ Relasi: `ChatSession ||--o{ ChatMessage : "has"`; `ChatSession }o--o| Provider :
 
 ---
 
-*Dokumen ini ditulis di bawah scope `docs/analysis/` sesuai aturan specialist System Analyst.*
+*Dokumen ini ditulis di bawah scope `documents/analysis/` sesuai aturan specialist System Analyst.*

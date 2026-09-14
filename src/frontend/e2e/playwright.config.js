@@ -22,6 +22,30 @@ const RUN_PY = path.join(ROOT, "run.py");
 //   AIGATE_PORT    -> port gateway (default 8080)
 //   AIGATE_URL     -> baseURL (default http://127.0.0.1:<port>)
 //   AIGATE_SERVER_CMD -> override perintah start server (default: python ../../run.py)
+//
+// ---------------------------------------------------------------------------
+// CARA JALAN — gunakan runner, JANGAN `playwright test` polos. Dua sebab runner
+// ini ada (keduanya terukur di Termux):
+//  1. Berkas config ini ada di src/frontend/e2e/, sedangkan perintah npm jalan
+//     dari src/frontend/. Playwright hanya mencari `playwright.config.*` di
+//     folder kerja, jadi config ini TIDAK terbaca: tanpa config, testDir default
+//     = src/frontend/ -> CLI ikut mengumpulkan src/frontend/tests/*.test.js
+//     (vitest) dan gagal dengan "Vitest failed to access its internal state".
+//     Runner ini selalu mengirim --config <folder ini>.
+//  2. Di Termux/Android, `playwright` CLI CRASH saat modulnya di-import,
+//     SEBELUM env apa pun dibaca:
+//       Error: Unsupported platform: android
+//         at .../playwright-core/lib/coreBundle.js:32822
+//     (registry playwright-core menghitung platform saat module-init).
+//     Shim yang terbukti jalan: preload yang mengubah process.platform ->
+//     "linux" lewat `--import data:` (Node 24 men-supportnya; TIDAK menyentuh
+//     node_modules):
+//       NODE_OPTIONS="--import data:text/javascript,<encoded-js>" \
+//       node node_modules/@playwright/test/cli.js test --config e2e/playwright.config.js
+//     encoded-js = encodeURIComponent(
+//       "Object.defineProperty(process,'platform',{value:'linux'});")
+//     `e2e/run.mjs` (dipanggil `npm run test:e2e`) sudah melakukan keduanya.
+//     Jangan pakai ts-node/--experimental-detect-module; jangan patch node_modules.
 // ===========================================================================
 
 const PORT = process.env.AIGATE_PORT || "8080";
@@ -38,7 +62,15 @@ if (NO_SANDBOX) {
 }
 
 export default defineConfig({
-  testDir: "e2e",
+  // testDir DINILAI RELATIF TERHADAP FOLDER CONFIG, bukan folder kerja.
+  // Nilai lama "e2e" -> jadi src/frontend/e2e/e2e -> "Error: No tests found".
+  // Pakai path absolut folder ini supaya berisi smoke.spec.js di mana pun
+  // diperintahkan dari dalam repo.
+  testDir: HERE,
+  // outputDir tidak disetel: default Playwright menaruh artefak (trace,
+  // error-context, screenshot "only-on-failure") di <folder kerja>/test-results.
+  // Terukur di sini: src/frontend/test-results/ — BUANG direktori itu setelah
+  // jalan kalau `git status --short` mau bersih (aturan B5, nol file sisa).
   timeout: 30000,
   expect: { timeout: 10000 },
   use: {
@@ -47,8 +79,11 @@ export default defineConfig({
     // Dukungan browser eksternal (Android/Termux). Bila kosong, Playwright pakai
     // browser bawaan (harus `npx playwright install` dulu).
     channel: CHANNEL,
-    executablePath: EXECUTABLE,
-    launchOptions: { args: launchArgs },
+    // executablePath BUKAN opsi `use` Playwright Test (0 kemunculan di
+    // node_modules/playwright/types/test.d.ts) -> dulu diabaikan DIAM-DIAM dan
+    // tetap mencari headless_shell bawaan yang tidak ada. Yang benar:
+    // launchOptions.executablePath.
+    launchOptions: { executablePath: EXECUTABLE, args: launchArgs },
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
   },
@@ -64,8 +99,15 @@ export default defineConfig({
   },
   projects: [
     {
+      // Desktop Chrome = viewport 1280x720 EKSPLISIT dari devices[]. Viewport di
+      // sini dinaikkan ke 1280x900 dan ditulis eksplisit (bukan warisan devices[])
+      // supaya terbaca di config: Log Window (#logWindow) tampil bawaan dan
+      // dipaku ke bawah layar (position:fixed, styles.css:1637-1648) sehingga di
+      // jendela sempit puncaknya naik menutupi tombol ⋮ baris (diukur pada
+      // 800x600: tombol 294-322px vs puncak panel 219px -> klik mendarat di panel
+      // log, menu tidak pernah terbuka).
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 900 } },
     },
   ],
 });

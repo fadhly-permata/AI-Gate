@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { indexDocument } from "./helpers/dom.js";
+import { indexDocument, htmlRefBase } from "./helpers/dom.js";
 
 // i18n dict (window.I18N) so getStr() resolves labels during render.
 import "../static/i18n.js";
@@ -575,16 +575,12 @@ describe("index.html wiring (B5.6 structure)", () => {
   });
 
   it("loads analytics.js after app.js + usage.js", () => {
-    const srcs = Array.from(doc.querySelectorAll("script[src]"))
-      .map((s) => s.getAttribute("src"));
-    // src may carry a ?v= cache-buster (same pattern as terminal.js) — match
-    // on the bare filename so the wiring assertion survives version bumps.
-    const analyticsSrc = srcs.find((s) => s.split("?")[0] === "analytics.js");
-    const appSrc = srcs.find((s) => s.split("?")[0] === "app.js");
-    const usageSrc = srcs.find((s) => s.split("?")[0] === "usage.js");
-    expect(analyticsSrc).toBeDefined();
-    expect(srcs.indexOf(appSrc)).toBeLessThan(srcs.indexOf(analyticsSrc));
-    expect(srcs.indexOf(usageSrc)).toBeLessThan(srcs.indexOf(analyticsSrc));
+    // Version-aware: compare basenames so the wiring assertion survives ?v= bumps.
+    const bases = Array.from(doc.querySelectorAll("script[src]"))
+      .map((s) => htmlRefBase(s.getAttribute("src")));
+    expect(bases).toContain("analytics.js");
+    expect(bases.indexOf("app.js")).toBeLessThan(bases.indexOf("analytics.js"));
+    expect(bases.indexOf("usage.js")).toBeLessThan(bases.indexOf("analytics.js"));
   });
 });
 

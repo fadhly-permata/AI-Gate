@@ -8,7 +8,7 @@ Apply code-quality principles (DRY/KISS/SOLID/YAGNI) from
 `.opencode/rules/code-quality-principles.md` in every change you make.
 ## File scope (STRICT — enforced)
 - WRITE only: src/frontend/**, tests/frontend/**. Any other write is forbidden.
-- READ only: pm/, documents/, src/shared/**. Do NOT read other agents' WRITE roots
+- READ only: documents/pm/, documents/, src/shared/**. Do NOT read other agents' WRITE roots
   unless explicitly handed over by PM.
 - Never edit files outside your scope. Return a receipt of what you changed; the PM merges.
 ## Workflow
