@@ -1336,3 +1336,11 @@ User: "gua gak ekspek user pake aigate offline... ya udah kita bikin bisa full o
 - KEPUTUSAN USER DIPERLUKAN (3): (1) scope Tahap 2 = openai-format upstream ONLY? (2) tool-use streaming basic mapping vs defer text-only? (3) mid-stream failure = emit `event: error` frame (spec-aligned) vs silent truncate?
 - STATUS: desain landed; be-dev BELUM spawn sampai 3 keputusan user. PM akan tanya user.
 
+## 20260914-B7-IMPL — B7 streaming Anthropic inbound SELESAI + DI-COMMIT (be-dev → PM audit & commit) (ProjectManager)
+- IMPLEMENTASI: be-dev edit `src/backend/gateway/translator.py` + `router.py` + `tests/backend/test_anthropic_messages.py` + NEW `tests/backend/test_anthropic_messages_stream.py`.
+- KEPUTUSAN PM (user: "lakukan yang menurut lu terbaik, jangan ngarang"): (1) openai-format upstream ONLY; (2) tool-use streaming dasar di-include; (3) mid-stream failure = `event: error` frame.
+- GERBANG PM MANDIRI (bukan telan receipt): `pytest tests/backend/test_anthropic_messages_stream.py` = 17 passed; `pytest tests/backend` = **574 passed, 1 skipped**; `git diff --check -- src/backend tests/backend` = clean; scope ONLY `src/backend/**`+`tests/backend/**` (nol frontend/PM docs ditulis be-dev); `:8080` user tak disentuh.
+- COMMIT `79317a7` feat(gateway): streaming POST /v1/messages (Anthropic inbound Tahap 2, B7) — 4 berkas kode/tes.
+- COMMIT `8f13379` docs(pm): catat desain + implementasi B7 (arsitektur B7 + state/status/CODE_CHANGES).
+- STATUS: B7 BEKERJA di level tes + terverifikasi isolated (TestClient respx+StaticPool, nol port). BELUM push/PR (tunggu perintah user). NEXT: B8 Chat Playground Fase 6 (desain sudah ada `documents/architecture/20260914-desain-chat-playground-fase6.md`, butuh ACC user D6 sebelum fe-dev).
+
