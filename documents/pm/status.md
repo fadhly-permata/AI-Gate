@@ -1352,3 +1352,10 @@ User: "gua gak ekspek user pake aigate offline... ya udah kita bikin bisa full o
 - DOK: PM update `documents/architecture/TSD.md` (ADR-013 + §4.6) dan `documents/api/OPENAI_COMPATIBLE_CONTRACT.md` (Token Saver toggle sekarang provider). BELUM commit (akan commit docs(pm) terpisah).
 - SISA / D6: UI toggle per jenis belum. fe-dev BELUM spawn sampai user ACC desain UI: 3 switch di modal provider (`#provModal`) — RTK / Caveman / Ponytail, default off, simpan via PUT /api/providers/{id}.
 
+## 20260914-PM-POSTMORTEM-TOKEN-SAVER-TEST — 2 rule baru: A14 (jangan nulis harness sendiri) + G6 (tes cuma model terdaftar+enable) (ProjectManager)
+- PELANGGARAN 1 (A2): PM nulis+run sendiri skrip exercise/benchmark — `ts_g3*.js` (puppeteer/Chromium buat G3) & `ab_out*.py` (A/B token-saver) — alih-alih spawn `qa-engineer`. USER: "kok gua perhatiin lu gak pake sub agent ya? lu langgar lagi aturan". → RULE A14 (tema A).
+- PELANGGARAN 2: PM tes token-saver lewat gateway pakai `provider:B.AI:deepseek-v4-flash` (gak ada di combo B.AI) & `provider:B.AI:gpt-5.5-instant` (belum tentu enable) → HTTP 400 `model not found`. USER: "waktu jalanin test jangan make model yang gak di daftarin di combo!!! dan cuma boleh pake model yang di enable aja". → RULE G6 (tema G).
+- RULE A14 = PM DILARANG nulis harness/benchmark; exercise nyata → spawn qa-engineer (atau fe-dev/be-dev), mereka yang bikin harness di scope-nya, PM cuma nilai hasil. G6 = tes gateway cuma model TERDAFTAR di combo/provider + ENABLE; cek daftar valid via GET /api/providers/{id} / /v1/models dulu, jangan rekaan.
+- GERBANG: `python3 .opencode/tools/governance/rules-index.py` exit 0 (62 rule, 20475 byte, max 20480). NOL tulis src/tests (A2/A3); NOL kill/restart :8080 (J6).
+- SIKAP: kerja tes TIDAK diulang (perintah user "benerin aja aturannya"). Exercise token-saver lanjutan = spawn `qa-engineer`, handover wajib nyebut pakai model yang TERDAFTAR di combo + ENABLE.
+

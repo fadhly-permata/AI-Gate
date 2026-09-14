@@ -22,6 +22,8 @@ A13 Materi publik (README/wiki/docs-site/release notes/varian bahasa) WAJIB diko
    menulis copy publik langsung. Publikasi tetap butuh ACC user. [baru] → `.opencode/agents/specialists/public-writer.md`,
    `.opencode/skills/public-writer-skill/SKILL.md`.
 
+A14 PM DILARANG nulis harness/benchmark (puppeteer/CDP/A-B/py) — itu nulis kode (A2). Verifikasi PM = suite SUDAH ADA + receipt/diff + scanner statis. Butuh e2e/tes nyata → SPAWN qa-engineer (atau fe-dev/be-dev); mereka bikin harness, PM nilai hasil. Pelanggar 2026-09-14: PM nulis+run `ts_g3*.js`/`ab_out*.py` alih-alih spawn qa-engineer. [A2,G3,B5]
+
 ## B — Penempatan & higienitas berkas
 B1 Semua dokumen proyek di `documents/**`, bukan `docs/**`. [R5]
 B2 Artefak opencode (command/rule/skill/agent) di `.opencode/**` proyek; global hanya bila user menyebut "global". [R6]
@@ -73,6 +75,7 @@ G2 Sub-agent: `py_compile` semua `.py` yang ditulis. Full `pytest`/`npm test` di
 G3 Aset yang dipakai fitur di-vendor lokal (bukan CDN); dependensi runtime masuk `pyproject` + diverifikasi terpasang. Klaim "fitur X jalan" hanya setelah fitur itu di-exercise end-to-end di lingkungan nyata; e2e menyentuh tiap fitur inti; "test hijau" ≠ "aplikasi kepake". [R20]
 G4 Setelah perubahan FE: periksa HTML final dari artefak markup/tool-call (`tsoassistant`, `recipient_name`, `functions.*`). `git diff --check` + unit test tidak cukup. [R24]
 G5 Perintah yang dibangkitkan orchestrator (self-heal): pakai subcommand non-interaktif yang dicek dari `--help`; marker `.done` hanya bila exit 0, `.failed` bila tidak; model id dikualifikasi ke `provider/model`; uji live, bukan assertion string. [R34]
+G6 Tes lewat gateway HANYA model TERDAFTAR di combo/provider (ProviderModel nyata, bukan id rekaan `provider:<nama>:<model>`) & ENABLE (provider+ProviderModel+akun). Larang model luar daftar/disabled → invalid. Cek daftar via GET /api/providers/{id} / /v1/models dulu. Pelanggar 2026-09-14: PM pakai model gak-terdaftar (`deepseek-v4-flash`,`gpt-5.5-instant`) → 400. [G3,A2]
 
 ## H — Git, catatan, PR
 H1 Awal task: checkpoint commit (`git add -A && git commit -m "checkpoint: <task> start"`). Tiap subtask selesai & terverifikasi: commit langsung. Conventional Commits; hormati `.gitignore` (`.env`, DB di `~/.aigate`); cek `git status` sebelum commit. [R19]
