@@ -1275,3 +1275,17 @@ User: "gua gak ekspek user pake aigate offline... ya udah kita bikin bisa full o
   (lembar desain+ACC D6) · B9 lokasi folder skrip CLI · push/PR branch `feat/wp1-python-check`.
 - KEPEMILIKAN: PM = `documents/pm/**` + `documents/dev/CODE_CHANGES.md` + operasi git; naskah = public-writer;
   skrip+`run.py` = fullstack-dev. NOL tulis `src/`/`tests/` oleh PM (A2/A3). NOL kill/restart proses user (J6).
+
+## 2026-09-14 14:55 — KOREKSI USER → RULE E6 (jangan paralel, sekuensial) (ProjectManager)
+- TEGURAN user: "jangan paralel kerjanya.. sekuen aja".
+- AKAR PELANGGARAN (jujur, atas nama PM sendiri): `documents/pm/handovers/handover-20260914-w21-strip-credit.md`
+  (public-writer) + `handover-20260914-desain-chat-playground.md` (tech-architect) aku spawn **paralel dalam satu
+  pesan**, tanpa menawarkan pilihan mode lebih dulu. Aturan `E1` + `.opencode/rules/parallel-sequential.md` sudah
+  mewajibkan tawaran SEBELUM spawn 2+ agen; write-root yang berbeda bukan izin untuk paralel.
+- YANG DITANGANKAN: hasil kedua agen sudah masuk & terverifikasi (strip kredit 8 naskah; lembar desain 335 baris)
+  → TIDAK dibatalkan (kerja sah, scope sah, nol tabrakan berkas). Koreksi = untuk pekerjaan BERIKUTNYA.
+- RULE BARU **E6** di `documents/pm/OPERATING_RULES.md` (tema E): default multi-agen = SEKUENSIAL; wajib tawarkan
+  sebelum spawn; belum dijawab → sekuensial; jangan asumsikan paralel karena scope beda.
+- GERBANG: `python3 .opencode/tools/governance/rules-index.py` → **LOLOS** (59 rule, 10 tema, exit 0).
+- STATE: `multiagent_mode: sequential` (berlaku sesi ini, jangan tanya lagi per E1).
+- KEPEMILIKAN: PM tulis `documents/pm/**` saja; NOL `src/`/`tests/` (A2/A3); NOL kill/restart (J6).

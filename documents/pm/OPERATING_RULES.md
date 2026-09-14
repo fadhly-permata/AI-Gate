@@ -56,6 +56,7 @@ E2 Satu panggilan = satu tujuan; reuse `file:line` yang sudah dibaca; spawn cepa
 E3 Jangan kirim pekerjaan baru di tengah `/run-impl`; tahan perubahan spec sampai run selesai atau batch di awal. [R15]
 E4 Saat iterasi hanya jalankan tes relevan; suite penuh sekali sebagai gate commit; perubahan yang tak tertes (markup/komentar/dokumen) tanpa suite; klaim kecepatan wajib angka `time`/`--durations`. [R35]
 E5 Jalur yang dijalankan tiap shell (`~/.bashrc`, `PROMPT_COMMAND`, hook) wajib bebas perintah blocking; kebutuhan hidup → cache state + background. Ukur dulu (`time bash -ic true`) sebelum dan sesudah. [R37]
+E6 Default eksekusi multi-agen = **SEKUENSIAL**, bukan paralel. PM wajib TAWARKAN pilihan (E1) sebelum spawn 2+ agen; kalau user belum jawab, JALANKAN sekuensial — jangan asumsikan paralel aman hanya karena write-root berbeda. Pelanggaran 2026-09-14: PM spawn 2 agen paralel tanpa tanya → user menegur "jangan paralel kerjanya.. sekuen aja". [R16]
 
 ## F — Fakta, sumber, provenance
 F1 Mengadopsi fitur dari sumber eksternal: fetch isinya dulu, sitat (nama + URL) di dokumen, align ke isi asli, lalu verifikasi sitat benar-benar ada. [R17]
