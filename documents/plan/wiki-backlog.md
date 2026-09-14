@@ -1,6 +1,6 @@
 # Wiki Backlog — aigate (halaman 1–8)
 
-**Dibuat:** 2026-09-08 · **Diperbarui:** 2026-09-08
+**Dibuat:** 2026-09-08 · **Diperbarui:** 2026-09-14
 Rencana & aturan: `documents/plan/wiki-plan.md`. Aturan konten: R44. Eksekusi: **sekuensial** (R17).
 Legenda: `[ ]` antre · `[~]` dikerjakan · `[!]` draft siap, **nunggu review user** · `[x]` di-ACC user
 
@@ -21,8 +21,16 @@ Legenda: `[ ]` antre · `[~]` dikerjakan · `[!]` draft siap, **nunggu review us
       → KOREKSI ATURAN: Self-Heal ternyata SUDAH PUBLIK di README (bikin branch, jalankan agen,
         benerin warning, merge) → larangan di wiki DICABUT. v4 tidak menyebutnya (butuh proyek +
         agen terpasang, off-theme); WAJIB dibahas di halaman 7 + risikonya.
-      → owner: business-analyst · 319 kata · 0 kata terlarang · 5 tautan internal valid
-      → temuan: klaim Self-Heal salah digambarkan → DICORET (lihat pertanyaan terbuka #6 di plan)
+       → owner: business-analyst · 319 kata · 0 kata terlarang · 5 tautan internal valid
+       → temuan: klaim Self-Heal salah digambarkan → DICORET (lihat pertanyaan terbuka #6 di plan)
+       → KOREKSI 2026-09-14 (user): jumlah bahasa aplikasi 7→8 (Hindi `hi` masuk registry
+         `window.LANGS` `i18n.js:28-37` + `hi.js`, 2026-09-13). `Home.md:11` "seven languages"
+         → "eight languages". Terverifikasi dari kode (8 entri LANGS + 8 file kamus).
+       → SPREAD 2026-09-14: angka yang sama basi di 8 README — semua dibetulin 7→8 dalam bahasa
+         masing-masing: `README.md:44` eight · `id:46` delapan · `zh:43` 8 · `zh-tw:40` 8 ·
+         `ja:42` 8 · `ru:48` восемь · `nl:44` acht · `hi:43` आठ. Verifikasi grep: 0 sisa "7",
+         9 baris baru (8 README + Home) = 8. (Catatan: `семь`=7 adalah sub-string dari
+         `восемь`=8 → jangan grep mentah "семь", bikin false positive.)
 - [ ] **W1.2** `Quick-Start.md` — pasang sampai jalan, 3 platform. Perbaiki 3 bug README.
       → owner: system-analyst (verifikasi perintah) + business-analyst (nada)
 - [!] **W1.3** `Interfaces.md` — daftar cara memakai aigate + link per halaman.

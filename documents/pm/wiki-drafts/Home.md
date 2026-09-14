@@ -8,7 +8,7 @@ aigate is a plain Python app you run yourself — Linux, Windows, Android (Termu
 
 ## What you can do with it 🧭
 
-- **Build on a small screen.** Made for phones, in seven languages, light or dark.
+- **Build on a small screen.** Made for phones, in eight languages, light or dark.
 - **Keep going when a key runs dry.** Line up a few providers in one group: when one errors or hits its quota, aigate moves to the next without a resend. [Set that up](Providers-and-Combos)
 - **See where your AI money went.** Each request logs tokens and an *estimated* cost, grouped your way, plus a CSV export.
 - **A real terminal in the browser.** 24 coding tools launch into a fresh tab with your chosen model. Missing one? You get an install command matched to your device — list still growing. [Look around](Terminal) · [See the tools](CLI-Tools)

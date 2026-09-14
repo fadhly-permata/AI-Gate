@@ -43,7 +43,7 @@ paginya kode sudah rapi.
 - **Data kamu tetap di perangkat.** API key dan riwayat request hanya
   ada di perangkat kamu. Hanya request ke provider pilihan kamu yang
   keluar ke internet.
-- **Nyaman di layar kecil.** Mode terang dan gelap, tujuh bahasa, dan
+- **Nyaman di layar kecil.** Mode terang dan gelap, delapan bahasa, dan
   tampilan yang enak dipakai dari HP maupun laptop.
 
 ## Coba 60 detik ⏱️

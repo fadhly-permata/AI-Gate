@@ -41,7 +41,7 @@ De thee is nog warm.
 - **Standaard privé.** API-sleutels en historie zijn lokale data op je
   apparaat. Het enige dat je apparaat verlaat, zijn je requests naar de
   providers die je zelf hebt gekozen.
-- **Fijne interface.** Licht en donker thema, zeven talen in de app, en
+- **Fijne interface.** Licht en donker thema, acht talen in de app, en
   op een klein scherm gedraagt alles zich prima.
 
 ## Probeer het in 60 seconden ⏱️
