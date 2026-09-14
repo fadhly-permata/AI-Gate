@@ -178,5 +178,9 @@ Fakta baru yang terbukti dari kode hari ini (9 koreksi; rinci di laporan `1201`)
    "working offline stays possible" → terlalu tegas, dan "60 menit adjustable in settings" → tidak diekspos layar.
 - Koreksi lama #1 (endpoint bukan port kedua) · #2 (putus koneksi ≠ proses mati) · #3 (tidak ada combo `default`)
   TETAP BERLAKU dan justru diperkuat di naskah baru.
-- **GATE user sekarang:** review 6 halaman hasil rewrite. Commit/publish BELUM (D1 — nunggu perintah).
+- **GATE user sekarang:** review 6 halaman hasil rewrite. **UPDATE 2026-09-14:** perintah user
+  "commit, push, dan publish ke halaman wiki" landed → commit `e5a376c`+`806b4cb` (docs/wiki di-push),
+  ke-6 halaman DIPUBLIKASIKAN ke wiki GitHub (`ae55c46`, gerbang konten 6/6 PASS di-run ulang sebelum
+  tayang, diverifikasi live). Review user kini OPSIONAL (halaman sudah tayang); WP.1 tetap antre;
+  Tahap 2 masih ditahan sampai user perintahkan.
 

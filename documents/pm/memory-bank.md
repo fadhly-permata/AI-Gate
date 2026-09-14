@@ -518,7 +518,9 @@ Arsip: `documents/pm/archive/memory-bank-decisions-lama.md`.
   user (2026-09-08)** — wiki hidup di branch `master`, halaman awal `Home.md`. Izin tulis
   diverifikasi lewat `git push --dry-run` (diterima, 0 byte ditulis) → auto-commit siap.
 - **BATAS IKAT dari user:** jangan menulis/meng-push apa pun ke wiki sampai izin turun.
-  Boleh: baca, clone, probe/dry-run.
+  Boleh: baca, clone, probe/dry-run. **OVERRIDE (2026-09-14):** perintah user "commit, push,
+  dan publish ke halaman wiki dong" MENCABUT batas ini → 6 halaman rewrite dipublikasikan ke
+  `AI-Gate.wiki.git` (commit `ae55c46`, 8 halaman live: 6 baru + Home/Quick-Start identik).
 - Rencana tooling (belum dikerjakan): script publisher di `.opencode/tools/docs/wiki/`
   (idempoten, wajib ada `--dry-run`), token dari `gh auth token` / `.env` (rule secrets,
   gak di-hardcode), sumber konten = `.md` di branch `docs/wiki` ini; wiki = hasil publikasi.

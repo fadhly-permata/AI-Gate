@@ -1161,3 +1161,30 @@ User: "gua gak ekspek user pake aigate offline... ya udah kita bikin bisa full o
   `clitools.js` = card + platform-logo + badge + legend. HEAD `docs/wiki` = 0-behind/10-ahead vs origin/main.
 - BELUM: push (D1 — nunggu perintah user); uji mata di peramban (G3, hard-refresh — cache-buster beda);
   merge balik `docs/wiki`→`main` masih ditahan user; WP.1 + review halaman wiki tetap terbuka.
+
+## 2026-09-14 — COMMIT + PUSH + PUBLISH 6 halaman wiki (perintah user, cabut tahan D1) (ProjectManager)
+- PERINTAH user: "commit, push, dan publish ke halaman wiki dong" → D2, kerjakan tanpa tanya. Note handover lama
+  "JANGAN tulis ke wiki GitHub asli" DI-OVERRIDE oleh perintah eksplisit ini.
+- CHECKPOINT (H1): branch `docs/wiki` HEAD `17e0101`, ahead-2 origin; remote hanya `origin` (tak ada `.wiki`).
+- GERBANG KONTEN DIJALANKAN ULANG SESI INI (A11/A12, bukan telan hasil lama): scanner token terlarang per file
+  (path src|documents, this repo, MIT, untested, experimental, seven, ADR-###, R#, id DOM, kelas CSS, modul
+  .py/.js) + validitas taut internal (8 nama halaman) + kredit baris terakhir + `aigate` kecil di prosa + nol
+  rujukan `documents/**`/handover di naskah publik → **6/6 PASS**. Pengecualian sah (fakta sisi-user, bukan bocor):
+  `aigate.db`/`.aigate`, env `AIGATE_PORT/DEV/DB_PATH`, perintah `python run.py`, `http://localhost:8080[/v1]`.
+- RE-READ 6 draf sebelum publikasi → sama dengan yang diverifikasi (nol suntingan nyasar).
+- COMMIT PER FITUR (H1–H3, `git add` eksplisit, BUKAN `git add -A`):
+  (a) `e5a376c` docs(wiki): rewrite 6 wiki pages via public-writer — 6 draf + 6 handover + laporan (13 berkas).
+  (b) `806b4cb` docs(pm): record wiki rewrite round + fact corrections — wiki-backlog + status + state +
+      memory-bank + CODE_CHANGES (5 berkas). Working tree bersih setelahnya.
+- PUSH `docs/wiki` → origin: `0634960..806b4cb` fast-forward, NOL force; sinkron.
+- PUBLISH ke wiki GitHub (tak ada remote `.wiki` → clone `AI-Gate.wiki.git` ke TMPDIR, token via URL
+  non-interaktif GIT_TERMINAL_PROMPT=0/GIT_ASKPASS): wiki tadinya cuma Home+Quick-Start (byte-identik draf ACC
+  lokal → TIDAK disentuh). 6 halaman baru di-copy nama persis → gerbang dijalankan ulang di salinan wiki (PASS) →
+  commit `ae55c46` → push `1df0d65..ae55c46 master`. VERIFIKASI LIVE publik (unauthenticated webfetch): Interfaces +
+  Providers-and-Combos tampil penuh, sidebar "Pages 8", kredit baris terakhir ada, `aigate` kecil. 8 halaman =
+  Home, CLI-Tools, Configuration-and-Keys, Interfaces, OpenAI-API, Providers-and-Combos, Quick-Start, Terminal.
+- CLEANUP: TMPDIR clone + `.git/config` (berisi token di remote URL) DIHAPUS; cek `git remote -v` origin = URL
+  polos TANPA token; `git grep` token di tree = 0. Repo tetap bersih, tak ada kredensial baru dibuat.
+- KEPEMILIKAN (A2/A3): PM nol tulis `src/`/`tests/`; naskah = public-writer (sudah ronden lalu); PM = documents/pm/**
+  + plan + CODE_CHANGES + operasi git/wiki. SISA USER: review 6 halaman tayang (opsional, sudah live); WP.1
+  (cek versi Python run.py) antre; Tahap 2 (Sidebar/Footer + terjemahan + halaman lanjutan + Pages) masih ditahan.
