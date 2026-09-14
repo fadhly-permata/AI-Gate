@@ -70,9 +70,13 @@ Android なら Termux にインストールして、ノート PC と同じよう
 
 ## 技術的な話は wiki に 📚
 
-API、アーキテクチャ、セットアップ、テストの話は
-[wiki](https://github.com/fadhly-permata/AI-Gate/wiki) にまとめています。
-この README はやさしい説明に留めて、詳しくは wiki に書いています。
+この README では触れない細かい話は wiki の方に。provider や combo
+の仕組み、コーディングツールのつなぎ方、自分のコードから API を呼ぶ
+方法までまとめてあります。はじめの一歩はここから:
+[Quick Start](https://github.com/fadhly-permata/AI-Gate/wiki/Quick-Start) ·
+[Providers & Combos](https://github.com/fadhly-permata/AI-Gate/wiki/Providers-and-Combos) ·
+[Terminal](https://github.com/fadhly-permata/AI-Gate/wiki/Terminal) ·
+[CLI Tools](https://github.com/fadhly-permata/AI-Gate/wiki/CLI-Tools)
 
 ## 状況 📌
 

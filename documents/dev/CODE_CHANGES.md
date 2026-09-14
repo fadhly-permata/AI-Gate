@@ -2018,3 +2018,29 @@ run_name="__main__")` dengan `sys.version_info` dipaksa `(3,9,7,"final",0)` → 
 pip install / import backend (bukti urutan gerbang, bukan asumsi); `git diff --check` exit 0; `git status`
 = hanya `run.py` (+ catatan PM) → nol berkas nyasar; tidak ada server dijalankan, port 8080 user tak disentuh (J6).
 **Belum:** push / PR (nunggu perintah user).
+
+### 2026-09-14 — W2.1 navigasi wiki + W2.5 tautan README (public-writer; audit+verifikasi PM) — branch `feat/wp1-python-check`
+**Asal:** user perintahkan kerjakan kategori B; `documents/plan/wiki-backlog.md` §Tahap 2 item W2.1 + W2.5.
+Handover `documents/pm/handovers/handover-20260914-w21-w25-nav-wiki-readme.md`. Sesi `ses_f61340bf5ffepYbCmL7kuKi2kM`.
+**Kepemilikan (A3):** penulis naskah = public-writer (write-root: `documents/pm/wiki-drafts/**`, `README.md`,
+`documents/readme-variants/**`); PM nol tulis materi publik. NOL sentuh `src/**`/`tests/**`/`.opencode/**`.
+**Per-berkas:**
+- `documents/pm/wiki-drafts/_Sidebar.md` (BARU, 37 kata): 3 kelompok (Start here / Set it up / Every way to use
+  it), menaut 8 halaman nyata pakai nama target persis (`Quick-Start`, `Providers-and-Combos`, dst.).
+- `documents/pm/wiki-drafts/_Footer.md` (BARU, 17 kata): kredit "Made with ❤️ by Fadhly Permata" + taut balik
+  `Home` + beranda repo URL absolut.
+- `README.md:75-77 → :75-81`: blok "Want the technical details?" dibetulkan — kalimat lama menyebut
+  "architecture ... testing docs" padahal dua halaman itu BELUM ada (W2.3 masih terbuka) = klaim melebihkan;
+  sekarang menunjuk 4 halaman nyata (Quick Start, Providers & Combos, Terminal, CLI Tools) URL absolut.
+- `documents/readme-variants/README.{id,ja,nl,ru,zh,zh-tw,hi}.md`: blok setara ditulis ULANG natural per
+  bahasa (bukan calque), 4 tautan sama, nama halaman tidak diterjemah (target tautan), jumlah halaman sengaja
+  tidak disebut biar tak basi saat W2.3 bertambah.
+**Verifikasi PM mandiri (bukan telan receipt):** `diff <daftar 8 halaman wiki-drafts> <target _Sidebar>` =
+**KOSONG** (nol tautan mati/nama salah eja); 8 URL halaman wiki di-fetch nyata → **HTTP 200 semua**
+(Quick-Start/Providers-and-Combos/Terminal/CLI-Tools/Home/Interfaces/Configuration-and-Keys/OpenAI-API);
+grep `architecture|testing|архитектур|architectuur|架构|アーキテクチャ` di README+7 varian = **0**; kredit
+"Fadhly" hadir 1× di 8 berkas publik; penutup "Try it, break it..." tak diubah; `git diff --check` exit 0;
+`git status` = hanya berkas dalam write-root public-writer.
+**MERAGU TERBUKA (keputusan user, belum dikerjakan):** tiap naskah halaman wiki sudah berakhir dengan baris
+kredit, dan `_Footer.md` dirender otomatis di BAWAH semua halaman → kredit bisa muncul **2×**. Pilihan:
+(a) buang baris kredit inline dari 8 naskah saat publish, atau (b) terima dobel. PM condong (a) (bersih).

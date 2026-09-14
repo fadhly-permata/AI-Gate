@@ -72,9 +72,13 @@ a full Linux distro inside your phone too, if you like that kind of magic.
 
 ## Want the technical details? 📚
 
-The API, architecture, setup options, and testing docs all live in the
-[wiki](https://github.com/fadhly-permata/AI-Gate/wiki) — this README
-stays friendly, the wiki goes deep.
+The wiki covers the parts this README keeps light — how providers and
+combos work, wiring up your coding tools, and calling the API from your
+own code. Good places to start:
+[Quick Start](https://github.com/fadhly-permata/AI-Gate/wiki/Quick-Start) ·
+[Providers & Combos](https://github.com/fadhly-permata/AI-Gate/wiki/Providers-and-Combos) ·
+[Terminal](https://github.com/fadhly-permata/AI-Gate/wiki/Terminal) ·
+[CLI Tools](https://github.com/fadhly-permata/AI-Gate/wiki/CLI-Tools).
 
 ## Status 📌
 

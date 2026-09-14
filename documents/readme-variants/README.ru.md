@@ -77,10 +77,13 @@ aigate, а в самих инструментах для кодинга: Android
 
 ## Технические подробности в wiki 📚
 
-API, архитектура, варианты установки и запуск тестов описаны в wiki:
-https://github.com/fadhly-permata/AI-Gate/wiki
-
-README — только знакомство. Детали лежат в wiki.
+Всё, что в README лишь намечено, разобрано в wiki: как устроены
+провайдеры и комбо, как подключить инструменты для кодинга и как
+обращаться к API из своего кода. Начинать удобно отсюда:
+[Quick Start](https://github.com/fadhly-permata/AI-Gate/wiki/Quick-Start) ·
+[Providers & Combos](https://github.com/fadhly-permata/AI-Gate/wiki/Providers-and-Combos) ·
+[Terminal](https://github.com/fadhly-permata/AI-Gate/wiki/Terminal) ·
+[CLI Tools](https://github.com/fadhly-permata/AI-Gate/wiki/CLI-Tools)
 
 ## Статус 📌
 

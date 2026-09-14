@@ -68,9 +68,12 @@ aigate 已在 Linux、Windows、Android (Termux) 上測試過，
 
 ## 技術細節都在 wiki 📚
 
-API、架構、安裝與部署的選項、測試方式，這些技術資訊都寫在
-[wiki](https://github.com/fadhly-permata/AI-Gate/wiki) 裡。
-這份 README 負責讓你快速看懂，wiki 負責帶你深入。
+這份 README 沒寫透的部分都放在 wiki：provider 和 combo 怎麼協作、怎麼接上你的
+程式工具、怎麼從自己的程式碼呼叫 API。從這幾頁開始最順：
+[Quick Start](https://github.com/fadhly-permata/AI-Gate/wiki/Quick-Start) ·
+[Providers & Combos](https://github.com/fadhly-permata/AI-Gate/wiki/Providers-and-Combos) ·
+[Terminal](https://github.com/fadhly-permata/AI-Gate/wiki/Terminal) ·
+[CLI Tools](https://github.com/fadhly-permata/AI-Gate/wiki/CLI-Tools)
 
 ## 現況 📌
 

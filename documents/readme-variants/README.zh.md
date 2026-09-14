@@ -70,10 +70,12 @@ aigate 认得出自己在 Termux 里，给出的安装命令在这台设备上�
 
 ## 技术细节都在 wiki 📚
 
-API、架构、部署选项、测试说明，全在
-[wiki](https://github.com/fadhly-permata/AI-Gate/wiki) 里。
-
-README 只讲大意，细节去 wiki 看。
+README 里略过的细节都写在 wiki：provider 和 combo 怎么配合、怎么接上你的
+编程工具、怎么从自己的代码里调用 API。先翻这几页最顺：
+[Quick Start](https://github.com/fadhly-permata/AI-Gate/wiki/Quick-Start) ·
+[Providers & Combos](https://github.com/fadhly-permata/AI-Gate/wiki/Providers-and-Combos) ·
+[Terminal](https://github.com/fadhly-permata/AI-Gate/wiki/Terminal) ·
+[CLI Tools](https://github.com/fadhly-permata/AI-Gate/wiki/CLI-Tools)
 
 ## 现状 📌
 
