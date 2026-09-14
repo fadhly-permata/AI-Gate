@@ -15,6 +15,36 @@ import os
 import subprocess
 import sys
 
+# Minimum required Python version. Mirrors pyproject.toml [project]
+# requires-python = ">=3.10" (line 11) — that entry is the source of truth;
+# keep this constant in sync if it ever changes.
+MIN_PYTHON = (3, 10)
+
+
+def _check_python_version(info) -> None:
+    """Exit with one friendly message if the interpreter is older than MIN_PYTHON.
+
+    info is a version tuple such as sys.version_info[:3]. Runs before any path
+    setup, dependency install, or backend import so an old Python sees this
+    message instead of a traceback from a package that needs 3.10+. Kept as a
+    separate function so it can be tested in isolation. The whole file avoids
+    3.10+ syntax (no match, no except*, no union annotations) so old
+    interpreters can still parse the gate itself.
+    """
+    if tuple(info[:2]) >= MIN_PYTHON:
+        return
+    need = ".".join(str(part) for part in MIN_PYTHON)
+    have = ".".join(str(part) for part in tuple(info[:3]))
+    sys.stderr.write(
+        f"aigate needs Python {need} or newer - you have {have}\n"
+        f"Install Python {need} or newer, then run this again.\n"
+    )
+    sys.exit(1)
+
+
+# Gate first: must stop old interpreters before anything below can break.
+_check_python_version(sys.version_info[:3])
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "src"))
 
