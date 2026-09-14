@@ -36,6 +36,14 @@ function withProviderModalDom() {
         '</div>' +
         '<p class="pd-status" id="provModalModelStatus" role="status" aria-live="polite"></p>' +
         '<input type="checkbox" id="provEnabled" />' +
+        '<div id="provTsFieldset" role="group">' +
+          '<input type="checkbox" id="provTokenSaver" />' +
+          '<div id="provTsSubs">' +
+            '<input type="checkbox" id="provTsRtk" />' +
+            '<input type="checkbox" id="provTsCaveman" />' +
+            '<input type="checkbox" id="provTsPonytail" />' +
+          '</div>' +
+        '</div>' +
         '<div class="form-row form-row-stack">' +
           '<div id="provHeaders"></div>' +
           '<button type="button" id="provAddHeaderBtn"></button>' +
@@ -345,6 +353,165 @@ describe("saveProvider sends PROFILE fields only (B2.2 / stage-3)", () => {
     await flush();
     await flush();
     expect(document.getElementById("provModal").hidden).toBe(true);
+    vi.unstubAllGlobals();
+  });
+});
+
+describe("Token Saver master + 3 sub-switches (D6/ACC)", () => {
+  const SUB = { rtk: "provTsRtk", caveman: "provTsCaveman", ponytail: "provTsPonytail" };
+  const master = () => document.getElementById("provTokenSaver");
+
+  beforeEach(() => { withProviderModalDom(); });
+
+  // Capture the PUT/POST body the modal submits (id set => PUT).
+  function captureSave() {
+    const calls = [];
+    vi.stubGlobal("fetch", vi.fn((url, opts) => {
+      calls.push({ url, opts });
+      return Promise.resolve({
+        ok: true, headers: { get: () => "application/json" },
+        json: () => Promise.resolve({ data: [] })
+      });
+    }));
+    return calls;
+  }
+  const putBody = (calls) => JSON.parse(
+    calls.find((c) => c.opts && c.opts.method === "PUT").opts.body
+  );
+
+  it("index.html ships the master + three disabled-by-default sub-switches", () => {
+    const doc = indexDocument();
+    const ids = ["provTokenSaver", "provTsRtk", "provTsCaveman", "provTsPonytail"];
+    ids.forEach((id) => {
+      const el = doc.getElementById(id);
+      expect(el, id).not.toBeNull();
+      expect(el.getAttribute("type")).toBe("checkbox");
+    });
+    // Subs start disabled; the master stays enabled.
+    ["provTsRtk", "provTsCaveman", "provTsPonytail"].forEach((id) => {
+      expect(doc.getElementById(id).hasAttribute("disabled"), id).toBe(true);
+    });
+    expect(doc.getElementById("provTokenSaver").hasAttribute("disabled")).toBe(false);
+    // Every control is keyboard-operable (native checkbox inside <label class=switch>)
+    // with an associated visible <label for=...> and a data-i18n key.
+    expect(doc.querySelector('label.form-label[for="provTokenSaver"]').getAttribute("data-i18n"))
+      .toBe("provider.token_saver");
+    expect(doc.querySelector('[data-i18n="provider.ts_help"]')).not.toBeNull();
+  });
+
+  it("master OFF disables the subs (change listener wired by wireProviderUi)", () => {
+    window.aigate.wireProviderUi();
+    const m = master();
+    m.checked = true;
+    m.dispatchEvent(new Event("change"));
+    Object.values(SUB).forEach((id) => {
+      expect(document.getElementById(id).disabled, id).toBe(false);
+    });
+    m.checked = false;
+    m.dispatchEvent(new Event("change"));
+    Object.values(SUB).forEach((id) => {
+      expect(document.getElementById(id).disabled, id).toBe(true);
+    });
+    vi.unstubAllGlobals();
+  });
+
+  it("master ON + RTK ON sends token_saver_rtk=true and leaves the others false", async () => {
+    const calls = captureSave();
+    document.getElementById("provId").value = "p1";
+    document.getElementById("provName").value = "ACME";
+    master().checked = true;
+    document.getElementById(SUB.rtk).checked = true;
+    window.aigate.saveProvider();
+    await flush();
+
+    const body = putBody(calls);
+    expect(body.token_saver_rtk).toBe(true);
+    expect(body.token_saver_caveman).toBe(false);
+    expect(body.token_saver_ponytail).toBe(false);
+    // The removed string field is never sent.
+    expect(body).not.toHaveProperty("token_saver");
+    vi.unstubAllGlobals();
+  });
+
+  it("master OFF forces all three booleans false even if subs are still checked", async () => {
+    const calls = captureSave();
+    document.getElementById("provId").value = "p1";
+    document.getElementById("provName").value = "ACME";
+    master().checked = false;
+    // Stale ON state (e.g. user turned master off after switching subs on).
+    document.getElementById(SUB.rtk).checked = true;
+    document.getElementById(SUB.ponytail).checked = true;
+    window.aigate.saveProvider();
+    await flush();
+
+    const body = putBody(calls);
+    expect(body.token_saver_rtk).toBe(false);
+    expect(body.token_saver_caveman).toBe(false);
+    expect(body.token_saver_ponytail).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
+  it("the three subs toggle independently (all true when master ON + each ON)", async () => {
+    const calls = captureSave();
+    document.getElementById("provId").value = "p1";
+    document.getElementById("provName").value = "ACME";
+    master().checked = true;
+    Object.values(SUB).forEach((id) => { document.getElementById(id).checked = true; });
+    window.aigate.saveProvider();
+    await flush();
+
+    const body = putBody(calls);
+    expect(body.token_saver_rtk).toBe(true);
+    expect(body.token_saver_caveman).toBe(true);
+    expect(body.token_saver_ponytail).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
+  it("openEditModal seeds master = OR(subs) and each sub from the DTO booleans", async () => {
+    const provider = {
+      id: "p1", name: "ACME", type: "openai-compatible", base_url: "", api_key: "",
+      default_model: "", enabled: true, custom_headers: {}, models: [],
+      token_saver_rtk: false, token_saver_caveman: true, token_saver_ponytail: false
+    };
+    stubEditModalApi({ provider, discover: { ok: true, models: [] } });
+    window.aigate.openEditModal("p1");
+    await flush();
+
+    // One sub true => master ON; subs reflect the DTO exactly.
+    expect(master().checked).toBe(true);
+    expect(document.getElementById(SUB.rtk).checked).toBe(false);
+    expect(document.getElementById(SUB.caveman).checked).toBe(true);
+    expect(document.getElementById(SUB.ponytail).checked).toBe(false);
+    expect(document.getElementById(SUB.caveman).disabled).toBe(false); // master ON
+    vi.unstubAllGlobals();
+  });
+
+  it("openEditModal with all subs false leaves master OFF + subs disabled", async () => {
+    const provider = {
+      id: "p1", name: "ACME", type: "openai-compatible", base_url: "", api_key: "",
+      default_model: "", enabled: true, custom_headers: {}, models: [],
+      token_saver_rtk: false, token_saver_caveman: false, token_saver_ponytail: false
+    };
+    stubEditModalApi({ provider, discover: { ok: true, models: [] } });
+    window.aigate.openEditModal("p1");
+    await flush();
+
+    expect(master().checked).toBe(false);
+    Object.values(SUB).forEach((id) => {
+      expect(document.getElementById(id).disabled, id).toBe(true);
+    });
+    vi.unstubAllGlobals();
+  });
+
+  it("openAddModal resets the master OFF and disables the subs", () => {
+    window.aigate.wireProviderUi();
+    master().checked = true;
+    document.getElementById(SUB.rtk).checked = true;
+    window.aigate.openAddModal();
+    expect(master().checked).toBe(false);
+    Object.values(SUB).forEach((id) => {
+      expect(document.getElementById(id).disabled, id).toBe(true);
+    });
     vi.unstubAllGlobals();
   });
 });

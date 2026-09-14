@@ -975,6 +975,42 @@
                 <span class="switch-slider"></span>
               </label>
             </div>
+            <!-- Token Saver (D6/ACC): one master switch + three independent
+                 sub-switches. Master OFF disables + greys the subs; on save the
+                 three booleans are forced false. Reuses the shared .switch. -->
+            <div class="ts-fieldset" id="provTsFieldset" role="group" aria-labelledby="provTsMasterLabel">
+              <div class="form-row">
+                <label class="form-label" id="provTsMasterLabel" for="provTokenSaver" data-i18n="provider.token_saver">Token Saver</label>
+                <label class="switch" title="Token Saver">
+                  <input type="checkbox" id="provTokenSaver" aria-label="Token Saver" />
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+              <p class="pd-status ts-help" data-i18n="provider.ts_help">Turn on Token Saver to trim tokens, then pick which tricks run. Each one is independent.</p>
+              <div class="ts-subs" id="provTsSubs">
+                <div class="form-row">
+                  <label class="form-label" for="provTsRtk" data-i18n="provider.ts_rtk">RTK</label>
+                  <label class="switch" title="RTK">
+                    <input type="checkbox" id="provTsRtk" disabled aria-label="RTK" />
+                    <span class="switch-slider"></span>
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label class="form-label" for="provTsCaveman" data-i18n="provider.ts_caveman">Caveman</label>
+                  <label class="switch" title="Caveman">
+                    <input type="checkbox" id="provTsCaveman" disabled aria-label="Caveman" />
+                    <span class="switch-slider"></span>
+                  </label>
+                </div>
+                <div class="form-row">
+                  <label class="form-label" for="provTsPonytail" data-i18n="provider.ts_ponytail">Ponytail</label>
+                  <label class="switch" title="Ponytail">
+                    <input type="checkbox" id="provTsPonytail" disabled aria-label="Ponytail" />
+                    <span class="switch-slider"></span>
+                  </label>
+                </div>
+              </div>
+            </div>
             <div class="form-row form-row-stack">
               <label class="form-label" data-i18n="providers.custom_headers">Custom Headers</label>
               <div class="headers-editor" id="provHeaders"></div>
