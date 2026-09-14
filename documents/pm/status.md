@@ -1289,3 +1289,20 @@ User: "gua gak ekspek user pake aigate offline... ya udah kita bikin bisa full o
 - GERBANG: `python3 .opencode/tools/governance/rules-index.py` → **LOLOS** (59 rule, 10 tema, exit 0).
 - STATE: `multiagent_mode: sequential` (berlaku sesi ini, jangan tanya lagi per E1).
 - KEPEMILIKAN: PM tulis `documents/pm/**` saja; NOL `src/`/`tests/` (A2/A3); NOL kill/restart (J6).
+
+## 2026-09-14 14:55 — KEPUTUSAN USER (ronde sebelum koreksi paralel) + STATUS EKSEKUSI (ProjectManager)
+- KEPUTUSAN (dari balasan user ronde lalu): (1) W2.2 wiki = **cukup Inggris saja, JANGAN terjemahkan** (TUTUP);
+  (2) W2.1 terbit `_Sidebar`+`_Footer` + **opsi a** = buang kredit inline dari 8 naskah lalu terbit; (3) W2.3
+  halaman lanjutan (Data Model/Architecture/Testing/Roadmap) = **JANGAN** (TUTUP); (4) B7 Anthropic inbound Tahap 2
+  = **nanti aja, pending**; (5) B8 Chat Playground Fase 6 = **kerjakan** (butuh ACC desain D6 sebelum fe-dev);
+  (6) B9 lokasi folder skrip install CLI = **pending** (user: "masih ada bug").
+- EKSEKUSI (sebelum koreksi paralel): PM spawn **paralel** `public-writer` (strip kredit 8 naskah, SELESAI +
+  terverifikasi PM: grep `Fadhly`=0, `---` ujung=0, `git diff` hanya 8 berkas) dan `tech-architect` (lembar desain
+  Chat Playground `documents/architecture/20260914-desain-chat-playground-fase6.md` 335 baris, SELESAI). Hasil SAH,
+  scope tak tumpang tindih → TIDAK dibatalkan. Koreksi: jangan paralel lagi (rule baru E6, lihat entri 14:55 atas).
+- STATUS BUKAN-PARALER setelah ini: (a) credit strip beres → tinggal **publish** via `publish_wiki.py --publish`
+  (PR user untuk opsi a, tapi PM belum publish karena koreksi muncul; tunggu arahan setelah ini); (b) lembar desain
+  Chat Fase 6 siap → butuh **ACC user (D6)** sebelum spawn be-dev (B6.1) / fe-dev (B6.2/B6.3); (c) B7/B9 = pending
+  per keputusan.
+- B9 bug: user sebut "masih ada bug" di skrip install CLI tapi BELUM sebut syptom → dicatat sebagai utang, bukan
+  di-debug sebelum symptom diberi tahu. (Perintah D1: pertanyaan/cela = jawab/cek, bukan bikin perintah).
