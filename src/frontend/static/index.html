@@ -17,7 +17,7 @@
        below; it is also read by i18n.js for the on-demand URLs. -->
   <script>
     (function () {
-      var V = "20260924";
+      var V = "20260927";
       window.I18N_VER = V;
       var loc = "en";
       try {
@@ -58,9 +58,17 @@
   <script defer src="vendor/xterm/xterm.js?v=20260920"></script>
   <script defer src="vendor/xterm/xterm-addon-fit.js?v=20260920"></script>
 
-  <link rel="stylesheet" href="styles.css?v=20260926" />
+  <link rel="stylesheet" href="styles.css?v=20260927" />
 </head>
+<!-- Developer Mode gate ships "off" by default so a fresh install never flashes
+     the dev-only surfaces (Log Window, Device Simulation, Self-Heal) before the
+     async /api/settings load lands. It is set with a synchronous inline script
+     as the FIRST node inside <body> (before any dev surface is parsed/rendered)
+     rather than as a `<body data-devmode="off">` attribute — tests/helpers/dom.js
+     slices the shipped markup on a literal `<body>`, so the opening tag must stay
+     bare; app.js applyDevMode() then mirrors the real value onto the same attr. -->
 <body>
+  <script>document.body.setAttribute("data-devmode", "off");</script>
   <div class="layout">
     <!-- ===== Header bar ===== -->
     <header class="topbar">
@@ -1281,29 +1289,36 @@
             <span data-i18n="term.log_window">Log Window</span>
           </h2>
           <div class="logwindow-controls">
-            <label class="form-label" for="logSeverity" data-i18n="term.severity">Severity</label>
-            <select class="form-input" id="logSeverity">
+            <!-- Icon-only controls for mobile readability: visible text dropped, the
+                 accessible name carried by aria-label (data-i18n-aria) + title. The
+                 severity <label> hides below 600px (styles.css) while the select keeps
+                 its aria-label. Existing i18n keys reused, none added. -->
+            <label class="form-label logwindow-sev-label" for="logSeverity" data-i18n="term.severity">Severity</label>
+            <select class="form-input" id="logSeverity" aria-label="Severity" data-i18n-aria="term.severity">
               <option value="all" data-i18n="term.sev_all">All</option>
               <option value="info" data-i18n="term.sev_info">Info</option>
               <option value="warning" data-i18n="term.sev_warning">Warning</option>
               <option value="error" data-i18n="term.sev_error">Error</option>
             </select>
-            <button class="btn btn-primary" id="logRefreshBtn" type="button">
-              <i class="fa fa-rotate"></i>
-              <span data-i18n="term.refresh">Refresh</span>
+            <button class="btn btn-primary logwindow-iconbtn" id="logRefreshBtn" type="button"
+                    aria-label="Refresh" title="Refresh" data-i18n-aria="term.refresh">
+              <i class="fa fa-rotate" aria-hidden="true"></i>
             </button>
             <!-- T2 log cleanup: irreversible -> always confirm first (app.js clearLogs) -->
-            <button class="btn" id="logClearBtn" type="button">
-              <i class="fa fa-trash"></i>
-              <span data-i18n="log.clear">Clear logs</span>
+            <button class="btn logwindow-iconbtn" id="logClearBtn" type="button"
+                    aria-label="Clear logs" title="Clear logs" data-i18n-aria="log.clear">
+              <i class="fa fa-trash" aria-hidden="true"></i>
             </button>
-            <!-- T2 show-resolved toggle: aria-pressed state, persisted in localStorage -->
-            <button class="btn" id="logShowResolvedBtn" type="button" aria-pressed="false">
-              <span data-i18n="log.show_resolved">Show resolved</span>
+            <!-- T2 show-resolved toggle: aria-pressed state, persisted in localStorage.
+                 applyShowResolved() re-applies aria-label/title from log.show_resolved. -->
+            <button class="btn logwindow-iconbtn" id="logShowResolvedBtn" type="button" aria-pressed="false"
+                    aria-label="Show resolved" title="Show resolved" data-i18n-aria="log.show_resolved">
+              <i class="fa fa-eye" aria-hidden="true"></i>
             </button>
             <!-- T2 resolve-all: non-destructive, no confirm -->
-            <button class="btn" id="logResolveAllBtn" type="button">
-              <span data-i18n="log.resolve_all">Resolve all (filtered)</span>
+            <button class="btn logwindow-iconbtn" id="logResolveAllBtn" type="button"
+                    aria-label="Resolve all (filtered)" title="Resolve all (filtered)" data-i18n-aria="log.resolve_all">
+              <i class="fa fa-check-double" aria-hidden="true"></i>
             </button>
           </div>
         </div>
@@ -1432,8 +1447,12 @@
   <!-- i18n registry + loader + helpers (must load before app.js).
        Translation strings live in i18n/<code>.js, loaded by the inline
        preloader in <head> (active language) and on demand by this file.
-       ?v= cache-buster: bump whenever i18n.js changes (stale cache = missing labels). -->
-  <script src="i18n.js?v=20260924" defer></script>
+        ?v= cache-buster: bump whenever i18n.js changes (stale cache = missing labels).
+        NOTE: this tag, app.js?v, and window.I18N_VER (the <head> preloader V) are
+        asserted EQUAL by tests/i18n.test.js — the dictionary files, the registry,
+        and app.js must reload together or on-demand i18n URLs point at a version
+        the browser cached away. So bumping app.js?v forces all three in lockstep. -->
+  <script src="i18n.js?v=20260927" defer></script>
    <!-- Device simulation helper (B4.2) — must load before app.js uses it.
         ?v= cache-buster: bump whenever device.js changes. -->
     <script src="device.js?v=20260922" defer></script>
@@ -1443,7 +1462,7 @@
   <script src="combobox.js?v=20260911" defer></script>
   <!-- App bootstrap (defer preserves order).
        ?v= cache-buster: bump whenever app.js changes. -->
-  <script src="app.js?v=20260924" defer></script>
+  <script src="app.js?v=20260927" defer></script>
    <!-- Combos / Proxy Pools / Endpoints management (B2.4 / B2.3 / B2.5).
         ?v= cache-buster: bump whenever these modules change — combos.js held
         a plain src through the stage-8 rewrite, so browsers kept serving the

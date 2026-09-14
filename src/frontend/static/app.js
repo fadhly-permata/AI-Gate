@@ -18,6 +18,12 @@
 
   var SETTINGS_API = "/api/settings";
 
+  // Rows with an expanded <details class="log-stack"> — preserved across the 3s
+  // re-render so an open stacktrace does not auto-collapse (Task 1). Declared up
+  // here so the test hook on window.aigate (assigned before this block executes)
+  // shares the same Set instance.
+  var openStackIds = new Set();
+
   function read(key, fallback) {
     try {
       var v = localStorage.getItem(key);
@@ -410,6 +416,9 @@
         if (f.dev_mode) f.dev_mode.checked = String(data.dev_mode) === "true";
         if (f.theme) f.theme.value = data.theme || DEFAULT_THEME;
         if (f.locale) f.locale.value = data.locale || DEFAULT_LOCALE;
+        // Developer Mode gate: reflects the persisted value on body and starts/
+        // stops the log poll accordingly (Task 3). Single source of truth.
+        applyDevMode(String(data.dev_mode) === "true");
       })
       .catch(function (err) {
         setMsg(getStr("settings.error") + " (" + err.message + ")", "error");
@@ -455,11 +464,27 @@
         write(THEME_KEY, f.theme.value);
         write(LOCALE_KEY, f.locale.value);
         updateLangUI(f.locale.value);
+        // Live Developer Mode gate: toggling the switch shows/hides the dev-only
+        // surfaces + starts/stops the log poll without a reload (Task 3).
+        applyDevMode(!!(f.dev_mode && f.dev_mode.checked));
         setMsg(getStr("settings.saved"), "ok");
       })
       .catch(function (err) {
         setMsg(getStr("settings.error") + " (" + err.message + ")", "error");
       });
+  }
+
+  /* Developer Mode switch: apply + persist the moment it toggles, so the gated
+     surfaces appear/disappear without a "Save" click (real-Chromium UX fix).
+     saveSettings() already PUTs the whole settings object (dev_mode included)
+     and calls applyDevMode() on success, so this reuses that single path —
+     no duplicated persist logic. It is idempotent with the Save button: the
+     submit handler still calls saveSettings on an explicit click, and the
+     Port/theme/locale fields are NOT wired here (no save-per-keystroke).
+     `change` fires only when the checkbox value settles, not per keypress. */
+  function wireDevModeToggle() {
+    var dm = document.getElementById("setDevMode");
+    if (dm) dm.addEventListener("change", function () { saveSettings(); });
   }
 
   /* Test hook: lets vitest assert the PUT body stringifies values. */
@@ -753,6 +778,15 @@
   window.aigate.isShowResolved = readShowResolved;
   window.aigate.startLogAutoRefresh = startLogAutoRefresh;
   window.aigate.stopLogAutoRefresh = stopLogAutoRefresh;
+  /* Task 1: expanded-stacktrace ids are exposed so a test can seed/presence-
+     check the set that survives the 3s re-render. Task 3: applyDevMode is the
+     single gate for the dev-only surfaces + log poll. */
+  window.aigate.openStackIds = openStackIds;
+  window.aigate.applyDevMode = applyDevMode;
+  // Re-attach the tbody delegates (init ran on an empty body in jsdom tests).
+  window.aigate.wireLogTable = wireLogTable;
+  // Re-attach the instant Developer Mode toggle (same jsdom re-wiring need).
+  window.aigate.wireDevModeToggle = wireDevModeToggle;
 
   /* ---- DOM helpers ---- */
   function provEl(id) { return document.getElementById(id); }
@@ -2074,6 +2108,23 @@
   /* ---- Log Window ---- */
   function logEl(id) { return document.getElementById(id); }
 
+  /* ---- Developer Mode gate (Task 3) ----
+     dev_mode false => hide the 3 dev-only surfaces (Log Window, Device
+     Simulation, Self Heal) via CSS `body[data-devmode="off"]` and do NOT run
+     the 3s /api/logs poll. true => show them + start the poll. Called from
+     loadSettings()/saveSettings() once the real value is known; body ships
+     data-devmode="off" so a fresh install flashes nothing before this runs. */
+  function applyDevMode(on) {
+    if (document.body) document.body.dataset.devmode = on ? "on" : "off";
+    if (typeof fetch !== "function") return; // headless: attribute only
+    if (on) {
+      loadLogs();            // fill the (now visible) panel immediately
+      startLogAutoRefresh();
+    } else {
+      stopLogAutoRefresh();
+    }
+  }
+
   function setLogMsg(text, kind) {
     var m = logEl("logMsg");
     if (!m) return;
@@ -2085,6 +2136,8 @@
   var LOG_SHOW_RESOLVED_KEY = "aigate.logShowResolved";
   // Last rendered (normalized) rows — resolve-all operates on these.
   var lastLogRows = [];
+  // NOTE: openStackIds (expanded stacktrace ids, Task 1) is declared at the top
+  // of this IIFE so window.aigate.openStackIds shares the same instance.
 
   function isResolvableSeverity(sev) {
     var s = (sev || "").toString().toLowerCase();
@@ -2131,7 +2184,15 @@
           escapeHtml(getStr("log.resolved")) + "</span>";
       }
       var stack = (row.stacktrace != null && row.stacktrace !== "")
-        ? '<details class="log-stack"><summary>' + escapeHtml(getStr("term.stacktrace")) +
+        ? '<details class="log-stack"' +
+          ' data-logid="' + escapeHtml(row.id) + '"' +
+          // Id is normalized to a string on BOTH sides: the delegate stores what
+          // getAttribute returns (always a string, even when the API sends a
+          // number like {"id":4}), and here we compare String(row.id) so a
+          // numeric id (4) matches the stored "4". Without this, a numeric id
+          // collapses on every 3s poll (type mismatch, jsdom-string tests hid it).
+          (openStackIds.has(String(row.id)) ? ' open' : '') +
+          '><summary>' + escapeHtml(getStr("term.stacktrace")) +
           '</summary><pre>' + escapeHtml(row.stacktrace) + "</pre></details>"
         : "";
       // Per-row resolve: only for unresolved warning|error rows.
@@ -2148,6 +2209,33 @@
         "<td>" + escapeHtml(row.message) + (stack ? "<br>" + stack : "") + resolveBtn + "</td>" +
       "</tr>";
     }).join("");
+  }
+
+  /* Delegated listeners on the (stable) #logTableBody. Extracted so a jsdom
+     test that creates the tbody AFTER init() can re-attach them (init ran
+     against an empty document body). One click delegate for per-row resolve,
+     one capture-phase `toggle` delegate to remember expanded stacktraces so
+     renderLogs re-applies `open` across the 3s poll instead of collapsing
+     them (Task 1). `toggle` does not bubble, so it is captured on the tbody. */
+  function wireLogTable() {
+    var logTableBody = document.getElementById("logTableBody");
+    if (!logTableBody) return;
+    logTableBody.addEventListener("click", function (e) {
+      var btn = e.target.closest ? e.target.closest(".log-resolve-btn") : null;
+      if (btn && btn.getAttribute("data-id")) resolveLog(btn.getAttribute("data-id"));
+    });
+    logTableBody.addEventListener("toggle", function (e) {
+      var d = e.target;
+      if (!d || !d.classList || !d.classList.contains("log-stack")) return;
+      var id = d.getAttribute("data-logid");
+      if (id == null) return;
+      // Store the normalized string key so it always matches String(row.id) in
+      // renderLogs. The API sends numeric ids but the attribute round-trips as a
+      // string; keying on the string form for both keeps number-vs-string safe.
+      id = String(id);
+      if (d.open) openStackIds.add(id);
+      else openStackIds.delete(id);
+    }, true);
   }
 
   // Optional (msg, kind): status shown after the reload lands — lets action
@@ -2492,6 +2580,8 @@
     // --- Settings form ---
     var form = document.getElementById("settingsForm");
     if (form) form.addEventListener("submit", saveSettings);
+    // Developer Mode switch applies + persists instantly on toggle (no Save click).
+    wireDevModeToggle();
 
     // --- Backup & Restore (B5.7) ---
     // Export: intercept the anchor so we surface the "Export started" status and
@@ -2555,23 +2645,21 @@
     }
     var logResolveAllBtn = document.getElementById("logResolveAllBtn");
     if (logResolveAllBtn) logResolveAllBtn.addEventListener("click", resolveAllLogs);
-    // Rows re-render often -> delegate resolve clicks on the tbody.
-    var logTableBody = document.getElementById("logTableBody");
-    if (logTableBody) logTableBody.addEventListener("click", function (e) {
-      var btn = e.target.closest ? e.target.closest(".log-resolve-btn") : null;
-      if (btn && btn.getAttribute("data-id")) resolveLog(btn.getAttribute("data-id"));
-    });
+    // Rows re-render often -> delegate resolve clicks + stacktrace toggles on the
+    // (stable) tbody, so the listeners survive every innerHTML rebuild.
+    wireLogTable();
 
-    // --- Global Log Window: restore show/hide + start auto-refresh once ---
+    // --- Global Log Window: restore show/hide + gate the log poll on dev_mode ---
     var logVisible = read(LOG_VISIBLE_KEY, "1") !== "0";
     applyLogVisible(logVisible);
     applyShowResolved();
     observeLogWindow();
-    // Start auto-refresh globally (runs across all view switches). Guarded so
-    // headless test envs without fetch() don't error on import.
+    // Read the real dev_mode and let applyDevMode() decide whether to start the
+    // 3s /api/logs poll. body ships data-devmode="off" (index.html), so a fresh
+    // install shows nothing until the value lands. Guarded so headless test envs
+    // without fetch() don't error on import.
     if (typeof fetch === "function") {
-      loadLogs();
-      startLogAutoRefresh();
+      loadSettings();
     }
 
     // Start on the welcome view.
