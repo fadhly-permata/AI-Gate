@@ -2,6 +2,19 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260916-KOREKSI-FAKTA — re-check GitHub sesi ini: PR #28 SUDAH MERGED, B8 desain doc PHANTOM (ProjectManager)
+- PERINTAH user 2026-09-16: "1. skip aja ntar gua test sendiri (Windows .ps1); 2. kerjain aja semuanya; 3. utang peninjauan penutur asli skip aja, gua gak punya kenalan penutur asli."
+- KOREKSI A (fakta eksternal basi): state.md lama nulis "PR #28 TERBUKA / BELUM merge". Re-check API sesi ini → PR #28 `state=closed`, `merged_at=2026-09-15T17:47:25Z`, merge commit `e500001` (origin/main=`e500001`). OPEN PR = 0. Jadi PR #28 + isinya (bootstrap installer, README/Quick-Start→bootstrap) SUDAH di `main`. Catatan lama wajib dikoreksi (A12/A13).
+- KOREKSI B (phantom reference): state.md lama nulis "B8 Chat Playground Fase 6 (desain `documents/architecture/20260914-desain-chat-playground-fase6.md` siap)". File tsb TIDAK ADA di disk (find seluruh repo = 0 hasil). Spesifikasi sah = `documents/PRD.md` §2.9 + `documents/analysis/ERD.md` (`ChatSession`/`ChatMessage`). B8 dikerjakan dari sumber itu (D2 default), TANPA lembar desain terpisah.
+- KOREKSI C (lokasi skrip CLI): `scripts/cli-tools/*.sh` = 25 file, SUDAH tracked di `main` + `origin/main`. Jadi "lokasi folder skrip install CLI belum tetap" SUDAH beres; sisa B9 = bug runtime yang gejalanya belum dikasih user.
+- PUTUSAN: Windows .ps1 test = SKIP (user tes sendiri); review penutur asli = SKIP permanen (utang DITUTUP); sisanya dikerjakan sekuensial (WP-C wiki, B8 B6.1/2/3, B6 review wiki, B9 audit).
+
+## 20260916-WP-C — kredit dobel BERES + _Sidebar/_Footer TAYANG (ProjectManager)
+- TUJUAN: selesaikan "kredit dobel" (baris `Made with ❤️ by Fadhly Permata` muncul inline di 8 naskah + di `_Footer.md`; wiki render _Footer di SETIAP halaman → dobel). Putusan PM (D2): kredit cukup SATU di `_Footer.md`.
+- EKSEKUSI: spawn **public-writer** (ses `ses_f59c552baffeBToFxw2Wm9SvGl`) → hapus baris kredit inline + 1 baris kosong di atasnya dari 8 naskah konten (`Home/Quick-Start/Interfaces/Configuration-and-Keys/Providers-and-Combos/Terminal/CLI-Tools/OpenAI-API`). AUDIT PM (tidak telan receipt): `git status`=8 berkas, `git diff --stat`=8×`2 --`, grep `Made with` HANYA `_Footer.md:1`; ekor berkas newline tunggal, tak ada baris kosong menggantung; `_Footer.md`/`_Sidebar.md` tak tersentuh. ✓
+- PUBLISH: `publish_wiki.py --pages _Sidebar.md,_Footer.md,Home.md,Quick-Start.md,Interfaces.md,Configuration-and-Keys.md,Providers-and-Combos.md,Terminal.md,CLI-Tools.md,OpenAI-API.md --publish` → exit 0, 10 halaman (2 BARU + 8 BERUBAH). VERIFIKSI 3 ARAH: (1) `git ls-remote` wiki = `767e9ccc`; (2) `origin` repo utama BERSIH tanpa token; (3) webfetch `wiki/Home` → sidebar + footer tampil, kredit muncul PERSIS SEKALI, konten tak ada kredit inline; "Pages 8". ✓
+- STATUS: WP-C SELESAI. Commit lokal (docs) + tahan push/PR.
+
 ## 20260915-WIKI-PUBLISH-QS — Quick-Start wiki TAYANG (draft → live GitHub wiki) (ProjectManager)
 - PERINTAH user: "wiki quick start tayangin juga" (pasca publish PR #28). HANYA halaman Quick-Start (7 halaman lain biarkan).
 - MEKANISME: `python3 .opencode/tools/docs/wiki/publish_wiki.py --pages Quick-Start.md --publish` (W2.4, idempoten). Token dari `.env`/`GITHUB_TOKEN`, nilai tak dicetak. Script clone `AI-Gate.wiki.git` (depth 1) ke tmp luar repo, banding sha256, tulis+commit+push HANYA berkas berubah; 7 halaman lain "SUMBER HILANG (ditahan)" = nggak dihapus/diubah (tanpa `--delete-removed`).

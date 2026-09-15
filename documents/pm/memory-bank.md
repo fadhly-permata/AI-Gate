@@ -4,6 +4,8 @@
 (empty — diisi PM saat task pertama)
 
 ## Decisions
+- 2026-09-16 (PERSIAPAN + KOREKSI, perintah user "kerjain aja semuanya"): user putuskan (1) **uji Windows `.ps1` = SKIP** (user tes sendiri), (2) kerjakan **semua** sisa pending, (3) **review penutur asli = SKIP permanen** (tak punya kontak) → utang itu DITUTUP. PM re-check fakta eksternal (A12/A13) sebelum eksekusi dan menemukansatu catatan basi + satu phantom: **PR #28 sebenarnya SUDAH di-MERGE** (`merged_at 2026-09-15T17:47Z`, merge `e500001`, open PR = 0) bukan "TERBUKA" spt state.md lama; dan **lembar desain B8 `20260914-desain-chat-playground-fase6.md` TIDAK ADA** (phantom di catatan lama) → B8 dibangun langsung dari `PRD §2.9` + `ERD (ChatSession/ChatMessage)` sebagai spec (D2 default, dicatat). `scripts/cli-tools/*.sh` (25) sudah di `main` → soal lokasi B9 beres, sisa = bug runtime (butuh gejala user). Rencana eksekusi SEKUENSIAL (E6): WP-C wiki (_Sidebar/_Footer + kredit dobel, default PM buang inline-dobel) → B8 (be-dev B6.1 → fe-dev B6.2 → fe-dev B6.3) → B6 review wiki → B9 audit statis. Push/PR/merge TAHAN sampai perintah user (D1/H); commit per-fitur lokal boleh.
+
 - 2026-09-15 (WIKI NON-MULTI-BAHASA + BOOTSTRAP INSTALLER): dua hal dari user.
   (A) **W2.2 DITUTUP** — user: "wiki gak pake multi bahasa". Wiki GitHub tetap Bahasa Inggris saja; terjemahan
        7 bahasa wiki BATAL (berbeda dari i18n aplikasi yang tetap 8 bahasa). Coret dari pending selamanya.
