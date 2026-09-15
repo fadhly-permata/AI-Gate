@@ -2157,3 +2157,36 @@ bug); folder tmp `aigate-wiki-*` **nol sisa** (try/finally); `grep` safety: `--p
 - (a) `fix(scripts): perbaiki gateway-reachability warning di 13 cli-tool installer` (scope: scripts/cli-tools/*.sh)
 - (b) `docs(pm): catat B9 audit CLI + B6 review wiki + status` (bookkeeping)
 **Belum:** push/PR/merge = hak user. Gejala runtime B9 diminta ke user.
+
+---
+
+## DEV-RESTART — tombol "Restart aigate" in-app (2026-09-16)
+**Asal:** user: "terus bikin tombol restart aigate aja di settings kalo developer mode nyala biar gampang restart..." (mojibake "gmna"). Developer Mode ON only. self-restart via `os.execv(sys.executable,[sys.executable,run.py,*argv])`.
+**Kepemilikan (A3):** backend (`src/backend/admin_router.py`, mount di `server.py`) = be-dev; frontend (`index.html`,`app.js`,`styles.css`,`i18n/*.js`,`tests/restart.test.js`) = fe-dev.
+
+### Perubahan per berkas
+- **backend `admin_router.py` (BARU):** `POST /api/dev/restart` → gate `_dev_mode_enabled()` (baca Setting `dev_mode`, fail-closed: non-"true"/missing/error = OFF → 403 `dev_mode_required`); bila ON → 200 `{"status":"restarting"}` + jadwal `_schedule_restart()` (daemon `Timer(0.6)`, single-shot `_RESTART_SCHEDULED` guard) yang panggil `os.execv` run.py. Auth: peran diabaikan demi kesederhanaan (kontrak be-dev).
+- **backend `server.py`:** mount `admin_router` (+3 baris).
+- **backend `tests/backend/test_admin_restart.py` (BARU):** 5 tes (gate ON=200, OFF=403, missing=403, single-shot guard, no execv saat 403) — execv di-mock.
+- **frontend `index.html`:** kartu `#devRestartCard` + tombol `#devRestartBtn` (data-i18n) di Settings; cache-buster `20260928→20260929` (var V / i18n.js?v / app.js?v).
+- **frontend `app.js`:** `devRestart()` (confirm → POST → status "Restarting…" → `pollHealthThenReload` GET /api/health 500ms×30 → `location.reload()`), `wireDevRestart()`; **reuse** `body[data-devmode]` gate (Log Window/Device Sim) → tombol tersembunyi saat dev mode OFF (tak bikin gate sendiri).
+- **frontend `styles.css`:** `.dev-restart-card` masuk blok `body[data-devmode="off"]{display:none}`.
+- **frontend `i18n/*.js` (8):** key baru `settings.dev_restart`, `settings.dev_restart_confirm`, `settings.restarting` (en+id benar, 6 mirror EN).
+- **frontend `tests/restart.test.js` (BARU):** 9 tes (visibility ikut dev-mode, klik→confirm→POST→poll→reload, path confirm=false/403/health-down-then-up).
+
+### Catatan kritis sesi (verifikasi PM)
+- **be-dev bug tertangkap PM:** spawn awal `dev_restart()` TIDAK memanggil `_dev_mode_enabled()` (gerbang ada tapi tak disambung) → mode OFF tetap 200 (siapa saja bisa restart!). 2 tes gagal. Resume spawn balikin receipt KOSONG & tak benerin. Spawn fe-dev-style BARU dgn kode persis → gerbang disisipkan baris 142, 5/5 lolos. **PM jangan percaya klaim agent; selalu jalankan tes.**
+- Dua spawn be-dev pertama (DEV-RESTART + fix) balikin receipt kosong (kemungkinan tool resume tak kembalikan teks) — verifikasi mandiri wajib.
+
+### Gerbang PM (verifikasi mandiri)
+- `pytest tests/backend/test_admin_restart.py` → 5 passed.
+- `pytest tests/backend` → 235 failed / 324 passed / 42 errors (nol regresi baru vs baseline 235/307/42; +12 chat +5 admin = 324 passed).
+- `vitest run` (src/frontend) → 29 file / 737 passed (incl. restart.test.js, parity, cache-buster).
+- `i18n-parity-check.mjs en id ru nl ja zh zh-tw hi` → 494 kunci, 0 hilang/lebih/kosong.
+- cache-buster `20260929` konsisten (V == i18n.js?v == app.js?v); `git diff --check` bersih.
+- scope bersih: backend tak nyasar (diff server.py hanya mount), frontend tak ubah backend.
+
+### Komit
+- (a) `feat: tombol Restart aigate di Settings (dev-mode gated) + endpoint /api/dev/restart` (scope: admin_router.py, server.py, test_admin_restart.py, src/frontend/**, tests/restart.test.js)
+- (b) `docs(pm): catat DEV-RESTART + status` (bookkeeping, documents/pm + CODE_CHANGES)
+**Belum:** push/PR/merge = hak user. Uji nyata tombol di perangkat = G3 (perlu restart aigate utk rilis kode & nyalakan Chat).

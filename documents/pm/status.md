@@ -1442,3 +1442,12 @@ User: "gua gak ekspek user pake aigate offline... ya udah kita bikin bisa full o
 - CATATAN: gak sengaja bundle 4 fitur dalam 1 PR (H2 prefers per-fitur, tapi user minta 1 PR). Draf wiki TETAP di luar repo (gak ikut PR). Working tree lain (wiki-drafts + B8 design) tetap untracked/modified, gak ke-push.
 - OPSI user: kalau mau dipecah per-fitur jadi stacked PR (WP.1 / wiki / B7 / token-saver), bilang — gw split via branch dari main + cherry-pick.
 
+
+---
+
+## 2026-09-16 — DEV-RESTART: tombol "Restart aigate" in-app (Settings, dev-mode gated)
+- **Pemicu:** user minta tombol restart di settings saat Developer Mode ON (biar restart gampang, sekalian uji B8). Desain: self-restart `os.execv(sys.executable,[sys.executable,run.py,*argv])` (launcher main thread → proses diganti, PID sama). Ditanya paralel/seq → seq; FE/BE → kuberi kontrak, spawn BE dulu.
+- **be-dev (backend):** `src/backend/admin_router.py` `POST /api/dev/restart` gate `_dev_mode_enabled` (Setting dev_mode, fail-closed) → 403 saat OFF; ON → 200 `{"status":"restarting"}` + Timer(0.6) execv, single-shot guard. Mount di server.py (+3). test_admin_restart.py (execv di-mock). Sesi: spawn awal balikin receipt KOSONG, gerbang TIDAK tersambung (dev_restart tak panggil _dev_mode_enabled) + print debug nyasar → PM tangkap via tes (2 fail). Spawn baru be-dev dgn kode persis → gerbang disisipkan (baris 142), print dibuang → PM tes ulang 5/5 lolos.
+- **fe-dev (frontend):** kartu `#devRestartCard`/`#devRestartBtn` di Settings (index.html), `devRestart()`+`wireDevRestart()` (app.js): confirm → POST → status "Restarting…" → poll /api/health 500ms×30 → location.reload(); **reuse** gate `body[data-devmode]` (Log Window/Device Sim) → tombol hidden saat dev OFF. styles.css ikut blok display:none. i18n 3 key ×8. tests/restart.test.js (9 tes, mock fetch+location). receipt riil.
+- **Gerbang PM:** test_admin_restart 5/5; backend 235f/324p/42e (nol regresi baru, +5); vitest 737 hijau; parity 494; cache-buster 20260929 konsisten; diff-check bersih; scope OK.
+- **Tahan:** commit lokal (a=code, b=docs) — NO push/PR/merge (hak user). G3: user harus restart utk rilis kode (aktifkan Chat + tombol Restart) lalu uji nyata.

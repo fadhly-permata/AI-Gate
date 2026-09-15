@@ -814,3 +814,11 @@ Lembar fakta A/B/C tanggal 2026-09-08 **sebagian basi**. Yang sudah diverifikasi
   `0913a3be95ac35ca2bbf0c6bc0ff4c7014f0ba73` dicatat supaya bisa dipulihkan; isi sudah tercover entri 14:05).
   B4 (WP.1 cek versi Python di `run.py`) didelegasikan ke **be-dev**. B5/B7/B8/B9 butuh keputusan user →
   ditanyakan sekali, hemat putaran.
+
+## DEV-RESTART — 2026-09-16 (tombol restart in-app, Settings, dev-mode gated)
+- User minta tombol "Restart aigate" muncul HANYA saat Developer Mode ON → restart in-process `os.execv` run.py (launch `python run.py` tetap, launcher main thread → proses diganti, PID sama). Ini juga menjawab kebutuhan restart utk uji Chat (B8) — tapi user TETAP perlu satu restart awal utk rilis kode (bootstrapping; J6 hak user).
+- Backend: `POST /api/dev/restart` (admin_router.py) gate Setting dev_mode fail-closed (OFF/missing/error=403), ON=200 lalu Timer(0.6) execv, single-shot guard. test_admin_restart.py mock execv.
+- Frontend: kartu #devRestartCard di Settings, hidden via reuse `body[data-devmode]` gate; confirm→POST→poll /api/health→location.reload(); i18n 3 key×8; cache-buster 20260928→20260929; tests/restart.test.js 9 tes.
+- VERIFIKASI MANDIRI PM: test_admin_restart 5/5, backend 235f/324p/42e (nol regresi baru, +5), vitest 737 hijau, parity 494, diff-check bersih.
+- PELAJARAN SESI: be-dev spawn awal balikin receipt KOSONG & bug (gerbang dev_mode TIDAK tersambung → OFF pun bisa restart, 2 tes gagal). PM TIDAK percaya klaim → jalankan tes → tangkap bug → spawn ulang dgn instruksi persis → fix. Agent (dan tool resume) bisa balas kosong; gerbang tes = kebenaran.
+- Status: commit lokal (feature+docs). push/PR/merge TAHAN. G3: user restart + uji nyata tombol.
