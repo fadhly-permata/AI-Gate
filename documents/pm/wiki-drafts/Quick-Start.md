@@ -6,8 +6,8 @@ bug in the page, not in you.
 
 ## What you need 🧰
 
-Python 3.10 or newer. That's genuinely it. No GPU, no special laptop, no compiler, no Docker, no
-cloud account.
+Nothing. That's genuinely it. No Python to install first, no GPU, no special laptop, no compiler,
+no Docker, no cloud account.
 
 You don't pay us anything — aigate is free and open source. The only thing that might cost money is
 the AI provider account *you* use, and some of those have free tiers.
@@ -19,19 +19,19 @@ Clone it, step inside, run:
 ```bash
 git clone https://github.com/fadhly-permata/AI-Gate
 cd AI-Gate
-python run.py
+bash scripts/bootstrap.sh
 ```
 
 No git? GitHub's archive download works too — unzip and open a terminal in that folder first.
 
-That last line grabs the Python pieces it's missing, then starts. There's no separate install step;
-that step doesn't exist. First launch takes a moment.
+That line makes sure Python is there (installs it if it isn't), grabs the packages it needs, and
+starts the app. There's no separate install step; that step doesn't exist. First launch takes a moment.
 
 Then the part everyone misses: **the browser doesn't open itself.** Type
 `http://localhost:8080` and the page is just there.
 
-Linux and Windows are identical here. On Windows, the terminal support it needs arrives on that
-first run, by itself.
+The steps are the same on Windows — start it with `powershell -File scripts\bootstrap.ps1` instead
+of the bash line. The terminal support Windows needs arrives on that first run, by itself.
 
 ## On your phone 📱
 
@@ -47,11 +47,11 @@ matches your device. [CLI Tools](CLI-Tools) covers that.
 If something already holds 8080, pick another port:
 
 ```bash
-AIGATE_PORT=9090 python run.py
+AIGATE_PORT=9090 bash scripts/bootstrap.sh
 ```
 
-On Windows, set it first: `$env:AIGATE_PORT = "9090"` in PowerShell, `set AIGATE_PORT=9090` in the
-old command prompt.
+On Windows, set it first, then run the script: `$env:AIGATE_PORT="9090"; pwsh scripts/bootstrap.ps1`
+in PowerShell, or `set AIGATE_PORT=9090` in the old command prompt.
 
 A quiet warning: aigate answers anyone on the same network — that's how your other devices reach it.
 So don't leave it running at a café or an airport.
@@ -66,15 +66,16 @@ Only then do the terminal, the coding tools, and the API come alive.
 
 ## When something goes wrong 🧯
 
-- **A wall of unfamiliar text before anything starts?** Your Python is older than 3.10. One line
-  tells you: `python --version` (on Windows, `py --version`). Install a newer Python, run again.
+- **A wall of unfamiliar text before anything starts?** That's rarer now — the setup line handles
+  Python for you. If it still couldn't find a way to install Python, tell me which OS you were on and
+  what you saw; meanwhile, installing Python 3.10+ yourself and running again works too.
 - **Browser stayed empty?** It never opens itself — type the address above.
 - **Address refused, or a port error?** Use another port; the command is above.
 - **Page loads but nothing answers?** You likely stopped before step 2 or 3 — a key added *and* a
   provider chosen. Still stuck, run it with the developer window and extra helpers:
 
 ```bash
-AIGATE_DEV=1 python run.py
+AIGATE_DEV=1 bash scripts/bootstrap.sh
 ```
 
 ---

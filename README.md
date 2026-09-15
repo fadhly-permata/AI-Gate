@@ -46,23 +46,33 @@ phone, in a browser tab.
 
 ## Try it in 60 seconds ⏱️
 
+Nothing to install first — not Python, not pip, nothing. This one command
+sets up whatever's missing and starts the app:
+
 ```bash
-python run.py
+bash scripts/bootstrap.sh
 ```
 
 Open **http://localhost:8080** — the first run grabs the few Python
-packages it needs, then starts.
+packages it needs, then starts. Already have Python 3.10 or newer? Running
+`run.py` directly still works.
+
+On Windows, run `pwsh scripts/bootstrap.ps1` (or
+`powershell -File scripts\bootstrap.ps1` on the built-in Windows PowerShell 5.1).
 
 Port busy? Pick another one:
 
 ```bash
-AIGATE_PORT=9090 python run.py
+AIGATE_PORT=9090 bash scripts/bootstrap.sh
 ```
+
+On Windows: `$env:AIGATE_PORT="9090"; pwsh scripts/bootstrap.ps1`.
 
 ## Runs on your phone 📱
 
-Install Termux on Android, get aigate in there, and start it the same way
-as on a laptop. The trickier part of phone life is installing the *coding
+Install Termux on Android, get aigate in there, and start it with the same
+`bash scripts/bootstrap.sh` you'd use on a laptop. The trickier part of phone
+life is installing the *coding
 tools* themselves — Android resolves packages differently than desktops —
 so aigate knows when it's on Termux and suggests the install command that
 actually works there, like a system package instead of the desktop one.
