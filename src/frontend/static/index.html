@@ -17,7 +17,7 @@
        below; it is also read by i18n.js for the on-demand URLs. -->
   <script>
     (function () {
-      var V = "20260927";
+      var V = "20260928";
       window.I18N_VER = V;
       var loc = "en";
       try {
@@ -58,7 +58,7 @@
   <script defer src="vendor/xterm/xterm.js?v=20260920"></script>
   <script defer src="vendor/xterm/xterm-addon-fit.js?v=20260920"></script>
 
-  <link rel="stylesheet" href="styles.css?v=20260927" />
+  <link rel="stylesheet" href="styles.css?v=20260928" />
 </head>
 <!-- Developer Mode gate ships "off" by default so a fresh install never flashes
      the dev-only surfaces (Log Window, Device Simulation, Self-Heal) before the
@@ -140,6 +140,10 @@
           <a class="nav-item" href="#" data-view="cli" aria-label="CLI Tools" data-i18n-aria="nav.cli">
             <i class="nav-icon fa fa-screwdriver-wrench"></i>
             <span class="nav-label" data-i18n="nav.cli">CLI Tools</span>
+          </a>
+          <a class="nav-item" href="#" data-view="chat" aria-label="Chat" data-i18n-aria="nav.chat">
+            <i class="nav-icon fa fa-comments"></i>
+            <span class="nav-label" data-i18n="nav.chat">Chat</span>
           </a>
         </div>
         <div class="nav-section" role="group" aria-labelledby="nav-section-insights">
@@ -915,6 +919,127 @@
         </div>
       </section>
 
+      <!-- Chat Playground (B8.B6.2 / PRD §2.9): sidebar session list + conversation
+           thread + composer + provider/combo picker. Rendering/streaming lives in
+           app.js (window.aigate.chat). No new <script> tag — the logic is part of
+           the SPA shell so it shares the chat.* i18n keys and the nav wiring. -->
+      <section class="view" data-view="chat">
+        <div class="page-banner">
+          <i class="fa fa-circle-info" aria-hidden="true"></i>
+          <p class="page-banner-text" data-i18n="page_desc.chat">Chat with a configured provider or combo through the aigate gateway — responses stream token by token and every conversation is saved locally.</p>
+        </div>
+
+        <div class="chat-layout">
+          <!-- Session list -->
+          <aside class="card chat-sidebar">
+            <div class="providers-head">
+              <h2 class="providers-title" data-i18n="chat.sessions">Sessions</h2>
+              <button class="btn btn-primary" id="chatNewBtn" type="button">
+                <i class="fa fa-plus"></i> <span data-i18n="chat.new">New chat</span>
+              </button>
+            </div>
+            <p class="settings-msg" id="chatListMsg" role="status" aria-live="polite"></p>
+            <ul class="chat-session-list" id="chatSessionList"></ul>
+          </aside>
+
+          <!-- Conversation -->
+          <section class="card chat-main">
+            <div class="chat-bar">
+              <div class="chat-bar-info">
+                <input class="form-input chat-title-input" id="chatTitleInput" type="text"
+                       aria-label="Chat title" data-i18n-aria="chat.title" />
+                <span class="chat-target" id="chatTarget"></span>
+              </div>
+              <div class="chat-bar-actions">
+                <button class="icon-btn-small" id="chatRenameBtn" type="button"
+                        data-i18n-aria="chat.rename" title="Rename" aria-label="Rename">
+                  <i class="fa fa-pen"></i></button>
+                <button class="icon-btn-small" id="chatDeleteBtn" type="button"
+                        data-i18n-aria="chat.delete" title="Delete" aria-label="Delete">
+                  <i class="fa fa-trash"></i></button>
+              </div>
+            </div>
+
+            <div class="chat-thread" id="chatThread" role="log" aria-live="polite"
+                 aria-label="Conversation"></div>
+
+            <div class="chat-settings" id="chatSettings">
+              <label class="form-label" for="chatSystemPrompt" data-i18n="chat.system_prompt">System prompt</label>
+              <textarea class="form-input chat-system" id="chatSystemPrompt" rows="2"></textarea>
+              <div class="chat-settings-row">
+                <label class="form-label" for="chatTemperature" data-i18n="chat.temperature">Temperature</label>
+                <input class="form-input" id="chatTemperature" type="number" min="0" max="2" step="0.1" />
+                <button class="btn" id="chatSettingsSave" type="button" data-i18n="chat.save">Save</button>
+              </div>
+              <p class="settings-msg" id="chatSettingsMsg" role="status" aria-live="polite"></p>
+            </div>
+
+            <div class="chat-composer">
+              <textarea class="form-input" id="chatInput" rows="2"
+                        aria-label="Message" data-i18n-aria="chat.input" placeholder=""></textarea>
+              <div class="chat-composer-actions">
+                <button class="btn btn-primary" id="chatSendBtn" type="button" data-i18n="chat.send">Send</button>
+                <button class="btn" id="chatStopBtn" type="button" data-i18n="chat.stop" hidden>Stop</button>
+              </div>
+              <p class="settings-msg" id="chatMsg" role="status" aria-live="polite"></p>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <!-- New chat modal: pick a provider/combo target via the combobox -->
+      <div class="modal-overlay" id="chatNewModal" hidden>
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="chatNewTitle">
+          <h3 class="modal-title" id="chatNewTitle" data-i18n="chat.new_title">New chat</h3>
+          <div class="form-row">
+            <label class="form-label" for="chatNewTitleInput" data-i18n="chat.title_label">Title</label>
+            <input class="form-input" type="text" id="chatNewTitleInput" />
+          </div>
+          <div class="form-row">
+            <label class="form-label" for="chatNewModel" data-i18n="chat.model">Model</label>
+            <div class="aigate-combo">
+              <input class="form-input" type="text" id="chatNewModel"
+                     autocomplete="off" placeholder=""
+                     role="combobox" aria-expanded="false" aria-controls="chatNewModelList"
+                     aria-autocomplete="list" />
+              <ul class="aigate-combo-list" id="chatNewModelList" role="listbox" hidden></ul>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-primary" id="chatNewCreate" data-i18n="chat.create">Create</button>
+            <button type="button" class="btn" id="chatNewCancel" data-i18n="chat.cancel">Cancel</button>
+          </div>
+          <p class="settings-msg" id="chatNewMsg" role="status" aria-live="polite"></p>
+        </div>
+      </div>
+
+      <!-- Rename modal -->
+      <div class="modal-overlay" id="chatRenameModal" hidden>
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="chatRenameTitle">
+          <h3 class="modal-title" id="chatRenameTitle" data-i18n="chat.rename_title">Rename conversation</h3>
+          <div class="form-row">
+            <label class="form-label" for="chatRenameInput" data-i18n="chat.title_label">Title</label>
+            <input class="form-input" type="text" id="chatRenameInput" />
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-primary" id="chatRenameSave" data-i18n="chat.save">Save</button>
+            <button type="button" class="btn" id="chatRenameCancel" data-i18n="chat.cancel">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Delete-confirm modal -->
+      <div class="modal-overlay" id="chatDeleteModal" hidden>
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="chatDeleteTitle">
+          <h3 class="modal-title" id="chatDeleteTitle" data-i18n="chat.delete">Delete conversation</h3>
+          <p class="chat-confirm-text" id="chatDeleteText" data-i18n="chat.delete_confirm">Delete this conversation? This cannot be undone.</p>
+          <div class="form-actions">
+            <button type="button" class="btn btn-primary" id="chatDeleteConfirm" data-i18n="chat.delete">Delete</button>
+            <button type="button" class="btn" id="chatDeleteCancel" data-i18n="chat.cancel">Cancel</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Provider add/edit modal (B2.2) — stage-3: PROFILE ONLY. The stage-2
            tablist + Accounts panel are gone (one surface per job): accounts and
            the rotation strategy live on the provider-detail page. The strategy
@@ -1457,6 +1582,8 @@
            data-i18n-aria="nav.terminal"><i class="fa fa-terminal"></i></a>
         <a class="bn-item" href="#" data-view="cli"
            data-i18n-aria="nav.cli"><i class="fa fa-screwdriver-wrench"></i></a>
+        <a class="bn-item" href="#" data-view="chat"
+           data-i18n-aria="nav.chat"><i class="fa fa-comments"></i></a>
         <span class="bn-sep" aria-hidden="true"></span>
         <a class="bn-item" href="#" data-view="usage"
            data-i18n-aria="nav.usage"><i class="fa fa-chart-line"></i></a>
@@ -1488,7 +1615,7 @@
         asserted EQUAL by tests/i18n.test.js — the dictionary files, the registry,
         and app.js must reload together or on-demand i18n URLs point at a version
         the browser cached away. So bumping app.js?v forces all three in lockstep. -->
-  <script src="i18n.js?v=20260927" defer></script>
+  <script src="i18n.js?v=20260928" defer></script>
    <!-- Device simulation helper (B4.2) — must load before app.js uses it.
         ?v= cache-buster: bump whenever device.js changes. -->
     <script src="device.js?v=20260922" defer></script>
@@ -1498,7 +1625,7 @@
   <script src="combobox.js?v=20260911" defer></script>
   <!-- App bootstrap (defer preserves order).
        ?v= cache-buster: bump whenever app.js changes. -->
-  <script src="app.js?v=20260927" defer></script>
+  <script src="app.js?v=20260928" defer></script>
    <!-- Combos / Proxy Pools / Endpoints management (B2.4 / B2.3 / B2.5).
         ?v= cache-buster: bump whenever these modules change — combos.js held
         a plain src through the stage-8 rewrite, so browsers kept serving the
