@@ -47,5 +47,3 @@ Turn an endpoint's access key on and send it as `Authorization: Bearer <key>` �
 Every call from your own code is recorded like any other — tokens in, tokens out, an estimated cost. Pointing a script at aigate isn't going around it.
 
 ---
-
-Made with ❤️ by Fadhly Permata

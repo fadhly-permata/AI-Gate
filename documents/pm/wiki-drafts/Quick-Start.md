@@ -79,5 +79,3 @@ AIGATE_DEV=1 bash scripts/bootstrap.sh
 ```
 
 ---
-
-Made with ❤️ by Fadhly Permata

@@ -27,5 +27,3 @@ Screen and API are one app on one port — `8080`, changeable here or with `AIGA
 A saved key isn't enough — choose which provider is the one in use. Until you do, the terminal, the tools, and the API stay silent. [Providers & Combos](Providers-and-Combos) is next.
 
 ---
-
-Made with ❤️ by Fadhly Permata
