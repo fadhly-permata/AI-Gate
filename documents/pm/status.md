@@ -2,6 +2,14 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260915-WIKI-PUBLISH-QS — Quick-Start wiki TAYANG (draft → live GitHub wiki) (ProjectManager)
+- PERINTAH user: "wiki quick start tayangin juga" (pasca publish PR #28). HANYA halaman Quick-Start (7 halaman lain biarkan).
+- MEKANISME: `python3 .opencode/tools/docs/wiki/publish_wiki.py --pages Quick-Start.md --publish` (W2.4, idempoten). Token dari `.env`/`GITHUB_TOKEN`, nilai tak dicetak. Script clone `AI-Gate.wiki.git` (depth 1) ke tmp luar repo, banding sha256, tulis+commit+push HANYA berkas berubah; 7 halaman lain "SUMBER HILANG (ditahan)" = nggak dihapus/diubah (tanpa `--delete-removed`).
+- DRY-RUN dlulu: Quick-Start.md = BERUBAH (10ff16f8→3c3aab1), 7 lain ditahan → aman. Lalu `--publish` exit 0: "1 halaman diterbitkan: Quick-Start.md".
+- VERIFIKASI 3 ARAH (F3/G3, bukan percaya output skrip): (1) `git ls-remote` wiki `master` → `c6a6bb83` (HEAD baru); (2) clone fresh → 8 halaman ada, Quick-Start berisi `bash scripts/bootstrap.sh`/`powershell -File scripts\bootstrap.ps1`, `python run.py` = 0; (3) webfetch `github.com/fadhly-permata/AI-Gate/wiki/Quick-Start` → render publik lengkap, "aigate edited this page Sep 15, 2026 · 2 revisions", "Pages 8". tmp clone dihapus.
+- KONTEKS: draft Quick-Start yang di-publish = versi dari working tree (`documents/pm/wiki-drafts/Quick-Start.md`), yang SEKARANG masih di branch `feat/bootstrap-installer` (PR #28, BELUM merge). Jadi isi wiki live == versi PR #28; kalau PR ditolak/revert, `main` & wiki bisa beda — catatan biasa, bukan bug.
+- BELUM: 7 halaman wiki lain (Home/Interfaces/Configuration/OpenAI/Providers/CLI/Terminal) tidak disentuh; README 7 varian + root sudah masuk PR #28.
+
 ## 20260915-PUSH-PR28 — Bootstrap + README/Quick-Start DI-PUSH + **PR #28 TERBUKA** (label enhancement+documentation, mergeable clean) (ProjectManager)
 - PERINTAH user: "push dan pr" (lalu "kerjain nomor 2" = update README/Quick-Start dulu biar masuk PR yang sama; "dah, lanjut" pasca-restart).
 - ITEM #2 lebih dulu: spawn **public-writer** (sesi `ses_f59e70d52ffeFPbtu0k9OUM0Id`, sudah ke-register setelah user restart opencode — sebelumnya gagal spawn "invalid agent type"). Handover `documents/pm/handovers/handover-20260915-readme-bootstrap-entry.md`. 9 berkas publik (README + 7 varian + Quick-Start draft): command first-run `python run.py` → `bash scripts/bootstrap.sh` (+ Windows `pwsh scripts/bootstrap.ps1`); "What you need" Python→"Nothing". GERBANG PM MANDIRI: grep `python run.py` 9 target = 0; bootstrap.ps1/sh hadir 9/9; frasa kunci utuh; `git diff --check`=0; Windows TIDAK di-overclaim.
