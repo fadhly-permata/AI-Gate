@@ -45,18 +45,27 @@ main branch में पहुँच गए। चाय अब भी गु�
 
 ## 60 सेकंड में आज़माएँ ⏱️
 
+पहले से कुछ इंस्टॉल करने की ज़रूरत नहीं — न Python, न pip, और कुछ भी नहीं।
+यह एक कमांड जो कुछ भी कम है उसे जुगाड़ लेता है, और aigate को चला देता है:
+
 ```bash
-python run.py
+bash scripts/bootstrap.sh
 ```
 
 फिर browser में **http://localhost:8080** खोलिए। पहली बार चलाने पर यह
-खुद ही ज़रूरी Python packages डाउनलोड कर लेता है।
+खुद ही ज़रूरी Python packages डाउनलोड कर लेता है। अगर आपके पास Python 3.10
+या उससे नया है, तो `run.py` सीधे चलाना भी चलेगा।
+
+Windows पर `pwsh scripts/bootstrap.ps1` चलाइए (अगर बिल्ट-इन Windows
+PowerShell 5.1 हो, तो `powershell -File scripts\bootstrap.ps1`)।
 
 8080 port खाली नहीं है? तो यह इस्तेमाल कीजिए:
 
 ```bash
-AIGATE_PORT=9090 python run.py
+AIGATE_PORT=9090 bash scripts/bootstrap.sh
 ```
+
+Windows पर: `$env:AIGATE_PORT="9090"; pwsh scripts/bootstrap.ps1`।
 
 ## फ़ोन पर चलाना 📱
 

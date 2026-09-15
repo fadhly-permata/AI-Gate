@@ -44,18 +44,27 @@ aigate 免费且开源——没有付费套餐，也没有需要订阅才能用�
 
 ## 60 秒跑起来 ⏱️
 
+不用先装任何东西 —— 不用 Python，不用 pip，什么都不用。这一条命令会把缺的
+补齐，再把 aigate 起起来：
+
 ```bash
-python run.py
+bash scripts/bootstrap.sh
 ```
 
 打开 **http://localhost:8080**。第一次启动会自动装好几个
-Python 依赖包，装完就起。
+Python 依赖包，装完就起。要是你已经装了 Python 3.10 以上，直接跑 `run.py`
+也行。
+
+在 Windows 上用 `pwsh scripts/bootstrap.ps1`（自带 Windows PowerShell 5.1 则
+用 `powershell -File scripts\bootstrap.ps1`）。
 
 端口被占用？换一个：
 
 ```bash
-AIGATE_PORT=9090 python run.py
+AIGATE_PORT=9090 bash scripts/bootstrap.sh
 ```
+
+Windows 上：`$env:AIGATE_PORT="9090"; pwsh scripts/bootstrap.ps1`。
 
 ## 在手机上跑 📱
 

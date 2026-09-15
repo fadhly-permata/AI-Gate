@@ -50,18 +50,27 @@ aigate бесплатен, а его исходный код открыт — п
 
 ## Попробуйте за 60 секунд ⏱️
 
+Ставить заранее нечего — ни Python, ни pip, ничего больше. Эта одна команда
+сама добирает недостающее и запускает aigate:
+
 ```bash
-python run.py
+bash scripts/bootstrap.sh
 ```
 
 Заходите на **http://localhost:8080**. Первый запуск сам тянет нужные
-Python-пакеты — их немного — и поднимает интерфейс.
+Python-пакеты — их немного — и поднимает интерфейс. Уже есть Python 3.10
+или новее? Можно по-прежнему запустить `run.py` напрямую.
+
+На Windows выполните `pwsh scripts/bootstrap.ps1` (или
+`powershell -File scripts\bootstrap.ps1` во встроенном Windows PowerShell 5.1).
 
 Порт занят? Возьмите другой:
 
 ```bash
-AIGATE_PORT=9090 python run.py
+AIGATE_PORT=9090 bash scripts/bootstrap.sh
 ```
+
+На Windows: `$env:AIGATE_PORT="9090"; pwsh scripts/bootstrap.ps1`.
 
 ## На телефоне 📱
 

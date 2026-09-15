@@ -46,18 +46,27 @@ De thee is nog warm.
 
 ## Probeer het in 60 seconden ⏱️
 
+Je hoeft vooraf niets te installeren — geen Python, geen pip, niets. Dit ene
+commando pakt wat er nog ontbreekt en start aigate meteen:
+
 ```bash
-python run.py
+bash scripts/bootstrap.sh
 ```
 
 Ga daarna naar **http://localhost:8080**. Bij de eerste start pakt aigate
-zelf de paar Python-pakketten die het nodig heeft.
+zelf de paar Python-pakketten die het nodig heeft. Heb je al Python 3.10 of
+nieuwer? Dan kun je `run.py` nog steeds rechtstreeks draaien.
+
+Op Windows: `pwsh scripts/bootstrap.ps1` (of
+`powershell -File scripts\bootstrap.ps1` in de ingebouwde Windows PowerShell 5.1).
 
 Is poort 8080 bezet? Neem er een andere:
 
 ```bash
-AIGATE_PORT=9090 python run.py
+AIGATE_PORT=9090 bash scripts/bootstrap.sh
 ```
+
+Op Windows: `$env:AIGATE_PORT="9090"; pwsh scripts/bootstrap.ps1`.
 
 ## Op je telefoon 📱
 

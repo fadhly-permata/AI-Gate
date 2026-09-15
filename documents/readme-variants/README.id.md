@@ -48,18 +48,27 @@ paginya kode sudah rapi.
 
 ## Coba 60 detik ⏱️
 
+Nggak perlu pasang apa-apa dulu — bukan Python, bukan pip, bukan apa pun.
+Satu perintah ini menyiapkan sisanya, lalu menjalankan aigate:
+
 ```bash
-python run.py
+bash scripts/bootstrap.sh
 ```
 
 Setelah itu buka **http://localhost:8080**. Saat pertama dijalankan,
-aigate otomatis mengunduh paket Python yang dibutuhkan.
+aigate otomatis mengunduh paket Python yang dibutuhkan. Sudah punya Python
+3.10 ke atas? Menjalankan `run.py` langsung juga masih bisa.
+
+Di Windows, jalankan `pwsh scripts/bootstrap.ps1` (atau
+`powershell -File scripts\bootstrap.ps1` di Windows PowerShell 5.1 bawaan).
 
 Kalau port 8080 sudah terpakai:
 
 ```bash
-AIGATE_PORT=9090 python run.py
+AIGATE_PORT=9090 bash scripts/bootstrap.sh
 ```
+
+Di Windows: `$env:AIGATE_PORT="9090"; pwsh scripts/bootstrap.ps1`.
 
 ## Jalan di HP 📱
 
