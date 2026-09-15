@@ -787,6 +787,11 @@
   window.aigate.wireLogTable = wireLogTable;
   // Re-attach the instant Developer Mode toggle (same jsdom re-wiring need).
   window.aigate.wireDevModeToggle = wireDevModeToggle;
+  // DEV-RESTART: expose the handler + re-wiring so the vitest sim can drive the
+  // same entry point the shipped button uses (init runs on an empty jsdom body).
+  window.aigate.devRestart = devRestart;
+  window.aigate.wireDevRestart = wireDevRestart;
+  window.aigate.pollHealthThenReload = pollHealthThenReload;
 
   /* ---- DOM helpers ---- */
   function provEl(id) { return document.getElementById(id); }
@@ -2167,6 +2172,69 @@
     }
   }
 
+  /* ---- DEV-RESTART (dev-only surface) ----
+     POST /api/dev/restart is fail-closed on the server (403 unless dev_mode is
+     ON), and the card that holds this button is hidden by the SAME
+     body[data-devmode="off"] CSS gate as the Log Window / Device Sim / Self-Heal
+     surfaces — applyDevMode() already drives it, so no separate JS gate here.
+     On 2xx the server restarts itself in-process (os.execv), so the client is
+     the only thing left standing: we poll GET /api/health (any 2xx = back up)
+     every RESTART_POLL_MS up to RESTART_POLL_MAX times, then location.reload()
+     to hand control back to the freshly-booted app. */
+  var RESTART_API = "/api/dev/restart";
+  var HEALTH_API = "/api/health";
+  var RESTART_POLL_MS = 500;
+  var RESTART_POLL_MAX = 30;
+
+  function setRestartMsg(text, kind) { setMsgIn("devRestartMsg", text, kind); }
+
+  function pollHealthThenReload(attempt) {
+    if (attempt >= RESTART_POLL_MAX) {
+      // Server never answered within the window — leave the honest status.
+      setRestartMsg(getStr("settings.restarting"), "error");
+      return;
+    }
+    fetch(HEALTH_API, {
+      method: "GET",
+      headers: { "Accept": "application/json" },
+      cache: "no-store"
+    })
+      .then(function (r) {
+        if (r.ok) { window.location.reload(); return; }
+        setTimeout(function () { pollHealthThenReload(attempt + 1); }, RESTART_POLL_MS);
+      })
+      .catch(function () {
+        setTimeout(function () { pollHealthThenReload(attempt + 1); }, RESTART_POLL_MS);
+      });
+  }
+
+  function devRestart() {
+    if (!window.confirm(getStr("settings.dev_restart_confirm"))) return;
+    setRestartMsg("", "");
+    fetch(RESTART_API, {
+      method: "POST",
+      headers: { "Accept": "application/json" }
+    })
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        setRestartMsg(getStr("settings.restarting"));
+        pollHealthThenReload(0);
+      })
+      .catch(function (err) {
+        // 403 dev_mode_required is unexpected (the button hides when off) — but
+        // surface it instead of spinning. fetchJson's error shape is reused.
+        setRestartMsg(getStr("settings.error") + " (" + err.message + ")", "error");
+      });
+  }
+
+  // Re-attach the click handler so a test that re-mounts the shipped body can
+  // bind the button in isolation (same reason wireDevModeToggle is exported).
+  function wireDevRestart() {
+    var btn = document.getElementById("devRestartBtn");
+    if (btn) btn.addEventListener("click", devRestart);
+  }
+
+
   function setLogMsg(text, kind) {
     var m = logEl("logMsg");
     if (!m) return;
@@ -2627,6 +2695,8 @@
     if (form) form.addEventListener("submit", saveSettings);
     // Developer Mode switch applies + persists instantly on toggle (no Save click).
     wireDevModeToggle();
+    // DEV-RESTART: bind the dev-only restart button (hidden via the dev gate when off).
+    wireDevRestart();
 
     // --- Backup & Restore (B5.7) ---
     // Export: intercept the anchor so we surface the "Export started" status and

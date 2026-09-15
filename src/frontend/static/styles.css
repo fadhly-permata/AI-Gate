@@ -2026,14 +2026,16 @@ body.log-visible .workspace {
 
 /* ===== Developer Mode gate (Task 3) — frontend-only surface hiding =====
    dev_mode is owned by the backend (default "false"); app.js applyDevMode()
-   reflects it on <body data-devmode>. When "off", the 3 dev-only surfaces are
+   reflects it on <body data-devmode>. When "off", the dev-only surfaces are
    removed: Log Window (topbar toggle + panel), Device Simulation (both triggers
-   + the modal), and the Self-Heal card. The Settings "Developer Mode" switch is
-   NOT matched here, so the user can always turn the features back on. */
+   + the modal), the Self-Heal card, and the DEV-RESTART card. The Settings
+   "Developer Mode" switch is NOT matched here, so the user can always turn the
+   features back on. */
 body[data-devmode="off"] #logWindowToggle,
 body[data-devmode="off"] #logWindow,
 body[data-devmode="off"] [data-device-trigger],
 body[data-devmode="off"] .selfheal-card,
+body[data-devmode="off"] .dev-restart-card,
 body[data-devmode="off"] #deviceModal {
   display: none !important;
 }
