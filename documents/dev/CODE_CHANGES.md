@@ -2136,3 +2136,24 @@ bug); folder tmp `aigate-wiki-*` **nol sisa** (try/finally); `grep` safety: `--p
 - (b) `feat(frontend): Chat Playground B6.2+B6.3 — halaman chat + streaming + polish + i18n`
 - (c) `docs(pm): catat B8 B6.1/B6.2/B6.3 + WP-A/B/C + temuan env httpx/starlette` (bookkeeping)
 **Belum:** push/PR/merge = hak user. Uji mata user.
+
+## 2026-09-16 — B9: audit skrip install CLI (`scripts/cli-tools/*.sh`) — PM → fullstack-dev — DONE (commit lokal, TAHAN push/PR/merge)
+
+**Asal:** user: "kerjain aja semuanya". B9 = "skrip install CLI masih ada bug" (gejala runtime tak dikasih). PM scan awal: 25/25 `bash -n` OK, backtick cuma di komentar.
+**Kepemilikan (A3):** `scripts/cli-tools/**` = berkas level-repo di luar write-root spesialis → fullstack-dev (`ses_f595a8ab1ffe4MbD6Q6Wwp8fWH`).
+
+### Temuan & perubahan per berkas
+- **DEFECT TERBUKTI (fix):** blok reachability `if ! curl ...; then rc=$?` → `$?` menangkap exit negasi `!` (=0), bukan exit curl asli (7/28) → peringatan "aigate not reachable" TAK PERNAH MUNCUL. Diperbaiki ke pola `llm.sh`: `if curl ...; then :; else rc=$?`. 13 berkas: `aichat,aider,claude,cline,codex,gemini,gptme,kilo,open-interpreter,opencode,openhands,oterm,qwen` (+39/−13).
+- **BERSIH (berbukti):** `_common.sh` (double-source guard + `BASH_SOURCE`), pesan literal (no-exec substitution), 10 skrip `NO_INSTALL`/`NOT_A_CLI` no-op (exit 0, 0 panggil PM), idempoten + path-independent, version-guard aider(3.10–3.12)/openhands(3.12) benar, env/flag launcher cocok `cli_presets.py`+`cli_tools_router.py`.
+- **Kandidat non-blocking (tak diubah):** `opencode.sh` tulis `models:{}` kosong (backend isi peta model) — beda standalone-vs-backend, butuh gejala user.
+
+### Gerbang PM (verifikasi mandiri)
+- `bash -n scripts/cli-tools/*.sh` → 25/25 = 0 error.
+- `git diff --stat` = 13 file (39+/13−); diff HANYA probe curl, **NOL** panggilan install baru.
+- Dry-run fullstack (shim PATH, `curl` exit 7): 14/24 skrip cetak WARN; `calls.log`=0 paket tersentuh. JANGAN sentuh `~/.aigate`/`:8080`/install asli.
+- NOTE: di Termux ini `curl` tak terpasang → blok probe dilewati → bug tak teramati di perangkat user; kemungkinan BUKAN sumber "bug" user. Gejala runtime (tool+error+langkah) MASIH diminta user.
+
+### Commit
+- (a) `fix(scripts): perbaiki gateway-reachability warning di 13 cli-tool installer` (scope: scripts/cli-tools/*.sh)
+- (b) `docs(pm): catat B9 audit CLI + B6 review wiki + status` (bookkeeping)
+**Belum:** push/PR/merge = hak user. Gejala runtime B9 diminta ke user.
