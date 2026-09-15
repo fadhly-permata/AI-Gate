@@ -4,6 +4,9 @@
 (empty — diisi PM saat task pertama)
 
 ## Decisions
+- 2026-09-16 (PERSIAPAN + KOREKSI, perintah user "kerjain aja semuanya"): user putuskan (1) **uji Windows `.ps1` = SKIP** (user tes sendiri), (2) kerjakan **semua** sisa pending, (3) **review penutur asli = SKIP permanen** (tak punya kontak) → utang itu DITUTUP. PM re-check fakta eksternal (A12/A13) sebelum eksekusi dan menemukansatu catatan basi + satu phantom: **PR #28 sebenarnya SUDAH di-MERGE** (`merged_at 2026-09-15T17:47Z`, merge `e500001`, open PR = 0) bukan "TERBUKA" spt state.md lama; dan **lembar desain B8 `20260914-desain-chat-playground-fase6.md` TIDAK ADA** (phantom di catatan lama) → B8 dibangun langsung dari `PRD §2.9` + `ERD (ChatSession/ChatMessage)` sebagai spec (D2 default, dicatat). `scripts/cli-tools/*.sh` (25) sudah di `main` → soal lokasi B9 beres, sisa = bug runtime (butuh gejala user). Rencana eksekusi SEKUENSIAL (E6): WP-C wiki (_Sidebar/_Footer + kredit dobel, default PM buang inline-dobel) → B8 (be-dev B6.1 → fe-dev B6.2 → fe-dev B6.3) → B6 review wiki → B9 audit statis. Push/PR/merge TAHAN sampai perintah user (D1/H); commit per-fitur lokal boleh.
+  **OUTCOME (2026-09-16, semua selesai & commit lokal):** WP-C → kredit dobel dibuang (public-writer hapus baris inline 8 naskah), `_Sidebar`+`_Footer` diterbitkan ke wiki (10 halaman, `git ls-remote`=767e9ccc, webfetch Home render sidebar+footer kredit sekali). B8 → be-dev B6.1 (models ChatSession/ChatMessage + `chat_router.py` + refactor gateway `run_chat_completion`, 12 tes, **nol regresi** baseline 235/307/42 → 235/319/42) + fe-dev B6.2/6.3 (halaman chat, SSE streaming, polish, i18n 44 kunci×8, **vitest FE 728 hijau**, G3 end-to-end mock SSE). B6 → review 6 halaman wiki = akurat, nol cacat. B9 → fullstack-dev temukan 1 defect terbukti (reachability warning dead-code di 13 skrip, `$?` salah tangkap) + diperbaiki; sisanya bersih. **MASIH BUTUH USER:** gejala runtime B9 (bug yg dibenerin kemungkinan bukan ini — curl tak ada di Termux), perintah push/PR/merge, mata user utk Chat. **TEMUAN LINGKUNGAN:** suite backend ~75% merah krn `httpx` tak dipin (0.28) vs `starlette 0.27` TestClient → TypeError; pre-existing, tawarkan pin `httpx<0.28` ke user.
+
 - 2026-09-15 (WIKI NON-MULTI-BAHASA + BOOTSTRAP INSTALLER): dua hal dari user.
   (A) **W2.2 DITUTUP** — user: "wiki gak pake multi bahasa". Wiki GitHub tetap Bahasa Inggris saja; terjemahan
        7 bahasa wiki BATAL (berbeda dari i18n aplikasi yang tetap 8 bahasa). Coret dari pending selamanya.
@@ -811,3 +814,11 @@ Lembar fakta A/B/C tanggal 2026-09-08 **sebagian basi**. Yang sudah diverifikasi
   `0913a3be95ac35ca2bbf0c6bc0ff4c7014f0ba73` dicatat supaya bisa dipulihkan; isi sudah tercover entri 14:05).
   B4 (WP.1 cek versi Python di `run.py`) didelegasikan ke **be-dev**. B5/B7/B8/B9 butuh keputusan user →
   ditanyakan sekali, hemat putaran.
+
+## DEV-RESTART — 2026-09-16 (tombol restart in-app, Settings, dev-mode gated)
+- User minta tombol "Restart aigate" muncul HANYA saat Developer Mode ON → restart in-process `os.execv` run.py (launch `python run.py` tetap, launcher main thread → proses diganti, PID sama). Ini juga menjawab kebutuhan restart utk uji Chat (B8) — tapi user TETAP perlu satu restart awal utk rilis kode (bootstrapping; J6 hak user).
+- Backend: `POST /api/dev/restart` (admin_router.py) gate Setting dev_mode fail-closed (OFF/missing/error=403), ON=200 lalu Timer(0.6) execv, single-shot guard. test_admin_restart.py mock execv.
+- Frontend: kartu #devRestartCard di Settings, hidden via reuse `body[data-devmode]` gate; confirm→POST→poll /api/health→location.reload(); i18n 3 key×8; cache-buster 20260928→20260929; tests/restart.test.js 9 tes.
+- VERIFIKASI MANDIRI PM: test_admin_restart 5/5, backend 235f/324p/42e (nol regresi baru, +5), vitest 737 hijau, parity 494, diff-check bersih.
+- PELAJARAN SESI: be-dev spawn awal balikin receipt KOSONG & bug (gerbang dev_mode TIDAK tersambung → OFF pun bisa restart, 2 tes gagal). PM TIDAK percaya klaim → jalankan tes → tangkap bug → spawn ulang dgn instruksi persis → fix. Agent (dan tool resume) bisa balas kosong; gerbang tes = kebenaran.
+- Status: commit lokal (feature+docs). push/PR/merge TAHAN. G3: user restart + uji nyata tombol.

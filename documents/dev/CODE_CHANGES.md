@@ -2105,3 +2105,88 @@ bug); folder tmp `aigate-wiki-*` **nol sisa** (try/finally); `grep` safety: `--p
 **Commit (branch `feat/bootstrap-installer`, staging eksplisit bukan `git add -A`):** (1) `feat(scripts): cold-start bootstrap installer (POSIX + Windows)`; (2) `docs: point first-run instructions at the bootstrap installer`; (3) `docs(pm): record bootstrap installer + close W2.2 + PR #28` (bookkeeping).
 **Belum:** merge = hak user. Publish wiki Quick-Start (`publish_wiki.py --publish`) = langkah terpisah keputusan user (draft diedit, halaman tayang belum). Uji jalur `.ps1` di Windows asli = pending reviewer.
 
+
+## 2026-09-16 — B8 Chat Playground Fase 6 (B6.1 backend + B6.2/B6.3 UI) — PM → be-dev + fe-dev — DONE (commit lokal, TAHAN push/PR/merge)
+
+**Asal:** user: "kerjain aja semuanya" (ambil alih sisa pending; skip uji Windows .ps1 + skip review penutur asli). Spesifikasi = `documents/PRD.md` §2.9 + `documents/analysis/ERD.md` (ChatSession/ChatMessage). Catatan lama menyebut "lembar desain fase 6" → TIDAK ADA (phantom, dikoreksi WP-A).
+**Kepemilikan (A3):** backend ChatSession model + chat_router + refactor gateway = be-dev (`src/backend/**`,`tests/backend/**`); UI halaman Chat = fe-dev (`src/frontend/**`). PM nol tulis keduanya.
+
+### Perubahan per berkas — BACKEND (B6.1, be-dev)
+- `src/backend/models.py` (+81 baris): `ChatSession` (`chat_sessions`: id,title,provider_id FK,combo_id FK,model,system_prompt,temperature,created_at,updated_at) + `ChatMessage` (`chat_messages`: id,session_id FK,role,content,tokens_in,tokens_out,created_at). Relasi 1:N `messages` cascade `all,delete-orphan` `order_by=id`. Tabel baru → `init_db()` `create_all` otomatis, TIDAK perlu `_ensure_*`.
+- `src/backend/gateway/router.py`: ekstrak body `_handle_chat_completion` → `run_chat_completion(payload,ctx,*,request,endpoint_name,preferred_account_id)` (salinan verbatim; kontrak `/v1/chat/completions` byte-identik). Chat Playground reuse in-process (no loopback HTTP/J6).
+- `src/backend/chat_router.py` (BARU): `GET|POST /api/chat/sessions`, `GET|PUT|DELETE /api/chat/sessions/{id}`, `POST /api/chat/sessions/{id}/complete` (SSE: simpan user msg → panggil `run_chat_completion` → teruskan SSE → simpan assistant dari akumulasi delta + usage; tokens `None` bila tak ada usage). Error envelope OpenAI-style.
+- `src/backend/server.py`: `import chat_router` + `app.include_router(chat_router)`.
+- `tests/backend/test_chat_router.py` (BARU, 12 tes) + `tests/backend/test_models.py` (tambah chat_sessions/chat_messages ke EXPECTED_TABLES — deviasi ratifikasi PM; wajib agar test exact-equality tak regresi).
+
+### Perubahan per berkas — FRONTEND (B6.2+B6.3, fe-dev)
+- `src/frontend/static/index.html`: nav-item + bn-item `data-view="chat"` (Operations, terakhir), `<section data-view="chat">`, 3 modal (new/rename/delete), cache-buster `20260927→20260928`.
+- `src/frontend/static/app.js`: modul `window.aigate.chat` + `wireChatUi`; `describeTarget/formatTokens/parseSseLine`; render sesi/pesan; `fetchChatModels` via `GET /v1/models`; CRUD + SSE (`fetch`+`readSseStream`+`AbortController` Stop); dialog aksesibel focus-trap.
+- `src/frontend/static/styles.css`: layout chat + responsif `@media (max-width:960px)/(600px)` + `body[data-device]` sim.
+- `src/frontend/static/i18n/*.js` (8): 42 kunci chat + `nav.chat`/`page_desc.chat` semua kamus (id diterjemahkan, 6 lain mirror EN; review penutur asli dicabut user).
+- `src/frontend/tests/views.test.js`: bn-item 10→11 + separator boundary. `src/frontend/tests/chat.test.js` (BARU, 22 tes).
+
+### Gerbang PM (verifikasi mandiri, bukan telan receipt)
+- BACKEND: `python3 -m pytest tests/backend/test_chat_router.py` = 12 passed. Delta regresi penuh via `git stash -u`: BASELINE `235 failed/307 passed/42 error` → CURRENT `235 failed/319 passed/42 error` = **tepat +12 passed, nol fail/error baru**. `git diff` gateway = murni ekstrak; model cocok ERD.
+- FRONTEND: `node ./node_modules/vitest/vitest.mjs run` = **28 file/728 tes HIJAU, exit 0** (chat.test 22, views guard update). `git diff --check`=0. Cache-buster seragam `20260928`. Backend tak tersentuh.
+- **PENEMUAN ENV (bukan ulah fitur):** suite backend ~75% merah di Termux krn `httpx` tak dipin (0.28) vs `starlette 0.27` TestClient (`httpx.Client(app=...)` dihapus di 0.28) → TypeError; baseline SUDAH merah sebelum B8. Kandidat fix: pin `httpx<0.28` (DI LUAR scope pending).
+- **SISA G3 (user):** mata user + provider nyata di app asli untuk render visual/HP.
+
+### Commit (staging eksplisit, BUKAN git add -A)
+- (a) `feat(backend): Chat Playground B6.1 — chat_router + ChatSession/ChatMessage models + reuse gateway pipeline`
+- (b) `feat(frontend): Chat Playground B6.2+B6.3 — halaman chat + streaming + polish + i18n`
+- (c) `docs(pm): catat B8 B6.1/B6.2/B6.3 + WP-A/B/C + temuan env httpx/starlette` (bookkeeping)
+**Belum:** push/PR/merge = hak user. Uji mata user.
+
+## 2026-09-16 — B9: audit skrip install CLI (`scripts/cli-tools/*.sh`) — PM → fullstack-dev — DONE (commit lokal, TAHAN push/PR/merge)
+
+**Asal:** user: "kerjain aja semuanya". B9 = "skrip install CLI masih ada bug" (gejala runtime tak dikasih). PM scan awal: 25/25 `bash -n` OK, backtick cuma di komentar.
+**Kepemilikan (A3):** `scripts/cli-tools/**` = berkas level-repo di luar write-root spesialis → fullstack-dev (`ses_f595a8ab1ffe4MbD6Q6Wwp8fWH`).
+
+### Temuan & perubahan per berkas
+- **DEFECT TERBUKTI (fix):** blok reachability `if ! curl ...; then rc=$?` → `$?` menangkap exit negasi `!` (=0), bukan exit curl asli (7/28) → peringatan "aigate not reachable" TAK PERNAH MUNCUL. Diperbaiki ke pola `llm.sh`: `if curl ...; then :; else rc=$?`. 13 berkas: `aichat,aider,claude,cline,codex,gemini,gptme,kilo,open-interpreter,opencode,openhands,oterm,qwen` (+39/−13).
+- **BERSIH (berbukti):** `_common.sh` (double-source guard + `BASH_SOURCE`), pesan literal (no-exec substitution), 10 skrip `NO_INSTALL`/`NOT_A_CLI` no-op (exit 0, 0 panggil PM), idempoten + path-independent, version-guard aider(3.10–3.12)/openhands(3.12) benar, env/flag launcher cocok `cli_presets.py`+`cli_tools_router.py`.
+- **Kandidat non-blocking (tak diubah):** `opencode.sh` tulis `models:{}` kosong (backend isi peta model) — beda standalone-vs-backend, butuh gejala user.
+
+### Gerbang PM (verifikasi mandiri)
+- `bash -n scripts/cli-tools/*.sh` → 25/25 = 0 error.
+- `git diff --stat` = 13 file (39+/13−); diff HANYA probe curl, **NOL** panggilan install baru.
+- Dry-run fullstack (shim PATH, `curl` exit 7): 14/24 skrip cetak WARN; `calls.log`=0 paket tersentuh. JANGAN sentuh `~/.aigate`/`:8080`/install asli.
+- NOTE: di Termux ini `curl` tak terpasang → blok probe dilewati → bug tak teramati di perangkat user; kemungkinan BUKAN sumber "bug" user. Gejala runtime (tool+error+langkah) MASIH diminta user.
+
+### Commit
+- (a) `fix(scripts): perbaiki gateway-reachability warning di 13 cli-tool installer` (scope: scripts/cli-tools/*.sh)
+- (b) `docs(pm): catat B9 audit CLI + B6 review wiki + status` (bookkeeping)
+**Belum:** push/PR/merge = hak user. Gejala runtime B9 diminta ke user.
+
+---
+
+## DEV-RESTART — tombol "Restart aigate" in-app (2026-09-16)
+**Asal:** user: "terus bikin tombol restart aigate aja di settings kalo developer mode nyala biar gampang restart..." (mojibake "gmna"). Developer Mode ON only. self-restart via `os.execv(sys.executable,[sys.executable,run.py,*argv])`.
+**Kepemilikan (A3):** backend (`src/backend/admin_router.py`, mount di `server.py`) = be-dev; frontend (`index.html`,`app.js`,`styles.css`,`i18n/*.js`,`tests/restart.test.js`) = fe-dev.
+
+### Perubahan per berkas
+- **backend `admin_router.py` (BARU):** `POST /api/dev/restart` → gate `_dev_mode_enabled()` (baca Setting `dev_mode`, fail-closed: non-"true"/missing/error = OFF → 403 `dev_mode_required`); bila ON → 200 `{"status":"restarting"}` + jadwal `_schedule_restart()` (daemon `Timer(0.6)`, single-shot `_RESTART_SCHEDULED` guard) yang panggil `os.execv` run.py. Auth: peran diabaikan demi kesederhanaan (kontrak be-dev).
+- **backend `server.py`:** mount `admin_router` (+3 baris).
+- **backend `tests/backend/test_admin_restart.py` (BARU):** 5 tes (gate ON=200, OFF=403, missing=403, single-shot guard, no execv saat 403) — execv di-mock.
+- **frontend `index.html`:** kartu `#devRestartCard` + tombol `#devRestartBtn` (data-i18n) di Settings; cache-buster `20260928→20260929` (var V / i18n.js?v / app.js?v).
+- **frontend `app.js`:** `devRestart()` (confirm → POST → status "Restarting…" → `pollHealthThenReload` GET /api/health 500ms×30 → `location.reload()`), `wireDevRestart()`; **reuse** `body[data-devmode]` gate (Log Window/Device Sim) → tombol tersembunyi saat dev mode OFF (tak bikin gate sendiri).
+- **frontend `styles.css`:** `.dev-restart-card` masuk blok `body[data-devmode="off"]{display:none}`.
+- **frontend `i18n/*.js` (8):** key baru `settings.dev_restart`, `settings.dev_restart_confirm`, `settings.restarting` (en+id benar, 6 mirror EN).
+- **frontend `tests/restart.test.js` (BARU):** 9 tes (visibility ikut dev-mode, klik→confirm→POST→poll→reload, path confirm=false/403/health-down-then-up).
+
+### Catatan kritis sesi (verifikasi PM)
+- **be-dev bug tertangkap PM:** spawn awal `dev_restart()` TIDAK memanggil `_dev_mode_enabled()` (gerbang ada tapi tak disambung) → mode OFF tetap 200 (siapa saja bisa restart!). 2 tes gagal. Resume spawn balikin receipt KOSONG & tak benerin. Spawn fe-dev-style BARU dgn kode persis → gerbang disisipkan baris 142, 5/5 lolos. **PM jangan percaya klaim agent; selalu jalankan tes.**
+- Dua spawn be-dev pertama (DEV-RESTART + fix) balikin receipt kosong (kemungkinan tool resume tak kembalikan teks) — verifikasi mandiri wajib.
+
+### Gerbang PM (verifikasi mandiri)
+- `pytest tests/backend/test_admin_restart.py` → 5 passed.
+- `pytest tests/backend` → 235 failed / 324 passed / 42 errors (nol regresi baru vs baseline 235/307/42; +12 chat +5 admin = 324 passed).
+- `vitest run` (src/frontend) → 29 file / 737 passed (incl. restart.test.js, parity, cache-buster).
+- `i18n-parity-check.mjs en id ru nl ja zh zh-tw hi` → 494 kunci, 0 hilang/lebih/kosong.
+- cache-buster `20260929` konsisten (V == i18n.js?v == app.js?v); `git diff --check` bersih.
+- scope bersih: backend tak nyasar (diff server.py hanya mount), frontend tak ubah backend.
+
+### Komit
+- (a) `feat: tombol Restart aigate di Settings (dev-mode gated) + endpoint /api/dev/restart` (scope: admin_router.py, server.py, test_admin_restart.py, src/frontend/**, tests/restart.test.js)
+- (b) `docs(pm): catat DEV-RESTART + status` (bookkeeping, documents/pm + CODE_CHANGES)
+**Belum:** push/PR/merge = hak user. Uji nyata tombol di perangkat = G3 (perlu restart aigate utk rilis kode & nyalakan Chat).

@@ -2,6 +2,47 @@
 
 > Log aktif 30 hari terakhir. Entri 2026-09-03 s/d 09-08 → `documents/pm/archive/status-2026-09-03_sampai_2026-09-08.md` (dipindah, tidak dihapus).
 
+## 20260916-KOREKSI-FAKTA — re-check GitHub sesi ini: PR #28 SUDAH MERGED, B8 desain doc PHANTOM (ProjectManager)
+- PERINTAH user 2026-09-16: "1. skip aja ntar gua test sendiri (Windows .ps1); 2. kerjain aja semuanya; 3. utang peninjauan penutur asli skip aja, gua gak punya kenalan penutur asli."
+- KOREKSI A (fakta eksternal basi): state.md lama nulis "PR #28 TERBUKA / BELUM merge". Re-check API sesi ini → PR #28 `state=closed`, `merged_at=2026-09-15T17:47:25Z`, merge commit `e500001` (origin/main=`e500001`). OPEN PR = 0. Jadi PR #28 + isinya (bootstrap installer, README/Quick-Start→bootstrap) SUDAH di `main`. Catatan lama wajib dikoreksi (A12/A13).
+- KOREKSI B (phantom reference): state.md lama nulis "B8 Chat Playground Fase 6 (desain `documents/architecture/20260914-desain-chat-playground-fase6.md` siap)". File tsb TIDAK ADA di disk (find seluruh repo = 0 hasil). Spesifikasi sah = `documents/PRD.md` §2.9 + `documents/analysis/ERD.md` (`ChatSession`/`ChatMessage`). B8 dikerjakan dari sumber itu (D2 default), TANPA lembar desain terpisah.
+- KOREKSI C (lokasi skrip CLI): `scripts/cli-tools/*.sh` = 25 file, SUDAH tracked di `main` + `origin/main`. Jadi "lokasi folder skrip install CLI belum tetap" SUDAH beres; sisa B9 = bug runtime yang gejalanya belum dikasih user.
+- PUTUSAN: Windows .ps1 test = SKIP (user tes sendiri); review penutur asli = SKIP permanen (utang DITUTUP); sisanya dikerjakan sekuensial (WP-C wiki, B8 B6.1/2/3, B6 review wiki, B9 audit).
+
+## 20260916-B9 — AUDIT SKRIP CLI: 1 DEFECT TERBUKTIP DIBENERIN, sisanya bersih (ProjectManager ← fullstack-dev)
+- OWNER fullstack-dev (ses `ses_f595a8ab1ffe4MbD6Q6Wwp8fWH`), handover `documents/pm/handovers/handover-20260916-b9-audit-cli-scripts.md`. Sasaran 25 file `scripts/cli-tools/*.sh`.
+- DEFECT NYATA (dibenerin): blok reachability `if ! curl ...; then rc=$?` → `$?` menangkap exit negasi `!` (=0), bukan curl asli (7/28) → peringatan "aigate not reachable" TIDAK PERNAH muncul di 13 skrip. Fix samakan ke pola `llm.sh` (`if curl; then :; else rc=$?`). 13 file, +39/−13.
+- VERIFIKASI PM MANDIRI: `bash -n` 25/25=0; `git diff --stat`=13 file (39+/13−); diff = HANYA probe curl (`...; then :`) → NOL panggilan install baru (npm/pip/pkg/cargo). Dry-run fullstack: `calls.log`=0 paket tersentuh (shim aman, tak install). ✓
+- AUDIT LAIN BERSIH (berbukti): _common.sh double-source guard; pesan literal (backtick cuma komentar; bug swe-agent lama tak berulang); NO_INSTALL/NOT_A_CLI 10 skrip exit 0 tanpa panggil PM; idempoten+path-independent; version-guard aider(3.10-3.12)/openhands(3.12) benar; env/flag cocok `cli_presets.py`+`cli_tools_router.py`.
+- CATATAN: di Termux ini `curl` tak terpasang → blok probe dilewati total, jadi bug ini tak teramati di perangkat user → **kemungkinan besar BUKAN** sumber "bug" yang user maksud. Kandidat non-blocking: `opencode.sh` tulis `models:{}` kosong vs backend isi peta model (butuh gejala). 
+- SISA = butuh GEJALA RUNTIME user (tool mana, pesan error, langkah gagal). Sudah disusun jadi daftar pertanyaan utk user.
+- STATUS: B9 (bagian audit statis/fix) SELESAI. Commit lokal `fix(scripts)`, tahan push/PR.
+
+
+- Baca 6 naskah (yang baru dipublish WP-C): Interfaces, Configuration-and-Keys, OpenAI-API, Providers-and-Combos, CLI-Tools, Terminal. Cek klaim faktual vs kode yang sudah diaudit: port tunggal 8080 + `AIGATE_PORT/DEV/DB_PATH` ✓; endpoint gateway `/v1/models`,`/v1/chat/completions`,`/v1/responses`,`/v1/messages`,`/v1/messages/count_tokens` ✓; "/v1/messages non-streaming untuk sekarang" ✓ (Stage 1); 5 strategi kombo (fallback/load_balance/latency_cost/three_tier/round_robin) ✓; multi-akun ✓; 8 bahasa ✓; 24 tool/3 grup ✓; kontrol terminal (Keep Screen On/TUI Passthrough/Paste-as-Code-Block/Full Page vs Fullscreen) ✓; 3 setelan off-screen (request log/retensi 7 hari/reap terminal 60 mnt) ✓; klaim salah "split-view" sudah dibuang saat audit 09-14 ✓.
+- OBSERVASI non-blocking: `CLI-Tools.md` bilang "aigate won't install tools for you (shows command)" — konsisten utk alur UI; skrip `scripts/cli-tools/*.sh` memang helper manual yang user jalankan sendiri. Bukan cacat.
+- HASIL: NOL perubahan. Tidak perlu public-writer. Render live sidebar/footer sudah diverifikasi di WP-C.
+
+
+- OWNER fe-dev (ses `ses_f59806606ffe7PFitZEMPjNvjA`), handover `documents/pm/handovers/handover-20260916-b8-b62-b63-ui-chat.md`. Halaman `data-view="chat"` (sidebar sesi + thread + composer + picker), nav-item + bn-item baru, 3 modal (new/rename/delete), SSE via fetch+ReadableStream+AbortController (Stop), system_prompt/temperature per sesi (PUT), rename, responsif, i18n 44 kunci × 8 kamus.
+- KEPUTUSAN fe-dev (diterima PM): picker pakai `GET /v1/models` (ref `provider:`/`combo:` kanonik) bukan rangkai /api+/combos — DRY + format ref dijamin benar (deviasi sehat dari hint handover, diverifikasi live). `provider_id/combo_id` tak diisi (model ref cukup). Stop → asisten tak tersimpan (diterima).
+- VERIFIKASI PM MANDIRI (F3/G3, tak telan receipt): `git status` scope = HANYA `src/frontend/**` (app.js/index.html/styles.css + 8 i18n + views.test.js + chat.test.js baru), **backend bersih**; `git diff --check` exit 0; cache-buster seragam `20260928` (styles/i18n.js/app.js + I18N_VER); vitest FE `node ./node_modules/vitest/vitest.mjs run` = **28 file/728 tes HIJAU, exit 0** (+22 chat.test.js, views.test.js guard bn-item 10→11). fe-dev bukti G3 end-to-end: server :8091 + DB tmp + mock SSE :9099 → SSE live + assistant tersimpan (content+tokens) + PUT/DELETE; hanya PID sendiri di-kill, `:8080` tak disentuh.
+- SISA G3 (user): mata user + provider sungguhan di app asli (headless tak bisa uji render visual/HP asli).
+- STATUS: **B8 Chat Playground SELESAI (B6.1+B6.2+B6.3)** backend+FE, commit lokal, tahan push/PR/merge.
+
+
+- OWNER be-dev (ses `ses_f59bbc32cffe5qJSzd53uemuKJ`). Spesifikasi = PRD §2.9 + ERD (file desain terpisah TIDAK ada — phantom di catatan lama, dikoreksi WP-A). Deliverable: model `ChatSession`/`ChatMessage` (models.py), `chat_router.py` (CRUD + `POST /api/chat/sessions/{id}/complete` SSE), refactor gateway ekstrak `run_chat_completion` (reuse pipeline, J6 no-loopback), mount di server.py, `tests/backend/test_chat_router.py` (12 tes).
+- DEVIASI RATIFIKASI PM: be-dev juga ubah `tests/backend/test_models.py` (tambah chat_sessions/chat_messages ke EXPECTED_TABLES). Ini WAJAR — test itu exact-equality; tabel 16→18 pasti regresi bila registry tak di-update. Scope roster be-dev = `tests/backend/**` jadi TIDAK melanggar batas (handover saja yang terlalu sempit). DITERIMA.
+- VERIFIKASI PM MANDIRI (F3/G3, tak telan receipt): chat tests = 12 passed (isolasi). Delta regresi penuh via `git stash -u` baseline vs current: BASELINE `235 failed/307 passed/42 error` → CURRENT `235 failed/319 passed/42 error` = **tepat +12 passed, nol fail/error baru**. Diff gateway = murni ekstrak (kontrak `/v1/*` byte-identik); model cocok ERD (cascade all,delete-orphan).
+- TEMUAN LINGKUNGAN (bukan ulah fitur): suite backend ~75% merah di env ini karena `httpx` TIDAK dipin di pyproject → ke-resolve 0.28, tapi `fastapi<0.100` menarik `starlette 0.27` yang `TestClient`-nya pakai `httpx.Client(app=...)` (dihapus di 0.28) → TypeError. Ini drift dependensi, baseline SUDAH merah sebelum B8. Butuh pin `httpx<0.28` (atau naik starlette) — DI LUAR scope "kerjain pending"; akan dilaporkan ke user, bukan diperbaiki sekarang.
+- STATUS: B6.1 SELESAI backend. Lanjut B6.2 (fe-dev). Commit lokal (feat+tests) + tahan push/PR.
+
+## 20260916-WP-C — kredit dobel BERES + _Sidebar/_Footer TAYANG (ProjectManager)
+- TUJUAN: selesaikan "kredit dobel" (baris `Made with ❤️ by Fadhly Permata` muncul inline di 8 naskah + di `_Footer.md`; wiki render _Footer di SETIAP halaman → dobel). Putusan PM (D2): kredit cukup SATU di `_Footer.md`.
+- EKSEKUSI: spawn **public-writer** (ses `ses_f59c552baffeBToFxw2Wm9SvGl`) → hapus baris kredit inline + 1 baris kosong di atasnya dari 8 naskah konten (`Home/Quick-Start/Interfaces/Configuration-and-Keys/Providers-and-Combos/Terminal/CLI-Tools/OpenAI-API`). AUDIT PM (tidak telan receipt): `git status`=8 berkas, `git diff --stat`=8×`2 --`, grep `Made with` HANYA `_Footer.md:1`; ekor berkas newline tunggal, tak ada baris kosong menggantung; `_Footer.md`/`_Sidebar.md` tak tersentuh. ✓
+- PUBLISH: `publish_wiki.py --pages _Sidebar.md,_Footer.md,Home.md,Quick-Start.md,Interfaces.md,Configuration-and-Keys.md,Providers-and-Combos.md,Terminal.md,CLI-Tools.md,OpenAI-API.md --publish` → exit 0, 10 halaman (2 BARU + 8 BERUBAH). VERIFIKSI 3 ARAH: (1) `git ls-remote` wiki = `767e9ccc`; (2) `origin` repo utama BERSIH tanpa token; (3) webfetch `wiki/Home` → sidebar + footer tampil, kredit muncul PERSIS SEKALI, konten tak ada kredit inline; "Pages 8". ✓
+- STATUS: WP-C SELESAI. Commit lokal (docs) + tahan push/PR.
+
 ## 20260915-WIKI-PUBLISH-QS — Quick-Start wiki TAYANG (draft → live GitHub wiki) (ProjectManager)
 - PERINTAH user: "wiki quick start tayangin juga" (pasca publish PR #28). HANYA halaman Quick-Start (7 halaman lain biarkan).
 - MEKANISME: `python3 .opencode/tools/docs/wiki/publish_wiki.py --pages Quick-Start.md --publish` (W2.4, idempoten). Token dari `.env`/`GITHUB_TOKEN`, nilai tak dicetak. Script clone `AI-Gate.wiki.git` (depth 1) ke tmp luar repo, banding sha256, tulis+commit+push HANYA berkas berubah; 7 halaman lain "SUMBER HILANG (ditahan)" = nggak dihapus/diubah (tanpa `--delete-removed`).
@@ -1401,3 +1442,12 @@ User: "gua gak ekspek user pake aigate offline... ya udah kita bikin bisa full o
 - CATATAN: gak sengaja bundle 4 fitur dalam 1 PR (H2 prefers per-fitur, tapi user minta 1 PR). Draf wiki TETAP di luar repo (gak ikut PR). Working tree lain (wiki-drafts + B8 design) tetap untracked/modified, gak ke-push.
 - OPSI user: kalau mau dipecah per-fitur jadi stacked PR (WP.1 / wiki / B7 / token-saver), bilang — gw split via branch dari main + cherry-pick.
 
+
+---
+
+## 2026-09-16 — DEV-RESTART: tombol "Restart aigate" in-app (Settings, dev-mode gated)
+- **Pemicu:** user minta tombol restart di settings saat Developer Mode ON (biar restart gampang, sekalian uji B8). Desain: self-restart `os.execv(sys.executable,[sys.executable,run.py,*argv])` (launcher main thread → proses diganti, PID sama). Ditanya paralel/seq → seq; FE/BE → kuberi kontrak, spawn BE dulu.
+- **be-dev (backend):** `src/backend/admin_router.py` `POST /api/dev/restart` gate `_dev_mode_enabled` (Setting dev_mode, fail-closed) → 403 saat OFF; ON → 200 `{"status":"restarting"}` + Timer(0.6) execv, single-shot guard. Mount di server.py (+3). test_admin_restart.py (execv di-mock). Sesi: spawn awal balikin receipt KOSONG, gerbang TIDAK tersambung (dev_restart tak panggil _dev_mode_enabled) + print debug nyasar → PM tangkap via tes (2 fail). Spawn baru be-dev dgn kode persis → gerbang disisipkan (baris 142), print dibuang → PM tes ulang 5/5 lolos.
+- **fe-dev (frontend):** kartu `#devRestartCard`/`#devRestartBtn` di Settings (index.html), `devRestart()`+`wireDevRestart()` (app.js): confirm → POST → status "Restarting…" → poll /api/health 500ms×30 → location.reload(); **reuse** gate `body[data-devmode]` (Log Window/Device Sim) → tombol hidden saat dev OFF. styles.css ikut blok display:none. i18n 3 key ×8. tests/restart.test.js (9 tes, mock fetch+location). receipt riil.
+- **Gerbang PM:** test_admin_restart 5/5; backend 235f/324p/42e (nol regresi baru, +5); vitest 737 hijau; parity 494; cache-buster 20260929 konsisten; diff-check bersih; scope OK.
+- **Tahan:** commit lokal (a=code, b=docs) — NO push/PR/merge (hak user). G3: user harus restart utk rilis kode (aktifkan Chat + tombol Restart) lalu uji nyata.

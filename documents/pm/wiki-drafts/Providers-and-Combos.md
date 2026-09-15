@@ -37,5 +37,3 @@ Each endpoint can require its own access key, so lending a laptop doesn't hand y
 Gather three providers into one combo — call it my-combo, point every tool at its single address, let aigate take the turns. Reshuffle the list in one place, and every connected tool follows.
 
 ---
-
-Made with ❤️ by Fadhly Permata

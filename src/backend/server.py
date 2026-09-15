@@ -29,7 +29,9 @@ from backend.providers_router import router as providers_router
 from backend.selfheal_router import router as selfheal_router
 from backend.proxies_router import router as proxies_router
 from backend.accounts_router import router as accounts_router
+from backend.admin_router import router as admin_router
 from backend.terminal.router import router as terminal_router
+from backend.chat_router import router as chat_router
 from backend.usage_router import router as usage_router
 
 STATIC_DIR: Path = (
@@ -132,6 +134,10 @@ app.include_router(accounts_router)
 app.include_router(usage_router)
 # Request-log (debug) + usage analytics API (B5.6): GET /api/request-logs, /api/analytics.
 app.include_router(analytics_router)
+# Chat Playground (B8.B6.1 / PRD §2.9): /api/chat/sessions CRUD + SSE /complete.
+app.include_router(chat_router)
+# Developer-mode self-restart (DEV-RESTART): POST /api/dev/restart.
+app.include_router(admin_router)
 # Render gateway failures as the OpenAI error envelope from the contract.
 app.add_exception_handler(GatewayError, gateway_error_handler)
 

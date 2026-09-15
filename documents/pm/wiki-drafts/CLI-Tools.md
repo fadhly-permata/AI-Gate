@@ -29,5 +29,3 @@ The card under the tool list: it makes its own git branch, runs an agentic tool 
 - **No launch offered for that tool** → that path isn't checked yet. A plain [Terminal](Terminal) tab still runs it.
 
 ---
-
-Made with ❤️ by Fadhly Permata

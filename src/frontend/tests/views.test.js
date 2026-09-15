@@ -22,7 +22,9 @@ describe("index.html structure — missing views + global Log Window", () => {
   it("groups sidebar items by user need without changing data-view values", () => {
     const groups = [
       ["nav.group.gateway", ["providers", "combos", "proxies", "endpoints"]],
-      ["nav.group.operations", ["terminal", "cli"]],
+      // B8.B6.2: Chat joins Operations (terminal, cli) — same interactive-tool
+      // group; the mirror tests below follow the order of the DOM lists.
+      ["nav.group.operations", ["terminal", "cli", "chat"]],
       ["nav.group.insights", ["usage", "analytics"]],
       ["nav.group.system", ["settings"]]
     ];
@@ -291,8 +293,8 @@ describe("sidebar Repository link — sticky footer", () => {
     expect(navRel).toContain("noreferrer");
     // No data-view -> app.js keeps native link behaviour (binding above).
     expect(navRepo.hasAttribute("data-view")).toBe(false);
-    // 9 app views + repo = 10 items in the bottom nav.
-    expect(doc.querySelectorAll(".bottom-nav .bn-item")).toHaveLength(10);
+    // 10 app views + repo = 11 items in the bottom nav.
+    expect(doc.querySelectorAll(".bottom-nav .bn-item")).toHaveLength(11);
   });
 });
 
@@ -374,7 +376,7 @@ describe("phone shell — hamburger hidden, bottom nav scrollable", () => {
       return item.getAttribute("data-view");
     });
     expect(sidebarViews).toEqual([
-      "providers", "combos", "proxies", "endpoints", "terminal", "cli",
+      "providers", "combos", "proxies", "endpoints", "terminal", "cli", "chat",
       "usage", "analytics", "settings"
     ]);
     expect(navViews).toEqual(sidebarViews);
@@ -388,7 +390,7 @@ describe("phone shell — hamburger hidden, bottom nav scrollable", () => {
     });
   });
 
-  it("scrolls .bottom-nav sideways so all 10 items stay reachable", function () {
+  it("scrolls .bottom-nav sideways so all 11 items stay reachable", function () {
     const shell = phoneShell();
     expect(shell, "phone-shell @media block found").toBeTruthy();
     const nav = ruleBlock(/(^|\n)\.bottom-nav\s*\{[^}]*\}/);
@@ -406,7 +408,7 @@ describe("phone shell — hamburger hidden, bottom nav scrollable", () => {
     // back into the viewport and the scroll disappears (the reported symptom).
     expect(item).toMatch(/flex:\s*1 1 0/);
     const items = doc.querySelectorAll(".bottom-nav .bn-item");
-    expect(items).toHaveLength(10);
+    expect(items).toHaveLength(11);
     // 10 x 60px = 600px > 360px (separators only add width): the row cannot
     // fit, so it must scroll — and no item can shrink below the tap target,
     // i.e. none is clipped out of reach.
@@ -448,7 +450,7 @@ describe("phone shell — hamburger hidden, bottom nav scrollable", () => {
     // controls, and Repo stays the final bottom-nav item).
     expect(boundaries).toEqual([
       ["nav.endpoints", "nav.terminal"],       // Gateway  -> Operations
-      ["nav.cli", "nav.usage"],                // Operations -> Insights
+      ["nav.chat", "nav.usage"],               // Operations -> Insights (chat is last op item)
       ["nav.analytics", "nav.settings"],       // Insights -> System
       ["nav.settings", "settings.device_sim"]  // System   -> device-sim (Repo follows)
     ]);

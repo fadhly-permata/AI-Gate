@@ -29,5 +29,3 @@ A failed command or a missing tool prints a readable line, not a crash. A coding
 This is a shell on the device aigate itself runs on — not a bridge to some other machine. And that device answers to everyone on the local network, which is why [Quick Start](Quick-Start) warns about cafés.
 
 ---
-
-Made with ❤️ by Fadhly Permata

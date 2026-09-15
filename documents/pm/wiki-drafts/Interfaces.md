@@ -26,5 +26,3 @@ Launch the tool you already reach for from inside aigate, model already set: no 
 Start on the browser screen — everything else begins with adding a provider. The tools and API are there when you want them; nothing forces you to write code. And nothing loads from the internet: the only traffic out goes to the providers you chose.
 
 ---
-
-Made with ❤️ by Fadhly Permata

@@ -30,5 +30,3 @@ Add the providers you have, put them side by side in a group — aigate calls it
 ---
 
 That's the map. [Quick Start](Quick-Start) is the first step.
-
-Made with ❤️ by Fadhly Permata

@@ -787,6 +787,11 @@
   window.aigate.wireLogTable = wireLogTable;
   // Re-attach the instant Developer Mode toggle (same jsdom re-wiring need).
   window.aigate.wireDevModeToggle = wireDevModeToggle;
+  // DEV-RESTART: expose the handler + re-wiring so the vitest sim can drive the
+  // same entry point the shipped button uses (init runs on an empty jsdom body).
+  window.aigate.devRestart = devRestart;
+  window.aigate.wireDevRestart = wireDevRestart;
+  window.aigate.pollHealthThenReload = pollHealthThenReload;
 
   /* ---- DOM helpers ---- */
   function provEl(id) { return document.getElementById(id); }
@@ -2167,6 +2172,69 @@
     }
   }
 
+  /* ---- DEV-RESTART (dev-only surface) ----
+     POST /api/dev/restart is fail-closed on the server (403 unless dev_mode is
+     ON), and the card that holds this button is hidden by the SAME
+     body[data-devmode="off"] CSS gate as the Log Window / Device Sim / Self-Heal
+     surfaces — applyDevMode() already drives it, so no separate JS gate here.
+     On 2xx the server restarts itself in-process (os.execv), so the client is
+     the only thing left standing: we poll GET /api/health (any 2xx = back up)
+     every RESTART_POLL_MS up to RESTART_POLL_MAX times, then location.reload()
+     to hand control back to the freshly-booted app. */
+  var RESTART_API = "/api/dev/restart";
+  var HEALTH_API = "/api/health";
+  var RESTART_POLL_MS = 500;
+  var RESTART_POLL_MAX = 30;
+
+  function setRestartMsg(text, kind) { setMsgIn("devRestartMsg", text, kind); }
+
+  function pollHealthThenReload(attempt) {
+    if (attempt >= RESTART_POLL_MAX) {
+      // Server never answered within the window — leave the honest status.
+      setRestartMsg(getStr("settings.restarting"), "error");
+      return;
+    }
+    fetch(HEALTH_API, {
+      method: "GET",
+      headers: { "Accept": "application/json" },
+      cache: "no-store"
+    })
+      .then(function (r) {
+        if (r.ok) { window.location.reload(); return; }
+        setTimeout(function () { pollHealthThenReload(attempt + 1); }, RESTART_POLL_MS);
+      })
+      .catch(function () {
+        setTimeout(function () { pollHealthThenReload(attempt + 1); }, RESTART_POLL_MS);
+      });
+  }
+
+  function devRestart() {
+    if (!window.confirm(getStr("settings.dev_restart_confirm"))) return;
+    setRestartMsg("", "");
+    fetch(RESTART_API, {
+      method: "POST",
+      headers: { "Accept": "application/json" }
+    })
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        setRestartMsg(getStr("settings.restarting"));
+        pollHealthThenReload(0);
+      })
+      .catch(function (err) {
+        // 403 dev_mode_required is unexpected (the button hides when off) — but
+        // surface it instead of spinning. fetchJson's error shape is reused.
+        setRestartMsg(getStr("settings.error") + " (" + err.message + ")", "error");
+      });
+  }
+
+  // Re-attach the click handler so a test that re-mounts the shipped body can
+  // bind the button in isolation (same reason wireDevModeToggle is exported).
+  function wireDevRestart() {
+    var btn = document.getElementById("devRestartBtn");
+    if (btn) btn.addEventListener("click", devRestart);
+  }
+
+
   function setLogMsg(text, kind) {
     var m = logEl("logMsg");
     if (!m) return;
@@ -2605,6 +2673,9 @@
         if (window.aigate && window.aigate.selfHeal) {
           window.aigate.selfHeal.onShow();
         }
+      } else if (view === "chat") {
+        // B8.B6.2/B6.3: load the session list; streaming + picker wired at boot.
+        if (window.aigate && window.aigate.chat) window.aigate.chat.onShow();
       }
     }
 
@@ -2624,6 +2695,8 @@
     if (form) form.addEventListener("submit", saveSettings);
     // Developer Mode switch applies + persists instantly on toggle (no Save click).
     wireDevModeToggle();
+    // DEV-RESTART: bind the dev-only restart button (hidden via the dev gate when off).
+    wireDevRestart();
 
     // --- Backup & Restore (B5.7) ---
     // Export: intercept the anchor so we surface the "Export started" status and
@@ -2654,6 +2727,10 @@
     // code here: the shipped page has to be re-mounted by tests, and duplicating
     // the wiring there would drift from production the first time it changed.
     wireProviderUi();
+
+    // --- Chat Playground (B8.B6.2/B6.3) — wired here so the view works from
+    // boot; its onShow hook (window.aigate.chat) is invoked by handleNav. ---
+    wireChatUi();
 
     // --- Log Window (B3.1) — GLOBAL, shown on every view, toggled from topbar ---
     var logRefreshBtn = document.getElementById("logRefreshBtn");
@@ -2707,6 +2784,558 @@
     // Start on the welcome view.
     showView("welcome");
   }
+
+  /* ===== Chat Playground (B8.B6.2 core + B6.3 polish / PRD §2.9) =====
+     A thin conversation UI on top of the gateway: sessions CRUD + an SSE
+     streaming composer + per-session system_prompt/temperature/rename/stop.
+     It is part of the SPA shell (no new <script>), so it shares window.aigate
+     helpers (getStr/escapeHtml/fetchJson), the nav wiring, and the i18n keys.
+     Backend contract (chat_router.py, verified): model ref is
+     `provider:<name>[:<model_id>]` or `combo:<name>` — the SAME strings the
+     gateway /v1/models advertises, so the picker reads that endpoint (never
+     guessing a ref). After a /complete stream the assistant turn is only in the
+     DB, so we ALWAYS re-GET the session (authoritative history). */
+  var CHAT_API = "/api/chat/sessions";
+  var CHAT_MODELS_API = "/v1/models";
+  var chatState = { currentId: null, currentModel: null, streaming: false, controller: null };
+  var chatDialogs = {};
+
+  function chatEl(id) { return document.getElementById(id); }
+  function chatMsg(id, text, kind) {
+    var m = chatEl(id);
+    if (!m) return;
+    m.textContent = text || "";
+    m.className = "settings-msg" + (kind ? " settings-msg-" + kind : "");
+  }
+  function setChatMsg(t, k) { chatMsg("chatMsg", t, k); }
+  function setChatListMsg(t, k) { chatMsg("chatListMsg", t, k); }
+  function setChatSettingsMsg(t, k) { chatMsg("chatSettingsMsg", t, k); }
+  function setChatNewMsg(t, k) { chatMsg("chatNewMsg", t, k); }
+
+  /* ---- Pure helpers (no DOM/fetch; exported for tests) ---- */
+
+  // Map a gateway model ref to a human label + its kind. Never invents a ref.
+  function describeTarget(modelRef) {
+    var ref = modelRef == null ? "" : String(modelRef);
+    if (!ref) return { kind: "none", name: "", model: "", label: "" };
+    if (ref.indexOf("combo:") === 0) {
+      var cname = ref.slice("combo:".length);
+      return { kind: "combo", name: cname, model: "", label: getStr("chat.target_combo") + ": " + cname };
+    }
+    if (ref.indexOf("provider:") === 0) {
+      var rest = ref.slice("provider:".length);
+      var i = rest.indexOf(":");
+      var pname = i === -1 ? rest : rest.slice(0, i);
+      var pmodel = i === -1 ? "" : rest.slice(i + 1);
+      return { kind: "provider", name: pname, model: pmodel,
+        label: getStr("chat.target_provider") + ": " + pname + (pmodel ? " · " + pmodel : "") };
+    }
+    return { kind: "bare", name: "", model: ref, label: ref }; // bare id (resolver accepts it too)
+  }
+
+  // tokens_in/out may be null (usage unavailable) -> "—", never a fake 0.
+  function formatTokens(v) {
+    return (v === null || v === undefined || v !== v) ? "—" : String(v);
+  }
+
+  // One SSE line -> {type, content?}. Only `data:` field lines carry payloads;
+  // other fields (event:/id:/retry:) and blanks are ignored, per the SSE spec.
+  //   delta   -> a content fragment to append
+  //   done    -> the [DONE] sentinel
+  //   error   -> an upstream/JSON error frame or unparseable data line
+  //   ignore  -> blank / non-data field line
+  function parseSseLine(line) {
+    if (line == null) return { type: "ignore" };
+    var s = String(line).replace(/\r$/, "");
+    if (s.indexOf("data:") !== 0) return { type: "ignore" };
+    s = s.slice(5).trim();
+    if (s === "") return { type: "ignore" };
+    if (s === "[DONE]") return { type: "done" };
+    var obj;
+    try { obj = JSON.parse(s); } catch (e) { return { type: "error", raw: s }; }
+    if (obj && obj.error) return { type: "error", raw: s };
+    var choices = (obj && Array.isArray(obj.choices)) ? obj.choices : [];
+    var c0 = choices[0] || {};
+    var content = "";
+    if (typeof c0.delta === "object" && c0.delta && typeof c0.delta.content === "string") {
+      content = c0.delta.content;
+    } else if (typeof c0.message === "object" && c0.message && typeof c0.message.content === "string") {
+      content = c0.message.content;
+    }
+    return { type: "delta", content: content };
+  }
+
+  /* ---- Rendering ---- */
+  function roleLabel(role) {
+    if (role === "assistant") return getStr("chat.role_assistant");
+    if (role === "system") return getStr("chat.role_system");
+    return getStr("chat.role_you");
+  }
+
+  function createMessageEl(msg) {
+    msg = msg || {};
+    var wrap = document.createElement("div");
+    wrap.className = "chat-msg chat-msg-" + (msg.role || "user");
+    var meta = document.createElement("div");
+    meta.className = "chat-msg-meta";
+    meta.textContent = roleLabel(msg.role);
+    var text = document.createElement("div");
+    text.className = "chat-msg-text";
+    text.textContent = msg.content == null ? "" : String(msg.content);
+    wrap.appendChild(meta);
+    wrap.appendChild(text);
+    if (msg.role === "assistant") {
+      var tok = document.createElement("div");
+      tok.className = "chat-msg-tokens";
+      tok.textContent = getStr("chat.tokens") + ": " +
+        formatTokens(msg.tokens_in) + " / " + formatTokens(msg.tokens_out);
+      wrap.appendChild(tok);
+    }
+    return wrap;
+  }
+
+  function scrollThreadToEnd() {
+    var thread = chatEl("chatThread");
+    if (thread) thread.scrollTop = thread.scrollHeight;
+  }
+
+  function renderMessages(messages) {
+    var thread = chatEl("chatThread");
+    if (!thread) return;
+    thread.innerHTML = "";
+    if (!messages || !messages.length) {
+      var empty = document.createElement("div");
+      empty.className = "chat-empty";
+      empty.textContent = getStr("chat.empty");
+      thread.appendChild(empty);
+      return;
+    }
+    for (var i = 0; i < messages.length; i++) thread.appendChild(createMessageEl(messages[i]));
+    scrollThreadToEnd();
+  }
+
+  function markActiveSession(id) {
+    var ul = chatEl("chatSessionList");
+    if (!ul) return;
+    Array.prototype.forEach.call(ul.querySelectorAll(".chat-session"), function (li) {
+      li.classList.toggle("is-active", li.getAttribute("data-id") === String(id));
+    });
+  }
+
+  function renderSessionList(list) {
+    var ul = chatEl("chatSessionList");
+    if (!ul) return;
+    ul.innerHTML = "";
+    if (!list || !list.length) {
+      var li = document.createElement("li");
+      li.className = "chat-session-empty";
+      li.textContent = getStr("chat.no_sessions");
+      ul.appendChild(li);
+      return;
+    }
+    list.forEach(function (s) {
+      var item = document.createElement("li");
+      item.className = "chat-session" + (s.id === chatState.currentId ? " is-active" : "");
+      item.setAttribute("data-id", s.id);
+      var title = document.createElement("div");
+      title.className = "chat-session-title";
+      title.textContent = s.title || getStr("chat.new");
+      var t = describeTarget(s.model);
+      var sub = document.createElement("div");
+      sub.className = "chat-session-target";
+      sub.textContent = t.kind === "none" ? getStr("chat.no_target") : t.label;
+      item.appendChild(title);
+      item.appendChild(sub);
+      item.addEventListener("click", function () { openSession(s.id); });
+      ul.appendChild(item);
+    });
+  }
+
+  function renderSession(session) {
+    if (!session) return;
+    chatState.currentId = session.id;
+    chatState.currentModel = session.model || null;
+    var title = chatEl("chatTitleInput");
+    if (title) title.value = session.title || "";
+    var target = chatEl("chatTarget");
+    if (target) {
+      var t = describeTarget(session.model);
+      target.textContent = t.kind === "none" ? getStr("chat.no_target") : t.label;
+      target.className = "chat-target" + (t.kind === "none" ? " chat-target-none" : "");
+    }
+    var sys = chatEl("chatSystemPrompt");
+    if (sys) sys.value = session.system_prompt || "";
+    var temp = chatEl("chatTemperature");
+    if (temp) temp.value = session.temperature == null ? "" : String(session.temperature);
+    renderMessages(session.messages || []);
+    markActiveSession(session.id);
+  }
+
+  /* ---- Loaders / actions ---- */
+  function loadChatSessions() {
+    return fetchJson(CHAT_API).then(function (data) {
+      renderSessionList((data && data.data) ? data.data : []);
+    }).catch(function (err) {
+      setChatListMsg(getStr("chat.load_error") + " (" + err.message + ")", "error");
+    });
+  }
+
+  function openSession(id) {
+    return fetchJson(CHAT_API + "/" + id).then(function (session) {
+      renderSession(session);
+    }).catch(function () {
+      setChatMsg(getStr("chat.error"), "error");
+    });
+  }
+
+  function loadChat() {
+    setChatMsg("", "");
+    setChatSettingsMsg("", "");
+    return loadChatSessions();
+  }
+
+  /* ---- Model/combo picker (combobox.js, same pattern as the CLI launcher) ---- */
+  var chatModelCombo = null;
+  function chatModelCtl() {
+    if (!chatModelCombo && typeof window.aigate !== "undefined" &&
+        typeof window.aigate.createCombobox === "function") {
+      chatModelCombo = window.aigate.createCombobox({
+        inputId: "chatNewModel",
+        listId: "chatNewModelList",
+        searchInside: true,
+        groupBy: "group",
+        groupOrder: [getStr("combobox.group_combos")],
+        subGroupBy: "prefix"
+      });
+    }
+    return chatModelCombo;
+  }
+
+  function fetchChatModels() {
+    return fetchJson(CHAT_MODELS_API).then(function (data) {
+      var list = (data && data.data) ? data.data : [];
+      var c = chatModelCtl();
+      var comboGroup = getStr("combobox.group_combos");
+      if (c && typeof c.setGroupOrder === "function") c.setGroupOrder([comboGroup]);
+      var opts = list.map(function (m) {
+        var id = m.id != null ? m.id : "";
+        if (id.indexOf("combo:") === 0) {
+          return { value: id, label: id.slice("combo:".length), group: comboGroup, subGroup: false };
+        }
+        return { value: id, label: id.split(":").pop(), group: m.owned_by || "unknown" };
+      });
+      opts.sort(function (a, b) {
+        var al = a.label.toLowerCase(), bl = b.label.toLowerCase();
+        return al < bl ? -1 : al > bl ? 1 : 0;
+      });
+      if (c) c.setOptions(opts);
+      if (c && opts.length) c.setValue(opts[0].value);
+      if (!list.length) setChatNewMsg(getStr("chat.picker_none"), "warn");
+      return list;
+    });
+  }
+
+  function readComboValue() {
+    var c = chatModelCombo;
+    if (c && typeof c.getValue === "function") return c.getValue();
+    var inp = chatEl("chatNewModel");
+    return inp ? String(inp.value || "").trim() : "";
+  }
+
+  /* ---- New-session modal ---- */
+  function openNewChatModal(trigger) {
+    var title = chatEl("chatNewTitleInput");
+    if (title) title.value = "";
+    setChatNewMsg("", "");
+    fetchChatModels().catch(function () {}).then(function () {
+      openChatDialog("chatNewModal", trigger);
+    });
+  }
+
+  function createChatSession() {
+    var model = readComboValue();
+    if (!model) { setChatNewMsg(getStr("chat.model_required"), "error"); return; }
+    var titleEl = chatEl("chatNewTitleInput");
+    var title = titleEl ? String(titleEl.value || "").trim() : "";
+    var body = { model: model };
+    if (title) body.title = title;
+    fetchJson(CHAT_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }).then(function (session) {
+      closeChatDialog("chatNewModal");
+      chatState.currentId = session.id;
+      return loadChatSessions().then(function () { openSession(session.id); });
+    }).catch(function (err) {
+      setChatNewMsg(err.message || getStr("chat.error"), "error");
+    });
+  }
+
+  /* ---- Rename / delete / settings (all via PUT/DELETE) ---- */
+  function openRenameModal(trigger) {
+    if (!chatState.currentId) { setChatMsg(getStr("chat.empty"), "warn"); return; }
+    var cur = chatEl("chatTitleInput");
+    var input = chatEl("chatRenameInput");
+    if (input) input.value = cur ? cur.value : "";
+    openChatDialog("chatRenameModal", trigger);
+  }
+  function saveRename() {
+    if (!chatState.currentId) return;
+    var input = chatEl("chatRenameInput");
+    var title = input ? String(input.value || "").trim() : "";
+    fetchJson(CHAT_API + "/" + chatState.currentId, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: title })
+    }).then(function (session) {
+      closeChatDialog("chatRenameModal");
+      var t = chatEl("chatTitleInput");
+      if (t) t.value = session.title || "";
+      loadChatSessions();
+    }).catch(function () { setChatMsg(getStr("chat.rename_error"), "error"); });
+  }
+
+  function openDeleteModal(trigger) {
+    if (!chatState.currentId) { setChatMsg(getStr("chat.empty"), "warn"); return; }
+    openChatDialog("chatDeleteModal", trigger);
+  }
+  function confirmDeleteSession() {
+    if (!chatState.currentId) return;
+    fetchJson(CHAT_API + "/" + chatState.currentId, { method: "DELETE" }).then(function () {
+      closeChatDialog("chatDeleteModal");
+      chatState.currentId = null;
+      chatState.currentModel = null;
+      var thread = chatEl("chatThread"); if (thread) thread.innerHTML = "";
+      var title = chatEl("chatTitleInput"); if (title) title.value = "";
+      var target = chatEl("chatTarget"); if (target) { target.textContent = ""; target.className = "chat-target"; }
+      loadChatSessions();
+    }).catch(function () { setChatMsg(getStr("chat.delete_error"), "error"); });
+  }
+
+  function saveChatSettings() {
+    if (!chatState.currentId) { setChatSettingsMsg(getStr("chat.empty"), "warn"); return; }
+    var sys = chatEl("chatSystemPrompt");
+    var temp = chatEl("chatTemperature");
+    var body = {};
+    if (sys) body.system_prompt = sys.value;
+    if (temp && String(temp.value).trim() !== "") {
+      var v = parseFloat(temp.value);
+      if (!isNaN(v)) body.temperature = v;
+    }
+    fetchJson(CHAT_API + "/" + chatState.currentId, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }).then(function (session) {
+      chatState.currentModel = session.model || null;
+      setChatSettingsMsg(getStr("chat.saved"), "ok");
+    }).catch(function () { setChatSettingsMsg(getStr("chat.save_error"), "error"); });
+  }
+
+  /* ---- Streaming (SSE via fetch + ReadableStream; Stop via AbortController) ---- */
+  function setStreamingUI(on) {
+    var sendBtn = chatEl("chatSendBtn");
+    var stopBtn = chatEl("chatStopBtn");
+    if (sendBtn) sendBtn.disabled = !!on;
+    if (stopBtn) stopBtn.hidden = !on;
+  }
+
+  // Read an SSE body to completion, invoking onDelta(content) per fragment.
+  function readSseStream(res, onDelta, signal) {
+    var reader = res.body.getReader();
+    var decoder = new TextDecoder("utf-8");
+    var buffer = "";
+    function step() {
+      if (signal && signal.aborted) return Promise.resolve();
+      return reader.read().then(function (result) {
+        if (result.done) return;
+        buffer += decoder.decode(result.value, { stream: true });
+        var frames = buffer.split("\n\n");
+        buffer = frames.pop() || "";
+        for (var f = 0; f < frames.length; f++) {
+          var lines = frames[f].split("\n");
+          for (var j = 0; j < lines.length; j++) {
+            var ev = parseSseLine(lines[j]);
+            if (ev.type === "delta") onDelta(ev.content);
+            else if (ev.type === "error") { reader.cancel(); return Promise.reject(new Error("stream_error")); }
+          }
+        }
+        return step();
+      });
+    }
+    return step();
+  }
+
+  function finishStream(sessionId) {
+    chatState.streaming = false;
+    chatState.controller = null;
+    setStreamingUI(false);
+    // Authoritative re-read: the persisted assistant turn only exists in the DB.
+    return openSession(sessionId).then(function () { loadChatSessions(); });
+  }
+
+  function streamChat(sessionId, content) {
+    if (chatState.streaming) return;
+    var controller = new AbortController();
+    chatState.controller = controller;
+    chatState.streaming = true;
+    setStreamingUI(true);
+    setChatMsg("", "");
+
+    var thread = chatEl("chatThread");
+    // Optimistic: show the user turn + a live assistant bubble while it streams.
+    if (thread && thread.querySelector(".chat-empty")) thread.innerHTML = "";
+    if (thread) thread.appendChild(createMessageEl({ role: "user", content: content }));
+    var assistantEl = createMessageEl({ role: "assistant", content: "" });
+    if (thread) thread.appendChild(assistantEl);
+    scrollThreadToEnd();
+    var textNode = assistantEl.querySelector(".chat-msg-text");
+
+    fetch(CHAT_API + "/" + sessionId + "/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
+      body: JSON.stringify({ content: content }),
+      signal: controller.signal
+    }).then(function (res) {
+      if (!res.ok) {
+        return res.json().catch(function () { return {}; }).then(function (b) {
+          var m = (b && b.error && b.error.message) ? b.error.message : ("HTTP " + res.status);
+          throw new Error(m);
+        });
+      }
+      var ct = res.headers.get("content-type") || "";
+      if (ct.indexOf("text/event-stream") !== -1) {
+        return readSseStream(res, function (chunk) {
+          if (textNode) textNode.textContent += chunk;
+          scrollThreadToEnd();
+        }, controller.signal);
+      }
+      // Non-stream fallback (some translated formats answer as JSON).
+      return res.json().then(function (data) {
+        var c = (data && data.choices && data.choices[0] && data.choices[0].message &&
+          data.choices[0].message.content) || "";
+        if (textNode) textNode.textContent += c;
+        scrollThreadToEnd();
+      });
+    }).then(function () {
+      return finishStream(sessionId);
+    }).catch(function (err) {
+      if (err && err.name === "AbortError") {
+        setChatMsg(getStr("chat.stop"), "warn");
+      } else {
+        setChatMsg(getStr("chat.send_error") + (err && err.message ? " (" + err.message + ")" : ""), "error");
+      }
+      return finishStream(sessionId);
+    });
+  }
+
+  function sendChatMessage() {
+    var input = chatEl("chatInput");
+    if (!input) return;
+    var content = String(input.value || "").trim();
+    if (!content) return;
+    if (!chatState.currentId) { setChatMsg(getStr("chat.empty"), "warn"); return; }
+    if (!chatState.currentModel) { setChatMsg(getStr("chat.no_target"), "error"); return; }
+    input.value = "";
+    streamChat(chatState.currentId, content);
+  }
+
+  function stopChatGeneration() {
+    if (chatState.controller) {
+      try { chatState.controller.abort(); } catch (e) { /* already done */ }
+    }
+  }
+
+  /* ---- Accessible dialogs (focus-trap + ESC + restore focus; mirrors the
+         device-sim modal pattern already in this file). Backdrop click closes. ---- */
+  function chatFocusables(modal) {
+    return Array.prototype.slice.call(modal.querySelectorAll(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), ' +
+      'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    ));
+  }
+  function openChatDialog(id, trigger) {
+    var m = chatEl(id);
+    if (!m) return;
+    chatDialogs[id] = { trigger: trigger || null };
+    m.hidden = false;
+    var f = chatFocusables(m);
+    if (f.length) f[0].focus();
+    var handler = function (e) {
+      if (e.key === "Escape") { e.preventDefault(); closeChatDialog(id); return; }
+      if (e.key !== "Tab") return;
+      var list = chatFocusables(m);
+      if (!list.length) return;
+      var first = list[0], last = list[list.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first || !m.contains(document.activeElement)) { e.preventDefault(); last.focus(); }
+      } else if (document.activeElement === last || !m.contains(document.activeElement)) {
+        e.preventDefault(); first.focus();
+      }
+    };
+    m.__chatKey = handler;
+    document.addEventListener("keydown", handler, true);
+  }
+  function closeChatDialog(id) {
+    var m = chatEl(id);
+    if (!m || m.hidden) return;
+    m.hidden = true;
+    if (m.__chatKey) { document.removeEventListener("keydown", m.__chatKey, true); m.__chatKey = null; }
+    var trigger = chatDialogs[id] ? chatDialogs[id].trigger : null;
+    delete chatDialogs[id];
+    if (trigger && typeof trigger.focus === "function") trigger.focus();
+  }
+
+  function wireChatUi() {
+    var b;
+    b = chatEl("chatNewBtn"); if (b) b.addEventListener("click", function () { openNewChatModal(b); });
+    b = chatEl("chatNewCreate"); if (b) b.addEventListener("click", createChatSession);
+    b = chatEl("chatNewCancel"); if (b) b.addEventListener("click", function () { closeChatDialog("chatNewModal"); });
+    b = chatEl("chatRenameBtn"); if (b) b.addEventListener("click", function () { openRenameModal(b); });
+    b = chatEl("chatRenameSave"); if (b) b.addEventListener("click", saveRename);
+    b = chatEl("chatRenameCancel"); if (b) b.addEventListener("click", function () { closeChatDialog("chatRenameModal"); });
+    b = chatEl("chatDeleteBtn"); if (b) b.addEventListener("click", function () { openDeleteModal(b); });
+    b = chatEl("chatDeleteConfirm"); if (b) b.addEventListener("click", confirmDeleteSession);
+    b = chatEl("chatDeleteCancel"); if (b) b.addEventListener("click", function () { closeChatDialog("chatDeleteModal"); });
+    b = chatEl("chatSendBtn"); if (b) b.addEventListener("click", sendChatMessage);
+    b = chatEl("chatStopBtn"); if (b) b.addEventListener("click", stopChatGeneration);
+    b = chatEl("chatSettingsSave"); if (b) b.addEventListener("click", saveChatSettings);
+
+    var input = chatEl("chatInput");
+    if (input) {
+      input.setAttribute("placeholder", getStr("chat.input_ph"));
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
+      });
+    }
+    var modelInput = chatEl("chatNewModel");
+    if (modelInput) modelInput.setAttribute("placeholder", getStr("combobox.search_ph"));
+
+    // backdrop click closes any open chat dialog
+    ["chatNewModal", "chatRenameModal", "chatDeleteModal"].forEach(function (id) {
+      var m = chatEl(id);
+      if (m) m.addEventListener("click", function (e) { if (e.target === m) closeChatDialog(id); });
+    });
+  }
+  window.aigate.wireChatUi = wireChatUi;
+
+  window.aigate.chat = {
+    onShow: loadChat,
+    loadChat: loadChat,
+    openSession: openSession,
+    send: sendChatMessage,
+    stop: stopChatGeneration,
+    _test: {
+      describeTarget: describeTarget,
+      formatTokens: formatTokens,
+      parseSseLine: parseSseLine,
+      createMessageEl: createMessageEl,
+      renderMessages: renderMessages,
+      renderSessionList: renderSessionList,
+      readSseStream: readSseStream
+    }
+  };
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);

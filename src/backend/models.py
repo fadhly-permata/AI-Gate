@@ -1,11 +1,12 @@
 """SQLAlchemy ORM models for all aigate config entities (from ERD.md).
 
-Sixteen entities are modeled with exact columns and foreign keys per
+Eighteen entities are modeled with exact columns and foreign keys per
 ``documents/analysis/ERD.md``:
 
     Provider, ProviderModel, ProxyPool, ProxyNode, Combo, ComboMember,
     Endpoint, EndpointBinding, CLIToolGroup, CLITool, TerminalSession,
-    TerminalTab, LogEntry, Setting, UsageRecord, RequestLog.
+    TerminalTab, LogEntry, Setting, UsageRecord, RequestLog,
+    ChatSession, ChatMessage.
 
 ADR-007: secret columns (``api_key``, ``internal_api_key``, ``password``)
 are stored in plaintext — no encryption, matching the ERD data dictionary.
@@ -465,6 +466,81 @@ class Setting(Base):
     )
 
 
+class ChatSession(Base):
+    """Chat Playground conversation (PRD §2.9 / ERD §ChatSession, B8.B6.1).
+
+    One session = one conversation bound to ONE target: a ``Provider`` (+ a
+    ``model`` ref) OR a ``Combo`` (routing), expressed via the nullable
+    ``provider_id`` / ``combo_id`` FKs plus the free-form ``model`` reference
+    the gateway resolver understands (``provider:<name>:<model_id>`` or
+    ``combo:<name>``). History lives in the child :class:`ChatMessage` rows and
+    survives a reload (PRD §2.9 "riwayat pesan disimpan di DB").
+    """
+
+    __tablename__ = "chat_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # Auto-titled from the first message / renamable by the user (FE owns the
+    # title text; the backend only persists what it is given — ERD).
+    title: Mapped[str] = mapped_column(String, nullable=False, default="")
+    # Target: provider OR combo (both nullable; the ERD marks them optional so a
+    # session can be created before the user picks a target).
+    provider_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("providers.id"), nullable=True
+    )
+    combo_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("combos.id"), nullable=True
+    )
+    # Model ref forwarded verbatim to the gateway resolver (e.g.
+    # ``provider:B.AI:gpt-5.5`` / ``combo:fast``); None until the user picks one.
+    model: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    # Per-session system prompt (PRD §2.9 "Parameter: system prompt per sesi").
+    system_prompt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Sampling temperature (PRD §2.9 "temperature, dll"); None = provider default.
+    temperature: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    provider: Mapped[Optional["Provider"]] = relationship()
+    combo: Mapped[Optional["Combo"]] = relationship()
+    # Deleting a session removes its whole transcript (ERD
+    # ``ChatSession ||--o{ ChatMessage : "has"`` — the DELETE endpoint contract
+    # explicitly cascades). Messages are read back oldest-first (chronological).
+    messages: Mapped[list["ChatMessage"]] = relationship(
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="ChatMessage.id",
+    )
+
+
+class ChatMessage(Base):
+    """One turn in a :class:`ChatSession` (PRD §2.9 / ERD §ChatMessage).
+
+    ``role`` is ``system`` | ``user`` | ``assistant``. ``tokens_in`` /
+    ``tokens_out`` are the best-effort token counts for an assistant turn taken
+    from the streamed usage frame (ERD "untuk telemetri"); they stay ``NULL``
+    when the upstream carried no usage chunk — never a fabricated number.
+    """
+
+    __tablename__ = "chat_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("chat_sessions.id"), nullable=False
+    )
+    role: Mapped[str] = mapped_column(String, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # Nullable on purpose: "no usage measured" (NULL) stays distinguishable from
+    # a real 0 (mirrors the UsageRecord.saved_tokens_est NULL-vs-0 convention).
+    tokens_in: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    tokens_out: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    session: Mapped["ChatSession"] = relationship(back_populates="messages")
+
+
 __all__ = [
     "Provider",
     "ProviderAccount",
@@ -483,4 +559,6 @@ __all__ = [
     "Setting",
     "UsageRecord",
     "RequestLog",
+    "ChatSession",
+    "ChatMessage",
 ]

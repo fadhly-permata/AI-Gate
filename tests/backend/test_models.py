@@ -26,8 +26,9 @@ from backend.models import (
     TerminalTab,
 )
 
-# All 16 table names declared on Base.metadata, per ERD.md (B5.6 adds
-# ``request_logs`` — the ERD RequestLog entity, now modeled).
+# All 18 table names declared on Base.metadata, per ERD.md (B5.6 adds
+# ``request_logs`` — the ERD RequestLog entity; B8.B6.1 adds ``chat_sessions`` +
+# ``chat_messages`` — the ERD ChatSession/ChatMessage entities).
 EXPECTED_TABLES = {
     "providers",
     "provider_accounts",
@@ -46,6 +47,8 @@ EXPECTED_TABLES = {
     "terminal_tabs",
     "log_entries",
     "settings",
+    "chat_sessions",
+    "chat_messages",
 }
 
 

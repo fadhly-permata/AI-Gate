@@ -96,7 +96,9 @@ fi
 # non-auth GET /v1/models; only a hard connect/timeout failure warns. codex is
 # NOT routed through aigate regardless, so this is informational only.
 if have_cmd curl; then
-  if ! curl -fsS -o /dev/null --max-time 3 "${AIGATE_BASE}/models" 2>/dev/null; then
+  if curl -fsS -o /dev/null --max-time 3 "${AIGATE_BASE}/models" 2>/dev/null; then
+    : # gateway reachable; nothing to warn about
+  else
     rc=$?
     if [ "$rc" -eq 7 ] || [ "$rc" -eq 28 ]; then
       log_msg "WARN: aigate not reachable at $AIGATE_BASE (check gateway_base_url / is aigate running?);"
