@@ -236,11 +236,46 @@ def _preferred_account_id(request: Request) -> Optional[int]:
 async def _handle_chat_completion(request: Request, ctx: dict) -> Union[dict, Response]:
     """Validate + route + forward one chat completion (raises GatewayError).
 
-    Returns a JSON dict (non-streaming) or a ``StreamingResponse`` (SSE) when the
-    client requested ``stream:true`` against an OpenAI-format target/combo.
+    Thin HTTP-surface wrapper: parses the body + reads the request headers, then
+    delegates to :func:`run_chat_completion` (the shared pipeline core). Kept as
+    a separate function so the ``/v1/chat/completions`` contract is byte-for-byte
+    unchanged while the Chat Playground router (B8.B6.1) drives the SAME pipeline
+    in-process (no HTTP loopback to a running server).
     """
     payload = await _parse_object_body(request)
+    return await run_chat_completion(
+        payload,
+        ctx,
+        request=request,
+        endpoint_name=request.headers.get("x-aigate-endpoint"),
+        preferred_account_id=_preferred_account_id(request),
+    )
 
+
+async def run_chat_completion(
+    payload: dict,
+    ctx: dict,
+    *,
+    request: Optional[Request] = None,
+    endpoint_name: Optional[str] = None,
+    preferred_account_id: Optional[int] = None,
+) -> Union[dict, Response]:
+    """Shared chat-completion pipeline core (validate -> resolve -> adapter/stream).
+
+    Extracted verbatim from the former ``_handle_chat_completion`` body so an
+    in-process caller (the Chat Playground router) can reuse the exact gateway
+    machinery — Token Saver hook, resolver/``combo:`` routing, provider adapter,
+    usage recording (B5.5) and SSE streaming — WITHOUT re-implementing an LLM
+    engine and WITHOUT an HTTP loopback to a live server (J6). The HTTP surface
+    passes ``request`` + ``endpoint_name`` + ``preferred_account_id`` parsed from
+    its headers; an internal caller passes only a built ``payload`` + ``ctx`` (and
+    ``endpoint_name=None``), so the endpoint-binding/access-control branch is
+    never reached.
+
+    Returns a JSON dict (non-streaming) or a ``StreamingResponse`` (SSE) when the
+    payload requests ``stream:true`` against an OpenAI-format target/combo.
+    Raises :class:`GatewayError` on any validation / resolution failure.
+    """
     # `model` must be a non-empty string in the RAW payload (the validated
     # model coerces types, but we forward the raw dict, so enforce str here).
     model = payload.get("model")
@@ -277,7 +312,8 @@ async def _handle_chat_completion(request: Request, ctx: dict) -> Union[dict, Re
     # ADR-008 / task B2.5: named Endpoint selected at request time via the
     # X-Aigate-Endpoint header. When present, routing + proxy binding are
     # driven by the Endpoint's EndpointBinding instead of the model reference.
-    endpoint_name = request.headers.get("x-aigate-endpoint")
+    # An in-process caller (Chat Playground) never sets this -> the branch below
+    # is HTTP-surface only and ``request`` is guaranteed non-None when taken.
     if endpoint_name:
         # ADR-013: apply the bound Provider's Token Saver hook to the payload
         # BEFORE forwarding (endpoint -> provider binding; combos use their first
@@ -302,7 +338,7 @@ async def _handle_chat_completion(request: Request, ctx: dict) -> Union[dict, Re
 
     try:
         target = resolve_target(
-            model, preferred_account_id=_preferred_account_id(request)
+            model, preferred_account_id=preferred_account_id
         )
     except TargetNotFound as exc:
         log_warning(
@@ -1850,6 +1886,7 @@ async def _route_via_endpoint(
 __all__ = [
     "router",
     "ChatCompletionRequest",
+    "run_chat_completion",
     "REQUEST_LOG_SETTING_KEY",
     "REQUEST_LOG_MAX_CHARS",
     "RESPONSE_PREVIEW_CHARS",
