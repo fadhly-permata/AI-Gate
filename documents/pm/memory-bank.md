@@ -4,6 +4,32 @@
 (empty — diisi PM saat task pertama)
 
 ## Decisions
+- 2026-09-15 (WIKI NON-MULTI-BAHASA + BOOTSTRAP INSTALLER): dua hal dari user.
+  (A) **W2.2 DITUTUP** — user: "wiki gak pake multi bahasa". Wiki GitHub tetap Bahasa Inggris saja; terjemahan
+       7 bahasa wiki BATAL (berbeda dari i18n aplikasi yang tetap 8 bahasa). Coret dari pending selamanya.
+  (B) **Fitur baru: bootstrap installer cold-start.** User: "bisa gak buatin script buat otomasi install dependency
+       (termasuk python) ketika jalanin aigate untuk pertama kali running?". PM audit: `run.py:52-70` SUDAH auto-pip
+       (fastapi/pydantic/uvicorn/websockets/sqlalchemy/ptyprocess/httpx+pywinpty) + gate Python≥3.10 (`run.py:24-46`),
+       tapi chicken-and-egg kalau mesin BELUM punya Python; frontend TIDAK butuh Node runtime (package.json = devDeps).
+       Gap = install **Python itu sendiri** → perlu cangkang tanpa-Python. 4 pertanyaan scope (installer = ubah sistem,
+       potentially irreversible → wajib klarifikasi, bukan asal gas): user kunci **Q1=semua platform (Termux/Linux/macOS/
+       Windows)**, **Q2=native PM dulu→fallback userspace uv**, **Q3=skrip bootstrap cold-start terpisah** (bukan ubah
+       run.py), **Q4=Python+pip(via run.py)+cek git (peringatan saja)**. Konsekuensi Q1=4: `bootstrap.sh` (bash) tak
+       native Windows → pasangan `bootstrap.ps1`. Letak: `scripts/` (folder sudah ada; aturan B1 larang berkas ROOT baru).
+       Eksekusi SEKUENSIAL (E6; 1 deliverable). PM tulis handover `documents/pm/handovers/handover-20260915-bootstrap-installer.md`,
+       spawn **fullstack-dev** (bootstrap = berkas level-repo di luar write-root spesialis; preseden `run.py` WP.1).
+       Hasil: `scripts/bootstrap.sh` (252 baris) + `scripts/bootstrap.ps1` (243 baris), `run.py` TIDAK disentuh.
+       GERBANG PM MANDIRI (bukan telan receipt): `bash -n`=0, `dash -n`=0, `sh -n`=0; `bash scripts/bootstrap.sh --check-only`
+       nyata di Termux → platform=termux, interpreter ke-deteksi, git present, TANPA install/TANPA launch (idempoten,
+       path-independent); `grep sudo|runas|password` = HANYA komentar (jaminan no-sudo: Linux non-root → langsung uv
+       userspace, tak pernah eskalasi); `git diff`=nol ke run.py/src/tests; `git status` = HANYA 2 skrip + report +
+       handover PM; port 8080 tak disentuh (J6). **LIMITATION JUJUR:** `-CheckOnly` Windows + jalur install native
+       (pkg/brew/apt/winget) + uv download BELUM dieksekusi — `pwsh`/`powershell` tak ada di lingkungan ini → butuh
+       reviewer Windows nyata. Open-question sub-agent soal "report PM-only vs every-agent" diselesaikan PM:
+       `agent-boundaries.md` §Task reports mengizinkan EVERY agent → report SAH, bukan pelanggaran. STATUS: selesai
+       tingkat kode+gerbang POSIX; BELUM commit/push/PR (D1); README/Quick-Start masih suruh `python run.py` →
+       follow-up koordinasikan public-writer SETELAH user putuskan arah publikasi.
+
 - 2026-09-14 (PUBLIC-WRITER): user meminta spesialis penulis publik yang selalu dikoordinasikan PM untuk materi publik
   (wiki/README/dll.) supaya generate otomatis tapi tetap menarik, mudah dibaca, dan ilustratif. PM membuat agen + skill
   berbarengan: `public-writer` dan `public-writer-skill`. Write scope = `documents/pm/wiki-drafts/**`, `README.md`,
