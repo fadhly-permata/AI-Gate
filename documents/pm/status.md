@@ -1451,3 +1451,12 @@ User: "gua gak ekspek user pake aigate offline... ya udah kita bikin bisa full o
 - **fe-dev (frontend):** kartu `#devRestartCard`/`#devRestartBtn` di Settings (index.html), `devRestart()`+`wireDevRestart()` (app.js): confirm → POST → status "Restarting…" → poll /api/health 500ms×30 → location.reload(); **reuse** gate `body[data-devmode]` (Log Window/Device Sim) → tombol hidden saat dev OFF. styles.css ikut blok display:none. i18n 3 key ×8. tests/restart.test.js (9 tes, mock fetch+location). receipt riil.
 - **Gerbang PM:** test_admin_restart 5/5; backend 235f/324p/42e (nol regresi baru, +5); vitest 737 hijau; parity 494; cache-buster 20260929 konsisten; diff-check bersih; scope OK.
 - **Tahan:** commit lokal (a=code, b=docs) — NO push/PR/merge (hak user). G3: user harus restart utk rilis kode (aktifkan Chat + tombol Restart) lalu uji nyata.
+
+---
+
+## 2026-09-16 — PUSH + PR #29
+- User: "push dan pr". PM cek fakta git (A12): `origin/main` e500001 BUKAN ancestor HEAD → branch lama `feat/bootstrap-installer` sudah ke-merge (PR#28); 10 commit baru menumpuk setelahnya.
+- Push HEAD (2cf9670) → branch remote BARU `feat/chat-restart-and-cli-fix` (hindari nama lama ke-merge). Auth: `GITHUB_TOKEN` dari .env via credential-helper baca env (nilai tak pernah dicetak). ls-remote cocok 2cf9670.
+- PR #29 OPEN (REST API, gh absen): base main <- feat/chat-restart-and-cli-fix; 10 commit / 54 file / +3789−59; mergeable=clean; label enhancement+documentation. https://github.com/fadhly-permata/AI-Gate/pull/29
+- Default PM (D2): SATU PR bundel 3 fitur (Chat B8 + CLI fix B9 + Restart) demi ringkas; dicatat bisa dipecah bila user mau. MERGE = hak user, TAHAN.
+- Bookkeeping commit lokal (docs) TIDAK di-push → PR tetap = 10 commit yang direview (tak diver).
