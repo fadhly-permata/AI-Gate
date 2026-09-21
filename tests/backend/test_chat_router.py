@@ -169,6 +169,32 @@ async def test_update_session_patches_title_and_params(client):
     assert body["model"] == MODEL_REF
 
 
+async def test_update_session_patches_model_and_persists(client):
+    """BUG-260916-1 fix: PUT with an explicit ``model`` persists it and the DTO
+    reflects the new selection (previously silently dropped by Extra.ignore)."""
+    sid = (await client.post("/api/chat/sessions", json={"title": "M1", "model": MODEL_REF})).json()["id"]
+    new_model = "provider:pgw:gpt-4o-mini"
+    r = await client.put(f"/api/chat/sessions/{sid}", json={"model": new_model})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["model"] == new_model
+    # independent GET confirms it hit the DB, not just the response body
+    r2 = await client.get(f"/api/chat/sessions/{sid}")
+    assert r2.status_code == 200
+    assert r2.json()["model"] == new_model
+
+
+async def test_update_session_without_model_keeps_existing(client):
+    """exclude_unset guard: a PUT that omits ``model`` must NOT clear an existing
+    model (only the provided keys are patched)."""
+    sid = (await client.post("/api/chat/sessions", json={"title": "M2", "model": MODEL_REF})).json()["id"]
+    # patch only the title; model must survive
+    r = await client.put(f"/api/chat/sessions/{sid}", json={"title": "renamed"})
+    assert r.status_code == 200, r.text
+    assert r.json()["model"] == MODEL_REF
+    assert r.json()["title"] == "renamed"
+
+
 async def test_delete_session_cascades_messages(client):
     sid = (await client.post("/api/chat/sessions", json={"title": "X", "model": MODEL_REF})).json()["id"]
     with db_mod.SessionLocal() as session:

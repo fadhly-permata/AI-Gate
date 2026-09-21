@@ -2797,8 +2797,11 @@
      DB, so we ALWAYS re-GET the session (authoritative history). */
   var CHAT_API = "/api/chat/sessions";
   var CHAT_MODELS_API = "/v1/models";
-  var chatState = { currentId: null, currentModel: null, streaming: false, controller: null };
+  var chatState = { currentId: null, currentModel: null, streaming: false, controller: null,
+                    titleAuto: true, firstUserMessage: null, modelsLoaded: false };
   var chatDialogs = {};
+  var chatSwitchCombo = null;       // in-chat model switcher combobox controller
+  var SIDEBAR_KEY = "aigate.chat.sidebarCollapsed";
 
   function chatEl(id) { return document.getElementById(id); }
   function chatMsg(id, text, kind) {
@@ -2810,7 +2813,16 @@
   function setChatMsg(t, k) { chatMsg("chatMsg", t, k); }
   function setChatListMsg(t, k) { chatMsg("chatListMsg", t, k); }
   function setChatSettingsMsg(t, k) { chatMsg("chatSettingsMsg", t, k); }
-  function setChatNewMsg(t, k) { chatMsg("chatNewMsg", t, k); }
+
+  // Grow the composer textarea to fit its content (capped); reset shrinks it back.
+  // jsdom reports scrollHeight 0, so the guard leaves height untouched there.
+  function autoGrowComposer() {
+    var el = chatEl("chatInput");
+    if (!el) return;
+    el.style.height = "auto";
+    var h = el.scrollHeight;
+    if (h > 0) el.style.height = Math.min(h, 200) + "px";
+  }
 
   /* ---- Pure helpers (no DOM/fetch; exported for tests) ---- */
 
@@ -2863,6 +2875,76 @@
       content = c0.message.content;
     }
     return { type: "delta", content: content };
+  }
+
+  /* ---- Target label + auto-title + collapsible sidebar (BUG-260916-1 p.3/4/5) ---- */
+  // Re-render the #chatTarget badge from the live chatState.currentModel.
+  function renderChatTarget() {
+    var target = chatEl("chatTarget");
+    if (!target) return;
+    var t = describeTarget(chatState.currentModel);
+    target.textContent = t.kind === "none" ? getStr("chat.no_target") : t.label;
+    target.className = "chat-target" + (t.kind === "none" ? " chat-target-none" : "");
+  }
+
+  // A title is "user-set" (so auto-title must NEVER overwrite it) once it is
+  // non-empty AND not the generic "New chat" placeholder shown for untitled rows.
+  function isAutoTitleCandidate(title) {
+    if (title == null) return true;
+    var t = String(title).trim();
+    if (!t) return true;
+    if (t === getStr("chat.new")) return true;
+    return false;
+  }
+
+  // Derive a compact title from the first user message: collapse whitespace,
+  // keep the first ~40 chars, trim. Pure + exported for tests.
+  function deriveAutoTitle(text) {
+    var s = String(text == null ? "" : text).trim().replace(/\s+/g, " ");
+    if (!s) return "";
+    return s.length > 40 ? s.slice(0, 40).trim() : s;
+  }
+
+  // On the FIRST send only: persist an auto-derived title via PUT and clear the
+  // titleAuto flag so a manual rename (or a re-derived title) is never clobbered.
+  function autoTitleIfNeeded(firstUserMsg) {
+    if (!chatState.titleAuto || !chatState.currentId) return false;
+    var title = deriveAutoTitle(firstUserMsg);
+    if (!title) return false;
+    chatState.titleAuto = false;
+    // Optimistic: show it now, the PUT below makes it durable.
+    var t = chatEl("chatTitleInput");
+    if (t) t.value = title;
+    fetchJson(CHAT_API + "/" + chatState.currentId, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: title })
+    }).then(function (session) {
+      if (t && session && session.title != null) t.value = session.title;
+      loadChatSessions();
+    }).catch(function () { /* non-fatal: keep the optimistic title in the input */ });
+    return true;
+  }
+
+  function chatLayoutEl() { return document.querySelector(".chat-layout"); }
+  function isSidebarCollapsed() {
+    try { return localStorage.getItem(SIDEBAR_KEY) === "1"; } catch (e) { return false; }
+  }
+  function applySidebarCollapse(collapsed) {
+    var layout = chatLayoutEl();
+    if (layout) layout.classList.toggle("is-collapsed", !!collapsed);
+    var btn = chatEl("chatSidebarToggle");
+    if (btn) {
+      var key = collapsed ? "chat.expand" : "chat.collapse";
+      btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      btn.setAttribute("aria-label", getStr(key));
+      btn.setAttribute("title", getStr(key));
+    }
+  }
+  function toggleSidebar() {
+    var collapsed = !isSidebarCollapsed();
+    try { localStorage.setItem(SIDEBAR_KEY, collapsed ? "1" : "0"); } catch (e) { /* storage blocked */ }
+    applySidebarCollapse(collapsed);
   }
 
   /* ---- Rendering ---- */
@@ -2955,19 +3037,22 @@
     if (!session) return;
     chatState.currentId = session.id;
     chatState.currentModel = session.model || null;
+    // Title is auto-derived until the user has set one (or a title already exists).
+    chatState.titleAuto = isAutoTitleCandidate(session.title);
+    var msgs = session.messages || [];
+    chatState.firstUserMessage = null;
+    for (var mi = 0; mi < msgs.length; mi++) {
+      if (msgs[mi] && msgs[mi].role === "user") { chatState.firstUserMessage = msgs[mi].content; break; }
+    }
     var title = chatEl("chatTitleInput");
     if (title) title.value = session.title || "";
-    var target = chatEl("chatTarget");
-    if (target) {
-      var t = describeTarget(session.model);
-      target.textContent = t.kind === "none" ? getStr("chat.no_target") : t.label;
-      target.className = "chat-target" + (t.kind === "none" ? " chat-target-none" : "");
-    }
+    renderChatTarget();
+    if (chatSwitchCombo) chatSwitchCombo.setValue(session.model || "");
     var sys = chatEl("chatSystemPrompt");
     if (sys) sys.value = session.system_prompt || "";
     var temp = chatEl("chatTemperature");
     if (temp) temp.value = session.temperature == null ? "" : String(session.temperature);
-    renderMessages(session.messages || []);
+    renderMessages(msgs);
     markActiveSession(session.id);
   }
 
@@ -2991,32 +3076,25 @@
   function loadChat() {
     setChatMsg("", "");
     setChatSettingsMsg("", "");
+    applySidebarCollapse(isSidebarCollapsed());
+    fetchChatModels().catch(function () { /* non-fatal */ });
+    // No conversation open yet -> show the friendly empty placeholder in the
+    // thread (a session already open keeps its rendered messages).
+    if (!chatState.currentId) renderMessages([]);
     return loadChatSessions();
   }
 
-  /* ---- Model/combo picker (combobox.js, same pattern as the CLI launcher) ---- */
-  var chatModelCombo = null;
-  function chatModelCtl() {
-    if (!chatModelCombo && typeof window.aigate !== "undefined" &&
-        typeof window.aigate.createCombobox === "function") {
-      chatModelCombo = window.aigate.createCombobox({
-        inputId: "chatNewModel",
-        listId: "chatNewModelList",
-        searchInside: true,
-        groupBy: "group",
-        groupOrder: [getStr("combobox.group_combos")],
-        subGroupBy: "prefix"
-      });
-    }
-    return chatModelCombo;
-  }
-
+  /* ---- Composer model switcher (combobox.js) ----
+     The SAME reused combobox feeds the inline model switcher that now lives in
+     the composer (Gemini-style). The old New-chat modal picker (a separate
+     #chatNewModel combobox) is gone — model choice + create happen inline, so
+     this loader only has to populate one widget: #chatModelSwitch. */
   function fetchChatModels() {
     return fetchJson(CHAT_MODELS_API).then(function (data) {
       var list = (data && data.data) ? data.data : [];
-      var c = chatModelCtl();
+      var s = chatSwitchCombo;
       var comboGroup = getStr("combobox.group_combos");
-      if (c && typeof c.setGroupOrder === "function") c.setGroupOrder([comboGroup]);
+      if (s && typeof s.setGroupOrder === "function") s.setGroupOrder([comboGroup]);
       var opts = list.map(function (m) {
         var id = m.id != null ? m.id : "";
         if (id.indexOf("combo:") === 0) {
@@ -3028,48 +3106,113 @@
         var al = a.label.toLowerCase(), bl = b.label.toLowerCase();
         return al < bl ? -1 : al > bl ? 1 : 0;
       });
-      if (c) c.setOptions(opts);
-      if (c && opts.length) c.setValue(opts[0].value);
-      if (!list.length) setChatNewMsg(getStr("chat.picker_none"), "warn");
+      // The switcher keeps whatever model is already chosen (a session's model, or
+      // a pending choice on a brand-new draft); it never pre-picks one.
+      if (s) {
+        s.setOptions(opts);
+        if (chatState.currentModel) s.setValue(chatState.currentModel);
+      }
+      chatState.modelsLoaded = list.length > 0;
+      if (!list.length) setChatMsg(getStr("chat.picker_none"), "warn");
       return list;
     });
   }
 
-  function readComboValue() {
-    var c = chatModelCombo;
-    if (c && typeof c.getValue === "function") return c.getValue();
-    var inp = chatEl("chatNewModel");
-    return inp ? String(inp.value || "").trim() : "";
+  /* ---- In-chat model switcher (BUG-260916-1 p.3): REUSES the same combobox
+         component as the New-chat picker, but switches the model of the CURRENT
+         session live (PUT /api/chat/sessions/{id} {model}). Selection is detected
+         WITHOUT reimplementing the widget: it renders <li role="option"
+         data-value> (click) and applies the value on Enter before its listeners
+         return, so a once-registered pair of document listeners is enough. ---- */
+  function chatInChatModelCtl() {
+    if (!chatSwitchCombo && typeof window.aigate !== "undefined" &&
+        typeof window.aigate.createCombobox === "function") {
+      chatSwitchCombo = window.aigate.createCombobox({
+        inputId: "chatModelSwitch",
+        listId: "chatModelSwitchList",
+        searchInside: true,
+        groupBy: "group",
+        groupOrder: [getStr("combobox.group_combos")],
+        subGroupBy: "prefix"
+      });
+    }
+    return chatSwitchCombo;
   }
 
-  /* ---- New-session modal ---- */
-  function openNewChatModal(trigger) {
-    var title = chatEl("chatNewTitleInput");
-    if (title) title.value = "";
-    setChatNewMsg("", "");
-    fetchChatModels().catch(function () {}).then(function () {
-      openChatDialog("chatNewModal", trigger);
-    });
-  }
-
-  function createChatSession() {
-    var model = readComboValue();
-    if (!model) { setChatNewMsg(getStr("chat.model_required"), "error"); return; }
-    var titleEl = chatEl("chatNewTitleInput");
-    var title = titleEl ? String(titleEl.value || "").trim() : "";
-    var body = { model: model };
-    if (title) body.title = title;
-    fetchJson(CHAT_API, {
-      method: "POST",
+  function commitModelSwitch(ref) {
+    ref = String(ref == null ? "" : ref).trim();
+    if (!ref) return;
+    if (!chatState.currentId) {
+      // Brand-new draft (Gemini-style, no modal): there is no session to PUT yet,
+      // so just remember the choice as the pending model on chatState. The first
+      // send creates the session with it (see sendChatMessage). No backend call.
+      if (ref === chatState.currentModel) return;
+      chatState.currentModel = ref;
+      renderChatTarget();
+      return;
+    }
+    if (ref === chatState.currentModel) return; // unchanged -> no PUT
+    fetchJson(CHAT_API + "/" + chatState.currentId, {
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
+      body: JSON.stringify({ model: ref })
     }).then(function (session) {
-      closeChatDialog("chatNewModal");
-      chatState.currentId = session.id;
-      return loadChatSessions().then(function () { openSession(session.id); });
-    }).catch(function (err) {
-      setChatNewMsg(err.message || getStr("chat.error"), "error");
+      // Prefer the server echo; fall back to the chosen ref so the UI is correct
+      // in-session even while the backend SessionUpdate ignores `model` (see receipt).
+      chatState.currentModel = (session && session.model != null) ? session.model : ref;
+      renderChatTarget();
+      loadChatSessions();
+      setChatMsg(getStr("chat.model_switched"), "ok");
+    }).catch(function () {
+      setChatMsg(getStr("chat.model_switch_error"), "error");
     });
+  }
+
+  /* Detect a switcher selection WITHOUT reimplementing the combobox. The two
+     elements are freshly created on every mount (wireChatUi runs again), so we
+     bind them directly (element scope, not a global document listener) — same
+     pattern as the rest of this module. The option <li> lives INSIDE the list,
+     so a click that bubbles to the list is read BEFORE the combobox's own
+     document handler rebuilds (detaches) it. Enter is deferred one tick so the
+     combobox has applied the highlighted/typed value to the input first. */
+  function wireModelSwitch() {
+    var ul = chatEl("chatModelSwitchList");
+    if (ul) {
+      ul.addEventListener("click", function (e) {
+        var li = (e.target && e.target.closest)
+          ? e.target.closest('li[role="option"]') : null;
+        if (li) commitModelSwitch(li.getAttribute("data-value"));
+      });
+    }
+    var inp = chatEl("chatModelSwitch");
+    if (inp) {
+      inp.addEventListener("keydown", function (e) {
+        if (e.key !== "Enter") return;
+        setTimeout(function () {
+          if (chatSwitchCombo) commitModelSwitch(chatSwitchCombo.getValue());
+        }, 0);
+      });
+    }
+  }
+
+  /* ---- New chat (Gemini-style, NO modal): #chatNewBtn starts a blank,
+         client-side draft. No session is created yet — the user types, picks a
+         model inline in the composer, and the FIRST message creates the session
+         (see sendChatMessage). This mirrors Gemini: "New chat" is instant. ---- */
+  function newChatDraft() {
+    chatState.currentId = null;
+    chatState.currentModel = null;
+    chatState.titleAuto = true;
+    chatState.firstUserMessage = null;
+    var title = chatEl("chatTitleInput"); if (title) title.value = "";
+    renderChatTarget();                       // -> "no model set" badge
+    if (chatSwitchCombo) chatSwitchCombo.setValue("");  // clear the switcher selection
+    renderMessages([]);                        // friendly empty thread, ready to type
+    markActiveSession(null);                   // drop the rail's active highlight
+    var input = chatEl("chatInput");
+    if (input) { input.value = ""; input.style.height = "auto"; input.focus(); }
+    // Make sure the inline switcher has its option list (idempotent model-list GET).
+    fetchChatModels().catch(function () { /* non-fatal: retry on focus/next show */ });
   }
 
   /* ---- Rename / delete / settings (all via PUT/DELETE) ---- */
@@ -3090,6 +3233,7 @@
       body: JSON.stringify({ title: title })
     }).then(function (session) {
       closeChatDialog("chatRenameModal");
+      chatState.titleAuto = false; // manual title -> stop auto-overwriting (p.4)
       var t = chatEl("chatTitleInput");
       if (t) t.value = session.title || "";
       loadChatSessions();
@@ -3106,11 +3250,17 @@
       closeChatDialog("chatDeleteModal");
       chatState.currentId = null;
       chatState.currentModel = null;
-      var thread = chatEl("chatThread"); if (thread) thread.innerHTML = "";
+      renderMessages([]);              // back to the friendly empty state
       var title = chatEl("chatTitleInput"); if (title) title.value = "";
       var target = chatEl("chatTarget"); if (target) { target.textContent = ""; target.className = "chat-target"; }
       loadChatSessions();
     }).catch(function () { setChatMsg(getStr("chat.delete_error"), "error"); });
+  }
+
+  function openChatSettings(trigger) {
+    if (!chatState.currentId) { setChatMsg(getStr("chat.empty"), "warn"); return; }
+    setChatSettingsMsg("", "");
+    openChatDialog("chatSettingsModal", trigger);
   }
 
   function saveChatSettings() {
@@ -3168,11 +3318,90 @@
   }
 
   function finishStream(sessionId) {
+    // Defensive: clear any still-running loader (e.g. a stream that finished with
+    // zero tokens) so its interval can never leak into the re-render below.
+    stopLoader(activeLoaderEl);
     chatState.streaming = false;
     chatState.controller = null;
     setStreamingUI(false);
     // Authoritative re-read: the persisted assistant turn only exists in the DB.
     return openSession(sessionId).then(function () { loadChatSessions(); });
+  }
+
+  /* ---- Waiting-for-response loader ----------------------------------------
+     The instant streaming starts (before any token) the live empty assistant
+     bubble shows a CYCLING "thinking" phrase + an animated rainbow (pelangi)
+     border, so the user never thinks the system is idle while the model answers
+     (the Gemini-like redesign keeps the bubble borderless, so the rainbow border
+     is the only motion that says "working"). The loader is removed the moment the
+     first real token lands (see streamChat). Phrases live in i18n
+     (chat.loader_01..N); we fall back to a built-in list only if a locale forgot
+     to ship them, so the pool is never empty and never below 32. */
+  var FALLBACK_LOADER_PHRASES = [
+    "Thinking…", "Crafting an answer…", "Composing a reply…", "Digging into the context…",
+    "Preparing a response…", "Processing your request…", "Reviewing your question…",
+    "Looking up information…", "Connecting ideas…", "Analyzing the input…",
+    "Gathering my thoughts…", "Weighing the options…", "Stringing words together…",
+    "Examining the details…", "Shaping an answer…", "Preparing a reply…",
+    "Collecting the facts…", "Filtering the information…", "Tracing the context…",
+    "Uncovering the meaning…", "Blending an answer…", "Ordering the arguments…",
+    "Working out the problem…", "Getting a response ready…", "Reading the patterns…",
+    "Weaving the narrative…", "Working through the question…", "Aligning my thoughts…",
+    "Summarizing the points…", "Presenting the answer…", "Linking the data…",
+    "Forging the sentences…"
+  ];
+  // Source of truth = the locale dictionary; resolved at module load (English
+  // fallback) so LoaderPhrases is ready before any chat is opened.
+  var LoaderPhrases = (function () {
+    var loc = document.documentElement.getAttribute("data-locale") || DEFAULT_LOCALE;
+    var dict = (window.I18N && window.I18N[loc]) || (window.I18N && window.I18N[DEFAULT_LOCALE]) || {};
+    var pool = [];
+    Object.keys(dict).sort().forEach(function (k) {
+      if (/^chat\.loader_\d+$/.test(k)) pool.push(dict[k]);
+    });
+    return pool.length >= 32 ? pool : FALLBACK_LOADER_PHRASES;
+  })();
+  var activeLoaderEl = null;   // the live assistant bubble currently loading
+
+  /** Show the streaming loader inside `assistantEl` (the live assistant bubble). */
+  function startLoader(assistantEl) {
+    if (!assistantEl) return;
+    var pool = LoaderPhrases;
+    if (!pool.length) return;
+    assistantEl.classList.add("chat-msg-loading");
+    var loader = document.createElement("div");
+    loader.className = "chat-loader";
+    var rainbow = document.createElement("div");
+    rainbow.className = "chat-loader-rainbow";
+    var text = document.createElement("div");
+    text.className = "chat-loader-text";
+    loader.appendChild(rainbow);
+    loader.appendChild(text);
+    assistantEl.appendChild(loader);          // loader sits inside the assistant bubble
+    // Random start so repeated sends don't always begin on the same word.
+    var idx = Math.floor(Math.random() * pool.length);
+    text.textContent = pool[idx];
+    // Calm rhythm (~1.9s); step by 1 through the pool so a phrase never repeats
+    // back-to-back.
+    var timer = setInterval(function () {
+      idx = (idx + 1) % pool.length;
+      text.textContent = pool[idx];
+    }, 1900);
+    assistantEl._loader = { el: loader, textEl: text, timer: timer };
+    activeLoaderEl = assistantEl;
+  }
+
+  /** Remove the loader and restore the bubble for streamed text. Idempotent. */
+  function stopLoader(assistantEl) {
+    if (!assistantEl) return;
+    var l = assistantEl._loader;
+    if (l) {
+      if (l.timer) clearInterval(l.timer);
+      if (l.el && l.el.parentNode) l.el.parentNode.removeChild(l.el);
+    }
+    assistantEl._loader = null;
+    assistantEl.classList.remove("chat-msg-loading");
+    if (assistantEl === activeLoaderEl) activeLoaderEl = null;
   }
 
   function streamChat(sessionId, content) {
@@ -3191,6 +3420,7 @@
     if (thread) thread.appendChild(assistantEl);
     scrollThreadToEnd();
     var textNode = assistantEl.querySelector(".chat-msg-text");
+    startLoader(assistantEl);          // show the rainbow + cycling phrase NOW
 
     fetch(CHAT_API + "/" + sessionId + "/complete", {
       method: "POST",
@@ -3206,7 +3436,10 @@
       }
       var ct = res.headers.get("content-type") || "";
       if (ct.indexOf("text/event-stream") !== -1) {
+        var firstToken = false;
         return readSseStream(res, function (chunk) {
+          // First real token: drop the loader so the streamed text owns the bubble.
+          if (!firstToken) { firstToken = true; stopLoader(assistantEl); }
           if (textNode) textNode.textContent += chunk;
           scrollThreadToEnd();
         }, controller.signal);
@@ -3215,12 +3448,14 @@
       return res.json().then(function (data) {
         var c = (data && data.choices && data.choices[0] && data.choices[0].message &&
           data.choices[0].message.content) || "";
+        if (c) stopLoader(assistantEl);   // the one-shot answer replaces the loader
         if (textNode) textNode.textContent += c;
         scrollThreadToEnd();
       });
     }).then(function () {
       return finishStream(sessionId);
     }).catch(function (err) {
+      stopLoader(assistantEl);           // abort/error before any token: no orphan spinner
       if (err && err.name === "AbortError") {
         setChatMsg(getStr("chat.stop"), "warn");
       } else {
@@ -3230,14 +3465,57 @@
     });
   }
 
+  /* Gemini-style first message on a brand-new draft: create the session with the
+     inline-chosen model (POST returns {id, model, title}), adopt it as the current
+     conversation, auto-title from this first message, then run the completion.
+     This is the ONLY backend write a new chat makes before streaming — no modal,
+     no separate "create" step. */
+  function startConversationWith(content) {
+    var model = chatState.currentModel;
+    fetchJson(CHAT_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: model })
+    }).then(function (session) {
+      if (!session || session.id == null) throw new Error(getStr("chat.error"));
+      chatState.currentId = session.id;
+      chatState.currentModel = session.model || model;
+      chatState.titleAuto = true;
+      chatState.firstUserMessage = content;
+      if (chatSwitchCombo) chatSwitchCombo.setValue(chatState.currentModel);
+      renderChatTarget();
+      if (chatState.titleAuto) autoTitleIfNeeded(content);   // title <- first message
+      return loadChatSessions().then(function () { streamChat(session.id, content); });
+    }).catch(function (err) {
+      // The composer was cleared before this async call; put the text back so a
+      // failed first send never loses what the user typed.
+      var input = chatEl("chatInput");
+      if (input && !input.value) input.value = content;
+      setChatMsg((err && err.message) ? err.message : getStr("chat.error"), "error");
+    });
+  }
+
   function sendChatMessage() {
     var input = chatEl("chatInput");
     if (!input) return;
     var content = String(input.value || "").trim();
     if (!content) return;
-    if (!chatState.currentId) { setChatMsg(getStr("chat.empty"), "warn"); return; }
-    if (!chatState.currentModel) { setChatMsg(getStr("chat.no_target"), "error"); return; }
+    if (chatState.streaming) return;                 // one turn at a time (also blocks a
+    // double-send while a draft-create is still in flight)
+    // Read a model typed (not yet committed) straight from the inline switcher, so
+    // a selection is honoured even if the user hit send before the widget's blur.
+    if (!chatState.currentModel && chatSwitchCombo && typeof chatSwitchCombo.getValue === "function") {
+      var typed = chatSwitchCombo.getValue();
+      if (typed) commitModelSwitch(typed);
+    }
+    if (!chatState.currentModel) { setChatMsg(getStr("chat.model_required"), "error"); return; }
+    // Empty + collapse the composer NOW (before any async work): the text is
+    // captured above, and this is what stops a second click re-sending it.
     input.value = "";
+    input.style.height = "auto";
+    // No session yet = a Gemini-style draft: the first message creates it, then sends.
+    if (!chatState.currentId) { startConversationWith(content); return; }
+    if (chatState.titleAuto) autoTitleIfNeeded(chatState.firstUserMessage || content);
     streamChat(chatState.currentId, content);
   }
 
@@ -3289,9 +3567,7 @@
 
   function wireChatUi() {
     var b;
-    b = chatEl("chatNewBtn"); if (b) b.addEventListener("click", function () { openNewChatModal(b); });
-    b = chatEl("chatNewCreate"); if (b) b.addEventListener("click", createChatSession);
-    b = chatEl("chatNewCancel"); if (b) b.addEventListener("click", function () { closeChatDialog("chatNewModal"); });
+    b = chatEl("chatNewBtn"); if (b) b.addEventListener("click", newChatDraft);
     b = chatEl("chatRenameBtn"); if (b) b.addEventListener("click", function () { openRenameModal(b); });
     b = chatEl("chatRenameSave"); if (b) b.addEventListener("click", saveRename);
     b = chatEl("chatRenameCancel"); if (b) b.addEventListener("click", function () { closeChatDialog("chatRenameModal"); });
@@ -3301,19 +3577,25 @@
     b = chatEl("chatSendBtn"); if (b) b.addEventListener("click", sendChatMessage);
     b = chatEl("chatStopBtn"); if (b) b.addEventListener("click", stopChatGeneration);
     b = chatEl("chatSettingsSave"); if (b) b.addEventListener("click", saveChatSettings);
+    b = chatEl("chatSettingsCancel"); if (b) b.addEventListener("click", function () { closeChatDialog("chatSettingsModal"); });
+    b = chatEl("chatSettingsBtn"); if (b) b.addEventListener("click", function () { openChatSettings(b); });
+    b = chatEl("chatSidebarToggle"); if (b) b.addEventListener("click", toggleSidebar);
+    chatInChatModelCtl();          // create the in-chat switcher combobox (reused component)
+    wireModelSwitch();             // detect selection (Enter / option click) once
+    var switchInput = chatEl("chatModelSwitch");
+    if (switchInput) switchInput.setAttribute("placeholder", getStr("chat.model_switch"));
 
     var input = chatEl("chatInput");
     if (input) {
       input.setAttribute("placeholder", getStr("chat.input_ph"));
+      input.addEventListener("input", autoGrowComposer);
       input.addEventListener("keydown", function (e) {
         if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
       });
     }
-    var modelInput = chatEl("chatNewModel");
-    if (modelInput) modelInput.setAttribute("placeholder", getStr("combobox.search_ph"));
 
     // backdrop click closes any open chat dialog
-    ["chatNewModal", "chatRenameModal", "chatDeleteModal"].forEach(function (id) {
+    ["chatRenameModal", "chatDeleteModal", "chatSettingsModal"].forEach(function (id) {
       var m = chatEl(id);
       if (m) m.addEventListener("click", function (e) { if (e.target === m) closeChatDialog(id); });
     });
@@ -3326,6 +3608,11 @@
     openSession: openSession,
     send: sendChatMessage,
     stop: stopChatGeneration,
+    // Waiting-for-response loader (rainbow border + cycling phrase). Exposed so
+    // tests can drive it directly and verify the phrase pool is >= 32.
+    LoaderPhrases: LoaderPhrases,
+    startLoader: startLoader,
+    stopLoader: stopLoader,
     _test: {
       describeTarget: describeTarget,
       formatTokens: formatTokens,
@@ -3333,7 +3620,23 @@
       createMessageEl: createMessageEl,
       renderMessages: renderMessages,
       renderSessionList: renderSessionList,
-      readSseStream: readSseStream
+      readSseStream: readSseStream,
+      // BUG-260916-1 additions (settings dialog / model switch / auto-title / collapse)
+      renderChatTarget: renderChatTarget,
+      isAutoTitleCandidate: isAutoTitleCandidate,
+      deriveAutoTitle: deriveAutoTitle,
+      autoTitleIfNeeded: autoTitleIfNeeded,
+      openChatSettings: openChatSettings,
+      saveChatSettings: saveChatSettings,
+      commitModelSwitch: commitModelSwitch,
+      toggleSidebar: toggleSidebar,
+      isSidebarCollapsed: isSidebarCollapsed,
+      applySidebarCollapse: applySidebarCollapse,
+      chatState: chatState,
+      // Loader test hooks
+      LoaderPhrases: LoaderPhrases,
+      startLoader: startLoader,
+      stopLoader: stopLoader
     }
   };
 

@@ -11,7 +11,7 @@ Routes (full paths on the decorator, matching the repo router style):
 * ``GET    /api/chat/sessions``            -> list sessions (updated_at desc)
 * ``POST   /api/chat/sessions``            -> create a session
 * ``GET    /api/chat/sessions/{id}``       -> session + chronological messages
-* ``PUT    /api/chat/sessions/{id}``       -> rename + parameters (title/system/temperature)
+* ``PUT    /api/chat/sessions/{id}``       -> rename + parameters (title/system/temperature/model)
 * ``DELETE /api/chat/sessions/{id}``       -> delete a session (cascades its messages)
 * ``POST   /api/chat/sessions/{id}/complete`` -> SSE chat completion, persists both turns
 
@@ -74,11 +74,18 @@ class SessionCreate(BaseModel):
 
 class SessionUpdate(BaseModel):
     """Body for ``PUT /api/chat/sessions/{id}`` (rename + parameters). Only the
-    provided keys are patched; ``None``/absent leaves the stored value."""
+    provided keys are patched; ``None``/absent leaves the stored value.
+
+    Adds ``model`` so the in-chat model switcher can persist its selection:
+    ``body.dict(exclude_unset=True)`` in :func:`update_session` means an absent
+    ``model`` is NOT sent, so an existing value is preserved (exclude_unset
+    semantics), while an explicitly provided ``model`` overwrites it.
+    """
 
     title: Optional[str] = None
     system_prompt: Optional[str] = None
     temperature: Optional[float] = None
+    model: Optional[str] = None
 
 
 class CompleteRequest(BaseModel):
@@ -250,7 +257,7 @@ def get_session(session_id: int) -> Any:
 
 @router.put("/api/chat/sessions/{session_id}")
 def update_session(session_id: int, body: SessionUpdate) -> Any:
-    """Rename + set parameters (title / system_prompt / temperature)."""
+    """Rename + set parameters (title / system_prompt / temperature / model)."""
     updates = body.dict(exclude_unset=True)
     with SessionLocal() as session:
         chat = session.get(ChatSession, session_id)

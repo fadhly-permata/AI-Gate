@@ -1460,3 +1460,33 @@ User: "gua gak ekspek user pake aigate offline... ya udah kita bikin bisa full o
 - PR #29 OPEN (REST API, gh absen): base main <- feat/chat-restart-and-cli-fix; 10 commit / 54 file / +3789−59; mergeable=clean; label enhancement+documentation. https://github.com/fadhly-permata/AI-Gate/pull/29
 - Default PM (D2): SATU PR bundel 3 fitur (Chat B8 + CLI fix B9 + Restart) demi ringkas; dicatat bisa dipecah bila user mau. MERGE = hak user, TAHAN.
 - Bookkeeping commit lokal (docs) TIDAK di-push → PR tetap = 10 commit yang direview (tak diver).
+
+## 20260916-LOGBUG — BUG-260916-1 dicatat (ProjectManager, /log-bug)
+- Perintah `/log-bug` user: judul = "halaman chat desainnya berantakan banget" + detail usulan perapihan UI chat (system prompt & temperature → popup dialog; model switch langsung; title otomatis; panel session expand/collapse; acuan https://gemini.google.com/app).
+- AUTO-FILL PM (user cuma kasih teks bebas): ID `BUG-260916-1` (n=1 hari ini, cek bugs.md), date 2026-09-16, reporter user, status open, **severity low** — klasifikasi kosmetis/UX, tanpa indikasi crash/blocker/data-loss.
+- 5 poin user dirinci ke Reproduction/Expected/Actual di `documents/pm/bugs.md`. Bukan perintah implementasi — cuma pencatatan; delegasi ke fe-dev menunggu keputusan user.
+- Memory-bank open risks TIDAK disentuh (prosedur: hanya bila severity high).
+
+## 20260916-BUGFIX — BUG-260916-1 UI Chat dirapikan (ProjectManager ← fe-dev + be-dev)
+- Perintah user: "oke, kerjain" atas 5 poin BUG-260916-1 (chat berantakan; system prompt+temperature → popup; model switch langsung; title otomatis; session panel expand/collapse; acuan Gemini).
+- PUTUSAN eksekusi: SEQUENTIAL (forced) — kelima poin nempel file FE yang sama (`app.js`+`styles.css`), paralel bakal tabrakan tulis (parallel-sequential.md §FORCED).
+- **fe-dev** (`src/frontend/**`): hapus `#chatSettings` inline → modal dialog (gear `#chatSettingsBtn`, ESC-dismissable); switcher model in-chat reuse `window.aigate.createCombobox` → PUT `{model}`; auto-title dari pesan pertama (flag `titleAuto`, manual rename mematikan auto); sidebar collapsible + localStorage `aigate.chat.sidebarCollapsed` + `aria-expanded`. Cache-buster → 20260930. +13 tes chat.
+- **be-dev** (`src/backend/**`): `SessionUpdate` +`model` (chat_router.py:88) — PM verifikasi `exclude_unset`+Extra.ignore bikin PUT `{model}` sebelumnya di-drop diam-diam. +2 tes persist/regresi.
+- GERBANG PM (re-run sendiri, bukan telan receipt): vitest FE 750/750 (chat 35/35), pytest BE chat 14/14, `node --check` bersih, cache-buster lockstep (styles/app/i18n/V=20260930), scope OK (fe-dev tak nyentuh backend).
+- TAHAN commit (D1 — user belum minta). G3: user wajib uji nyata di browser (restart/refresh, cek model-switch reload + auto-title + collapse) sebelum dianggap usable.
+
+## 20260916-REDESIGN — BUG-260916-1 RONDE-2: bongkar total tampilan chat (ProjectManager ← fe-dev)
+- Setelah ronde-1 user: "kok gak ada efeknya?" lalu "masih aneh dan berantakan" lalu "semuanya gak suka gua, redesign aja".
+- DIAGNOSA PM: server live SUDAH serve kode baru (curl → chatSettingsModal + app.js?v=20260930) → "gak ada efek" = cache browser + RONDE-1 cuma relokasi kontrol, layout gak diutak-atik. Playwright tak bisa render (Unsupported platform: android) → PM gak bisa lihat layar → minta screenshot/detail; user pilih "redesign aja" tanpa detail → PM kunci acuan Gemini dari pengetahuan + minta fe-dev kerja struktural.
+- BATASAN dikunci PM sebelum spawn: ID yang ditest (35) wajib utuh; JANGAN nambah blok `@media (max-width:960px)` (test views pin count=1, `#sidebarToggle{`=2); pakai token `:root` ada; reuse createCombobox; cache-buster lockstep.
+- fe-dev: rewrite view chat (index.html 946–1042), ganti CSS section chat (styles.css 2436–2823), token `--chat-user-bg` (+dark), app.js (autoGrowComposer/empty-state/chatSettingsCancel), +7 tes struktur Gemini. Cache-buster → 20261001.
+- GERBANG PM (re-run sendiri): vitest 757 passed (chat 42/views 30/i18n 36, 0 regresi), node --check bersih, `@media` 960 real block tetap 1, cache-buster lockstep 20261001, curl live server = markup baru ke-saji (chatLayout/chat-rail/chat-composer-wrap). UI tak butuh restart (StaticFiles baca disk) → hard-refresh cukup.
+- TAHAN commit (D1). G3 OPEN: user hard-refresh + nilai visual; kalau masih kurang spesifik → PM minta screenshot/daftar bagian (round-3), bukan tebak lagi.
+
+## 20260916-NEWCHAT — BUG-260916-1 RONDE-3: alur New-chat ala Gemini (tanpa dialog) (ProjectManager ← fe-dev)
+- User: "new chat kenapa masih pake dialog title dan pilih model segala? ... bisa langsung pilih model di deket teksboks". PM verifikasi kontrak (create_session boleh tanpa model; complete 400 no_model kalau chat.model kosong → model hrs ter-set sebelum complete).
+- Arah: hapus `#chatNewModal` + prompt judul; `#chatNewBtn` → draft baru langsung; model switcher `#chatModelSwitch` DIPINDAH dari `.chat-bar` ke `.chat-composer-model` (deket kotak ketik); kirim-pertama create session+set model+auto-title; tanpa model → inline hint `chat.model_required`, bukan modal.
+- FE2spawn PERTAMA kepotong user ("force close"): HTML modal UDAH dihapus tapi app.js masih `openNewChatModal`+`setChatNewMsg` (undefined) → PM gate tangkap **3 fail** (bukan "udah selesai" versi user). PM TIDAK klaim selesai — spawn resume fe-dev dgn bukti baris.
+- Resume fe-dev: app.js bersih (grep chatNewModal/chatNewCreate/chatNewCancel/openNewChatModal = 0), `openNewChat` (draft) + first-send create-with-model + auto-title, rework 2 tes new-chat + tes struktur Gemini (switcher di composer). Cache-buster → **20261002**.
+- GERBANG PM (re-run sendiri): vitest **757 passed** (chat 42/42), node --check bersih, cache-buster lockstep 20261002, **curl live server** = tanpa chatNewModal + ada chat-composer-model → UI cukup HARD-REFRESH (gak perlu restart; perubahan FE via StaticFiles).
+- TAHAN commit (D1). G3 OPEN: user hard-refresh & coba New chat → langsung ngetik + pilih model inline.
