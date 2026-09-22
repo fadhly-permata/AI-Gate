@@ -17,7 +17,7 @@
        below; it is also read by i18n.js for the on-demand URLs. -->
   <script>
     (function () {
-      var V = "20260929";
+      var V = "20260916";
       window.I18N_VER = V;
       var loc = "en";
       try {
@@ -58,7 +58,7 @@
   <script defer src="vendor/xterm/xterm.js?v=20260920"></script>
   <script defer src="vendor/xterm/xterm-addon-fit.js?v=20260920"></script>
 
-  <link rel="stylesheet" href="styles.css?v=20260928" />
+  <link rel="stylesheet" href="styles.css?v=20260916" />
 </head>
 <!-- Developer Mode gate ships "off" by default so a fresh install never flashes
      the dev-only surfaces (Log Window, Device Simulation, Self-Heal) before the
@@ -938,99 +938,118 @@
         </div>
       </section>
 
-      <!-- Chat Playground (B8.B6.2 / PRD §2.9): sidebar session list + conversation
-           thread + composer + provider/combo picker. Rendering/streaming lives in
-           app.js (window.aigate.chat). No new <script> tag — the logic is part of
-           the SPA shell so it shares the chat.* i18n keys and the nav wiring. -->
+      <!-- Chat Playground (B8.B6.2 / PRD §2.9) — Gemini-like redesign: a slim
+           collapsible SESSIONS rail + one centered DOCUMENT-STYLE reading column
+           (thread + rounded composer). Rendering/streaming lives in app.js
+           (window.aigate.chat); no new <script> tag — it shares chat.* i18n keys
+           and the nav wiring. Hard element IDs are preserved for the jsdom tests. -->
       <section class="view" data-view="chat">
-        <div class="page-banner">
-          <i class="fa fa-circle-info" aria-hidden="true"></i>
-          <p class="page-banner-text" data-i18n="page_desc.chat">Chat with a configured provider or combo through the aigate gateway — responses stream token by token and every conversation is saved locally.</p>
-        </div>
-
-        <div class="chat-layout">
-          <!-- Session list -->
-          <aside class="card chat-sidebar">
-            <div class="providers-head">
-              <h2 class="providers-title" data-i18n="chat.sessions">Sessions</h2>
-              <button class="btn btn-primary" id="chatNewBtn" type="button">
-                <i class="fa fa-plus"></i> <span data-i18n="chat.new">New chat</span>
+        <div class="chat-layout" id="chatLayout">
+          <!-- Sessions rail: slim, collapses to a 56px icon rail. -->
+          <aside class="chat-rail" id="chatSidebar">
+            <div class="chat-rail-head">
+              <button class="chat-rail-toggle" id="chatSidebarToggle" type="button"
+                      aria-label="Collapse sessions" data-i18n-aria="chat.collapse" aria-expanded="true">
+                <i class="fa fa-chevron-left" aria-hidden="true"></i>
+              </button>
+              <span class="chat-rail-title" data-i18n="chat.sessions">Sessions</span>
+              <button class="chat-new-btn" id="chatNewBtn" type="button" title="New chat">
+                <i class="fa fa-plus" aria-hidden="true"></i>
+                <span class="chat-new-label" data-i18n="chat.new">New chat</span>
               </button>
             </div>
-            <p class="settings-msg" id="chatListMsg" role="status" aria-live="polite"></p>
+            <p class="settings-msg chat-list-msg" id="chatListMsg" role="status" aria-live="polite"></p>
             <ul class="chat-session-list" id="chatSessionList"></ul>
           </aside>
 
-          <!-- Conversation -->
-          <section class="card chat-main">
-            <div class="chat-bar">
-              <div class="chat-bar-info">
-                <input class="form-input chat-title-input" id="chatTitleInput" type="text"
-                       aria-label="Chat title" data-i18n-aria="chat.title" />
-                <span class="chat-target" id="chatTarget"></span>
-              </div>
+          <!-- Reading column. -->
+          <section class="chat-main">
+            <header class="chat-bar">
               <div class="chat-bar-actions">
-                <button class="icon-btn-small" id="chatRenameBtn" type="button"
-                        data-i18n-aria="chat.rename" title="Rename" aria-label="Rename">
-                  <i class="fa fa-pen"></i></button>
-                <button class="icon-btn-small" id="chatDeleteBtn" type="button"
-                        data-i18n-aria="chat.delete" title="Delete" aria-label="Delete">
-                  <i class="fa fa-trash"></i></button>
+                <button class="chat-ghost-btn" id="chatRenameBtn" type="button"
+                        aria-label="Rename" data-i18n-aria="chat.rename" title="Rename">
+                  <i class="fa fa-pen" aria-hidden="true"></i></button>
+                <button class="chat-ghost-btn chat-ghost-danger" id="chatDeleteBtn" type="button"
+                        aria-label="Delete" data-i18n-aria="chat.delete" title="Delete">
+                  <i class="fa fa-trash" aria-hidden="true"></i></button>
+                <button class="chat-ghost-btn" id="chatSettingsBtn" type="button"
+                        aria-label="Settings" data-i18n-aria="chat.settings" title="Settings">
+                  <i class="fa fa-gear" aria-hidden="true"></i></button>
               </div>
+            </header>
+
+            <div class="chat-title-wrap">
+              <input class="chat-title-input" id="chatTitleInput" type="text" readonly
+                     aria-label="Chat title" data-i18n-aria="chat.title" />
+              <span class="chat-target" id="chatTarget"></span>
             </div>
 
-            <div class="chat-thread" id="chatThread" role="log" aria-live="polite"
-                 aria-label="Conversation"></div>
-
-            <div class="chat-settings" id="chatSettings">
-              <label class="form-label" for="chatSystemPrompt" data-i18n="chat.system_prompt">System prompt</label>
-              <textarea class="form-input chat-system" id="chatSystemPrompt" rows="2"></textarea>
-              <div class="chat-settings-row">
-                <label class="form-label" for="chatTemperature" data-i18n="chat.temperature">Temperature</label>
-                <input class="form-input" id="chatTemperature" type="number" min="0" max="2" step="0.1" />
-                <button class="btn" id="chatSettingsSave" type="button" data-i18n="chat.save">Save</button>
-              </div>
-              <p class="settings-msg" id="chatSettingsMsg" role="status" aria-live="polite"></p>
+            <div class="chat-scroll">
+              <div class="chat-thread" id="chatThread" role="log" aria-live="polite"
+                   aria-label="Conversation"></div>
             </div>
 
-            <div class="chat-composer">
-              <textarea class="form-input" id="chatInput" rows="2"
-                        aria-label="Message" data-i18n-aria="chat.input" placeholder=""></textarea>
-              <div class="chat-composer-actions">
-                <button class="btn btn-primary" id="chatSendBtn" type="button" data-i18n="chat.send">Send</button>
-                <button class="btn" id="chatStopBtn" type="button" data-i18n="chat.stop" hidden>Stop</button>
+            <div class="chat-composer-wrap">
+              <div class="chat-composer">
+                <!-- Inline model switcher (Gemini-style): sits just above the textarea,
+                     visible on a brand-new draft AND an existing session. Same IDs +
+                     reused combobox as the old in-chat switcher; a selection on a draft is
+                     remembered locally, and the first send creates the session with it. -->
+                <div class="chat-composer-model">
+                  <span class="chat-model-pill">
+                    <span class="chat-model-pill-label" data-i18n="chat.model">Model</span>
+                    <span class="aigate-combo chat-model-switch">
+                      <input class="chat-model-switch-input" type="text" id="chatModelSwitch"
+                             autocomplete="off" placeholder=""
+                             role="combobox" aria-expanded="false" aria-controls="chatModelSwitchList"
+                             aria-autocomplete="list" data-i18n-aria="chat.model_switch" />
+                      <ul class="aigate-combo-list" id="chatModelSwitchList" role="listbox" hidden></ul>
+                    </span>
+                  </span>
+                </div>
+                <div class="chat-composer-row">
+                  <textarea class="chat-input" id="chatInput" rows="1"
+                            aria-label="Message" data-i18n-aria="chat.input" placeholder=""></textarea>
+                  <div class="chat-composer-actions">
+                    <button class="chat-stop-btn" id="chatStopBtn" type="button" hidden
+                            aria-label="Stop" data-i18n-aria="chat.stop" title="Stop">
+                      <i class="fa fa-stop" aria-hidden="true"></i></button>
+                    <button class="chat-send-btn" id="chatSendBtn" type="button"
+                            aria-label="Send" data-i18n-aria="chat.send" title="Send">
+                      <i class="fa fa-paper-plane" aria-hidden="true"></i></button>
+                  </div>
+                </div>
               </div>
-              <p class="settings-msg" id="chatMsg" role="status" aria-live="polite"></p>
+              <p class="settings-msg chat-msg-status" id="chatMsg" role="status" aria-live="polite"></p>
             </div>
           </section>
         </div>
       </section>
 
-      <!-- New chat modal: pick a provider/combo target via the combobox -->
-      <div class="modal-overlay" id="chatNewModal" hidden>
-        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="chatNewTitle">
-          <h3 class="modal-title" id="chatNewTitle" data-i18n="chat.new_title">New chat</h3>
-          <div class="form-row">
-            <label class="form-label" for="chatNewTitleInput" data-i18n="chat.title_label">Title</label>
-            <input class="form-input" type="text" id="chatNewTitleInput" />
+      <!-- Chat settings dialog (system prompt + temperature) — opened by the gear
+           in .chat-bar; closes via overlay click / Cancel / Escape. -->
+      <div class="modal-overlay" id="chatSettingsModal" hidden>
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="chatSettingsTitle">
+          <h3 class="modal-title" id="chatSettingsTitle" data-i18n="chat.settings_title">Chat settings</h3>
+          <div class="form-row form-row-stack">
+            <label class="form-label" for="chatSystemPrompt" data-i18n="chat.system_prompt">System prompt</label>
+            <textarea class="form-input chat-system" id="chatSystemPrompt" rows="3"></textarea>
           </div>
-          <div class="form-row">
-            <label class="form-label" for="chatNewModel" data-i18n="chat.model">Model</label>
-            <div class="aigate-combo">
-              <input class="form-input" type="text" id="chatNewModel"
-                     autocomplete="off" placeholder=""
-                     role="combobox" aria-expanded="false" aria-controls="chatNewModelList"
-                     aria-autocomplete="list" />
-              <ul class="aigate-combo-list" id="chatNewModelList" role="listbox" hidden></ul>
-            </div>
+          <div class="form-row form-row-stack">
+            <label class="form-label" for="chatTemperature" data-i18n="chat.temperature">Temperature</label>
+            <input class="form-input chat-temperature" id="chatTemperature" type="number" min="0" max="2" step="0.1" />
           </div>
+          <p class="settings-msg" id="chatSettingsMsg" role="status" aria-live="polite"></p>
           <div class="form-actions">
-            <button type="button" class="btn btn-primary" id="chatNewCreate" data-i18n="chat.create">Create</button>
-            <button type="button" class="btn" id="chatNewCancel" data-i18n="chat.cancel">Cancel</button>
+            <button class="btn btn-primary" id="chatSettingsSave" type="button" data-i18n="chat.save">Save</button>
+            <button class="btn" id="chatSettingsCancel" type="button" data-i18n="chat.cancel">Cancel</button>
           </div>
-          <p class="settings-msg" id="chatNewMsg" role="status" aria-live="polite"></p>
         </div>
       </div>
+
+      <!-- New-chat is now modal-free (Gemini-style): #chatNewBtn starts a blank
+           draft and the model is chosen inline in the composer (see .chat-composer-model).
+           The old title+model picker modal is gone. -->
 
       <!-- Rename modal -->
       <div class="modal-overlay" id="chatRenameModal" hidden>
@@ -1634,7 +1653,7 @@
         asserted EQUAL by tests/i18n.test.js — the dictionary files, the registry,
         and app.js must reload together or on-demand i18n URLs point at a version
         the browser cached away. So bumping app.js?v forces all three in lockstep. -->
-  <script src="i18n.js?v=20260929" defer></script>
+  <script src="i18n.js?v=20260916" defer></script>
    <!-- Device simulation helper (B4.2) — must load before app.js uses it.
         ?v= cache-buster: bump whenever device.js changes. -->
     <script src="device.js?v=20260922" defer></script>
@@ -1644,7 +1663,7 @@
   <script src="combobox.js?v=20260911" defer></script>
   <!-- App bootstrap (defer preserves order).
        ?v= cache-buster: bump whenever app.js changes. -->
-  <script src="app.js?v=20260929" defer></script>
+  <script src="app.js?v=20260916" defer></script>
    <!-- Combos / Proxy Pools / Endpoints management (B2.4 / B2.3 / B2.5).
         ?v= cache-buster: bump whenever these modules change — combos.js held
         a plain src through the stage-8 rewrite, so browsers kept serving the

@@ -18,6 +18,9 @@
   --header-h: 56px;
   --sidebar-w: 230px;
   --sidebar-w-collapsed: 56px;
+  /* Chat Playground (Gemini-like redesign): one chat-scoped colour — the subtle
+     right-aligned user bubble. Derived neutral; dark value follows below. */
+  --chat-user-bg: #f1f3f4;
   --radius: 8px;
   --transition: 0.22s ease;
   /* Uniform workspace padding (overridden per breakpoint). Kept as a token so
@@ -68,6 +71,8 @@
   --accent-contrast: #ffffff;
   --muted: #8b929c;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  /* Chat user bubble: a soft neutral that stays subtle against the dark panel. */
+  --chat-user-bg: #2f353c;
   /* Terminal: frame blends into the dark shell; active tab tint follows the
      brighter dark accent. Surface/chrome stay identical (always-dark pane). */
   --term-frame: #343a40;
@@ -885,9 +890,17 @@ body.sidebar-collapsed .device-trigger { justify-content: center; padding: 12px 
   .view[data-view="settings"].is-active { display: block; }
   .view[data-view="settings"] .page-banner { grid-column: auto; }
   .view[data-view="settings"] .backup-card { margin-top: 18px; }
-  /* Chat: collapse the two columns so the session list + thread both fit. */
-  .chat-layout { grid-template-columns: 1fr; }
-  .chat-sidebar { max-height: 240px; }
+  /* Chat: stack the rail above the reading column (single full-width column) so
+     the session list never fights the thread for width on a real narrow screen. */
+  .chat-layout, .chat-layout.is-collapsed {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .chat-rail {
+    border-right: none;
+    border-bottom: 1px solid var(--panel-border);
+    max-height: 240px;
+  }
 }
 
 /* Phone — real narrow viewport OR device simulation = phone: NON-AdminLTE shell.
@@ -927,12 +940,16 @@ body.sidebar-collapsed .device-trigger { justify-content: center; padding: 12px 
   .cli-tools { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
   .data-table { display: block; overflow-x: auto; white-space: nowrap; }
   .modal { width: 100%; }
-  /* Chat on a phone: one column, compact thread, full-width fields, no overflow. */
-  .chat-layout { grid-template-columns: 1fr; }
-  .chat-sidebar { max-height: 200px; }
-  .chat-thread { max-height: 46vh; }
-  .chat-title-input { max-width: 100%; }
-  .chat-settings-row .form-input { width: 100%; }
+  /* Chat on a phone: one column (rail stacks above the thread), no overflow.
+     The thread flex-fills the exact-fit column, so no vh cap is needed. */
+  .chat-layout, .chat-layout.is-collapsed {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .chat-rail { border-right: none; border-bottom: 1px solid var(--panel-border); max-height: 200px; }
+  .chat-thread { gap: 18px; }
+  .chat-msg-user { max-width: 88%; }
+  .chat-model-pill { max-width: 100%; }
 }
 
 body[data-device="phone"] { --ws-pad: 12px; }
@@ -2416,151 +2433,473 @@ body[data-device="phone"] .cli-tool { padding: 12px; border-radius: 10px; }
 body[data-device="phone"] .trend-chart { height: 150px; }
 body[data-device="phone"] .reqlog-details { max-width: 240px; }
 
-/* ===== Chat Playground (B8.B6.2 core + B6.3 polish / PRD §2.9) =====
-   Two-column on desktop (session list | conversation), single column on
-   narrow viewports. token-only colors so the dark theme follows. No fixed
-   widths that can force horizontal scroll — every wide element allows wrap. */
-.chat-layout {
-  display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 16px;
-  align-items: start;
-}
-.chat-sidebar {
+/* ===== Chat Playground — Gemini-like redesign (B8.B6.2 / PRD §2.9, BUG-260916-1) =====
+   A calm, airy, document-style conversation view. Frame = slim collapsible
+   SESSIONS rail + ONE centered reading column (max-width --chat-read, auto
+   margins) that fills the workspace exactly (the same flex fit the terminal
+   view uses, so the page itself never scrolls — only the thread does). The
+   conversation has NO card chrome; the only surface is the rounded composer.
+   Built ON the :root tokens (light + dark follow); the ONE chat-scoped colour
+   (--chat-user-bg, the subtle user bubble) is declared with the other tokens. */
+.view[data-view="chat"].is-active {
+  /* Exact-fit flex column (mirrors .view[data-view="terminal"]): the frame fills
+     the workspace content box and only the thread scrolls — never the page. The
+     combobox panel is position:fixed, so overflow:hidden here never clips it. */
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - var(--header-h) - 2 * var(--ws-pad));
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
+.chat-layout {
+  --chat-read: 820px;                 /* the centered reading column */
+  --chat-gutter: clamp(16px, 5vw, 40px);
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  gap: 0;
+  transition: grid-template-columns var(--transition);
+}
+/* Collapse the rail to a 56px icon rail (desktop only; the single-column
+   tablet/phone shells below override this back to full width). */
+.chat-layout.is-collapsed { grid-template-columns: var(--sidebar-w-collapsed) minmax(0, 1fr); }
+
+/* ---- Sessions rail ---- */
+.chat-rail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 14px 10px;
+  background: var(--panel);
+  border-right: 1px solid var(--panel-border);
+  overflow: hidden;
+}
+.chat-rail-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px 6px;
+}
+.chat-rail-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  transition: background var(--transition), color var(--transition);
+}
+.chat-rail-toggle:hover { background: var(--bg); color: var(--fg); }
+.chat-rail-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.chat-new-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 9px 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: border-color var(--transition), background var(--transition);
+}
+.chat-new-btn:hover { border-color: var(--accent); }
+.chat-new-btn i { flex: 0 0 auto; color: var(--accent); }
+/* #chatListMsg / #chatMsg keep id-scoped rhythm: the JS chatMsg() helper resets
+   their className to "settings-msg[-kind]" on every write, so only id/descendant
+   selectors survive. */
+.chat-rail #chatListMsg { margin: 0 4px 6px; min-height: 0; font-size: 12px; }
 .chat-session-list {
-  list-style: none;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
   margin: 0;
   padding: 0;
+  list-style: none;
   overflow-y: auto;
 }
 .chat-session {
-  padding: 10px 12px;
-  margin-bottom: 8px;
-  border: 1px solid var(--panel-border);
+  padding: 9px 12px;
+  margin-bottom: 2px;
+  border: 1px solid transparent;
   border-radius: var(--radius);
-  background: var(--bg);
+  background: transparent;
   cursor: pointer;
-  transition: border-color var(--transition), background var(--transition);
+  transition: background var(--transition), color var(--transition);
 }
-.chat-session:hover { border-color: var(--accent); }
+.chat-session:hover { background: var(--bg); }
+/* Active = soft accent-tint, never a solid filled block. */
 .chat-session.is-active {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-contrast);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
 }
-.chat-session.is-active .chat-session-target { color: var(--accent-contrast); }
-.chat-session-title { font-weight: 600; word-break: break-word; }
-.chat-session-target { margin-top: 2px; font-size: 12px; color: var(--muted); word-break: break-word; }
-.chat-session-empty { padding: 10px 4px; color: var(--muted); }
+.chat-session.is-active .chat-session-title { color: var(--accent); }
+.chat-session.is-active .chat-session-target {
+  color: color-mix(in srgb, var(--accent) 65%, var(--muted));
+}
+.chat-session-title {
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+.chat-session-target {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted);
+  word-break: break-word;
+}
+.chat-session-empty { padding: 12px 8px; color: var(--muted); font-size: 13px; }
 
+/* Collapsed rail: hide every label, keep only the icons, centre them. */
+.chat-layout.is-collapsed .chat-rail-title,
+.chat-layout.is-collapsed .chat-new-label,
+.chat-layout.is-collapsed .chat-session-list,
+.chat-layout.is-collapsed #chatListMsg { display: none; }
+.chat-layout.is-collapsed .chat-rail-head { justify-content: center; padding-bottom: 8px; }
+.chat-layout.is-collapsed .chat-new-btn { justify-content: center; padding: 9px 0; }
+.chat-layout.is-collapsed .chat-rail-toggle .fa-chevron-left { transform: rotate(180deg); }
+
+/* ---- Reading column (chat-main is the flex column: bar -> title -> scroll -> composer) ---- */
 .chat-main {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  min-width: 0; /* let the column shrink instead of overflowing */
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 .chat-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
+  flex: 0 0 auto;
+  gap: 12px;
+  width: 100%;
+  max-width: var(--chat-read);
+  margin: 0 auto;
+  padding: 14px var(--chat-gutter) 6px;
 }
-.chat-bar-info {
-  display: flex;
+.chat-bar-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+/* Compact "Model: <name>" pill wrapping the reused combobox. */
+.chat-model-pill {
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
-  flex: 1 1 auto;
-}
-.chat-title-input { max-width: 280px; }
-.chat-target {
-  padding: 2px 8px;
+  max-width: 100%;
+  padding: 5px 14px;
   border: 1px solid var(--panel-border);
-  border-radius: var(--radius);
+  border-radius: 999px;
   background: var(--bg);
+}
+.chat-model-pill-label {
+  flex: 0 0 auto;
   font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.chat-model-switch { display: inline-flex; min-width: 0; max-width: 100%; }
+.chat-model-switch-input {
+  min-width: 70px;
+  max-width: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  font-size: 14px;
+  font-weight: 600;
+}
+.chat-model-switch-input:focus { outline: none; }
+.chat-bar-actions { display: flex; align-items: center; gap: 2px; flex: 0 0 auto; }
+/* Ghost icon-buttons next to the gear (rename / delete / settings). */
+.chat-ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 15px;
+  transition: background var(--transition), color var(--transition);
+}
+.chat-ghost-btn:hover { background: var(--bg); color: var(--fg); }
+.chat-ghost-danger:hover { color: #dc3545; }
+
+/* Large, borderless, light title (read-only until renamed) + a muted target line. */
+.chat-title-wrap {
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: var(--chat-read);
+  margin: 0 auto;
+  padding: 2px var(--chat-gutter) 10px;
+}
+.chat-title-input {
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  font-weight: 600;
+  font-size: clamp(22px, 3.4vw, 30px);
+  line-height: 1.25;
+  text-align: left;
+  cursor: default;
+}
+.chat-title-input:focus { outline: none; }
+.chat-target {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .chat-target-none { font-style: italic; }
-.chat-bar-actions { display: flex; gap: 6px; flex: 0 0 auto; }
 
+/* ---- Thread (the document) ---- */
+.chat-scroll {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
 .chat-thread {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  min-height: 320px;
-  max-height: 52vh;
-  overflow-y: auto;
-  padding: 16px;
-  border: 1px solid var(--panel-border);
-  border-radius: var(--radius);
-  background: var(--bg);
+  gap: 22px;
+  width: 100%;
+  max-width: var(--chat-read);
+  margin: 0 auto;
+  padding: 8px var(--chat-gutter) 24px;
 }
-.chat-empty { margin: auto; color: var(--muted); text-align: center; }
+.chat-empty {
+  margin: auto;
+  padding: 40px 12px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.6;
+  text-align: center;
+}
 .chat-msg {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  max-width: 88%;
+  gap: 6px;
+  max-width: 100%;
 }
-.chat-msg-user { align-self: flex-end; align-items: flex-end; }
-.chat-msg-assistant { align-self: flex-start; align-items: flex-start; }
+.chat-msg-assistant { align-self: stretch; align-items: flex-start; }
+.chat-msg-user { align-self: flex-end; align-items: flex-end; max-width: 80%; }
 .chat-msg-system { align-self: stretch; }
-.chat-msg-meta {
-  font-size: 11px;
-  letter-spacing: 0.4px;
-  text-transform: uppercase;
-  color: var(--muted);
-}
+/* Role labels stay in the DOM (tests) but the clean document look hides them. */
+.chat-msg-meta { display: none; }
 .chat-msg-text {
-  padding: 10px 12px;
-  border: 1px solid var(--panel-border);
-  border-radius: var(--radius);
-  background: var(--panel);
-  line-height: 1.45;
-  white-space: pre-wrap;        /* preserve model whitespace/newlines */
-  word-break: break-word;       /* never push past the viewport */
+  color: var(--fg);
+  font-size: 15px;
+  line-height: 1.6;               /* generous, airy reading rhythm */
+  white-space: pre-wrap;          /* preserve model whitespace/newlines */
+  word-break: break-word;         /* never push past the viewport */
   overflow-wrap: anywhere;
 }
+/* Assistant = plain text on the panel, no bubble/border/fill. */
+.chat-msg-assistant .chat-msg-text { padding: 0; background: transparent; }
+/* User = subtle right-aligned soft-gray bubble, minimal (no accent fill). */
 .chat-msg-user .chat-msg-text {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-contrast);
+  padding: 10px 16px;
+  border-radius: 20px;
+  background: var(--chat-user-bg);
+  color: var(--fg);
 }
 .chat-msg-tokens { font-size: 11px; color: var(--muted); }
 
-.chat-settings { display: flex; flex-direction: column; gap: 8px; }
-.chat-settings-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.chat-settings-row .form-label { margin: 0; }
-.chat-settings-row .form-input { width: 90px; }
+/* ---- Waiting-for-response loader (pelangi border + cycling phrase) ----
+   The empty live assistant bubble gets a soft card with an animated rainbow
+   (pelangi) BORDER that runs around it, plus a small rainbow ring + a cycling
+   "thinking" phrase. All motion is calm (4.2s/rev). */
+.chat-msg.chat-msg-loading {
+  position: relative;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: var(--panel);
+}
+/* Animated rainbow BORDER: a rotating conic-gradient pseudo-element masked down
+   to a thin ring (the classic gradient-border trick). */
+.chat-msg.chat-msg-loading::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;                              /* the visible border thickness */
+  background: conic-gradient(from 0deg,
+    #ff3b3b, #ff8a00, #ffd400, #36c740, #00b3ff, #7a5cff, #ff4fd8, #ff3b3b);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  animation: chat-rainbow-spin 4.2s linear infinite;
+  pointer-events: none;
+}
+.chat-msg.chat-msg-loading > * { position: relative; z-index: 1; }
+.chat-msg.chat-msg-loading .chat-msg-tokens { display: none; }
+@keyframes chat-rainbow-spin { to { transform: rotate(360deg); } }
+
+.chat-loader {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+/* The small rainbow ring beside the phrase (its own animated conic-gradient). */
+.chat-loader-rainbow {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg,
+    #ff3b3b, #ff8a00, #ffd400, #36c740, #00b3ff, #7a5cff, #ff4fd8, #ff3b3b);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+  animation: chat-rainbow-spin 4.2s linear infinite;
+}
+.chat-loader-text {
+  font-size: 14px;
+  font-style: italic;
+  color: var(--muted);
+}
+
+/* Reduced motion: hold the rainbow still — never force a spinning border. */
+@media (prefers-reduced-motion: reduce) {
+  .chat-msg.chat-msg-loading::before,
+  .chat-loader-rainbow { animation: none; }
+}
+
+/* ---- Composer (the single rounded surface) ---- */
+.chat-composer-wrap {
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: var(--chat-read);
+  margin: 0 auto;
+  padding: 6px var(--chat-gutter) 18px;
+}
+.chat-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 24px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+/* Inline model switcher sits on its own row above the input (Gemini-style). */
+.chat-composer-model {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--panel-border);
+}
+/* Textarea + send/stop share the lower row, aligned to the input's baseline. */
+.chat-composer-row { display: flex; align-items: flex-end; gap: 8px; }
+.chat-composer:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.chat-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-height: 200px;
+  padding: 8px 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.5;
+  resize: none;
+  overflow-y: auto;
+}
+.chat-input:focus { outline: none; }
+.chat-composer-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.chat-send-btn,
+.chat-stop-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 15px;
+  transition: background var(--transition), filter var(--transition), opacity var(--transition);
+}
+.chat-send-btn { background: var(--accent); color: var(--accent-contrast); }
+.chat-send-btn:hover { filter: brightness(1.05); }
+.chat-send-btn:disabled { opacity: 0.5; cursor: default; filter: none; }
+.chat-stop-btn {
+  border: 1px solid var(--panel-border);
+  background: var(--bg);
+  color: var(--fg);
+}
+.chat-stop-btn:hover { background: var(--panel-border); }
+/* #chatMsg keeps id-scoped rhythm: chatMsg() resets its className to settings-msg,
+   so only the id/descendant selector survives. */
+.chat-composer-wrap #chatMsg { margin: 6px 4px 0; font-size: 12px; }
+
+/* ---- Settings modal helpers (system prompt + temperature read stacked) ---- */
 .chat-system { width: 100%; resize: vertical; }
-
-.chat-composer { display: flex; flex-direction: column; gap: 8px; }
-.chat-composer textarea { width: 100%; resize: vertical; }
-.chat-composer-actions { display: flex; gap: 8px; }
-
+.chat-temperature { width: 120px; max-width: 100%; }
 .chat-confirm-text { margin: 0 0 16px; }
 
-/* Tablet: keep the two-panel shell but tighten; below 960px collapse to one
-   full-width column so the session list never fights the thread for width.
-   The real-viewport stacking lives in the SHARED @media (max-width: 960px)
-   block (tests pin exactly one such block); only the simulation hook is here. */
-body[data-device="tablet"] .chat-layout { grid-template-columns: 1fr; }
-body[data-device="tablet"] .chat-sidebar { max-height: 240px; }
-
-/* Phone: single column, no horizontal scroll anywhere. Real-viewport rules
-   live in the SHARED @media (max-width: 600px) block above; only the
-   simulation hook is repeated here so body[data-device="phone"] mirrors it. */
-body[data-device="phone"] .chat-layout { grid-template-columns: 1fr; }
-body[data-device="phone"] .chat-sidebar { max-height: 200px; }
-body[data-device="phone"] .chat-thread { max-height: 46vh; }
-body[data-device="phone"] .chat-title-input { max-width: 100%; }
-body[data-device="phone"] .chat-settings-row .form-input { width: 100%; }
+/* ---- Narrow shells: stack the rail above the reading column as a single
+      full-width column so it never fights the thread for width. Uses ONLY the
+      existing shared @media blocks + the body[data-device] sim hooks (the repo
+      pins exactly one @media (max-width:960px) block). ---- */
+body[data-device="tablet"] .chat-layout,
+body[data-device="tablet"] .chat-layout.is-collapsed,
+body[data-device="phone"] .chat-layout,
+body[data-device="phone"] .chat-layout.is-collapsed {
+  grid-template-columns: 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+body[data-device="tablet"] .chat-rail,
+body[data-device="phone"] .chat-rail {
+  border-right: none;
+  border-bottom: 1px solid var(--panel-border);
+  max-height: 220px;
+}
+body[data-device="phone"] .chat-rail { max-height: 180px; }
+body[data-device="phone"] .chat-thread { gap: 18px; }
+body[data-device="phone"] .chat-msg-user { max-width: 88%; }
+body[data-device="phone"] .chat-model-pill { max-width: 100%; }

@@ -822,3 +822,9 @@ Lembar fakta A/B/C tanggal 2026-09-08 **sebagian basi**. Yang sudah diverifikasi
 - VERIFIKASI MANDIRI PM: test_admin_restart 5/5, backend 235f/324p/42e (nol regresi baru, +5), vitest 737 hijau, parity 494, diff-check bersih.
 - PELAJARAN SESI: be-dev spawn awal balikin receipt KOSONG & bug (gerbang dev_mode TIDAK tersambung → OFF pun bisa restart, 2 tes gagal). PM TIDAK percaya klaim → jalankan tes → tangkap bug → spawn ulang dgn instruksi persis → fix. Agent (dan tool resume) bisa balas kosong; gerbang tes = kebenaran.
 - Status: commit lokal (feature+docs). push/PR/merge TAHAN. G3: user restart + uji nyata tombol.
+
+- 2026-09-16 — BUG-260916-1 (UI chat berantakan) SELESAI kode: fe-dev rapikan layout + system-prompt/temp→popup dialog + model-switch in-chat + auto-title + sidebar collapse; be-dev tambah field `model` ke SessionUpdate (persist switch). Gerbang PM: FE 750/750, BE chat 14/14, cache-buster 20260930. TAHAN commit; G3 user uji browser.
+
+- 2026-09-16 — BUG-260916-1 RONDE-2 FULL REDESIGN (user tolak ronde-1, minta "redesign aja"): fe-dev bongkar tampilan chat ala Gemini (rail collapse + kolom baca terpusat + pesan dokumen + composer membulat; banner/card dihapus). Gerbang PM: vitest 757 passed, cache-buster 20261001, server live udah saji markup baru (UI tak perlu restart, hard-refresh cukup). TAHAN commit. G3 OPEN: user nilai visual; kalau kurang → round-3 dgn screenshot/detail.
+
+- 2026-09-16 — BUG-260916-1 RONDE-3 (New-chat ala Gemini, tanpa dialog): hapus #chatNewModal + prompt judul; #chatNewBtn = draft langsung; model switcher pindah ke composer (.chat-composer-model); kirim-pertama create+set model+auto-title; tanpa model = inline hint. Spawn pertama kepotong (app.js rusak, 3 tes fail) → PM tangkap di gerbang, resume fe-dev. Gerbang PM: vitest 757 passed, cache-buster 20261002, server live serve versi final (hard-refresh cukup). TAHAN commit. G3 user nilai.

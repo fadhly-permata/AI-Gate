@@ -1,5 +1,64 @@
 # Code Changes Register (code ↔ docs alignment)
 
+## 2026-09-16 — BUG-260916-1 RONDE-3: New-chat flow ala Gemini (tanpa dialog) (PM → fe-dev) — DONE (BELUM di-commit)
+
+**Asal:** user: "new chat kenapa masih pake dialog title dan pilih model segala? ... bisa langsung pilih model di deket teksboks chat". PM verifikasi kontrak (create_session boleh tanpa model; complete 400 no_model kalau chat.model kosong).
+
+### Perubahan per berkas
+- `src/frontend/static/index.html` (fe-dev): `#chatNewModal` (judul+model) DIHAPUS; `#chatModelSwitch`/`#chatModelSwitchList` dipindah dari `.chat-bar` ke `.chat-composer-model` (deket kotak ketik). Cache-buster → `20261002`.
+- `src/frontend/static/app.js` (fe-dev): `openNewChatModal`/`setChatNewMsg`/`chatNewCreate`/`chatNewCancel` listener DIHAPUS (sisa 0); `#chatNewBtn` → `openNewChat` draft langsung (tanpa modal/judul); first-send create session + set model + auto-title; tanpa model → inline hint `#chatMsg` (`chat.model_required`). Reuse `commitModelSwitch`/`wireModelSwitch` + `createCombobox`.
+- `src/frontend/static/styles.css` (fe-dev): style `.chat-composer-model` + pill inline (nest di blok @media existing).
+- `src/frontend/tests/chat.test.js` (fe-dev): rework 2 tes `new chat flow` (modal → draft + switcher di composer, no modal); tes struktur Gemini diupdate (switcher di composer); in-chat switcher tetap PUT `{model}`.
+
+### Gerbang PM (bukti)
+- vitest **757 passed** (chat 42/42), 0 regresi. `node --check` bersih. `grep chatNewModal|chatNewCreate|chatNewCancel|openNewChatModal` di app.js = 0. `@media (max-width:960px)` real block tetap 1. Cache-buster lockstep `app.js`/`styles.css`/`i18n.js`/`V` = `20261002`. curl live server: tanpa `chatNewModal`, ada `chat-composer-model` → UI cukup hard-refresh (gak perlu restart server).
+
+### Commit
+- **TAHAN** (D1). G3: user hard-refresh & coba New chat (langsung ngetik + pilih model inline).
+
+---
+
+## 2026-09-16 — BUG-260916-1 RONDE-2: BONGKAR TOTAL tampilan Chat (PM → fe-dev) — DONE (BELUM di-commit)
+
+**Asal:** ronde-1 user tolak ("masih aneh dan berantakan" + "semuanya gak suka gua, redesign aja"). PM diagnosa: server live SUDAH serve ronde-1 (curl ok) → "gak ada efek" = cache browser + ronde-1 cuma relokasi kontrol. PM kunci acuan Gemini + batasan (ID ditest utuh; jangan nambah blok @media 960; reuse token/createCombobox; cache-buster lockstep).
+
+### Perubahan per berkas
+- `src/frontend/static/index.html` (fe-dev): `data-view="chat` ditulis ulang (946–1042) → `.chat-layout#chatLayout` = `.chat-rail#chatSidebar` (collapse 230↔56px) + `.chat-main` kolom baca ~820px; banner + `.card` chrome DIHAPUS; `.chat-bar` (model pill + ghost gear/rename/delete); `.chat-title-wrap` (judul borderless readonly); `.chat-scroll>.chat-thread#chatThread`; `.chat-composer-wrap>.chat-composer`. `#chatSettingsModal` + `#chatSettingsCancel`. Cache-buster → `20261001`.
+- `src/frontend/static/styles.css` (fe-dev): token `--chat-user-bg` (#f1f3f4 light / #2f353c dark) di `:root`+`[data-theme=dark]`; section chat (2436–2823) DIGANTI penuh (rail, active tint color-mix, pill, thread dokumen line-height 1.6, composer radius 24px, hook responsive `body[data-device]`); chat rule nest di blok @media EKSISTING (block 960 real tetap 1).
+- `src/frontend/static/app.js` (fe-dev): `autoGrowComposer`; empty-state `loadChat`/`confirmDeleteSession`; wire `#chatSettingsCancel`; input listener composer. Export tes dipertahankan.
+- `src/frontend/static/i18n/*.js` (fe-dev): key `page_desc.chat` jadi unused (parity dipertahankan).
+- `src/frontend/tests/chat.test.js` (fe-dev): +7 tes struktur Gemini-like (pill, ghost actions, composer satu permukaan, bubble user vs teks assistant, empty-state ramah, Cancel settings). 13 tes ronde-1 dipertahankan.
+
+### Gerbang PM (bukti)
+- vitest **757 passed** (chat 42 / views 30 / i18n 36), 0 regresi. `node --check` bersih. `@media (max-width:960px)` real block = 1; `#sidebarToggle{` = 2. Cache-buster lockstep `app.js`/`styles.css`/`i18n.js`/`V` = `20261001`. curl live server saji markup baru (chatLayout/chat-rail/chat-composer-wrap) → UI TAK butuh restart server (cukup hard-refresh).
+
+### Commit
+- **TAHAN** (D1). G3: user hard-refresh & nilai visual — PM gak bisa render (Playwright unsupported android).
+
+---
+
+## 2026-09-16 — BUG-260916-1 perapihan UI Chat (PM → fe-dev + be-dev) — DONE (BELUM di-commit)
+
+**Asal:** `/log-bug` user (judul "halaman chat desainnya berantakan banget" + detail 4 usulan UI, acuan Gemini) → user "oke, kerjain". Sequential (semua poin nempel file FE yang sama → FORCED sequential per parallel-sequential.md).
+
+### Perubahan per berkas
+- `src/frontend/static/index.html` (fe-dev): block `#chatSettings` inline DIHAPUS; +`#chatSidebarToggle` (chevron, sidebar header); +switcher model `#chatModelSwitch`/`#chatModelSwitchList` di `.chat-bar-actions`; +`#chatSettingsBtn` (gear); `#chatTitleInput` jadi `readonly`; +modal `#chatSettingsModal`. Cache-buster `V`/`i18n.js`/`app.js`/`styles.css` → `20260930`.
+- `src/frontend/static/app.js` (fe-dev): `chatState` +`titleAuto`,`firstUserMessage`; helper `renderChatTarget`/`deriveAutoTitle`/`autoTitleIfNeeded`/`isAutoTitleCandidate`; sidebar collapse (`applySidebarCollapse`/`toggleSidebar`/`isSidebarCollapsed`, localStorage `aigate.chat.sidebarCollapsed`); `renderSession` rewrite; `chatInChatModelCtl`/`commitModelSwitch`/`wireModelSwitch` (reuse `createCombobox`, PUT `{model}`); `openChatSettings`; hook auto-title di `sendChatMessage`; +`_test` exports.
+- `src/frontend/static/styles.css` (fe-dev): blok redesign (rail collapse `@media (min-width:961px)`, readonly-title, sizing switcher); rule `.chat-settings` mati DIHAPUS.
+- `src/frontend/static/i18n/{en,id,zh,zh-tw,ja,ru,hi,nl}.js` (fe-dev): +7 key (`chat.settings`, `chat.settings_title`, `chat.model_switch`, `chat.model_switched`, `chat.model_switch_error`, `chat.collapse`, `chat.expand`); `id.js` Indonesia, lainnya mirror EN (parity hijau).
+- `src/backend/chat_router.py` (be-dev): `SessionUpdate` +`model: Optional[str]=None` (line 88) — tanpa ini PUT `{model}` di-drop (Extra.ignore) → pergantian model gak persist. Docstring + route-table comment diupdate.
+- `src/frontend/tests/chat.test.js` (fe-dev): +13 tes (settings dialog open/save/ESC, model switch persist, auto-title derivation + single-fire + manual-rename disable, sidebar collapse + localStorage).
+- `tests/backend/test_chat_router.py` (be-dev): +2 tes (`test_update_session_patches_model_and_persists`, `test_update_session_without_model_keeps_existing`).
+
+### Gerbang PM (bukti, F3/H5)
+- FE vitest **750/750** hijau (chat **35/35**), tanpa regresi; parity i18n (suite penuh) hijau.
+- BE pytest chat **14 passed**. `node --check` app.js + i18n en/id bersih.
+- Cache-buster lockstep terverifikasi: `styles.css?v=20260930`, `app.js?v=20260930`, `i18n.js?v=20260930`, head `V="20260930"`.
+
+### Commit
+- **TAHAN** — user belum minta commit (D1/H1). Siap commit per-fitur kalau user bilang.
+- G3: belum diuji nyata di browser — perlu user restart/refresh lalu cek (model switch reload, auto-title, collapse).
+
 ## 2026-09-14 — Tulis ulang 6 halaman wiki (PM → public-writer) — DONE (DI-COMMIT e5a376c + docs(pm), branch docs/wiki, DI-PUSH, DI-PUBLISH ke wiki GitHub)
 
 **Asal:** user: "tulis ulang dokumen wiki dengan menggunakan spesialis agent yang baru" (ronde lalu) →
